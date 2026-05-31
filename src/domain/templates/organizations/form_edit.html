@@ -3,7 +3,7 @@
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
-{% block content %}
+{% block form_content %}
   <form hx-patch="{{ entity_url('organization', id=organization.id) }}">
     <fieldset>
       <legend>Identity</legend>

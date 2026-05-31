@@ -184,13 +184,13 @@ emitted attribute string. #}
   {{ text_field(name, label, current=current, required=required, help=help, invalid=invalid, error=error, type="url") }}
 {%- endmacro %}
 {# ---- selects ------------------------------------------------------- #}
-{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None, error=None) -%}
+{% macro select_field(name, label, options, labels=None, current=None, required=True, placeholder=False, help=None, invalid=None, error=None, hidden=False) -%}
   {%- set _form_errors = form_errors|default({}, true) -%}
   {%- set _form_values = form_values|default({}, true) -%}
   {%- set error = error if error is not none else _form_errors.get(name) -%}
   {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
-  <label class="form-field" for="{{ name }}">
+  <label class="form-field" for="{{ name }}"{% if hidden %} hidden{% endif %}>
     <span class="form-field-label">{{ _field_label(label, required) }}</span>
     <select id="{{ name }}"
             name="{{ name }}"
@@ -368,39 +368,3 @@ emitted attribute string. #}
    list on edit). The form using this macro must also declare
    `data-array-fields="<name> ..."` so a 0-checked grid still posts an
    empty array. #}
-{# `time_grid_field` is `required=False` by default — every existing
-   usage treats "no checkboxes selected" as a legitimate state. Callers
-   that need a non-empty selection can pass `required=True` (no caller
-   today). #}
-{% macro time_grid_field(name, label, current=None, required=False, help=None) -%}
-  {%- set selected = current or [] -%}
-  <fieldset class="form-field">
-    <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
-    <table>
-      <thead>
-        <tr>
-          <th></th>
-          {%- for part in DESIRED_TIME_PARTS %}<th scope="col">{{ DESIRED_TIME_PART_LABELS[part] }}</th>{%- endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {%- for day in DESIRED_TIME_DAYS %}
-          <tr>
-            <th scope="row">{{ DESIRED_TIME_DAY_SHORT_LABELS[day] }}</th>
-            {%- for part in DESIRED_TIME_PARTS %}
-              {%- set token = day ~ "_" ~ part -%}
-              <td>
-                <input type="checkbox"
-                       name="{{ name }}"
-                       value="{{ token }}"
-                       {% if token in selected %}checked{% endif %}
-                       aria-label="{{ DESIRED_TIME_DAY_LABELS[day] }} {{ DESIRED_TIME_PART_LABELS[part] }}" />
-              </td>
-            {%- endfor %}
-          </tr>
-        {%- endfor %}
-      </tbody>
-    </table>
-    {{- _help_small(name, help) }}
-  </fieldset>
-{%- endmacro %}

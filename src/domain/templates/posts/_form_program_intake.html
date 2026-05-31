@@ -18,7 +18,7 @@ The wrapper templates `posts/new_program_intake.html` /
 when `current_user.programs` is empty, so this macro always renders
 with at least one Program available.
 #}
-{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for, form_section -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, field_for, form_section -%}
 {%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro intake_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
@@ -52,7 +52,7 @@ with at least one Program available.
       {{ field_for(schema, "website", "Website", current=d.website if d else None) }}
     {% endcall %}
     {% call form_section("Availability") %}
-      {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
+      {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
       {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
     {% endcall %}
     {% call form_section("Featured services") %}

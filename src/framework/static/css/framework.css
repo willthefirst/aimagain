@@ -113,14 +113,19 @@ dd { margin: 0; }
   dt { margin-bottom: 0.125rem; }
 }
 /* Form-field layout — the form-side mirror of the `<dl>` grid
-   above. The key trick is **subgrid**: the parent `<form>` (and
-   every `<fieldset>` inside it) declares a 2-column grid track
-   once (`max-content 1fr`), and every `.form-field` row uses
-   `grid-template-columns: subgrid` to inherit those tracks. That
-   makes the label column the SAME width across every row in the
-   form — including across fieldset boundaries — instead of each
-   row sizing to its own label independently (the previous bug
-   where labels didn't align).
+   above. The key trick is **subgrid**: the parent `<form>` declares
+   a 2-column grid track once (`max-content 1fr`), and every
+   `.form-field` row uses `grid-template-columns: subgrid` to inherit
+   those tracks. That makes the label column the SAME width across
+   every row in the form — including across fieldset boundaries —
+   instead of each row sizing to its own label independently.
+
+   Fieldsets use `display: contents` so their children participate
+   directly in the form's grid rather than establishing a new grid
+   layer. Chrome does not propagate subgrid tracks through a
+   fieldset-as-grid-container, so the intermediate layer must be
+   collapsed. Legends inside fieldsets get `grid-column: 1 / -1` so
+   they span the full form width as visual section headers.
 
    Markup contract (emitted by `_shared/form_fields.html` macros):
 
@@ -130,7 +135,7 @@ dd { margin: 0; }
        <small id="x-helper">helper</small>     {# optional #}
      </label>
 
-   Fieldset-shaped fields (radio_bool_field, time_grid_field)
+   Fieldset-shaped fields (radio_bool_field)
    use the same class on `<fieldset>` with the label in
    `<legend class="form-field-label">` and the controls wrapped
    in `<div class="form-field-control">`.
@@ -144,24 +149,26 @@ dd { margin: 0; }
    Scoped to `.entity-form-page` so search forms, auth forms,
    and any other `<form>` outside the entity create/edit chrome
    keep their existing flow. */
-.entity-form-page form,
-.entity-form-page form > fieldset {
+.entity-form-page form {
   display: grid;
   grid-template-columns: max-content 1fr;
   column-gap: 0.75rem;
   row-gap: var(--pico-spacing);
   align-items: baseline;
 }
-/* Fieldsets participate in the form's grid (subgrid) so labels
-   inside align with labels at the form's top level. Reset
-   Pico's fieldset chrome — these are logical groups, not visual
-   frames. */
+/* Fieldsets collapse out of the layout so their children (labels,
+   legends) become direct form grid items. This lets `.form-field`
+   subgrid from the form rather than from an intermediate fieldset
+   layer — Chrome doesn't propagate subgrid tracks through
+   fieldset-as-grid-container. */
 .entity-form-page form > fieldset {
-  grid-template-columns: subgrid;
+  display: contents;
+}
+/* Legend becomes a full-width section header in the form grid. */
+.entity-form-page form > fieldset > legend {
   grid-column: 1 / -1;
-  border: 0;
-  padding: 0;
-  margin: 0;
+  font-weight: 600;
+  margin-block-start: var(--pico-spacing);
 }
 /* Every direct child of the form/fieldset that ISN'T a
    `.form-field` spans both columns of the parent grid: legends,
@@ -255,8 +262,7 @@ dd { margin: 0; }
   gap: 0.25rem;
 }
 @media (max-width: 640px) {
-  .entity-form-page form,
-  .entity-form-page form > fieldset {
+  .entity-form-page form {
     grid-template-columns: 1fr;
   }
   .entity-form-page form .form-field > small,
@@ -414,10 +420,8 @@ td > menu > li > [role="button"] {
   .form-actions { flex-direction: column; align-items: stretch; }
   .form-actions > .form-actions-destructive { margin-left: 0; }
 }
-/* Pico's `<fieldset>` carries a top margin that visually competes
-   with the cap above — flatten the rhythm so siblings sit at a
-   consistent gap inside the capped form. */
-.entity-form-page form > fieldset { margin-block-start: var(--pico-spacing); }
+/* (fieldset margin-block-start removed — fieldsets use display:contents
+   and ignore box-model properties; spacing is on legend instead.) */
 /* Search-page multi-choice filters render as a `<fieldset>` of
    single-click checkboxes (replacing the previous native
    `<select multiple>` listbox — #583). The default layout is one

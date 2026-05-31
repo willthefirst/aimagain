@@ -9,6 +9,6 @@
 {% set view = post_card_view(post) %}
 {% block resource_label %}Posts{% endblock %}
 {% block current_label %}{{ view.headline or 'Referral' }}{% endblock %}
-{% block content %}
+{% block form_content %}
   {{ referral_form("patch", entity_url('post', id=post.id) , "Save changes", post=post, schema=referral_create_schema, cancel_url=entity_url('post', id=post.id)) }}
 {% endblock %}

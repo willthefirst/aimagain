@@ -37,9 +37,9 @@
              id="solo_practice"
              name="solo_practice"
              value="true"
-             onchange=" var orgRow = document.getElementById('org-row'); var orgSel = orgRow.querySelector('select'); orgRow.hidden = this.checked; orgSel.required = !this.checked; " />
+             onchange="var f=document.getElementById('org_id').closest('.form-field');f.hidden=this.checked;f.querySelector('select').required=!this.checked;" />
     </label>
-    <div id="org-row">{{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help() ) }}</div>
+    {{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help() ) }}
     {{ field_for(schema, "location_city", "City") }}
     {{ field_for(schema, "location_state", "State") }}
     {{ field_for(schema, "location_zip", "ZIP") }}

@@ -6,7 +6,7 @@
    silently no-ops. #}
 {% from "posts/_form_referral.html" import referral_form with context %}
 {% block resource_label %}Posts{% endblock %}
-{% block content %}
+{% block form_content %}
   {% if not current_user.clinicians %}
     {% include "posts/_shared/_require_clinician_profile.html" %}
   {% else %}

@@ -13,7 +13,7 @@ better. The H1 on the kind-specific form page still funnels through
 #}
 {% extends "views/form_new.html" %}
 {% block resource_label %}Posts{% endblock %}
-{% block content %}
+{% block form_content %}
   <a href="{{ entity_form_url("post") }}?kind=referral">
     <hgroup>
       <h2>Referral</h2>
