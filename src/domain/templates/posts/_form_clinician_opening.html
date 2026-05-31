@@ -22,7 +22,7 @@ to the clinician-create flow when `current_user.clinicians` is empty.
    the top of `_shared/form_fields.html`). No per-field error or value
    threading is required at the callsite; explicit overrides still win
    if a future caller needs them. #}
-{%- from "_shared/form_fields.html" import entity_select_field, text_field, textarea_field, select_field, multi_select_field, field_for, form_section with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section with context -%}
 {%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
@@ -45,30 +45,17 @@ to the clinician-create flow when `current_user.clinicians` is empty.
      (clinician × org practice-role rows); the dropdown labels each
      option by the affiliation's org name so a clinician who works at
      two practices sees both options. Each option's value is the
-     clinician id; the label comes from the affiliation's org. Hand-
-     written rather than via `entity_select_field` because the option
-     label is sourced from a nested `affiliations` loop, not a flat
-     attribute on the clinician — mirrors `_form_referral.html`'s
-     referring_clinician_id picker. The `.form-field` + `.form-field-label`
-     wrapper slots it into the canonical 2-column grid. #}
-    {%- set _cid_fv = (form_values|default({})).get('clinician_id') -%}
-    <label class="form-field" for="clinician_id">
-      <span class="form-field-label">Which practice?</span>
-      <select id="clinician_id" name="clinician_id" required>
-        {%- for c in current_user.clinicians %}
-          {%- set outer_first = loop.first %}
-          {%- for aff in c.affiliations %}
-            {%- set is_fv_match = _cid_fv and _cid_fv|string == c.id|string and loop.first -%}
-            {%- set is_edit_match = not _cid_fv and d and d.clinician_id == c.id and loop.first -%}
-            {%- set is_create_default = not _cid_fv and not d and outer_first and loop.first -%}
-            <option value="{{ c.id }}"
-                    {% if is_fv_match or is_edit_match or is_create_default %}selected{% endif %}>
-              {{ aff.org.name }}
-            </option>
-          {%- endfor %}
-        {%- endfor %}
-      </select>
-    </label>
+     clinician id; the label comes from the affiliation's org. Uses
+     `composite_select_field` because the label is sourced from a
+     nested `affiliations` loop, not a flat attribute on the clinician
+     — mirrors `_form_referral.html`'s referring_clinician_id picker. #}
+    {%- set _practices = namespace(opts=[]) -%}
+    {%- for c in current_user.clinicians -%}
+      {%- for aff in c.affiliations -%}
+        {%- set _practices.opts = _practices.opts + [(c.id, aff.org.name)] -%}
+      {%- endfor -%}
+    {%- endfor -%}
+    {{ composite_select_field("clinician_id", "Which practice?", _practices.opts, current=d.clinician_id if d else None, default_first=true) }}
     {# About: free-text core fields — description / referral / website. #}
     {% call form_section("About") %}
       {{ field_for(schema, "description", "Description", current=d.description if d else None) }}

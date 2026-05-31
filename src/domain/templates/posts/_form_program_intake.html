@@ -18,7 +18,7 @@ The wrapper templates `posts/new_program_intake.html` /
 when `current_user.programs` is empty, so this macro always renders
 with at least one Program available.
 #}
-{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, field_for, form_section with context -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section with context -%}
 {%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro intake_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
@@ -26,27 +26,16 @@ with at least one Program available.
   <form hx-{{ hx_method }}="{{ action }}">
     <input type="hidden" name="kind" value="program_intake" />
     {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
-    {# Program picker — hand-written rather than via `entity_select_field`
-     because the option label is a composite "<Program> · <Org>" derived
-     from `p.organization.name`, not a flat attribute on `p`. The
-     `.form-field` + `.form-field-label` wrapper slots it into the
-     canonical 2-column grid; mirrors the picker pattern in
-     `_form_referral.html` / `_form_clinician_opening.html`. #}
-    {%- set _pid_fv = (form_values|default({})).get('program_id') -%}
-    <label class="form-field" for="program_id">
-      <span class="form-field-label">Which program?</span>
-      <select id="program_id" name="program_id" required>
-        {%- if not _pid_fv and not d %}<option value="" disabled selected>--</option>{%- endif %}
-        {%- for p in current_user.programs %}
-          {%- set is_fv_match = _pid_fv and _pid_fv|string == p.id|string -%}
-          {%- set is_edit_match = not _pid_fv and d and d.program_id == p.id -%}
-          <option value="{{ p.id }}"
-                  {% if is_fv_match or is_edit_match %}selected{% endif %}>
-            {{ p.name }} &middot; {{ p.organization.name }}
-          </option>
-        {%- endfor %}
-      </select>
-    </label>
+    {# Program picker — uses `composite_select_field` because the
+     option label is a "<Program> · <Org>" composite derived from
+     `p.organization.name`, not a flat attribute on `p`. Mirrors the
+     picker pattern in `_form_referral.html` /
+     `_form_clinician_opening.html`. #}
+    {%- set _programs = namespace(opts=[]) -%}
+    {%- for p in current_user.programs -%}
+      {%- set _programs.opts = _programs.opts + [(p.id, p.name ~ ' · ' ~ p.organization.name)] -%}
+    {%- endfor -%}
+    {{ composite_select_field("program_id", "Which program?", _programs.opts, current=d.program_id if d else None) }}
     {# About: free-text core fields — description / referral / website. #}
     {% call form_section("About") %}
       {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
