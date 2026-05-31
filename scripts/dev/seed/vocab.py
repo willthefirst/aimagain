@@ -694,6 +694,11 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
         # audit rows.
         "resource_type",
         "action",
+        # Org's cached NPPES "Authorized Official" name (free text from
+        # NPPES). Seed data doesn't simulate NPPES so a placeholder
+        # value here is meaningless — the column is only populated by
+        # `run_org_verification` against real NPPES responses.
+        "authorized_official_name",
     }
 )
 

@@ -458,6 +458,41 @@ class VerificationStatus(LabeledChoice):
 VERIFICATION_STATUSES: Final[tuple[str, ...]] = VerificationStatus.values()
 
 
+# NPPES name-match state for an NPI on a `Clinician` (Type-1) or
+# `Organization` (Type-2). `none` — no NPI submitted yet; `pending` — the
+# row carries an NPI and a worker has yet to resolve it; `matched` — the
+# NPPES legal name (or org name + Authorized Official for Type-2) clears
+# the similarity threshold; `mismatch` — final state after admin review
+# rejects a soft mismatch. Per handoff §10.1, NPPES soft mismatches stay
+# `pending` until an admin closes them — they never auto-flip to
+# `mismatch`. The icons are Lucide names rendered by the chrome's claim
+# badges.
+class NpiMatchStatus(LabeledChoice):
+    none = "none", "Not submitted", "circle-dashed"
+    pending = "pending", "Verifying…", "loader"
+    matched = "matched", "Matched", "shield-check"
+    mismatch = "mismatch", "Mismatch — in review", "shield-alert"
+
+
+NPI_MATCH_STATUSES: Final[tuple[str, ...]] = NpiMatchStatus.values()
+NPI_MATCH_STATUS_LABELS: Final[dict[str, str]] = NpiMatchStatus.labels()
+
+
+# Computed-and-stored status of a `ClinicianLicensure`. Derived on write
+# from `expiration_date` and `attested_active` (see Phase 8's nightly
+# expiry worker) and persisted for query-speed reasons: list views and
+# the directory-listing filter both restrict on "has an active license"
+# without recomputing per row.
+class LicenseStatus(LabeledChoice):
+    active = "active", "Active", "check"
+    expired = "expired", "Expired", "x-circle"
+    pending = "pending", "Pending", "loader"
+
+
+LICENSE_STATUSES: Final[tuple[str, ...]] = LicenseStatus.values()
+LICENSE_STATUS_LABELS: Final[dict[str, str]] = LicenseStatus.labels()
+
+
 def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     """SQL fragment for a `column IN (...)` CHECK constraint, rendered
     from a tuple. Used by per-kind detail tables so the DB-level
