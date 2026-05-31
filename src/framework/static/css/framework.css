@@ -16,6 +16,16 @@ html { scrollbar-gutter: stable; }
   --pico-font-size-h3: 1.125rem;
   --pico-font-size-h4: 1rem;
 }
+/* Entity list — <ul class="entity-list"> wraps every list of entity
+   cards. Resets remove browser list chrome while keeping the <ul>/<li>
+   in the accessibility tree so screen readers announce "list of N items".
+   Each <li> contains one <article class="entity-card">. */
+ul.entity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+ul.entity-list > li { padding: 0; }
 /* Card chrome (background, border, padding, rounded corners,
    tinted header/footer bands) is reserved for items inside a
    possible list of items — post-list cards, the per-affiliation
