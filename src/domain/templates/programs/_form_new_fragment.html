@@ -11,7 +11,7 @@
    `with context` lets the form-field macros auto-resolve `error=` /
    `current=` from the `form_errors` / `form_values` injected into
    the render context by `mount_create` on a 422. #}
-{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field, form_section with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, checkbox_field, text_field, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -32,7 +32,7 @@
     {{ text_field("end_date", "End date", required=false, type="date") }}
   {% endcall %}
   {% call form_section("Intake") %}
-    {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
+    {{ checkbox_field("accepting_referrals", "Currently accepting referrals", current=true) }}
   {% endcall %}
   {{ actions(entity_create_label('program') , cancel_url=entity_url('program')) }}
 {% endcall %}

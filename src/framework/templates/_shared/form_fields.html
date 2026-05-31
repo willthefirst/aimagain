@@ -336,36 +336,67 @@ emitted attribute string. #}
       {{- _help_small(name, help, error) }}
     </label>
   {%- endmacro %}
-  {# ---- radio groups ------------------------------------------------- #}
-  {# Yes / No radio pair. `<fieldset>` + `<legend>` is the accessible
-   substitute for `<label>` when one logical question owns multiple
-   inputs. Each radio carries `aria-describedby` so screen readers
-   announce the helper text on either selection. #}
-  {% macro radio_bool_field(name, label, current=None, required=True, help=None) -%}
-    <fieldset class="form-field">
-      <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
-      <div class="form-field-control">
-        <label class="form-field-inline">
-          <input type="radio"
-                 name="{{ name }}"
-                 value="true"
-                 {% if current is sameas true %}checked{% endif %}
-                 {% if required %}required{% endif %}
-                 {% if help %}aria-describedby="{{ name }}-helper"{% endif %} />
-          Yes
-        </label>
-        <label class="form-field-inline">
-          <input type="radio"
-                 name="{{ name }}"
-                 value="false"
-                 {% if current is sameas false %}checked{% endif %}
-                 {% if required %}required{% endif %}
-                 {% if help %}aria-describedby="{{ name }}-helper"{% endif %} />
-          No
-        </label>
-        {{- _help_small(name, help) }}
-      </div>
-    </fieldset>
+  {# ---- checkbox ----------------------------------------------------- #}
+  {# Single boolean checkbox as a normal form-grid row. The label sits in
+   column 1 and the `<input type="checkbox">` sits in column 2 — same
+   markup shape as every other macro (`<label class="form-field">` with
+   a `<span class="form-field-label">` child), so the row aligns with
+   text/select fields without any special CSS.
+
+   ## The hidden-input Rails pattern
+
+   A bare `<input type="checkbox">` submits nothing when unchecked —
+   problematic for default-true booleans (`accepts_out_of_network`),
+   where "unchecked" must round-trip as `false` rather than fall back
+   to the schema's `True` default. The macro emits a sibling
+   `<input type="hidden" name="<name>" value="false">` **before** the
+   checkbox so the negative value is always on the wire; the
+   checkbox's `value="true"` overrides it (in document order) when the
+   user checks the box.
+
+   `parse_form_to_payload` collapses the resulting
+   `["false"]` / `["false", "true"]` list into the last value as a
+   scalar (see `src/framework/http/forms.py`). Pydantic's `bool`
+   validator then accepts the resulting `"true"`/`"false"` string the
+   same way it accepts a single-value checkbox post.
+
+   ## current=
+
+   Accepts `True`, `False`, the literal strings `"true"`/`"false"`
+   (the shape `form_values` carries on a validation-failure
+   re-render), or any other truthy/falsy value. The render-time
+   check is a plain truthiness test so all four spellings work
+   uniformly.
+
+   ## required=
+
+   Defaults to `False` because every checkbox in the codebase today
+   is a feature flag where "unchecked" is a meaningful answer. Pass
+   `required=True` for the rare HTML-required-checkbox case
+   (terms-of-service acceptance, etc.) — the rendered input gets the
+   `required` attr; the hidden sibling still ships so unchecked
+   submits fail client-side validation rather than silently posting
+   `false`. #}
+  {% macro checkbox_field(name, label, current=False, required=False, help=None, invalid=None, error=None) -%}
+    {%- set _form_errors = form_errors|default({}, true) -%}
+    {%- set _form_values = form_values|default({}, true) -%}
+    {%- set error = error if error is not none else _form_errors.get(name) -%}
+    {%- set current = _form_values[name] if name in _form_values else current -%}
+    {%- set is_checked = current in (true, "true", "True", "on", 1, "1") -%}
+    {%- set aria_invalid = true if error else invalid -%}
+    <label class="form-field" for="{{ name }}">
+      <span class="form-field-label">{{ _field_label(label, required) }}</span>
+      <input type="hidden" name="{{ name }}" value="false" />
+      <input type="checkbox"
+             id="{{ name }}"
+             name="{{ name }}"
+             value="true"
+             {% if is_checked %}checked{% endif %}
+             {% if required %}required{% endif %}
+             {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+             {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %} />
+      {{- _help_small(name, help, error) }}
+    </label>
   {%- endmacro %}
   {# ---- schema-driven dispatch --------------------------------------- #}
   {# Reads `field_spec(schema, name)` and delegates to the right inner

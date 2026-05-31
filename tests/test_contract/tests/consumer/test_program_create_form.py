@@ -62,8 +62,12 @@ async def test_consumer_program_create_form_submits(
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
     # DOM-order field serialization. Blank optional inputs serialize
-    # as `<name>=`; the radio `accepting_referrals` is pre-checked at
-    # "true" by the template (`current=true`).
+    # as `<name>=`; the `accepting_referrals` checkbox is pre-checked
+    # by the template (`current=true`). `checkbox_field` emits a
+    # sibling `<input type="hidden" value="false">` before the
+    # checkbox so default-true booleans round-trip — checked submits
+    # both, the parser collapses to the last value (see
+    # `src/framework/http/forms.py`).
     expected_request_body = (
         f"org_id={STUB_PROGRAM_FORM_ORG_ID}"
         "&name=Intensive+Outpatient"
@@ -71,6 +75,7 @@ async def test_consumer_program_create_form_submits(
         "&state_preference=NY"
         "&start_date="
         "&end_date="
+        "&accepting_referrals=false"
         "&accepting_referrals=true"
     )
 

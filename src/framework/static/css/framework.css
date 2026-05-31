@@ -135,10 +135,11 @@ dd { margin: 0; }
        <small id="x-helper">helper</small>     {# optional #}
      </label>
 
-   Fieldset-shaped fields (radio_bool_field)
-   use the same class on `<fieldset>` with the label in
-   `<legend class="form-field-label">` and the controls wrapped
-   in `<div class="form-field-control">`.
+   Every macro funnels through this shape — including `checkbox_field`,
+   which emits a sibling `<input type="hidden">` immediately before
+   the checkbox itself. The hidden input has `display: none` from the
+   browser default so it doesn't take a grid slot; layout still falls
+   to the label-span (col 1) and the visible checkbox (col 2).
 
    Mobile (≤640px): the parent's grid collapses to a single
    column; subgrids inherit that automatically and the labels

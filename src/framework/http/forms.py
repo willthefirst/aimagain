@@ -18,12 +18,33 @@ async def parse_form_to_payload(request: Request) -> dict:
     (e.g. checkboxes that submit the same name several times), the values
     are returned as a list. A single value is returned as a scalar so
     schemas typed as `str | None` keep working.
+
+    **Checkbox-with-hidden Rails pattern:** the `checkbox_field` macro
+    emits a `<input type="hidden" name="x" value="false">` immediately
+    before the `<input type="checkbox" name="x" value="true">` so that
+    default-true booleans round-trip when the user unchecks the box
+    (the hidden value carries the negative; the checkbox overrides
+    when checked). That produces a list of bool strings on the wire —
+    `["false"]` when unchecked, `["false", "true"]` when checked. When
+    every value in a repeated-key list is exactly `"true"` or
+    `"false"`, last-wins applies and the payload entry becomes the
+    final value as a scalar string — Pydantic's `bool` validator then
+    accepts it like any single-value checkbox post.
+
+    Multi-select fields are unaffected: their controlled-vocabulary
+    options (`"in_person"`, `"morning"`, `"monday_am"`, etc.) never
+    consist solely of `"true"`/`"false"` tokens, so the heuristic
+    doesn't fire on them.
     """
     form_data = await request.form()
     payload: dict = {}
     for key in form_data:
         values = form_data.getlist(key)
-        payload[key] = values if len(values) > 1 else values[0] if values else None
+        if len(values) > 1 and all(v in ("true", "false") for v in values):
+            # Rails checkbox+hidden pattern → last wins as a scalar.
+            payload[key] = values[-1]
+        else:
+            payload[key] = values if len(values) > 1 else values[0] if values else None
     return payload
 
 

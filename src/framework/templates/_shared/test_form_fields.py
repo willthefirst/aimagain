@@ -46,7 +46,7 @@ def _render(env: Environment, body: str) -> str:
     it so tests can stay focused on the macro call under test.
     """
     template = textwrap.dedent(f"""\
-        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, radio_bool_field -%}}
+        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, checkbox_field -%}}
         {body}
         """)
     return env.from_string(template).render()
@@ -401,26 +401,120 @@ def test_optional_marker_renders_inside_form_field_label_span() -> None:
     assert small.text().strip() == "(optional)"
 
 
-# --- radio_bool_field -----------------------------------------------------
+# --- checkbox_field -------------------------------------------------------
 
 
-def test_radio_bool_field_with_help_emits_small_inside_fieldset() -> None:
-    """The bool radios are wrapped in `<fieldset>`+`<legend>` because
-    one logical question owns two controls. Helper text becomes a
-    `<small id="<name>-helper">` child of the `<fieldset>` (after the
-    radios), and *each* radio carries `aria-describedby` so SRs hear
-    the helper on either selection."""
+def test_checkbox_field_emits_hidden_then_checkbox() -> None:
+    """The macro emits a `<input type="hidden" value="false">` sibling
+    immediately before the visible `<input type="checkbox" value="true">`
+    so the default-true Rails pattern round-trips: unchecked ships
+    `false`, checked ships `false` then `true` (last wins at the
+    parser layer — pinned by `src/framework/http/test_forms.py`)."""
     html = _render(
         _make_env(),
-        '{{ radio_bool_field("ok", "OK?", help="Pick one.") }}',
+        '{{ checkbox_field("sliding_scale", "Offers sliding scale") }}',
     )
     tree = HTMLParser(html)
-    fs = tree.css_first("fieldset")
-    radios = fs.css('input[type="radio"]')
-    assert len(radios) == 2
-    for r in radios:
-        assert r.attributes.get("aria-describedby") == "ok-helper"
-    assert fs.css_first("small#ok-helper") is not None
+    label = tree.css_first('label[for="sliding_scale"]')
+    assert label is not None
+    inputs = label.css("input")
+    assert len(inputs) == 2
+    assert inputs[0].attributes.get("type") == "hidden"
+    assert inputs[0].attributes.get("name") == "sliding_scale"
+    assert inputs[0].attributes.get("value") == "false"
+    assert inputs[1].attributes.get("type") == "checkbox"
+    assert inputs[1].attributes.get("name") == "sliding_scale"
+    assert inputs[1].attributes.get("value") == "true"
+
+
+def test_checkbox_field_current_true_renders_checked() -> None:
+    """`current=true` on create — the default for default-true bool
+    fields like `accepts_out_of_network` — pre-checks the visible
+    checkbox so the user sees the schema's natural posture."""
+    html = _render(
+        _make_env(),
+        '{{ checkbox_field("accepts_out_of_network", "Accepts OON", current=true) }}',
+    )
+    tree = HTMLParser(html)
+    checkbox = tree.css_first('input[type="checkbox"][name="accepts_out_of_network"]')
+    assert "checked" in checkbox.attributes
+
+
+def test_checkbox_field_current_false_renders_unchecked() -> None:
+    """Default-false rendering. The hidden sibling still ships so the
+    field is present on the wire even when unchecked."""
+    html = _render(
+        _make_env(),
+        '{{ checkbox_field("sliding_scale", "Sliding scale", current=false) }}',
+    )
+    tree = HTMLParser(html)
+    checkbox = tree.css_first('input[type="checkbox"][name="sliding_scale"]')
+    assert "checked" not in checkbox.attributes
+
+
+def test_checkbox_field_current_string_true_round_trips() -> None:
+    """`form_values` carries the parsed wire shape — string `"true"` /
+    `"false"` rather than Python bools — into the macro context. The
+    truthiness check normalizes both forms so a validation-rerender
+    keeps the user's selection."""
+    env = _make_env()
+    template = (
+        '{%- from "_shared/form_fields.html" import checkbox_field with context -%}'
+        '{{ checkbox_field("x", "X") }}'
+    )
+    html_true = env.from_string(template).render(form_values={"x": "true"})
+    html_false = env.from_string(template).render(form_values={"x": "false"})
+    assert (
+        "checked"
+        in HTMLParser(html_true).css_first('input[type="checkbox"]').attributes
+    )
+    assert (
+        "checked"
+        not in HTMLParser(html_false).css_first('input[type="checkbox"]').attributes
+    )
+
+
+def test_checkbox_field_renders_in_form_field_grid_shape() -> None:
+    """The macro emits the same `<label class="form-field">` +
+    `<span class="form-field-label">` shape as text/select/textarea so
+    the row aligns with neighboring fields under the entity-form-page
+    subgrid CSS without any element-type-specific rule."""
+    html = _render(_make_env(), '{{ checkbox_field("x", "X label") }}')
+    tree = HTMLParser(html)
+    label = tree.css_first("label.form-field")
+    assert label is not None
+    span = label.css_first("span.form-field-label")
+    assert span is not None
+    assert "X label" in span.text()
+
+
+def test_checkbox_field_with_help_emits_small_linked_via_aria() -> None:
+    """`help=` renders a `<small id="<name>-helper">` inside the label
+    and points the checkbox at it via `aria-describedby` — same Pico
+    pattern as every other input macro."""
+    html = _render(
+        _make_env(),
+        '{{ checkbox_field("x", "X", help="Useful note.") }}',
+    )
+    tree = HTMLParser(html)
+    checkbox = tree.css_first('input[type="checkbox"]')
+    assert checkbox.attributes.get("aria-describedby") == "x-helper"
+    small = tree.css_first("small#x-helper")
+    assert small is not None
+    assert "Useful note." in small.text()
+
+
+def test_checkbox_field_required_false_by_default_shows_optional_marker() -> None:
+    """Checkbox fields default to `required=False` because the
+    overwhelming use case is feature flags (where "unchecked" is a
+    meaningful answer). The `(optional)` marker appears in the label
+    accordingly."""
+    html = _render(_make_env(), '{{ checkbox_field("x", "X") }}')
+    tree = HTMLParser(html)
+    span = tree.css_first("span.form-field-label")
+    assert span is not None
+    small = span.css_first("small.form-field-optional")
+    assert small is not None
 
 
 # --- error-state contract (pattern, parametrized over every macro) -------
@@ -452,7 +546,7 @@ def _render_macro(macro_call: str) -> "HTMLParser":
     template = (
         '{%- from "_shared/form_fields.html" import text_field, textarea_field,'
         " url_field, select_field, multi_select_field, entity_select_field,"
-        " composite_select_field, field_for -%}\n"
+        " composite_select_field, checkbox_field, field_for -%}\n"
         f"{macro_call}"
     )
     return HTMLParser(env.from_string(template).render())
@@ -486,6 +580,11 @@ _INPUT_MACROS = [
         "composite_select_field",
         '{{ composite_select_field("x", "X", [("1", "Alpha")], error="bad") }}',
         "select",
+    ),
+    (
+        "checkbox_field",
+        '{{ checkbox_field("x", "X", error="bad") }}',
+        'input[type="checkbox"]',
     ),
 ]
 
@@ -643,7 +742,7 @@ def _render_macro_with_context(macro_call: str, **context: dict) -> "HTMLParser"
     template = (
         '{%- from "_shared/form_fields.html" import text_field, textarea_field,'
         " url_field, select_field, multi_select_field, entity_select_field,"
-        " composite_select_field, field_for with context -%}\n"
+        " composite_select_field, checkbox_field, field_for with context -%}\n"
         f"{macro_call}"
     )
     return HTMLParser(env.from_string(template).render(**context))
@@ -668,6 +767,11 @@ _AUTO_RESOLVE_MACROS = [
         "composite_select_field",
         '{{ composite_select_field("x", "X", [("1", "Alpha")]) }}',
         "select",
+    ),
+    (
+        "checkbox_field",
+        '{{ checkbox_field("x", "X") }}',
+        'input[type="checkbox"]',
     ),
 ]
 
@@ -745,6 +849,15 @@ def _select_selected_check(values: list[str]):
     return check
 
 
+def _checkbox_checked_check(expected: bool):
+    def check(tree: HTMLParser) -> tuple[bool, str]:
+        checkbox = tree.css_first('input[type="checkbox"][name="x"]')
+        actual = "checked" in checkbox.attributes if checkbox else False
+        return actual == expected, f"expected checked={expected}, got {actual}"
+
+    return check
+
+
 _AUTO_RESOLVE_VALUE_CASES = [
     ("text_field", '{{ text_field("x", "X") }}', "typed", _input_value_check("typed")),
     (
@@ -776,6 +889,12 @@ _AUTO_RESOLVE_VALUE_CASES = [
         '{{ composite_select_field("x", "X", [("1", "Alpha")]) }}',
         "1",
         _select_selected_check(["1"]),
+    ),
+    (
+        "checkbox_field",
+        '{{ checkbox_field("x", "X") }}',
+        "true",
+        _checkbox_checked_check(True),
     ),
 ]
 
