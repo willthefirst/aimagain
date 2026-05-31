@@ -83,6 +83,15 @@ def test_add_refuses_uuid_shaped_names(tmp_path: Path, capsys) -> None:
     assert not (repo / ".claude" / "worktrees" / "a3f9c2deadbeef").exists()
 
 
+def test_add_prints_dev_up_hint(tmp_path: Path, capsys) -> None:
+    repo = _init_repo(tmp_path)
+    cmd = WorktreeCommands(_FakeRunner(repo))
+    assert cmd.add("707", base="origin/main") == 0
+    out = capsys.readouterr().out
+    assert "dev up" in out
+    assert str(repo / ".claude" / "worktrees" / "issue-707") in out
+
+
 def test_add_refuses_when_path_exists(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     cmd = WorktreeCommands(_FakeRunner(repo))

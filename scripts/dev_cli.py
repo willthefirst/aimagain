@@ -761,6 +761,8 @@ class WorktreeCommands:
         print(f"✅ Worktree ready: {path}")
         print(f"   Branch: {branch}")
         print(f"   App port: {app_port}  →  http://localhost:{app_port}")
+        print(f"\n   To start the dev server:")
+        print(f"       cd {path} && dev up")
         return 0
 
     def _assign_worktree_port(self) -> int:
