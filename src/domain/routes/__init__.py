@@ -23,6 +23,7 @@ dispatches POST/PATCH bodies by their declared `kind`.
 from . import (
     clinicians,
     favorites,
+    org_representations,
     organizations,
     posts,
     programs,
@@ -32,6 +33,7 @@ from . import (
 __all__ = [
     "clinicians",
     "favorites",
+    "org_representations",
     "organizations",
     "posts",
     "programs",

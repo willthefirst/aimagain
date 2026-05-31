@@ -77,6 +77,14 @@ class AuditAction(str, Enum):
     CREATE_VERIFICATION = "create_verification"
     UPDATE_VERIFICATION = "update_verification"
     DELETE_VERIFICATION = "delete_verification"
+    # `OrgRepresentation` (User↔Org authority) — CRUD via the generic
+    # `mount_entity` factories; `SET_ORG_REPRESENTATION_AUTHORITY` is the
+    # state-axis action an admin invokes to flip `authority_status`
+    # (pending → verified / rejected) without re-PUTing the whole row.
+    CREATE_ORG_REPRESENTATION = "create_org_representation"
+    UPDATE_ORG_REPRESENTATION = "update_org_representation"
+    DELETE_ORG_REPRESENTATION = "delete_org_representation"
+    SET_ORG_REPRESENTATION_AUTHORITY = "set_org_representation_authority"
 
 
 Verb = Literal["create", "update", "delete"]
