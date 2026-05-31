@@ -27,7 +27,10 @@ from src.domain.routes import (
 )
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
-from src.framework.http.middleware import StripEmptyQueryParamsMiddleware
+from src.framework.http.middleware import (
+    StaticNoCacheMiddleware,
+    StripEmptyQueryParamsMiddleware,
+)
 from src.framework.http.responses import APIResponse
 from src.framework.observability import observability
 from src.jobs.scheduler import make_scheduler, register_jobs
@@ -91,6 +94,9 @@ observability.init_app(app)
 # as omitting the param. See `src/framework/http/middleware.py` for the
 # full convention rationale.
 app.add_middleware(StripEmptyQueryParamsMiddleware)
+
+if settings.ENVIRONMENT == "development":
+    app.add_middleware(StaticNoCacheMiddleware)
 
 
 @app.exception_handler(HTTPException)
