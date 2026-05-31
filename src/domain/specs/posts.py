@@ -153,13 +153,13 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         form_edit="posts/form_edit.html",
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
-    # Per-kind FK-ownership check. The dispatcher reads `payload.kind`
-    # and validates the kind-specific FK fields (clinician_opening's
-    # `clinician_id`, program_intake's `program_id`) against the
-    # requesting user's ownership.
-    payload_authz_path=(
-        "src.domain.logic.posts.handlers._assert_post_payload_target_ownership"
-    ),
+    # Per-kind FK-ownership check + Claim-A capability gate. The
+    # dispatcher reads `payload.kind` and validates the kind-specific FK
+    # fields (clinician_opening's `clinician_id`, program_intake's
+    # `program_id`) against the requesting user's ownership, then
+    # enforces the matching claim gate from the two-claim verification
+    # model. See `_assert_post_payload_authz` for the full contract.
+    payload_authz_path="src.domain.logic.posts.handlers._assert_post_payload_authz",
     payload_authz_repos=(
         ("clinician_repo", ClinicianRepository),
         ("program_repo", ProgramRepository),

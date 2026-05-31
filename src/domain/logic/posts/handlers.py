@@ -1,28 +1,31 @@
 """Per-spec hook callables for the `Post` entity.
 
-One callable today — :func:`_assert_post_payload_target_ownership` —
-driven by ``POST_ENTITY.payload_authz_path``. The post entity has no
-bespoke CRUD handlers; this hook plus the spec declaration is the
-entire wire-side authorization surface for posts.
+`_assert_post_payload_authz` is the entry point driven by
+``POST_ENTITY.payload_authz_path``: it layers FK-ownership (the
+submitter must own the cross-entity row the post references) AND the
+capability gate from the two-claim verification model (a referral / a
+clinician-opening requires Claim A; a program-intake requires Claim B
+for the org behind the referenced Program).
 
 Why it dispatches on ``payload.kind``: all three kinds reference a
 cross-entity FK the submitting user must own.
 ``clinician_opening.clinician_id`` and ``program_intake.program_id``
 point at rows the user created; ``referral.referring_clinician_id``
-points at a Clinician the user owns (the referring clinician on a CR
-post must belong to the submitting user). The cleaner long-term shape
-is per-kind authz on :class:`PostKindSpec`; a type-switching dispatcher
-is acceptable while the kind set is small.
+points at a Clinician the user owns. The cleaner long-term shape is
+per-kind authz on :class:`PostKindSpec`; a type-switching dispatcher is
+acceptable while the kind set is small.
 """
 
 import logging
 
 from pydantic import BaseModel
 
+from src.domain.logic import capabilities
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.programs.repository import ProgramRepository
 from src.domain.models import Clinician, Program, User
 from src.framework.authz import assert_fk_ownership
+from src.framework.http.exceptions import ForbiddenError
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,70 @@ _KIND_FK_TARGETS: tuple[tuple[str, str, str, type], ...] = (
 )
 
 
+async def _assert_post_payload_authz(
+    *,
+    payload: BaseModel,
+    requesting_user: User,
+    clinician_repo: ClinicianRepository,
+    program_repo: ProgramRepository,
+) -> None:
+    """`POST_ENTITY.payload_authz_path` target — runs the two
+    payload-time authorization checks in order:
+
+    1. **Ownership** — the per-kind FK on the payload must point at a
+       row the requesting user owns. (Existing rule.)
+    2. **Capability** — the submitter must hold the claim that gates
+       this post-kind:
+
+       - ``referral`` / ``clinician_opening`` → Claim A
+         (`capabilities.clinician_verified(user)`).
+       - ``program_intake`` → Claim B for the referenced Program's org
+         (deferred — the org lookup lands when the Profile Hub PR
+         (Phase 5) wires the program-intake create flow end-to-end).
+
+    Superusers bypass the capability check the same way they bypass
+    ownership — admins act on any row.
+    """
+    await _assert_post_payload_target_ownership(
+        payload=payload,
+        requesting_user=requesting_user,
+        clinician_repo=clinician_repo,
+        program_repo=program_repo,
+    )
+    _assert_post_payload_capability(payload, requesting_user)
+
+
+def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -> None:
+    """Per-kind capability gate. Skips for superusers (admin write
+    rights override the claim-based gate). For `program_intake`, the
+    Claim-B check requires the referenced Program's org id — which is
+    a DB read we don't want to add to this payload-time hook. The
+    Profile Hub PR (Phase 5) introduces the dedicated program-intake
+    create path that takes the org check; this hook stays focused on
+    Claim A."""
+    if getattr(requesting_user, "is_superuser", False):
+        return
+    kind = getattr(payload, "kind", None)
+    if kind == "referral" and not capabilities.can_post_referral(requesting_user):
+        raise ForbiddenError(
+            detail=(
+                "Posting a referral requires a verified clinician profile "
+                "(Claim A). Visit /profile to complete verification."
+            ),
+        )
+    if kind == "clinician_opening" and not capabilities.can_post_opening(
+        requesting_user
+    ):
+        raise ForbiddenError(
+            detail=(
+                "Posting a clinician opening requires a verified clinician "
+                "profile (Claim A). Visit /profile to complete verification."
+            ),
+        )
+    # `program_intake` Claim-B gate is intentionally deferred — see
+    # docstring above.
+
+
 async def _assert_post_payload_target_ownership(
     *,
     payload: BaseModel,
@@ -44,9 +111,8 @@ async def _assert_post_payload_target_ownership(
     clinician_repo: ClinicianRepository,
     program_repo: ProgramRepository,
 ) -> None:
-    """``POST_ENTITY.payload_authz_path`` target — reject a Post
-    create/update whose per-kind FK points at a row the requesting user
-    doesn't own (superusers bypass).
+    """Reject a Post create/update whose per-kind FK points at a row
+    the requesting user doesn't own (superusers bypass).
 
     Dispatches on ``payload.kind`` via :data:`_KIND_FK_TARGETS`:
 
