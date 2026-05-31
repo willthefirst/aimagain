@@ -17,6 +17,7 @@ it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
+{%- from "_shared/_item_list.html" import item_list -%}
 {% extends "base.html" %}
 {% block head %}
   <style>
@@ -27,32 +28,39 @@ it's dev-only chrome that should never ship to production. #}
     gap: 2rem;
     align-items: start;
   }
-  .gallery-nav {
+  .gallery-layout > aside {
     position: sticky;
     top: 1rem;
+    text-align: left;
   }
-  .gallery-nav ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
+  .gallery-nav ul ul { padding-left: 0.5rem; }
   .gallery-nav a {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    display: block;
     text-decoration: none;
     color: var(--pico-muted-color);
   }
   .gallery-nav a:hover { color: var(--pico-color); }
   .gallery-nav .gallery-nav-group {
-    font-size: 0.7rem;
-    font-weight: 600;
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     color: var(--pico-muted-color);
     margin-top: 1rem;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.15rem;
+  }
+  .gallery-nav .gallery-nav-subgroup {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--pico-muted-color);
+    opacity: 0.6;
+    margin-top: 0.4rem;
   }
   .gallery-section {
     border-top: 1px solid var(--pico-muted-border-color);
@@ -103,7 +111,7 @@ it's dev-only chrome that should never ship to production. #}
   .gallery-icon-item i { font-size: 1.1em; color: var(--pico-color); }
   @media (max-width: 640px) {
     .gallery-layout { grid-template-columns: 1fr; }
-    .gallery-nav { position: static; }
+    .gallery-layout > aside { position: static; }
   }
   </style>
 {% endblock %}
@@ -114,70 +122,118 @@ it's dev-only chrome that should never ship to production. #}
 {% block content %}
   <div class="gallery-layout">
     {# ── Sidebar nav ─────────────────────────────────────────────── #}
-    <nav class="gallery-nav" aria-label="Gallery sections">
-      <ul>
-        <li class="gallery-nav-group">Framework</li>
-        <li>
-          <a href="#tokens">Design tokens</a>
-        </li>
-        <li>
-          <a href="#typography">Typography</a>
-        </li>
-        <li>
-          <a href="#icons">Icons</a>
-        </li>
-        <li>
-          <a href="#cards">Cards</a>
-        </li>
-        <li>
-          <a href="#facts">Fact rows</a>
-        </li>
-        <li>
-          <a href="#meta">Meta list</a>
-        </li>
-        <li>
-          <a href="#glyph-list">Glyph list</a>
-        </li>
-        <li>
-          <a href="#forms">Form fields</a>
-        </li>
-        <li>
-          <a href="#form-banner">Form banner</a>
-        </li>
-        <li>
-          <a href="#actions">Actions</a>
-        </li>
-        <li>
-          <a href="#toolbar">Toolbar</a>
-        </li>
-        <li>
-          <a href="#breadcrumb">Breadcrumb</a>
-        </li>
-        <li>
-          <a href="#pagination">Pagination</a>
-        </li>
-        <li>
-          <a href="#checkboxes">Checkboxes</a>
-        </li>
-        <li class="gallery-nav-group">Domain</li>
-        <li>
-          <a href="#type-tags">Type-tag pills</a>
-        </li>
-        <li>
-          <a href="#feed-rows">Feed rows</a>
-        </li>
-        <li>
-          <a href="#credentials">Credential rows</a>
-        </li>
-        <li>
-          <a href="#browse-layout">Browse layout</a>
-        </li>
-      </ul>
-    </nav>
+    <aside>
+      <nav class="gallery-nav" aria-label="Gallery sections">
+        <ul>
+          <li>
+            <span class="gallery-nav-group">Framework</span>
+            <ul>
+              <li>
+                <span class="gallery-nav-subgroup">Foundations</span>
+                <ul>
+                  <li>
+                    <a href="#tokens">Design tokens</a>
+                  </li>
+                  <li>
+                    <a href="#typography">Typography</a>
+                  </li>
+                  <li>
+                    <a href="#icons">Icons</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span class="gallery-nav-subgroup">Content</span>
+                <ul>
+                  <li>
+                    <a href="#cards">Cards</a>
+                  </li>
+                  <li>
+                    <a href="#facts">Fact rows</a>
+                  </li>
+                  <li>
+                    <a href="#meta">Meta list</a>
+                  </li>
+                  <li>
+                    <a href="#glyph-list">Glyph list</a>
+                  </li>
+                  <li>
+                    <a href="#item-list">Item list</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span class="gallery-nav-subgroup">Navigation</span>
+                <ul>
+                  <li>
+                    <a href="#toolbar">Toolbar</a>
+                  </li>
+                  <li>
+                    <a href="#breadcrumb">Breadcrumb</a>
+                  </li>
+                  <li>
+                    <a href="#pagination">Pagination</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span class="gallery-nav-subgroup">Forms</span>
+                <ul>
+                  <li>
+                    <a href="#checkboxes">Checkboxes</a>
+                  </li>
+                  <li>
+                    <a href="#forms">Form fields</a>
+                  </li>
+                  <li>
+                    <a href="#form-banner">Form banner</a>
+                  </li>
+                  <li>
+                    <a href="#actions">Actions</a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <span class="gallery-nav-group">Domain</span>
+            <ul>
+              <li>
+                <span class="gallery-nav-subgroup">Posts</span>
+                <ul>
+                  <li>
+                    <a href="#type-tags">Type-tag pills</a>
+                  </li>
+                  <li>
+                    <a href="#feed-rows">Feed rows</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span class="gallery-nav-subgroup">Clinicians</span>
+                <ul>
+                  <li>
+                    <a href="#credentials">Credential rows</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span class="gallery-nav-subgroup">Layouts</span>
+                <ul>
+                  <li>
+                    <a href="#browse-layout">Browse layout</a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+    </aside>
     {# ── Main content ─────────────────────────────────────────────── #}
     <div>
       {# ═══════════════════════════════════════════════════════════ #}
-      {# FRAMEWORK COMPONENTS                                         #}
+      {# FRAMEWORK: FOUNDATIONS                                       #}
       {# ═══════════════════════════════════════════════════════════ #}
       <section class="gallery-section" id="tokens">
         <h2>Design tokens</h2>
@@ -267,6 +323,9 @@ it's dev-only chrome that should never ship to production. #}
           {% endfor %}
         </div>
       </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# FRAMEWORK: CONTENT                                           #}
+      {# ═══════════════════════════════════════════════════════════ #}
       <section class="gallery-section" id="cards">
         <h2>Cards</h2>
         <p>
@@ -349,6 +408,89 @@ it's dev-only chrome that should never ship to production. #}
         </p>
         {{ icon_list(fixture_icon_list) }}
       </section>
+      <section class="gallery-section" id="item-list">
+        <h2>Item list</h2>
+        <p>
+          <small>Rendered via <code>_shared/_item_list.html</code> → <code>item_list()</code> macro. Generic <code>&lt;section&gt;/&lt;ul&gt;</code> wrapper used by every entity list page. Accepts any single-arg row macro, an optional empty state, and a <code>Pager</code>.</small>
+        </p>
+        {% macro gallery_item_row(item) %}
+          {% call card(id=item.id, headline_url="#", headline=item.name, subtitle=item.subtitle) %}
+            <section class="entity-facts">
+              <dl>
+                {{ fact("type", "Type", item.type) }}
+              </dl>
+            </section>
+          {% endcall %}
+        {% endmacro %}
+        <h3>With items + pagination</h3>
+        {{ item_list(fixture_item_list_items, gallery_item_row, "gallery-item-list", pager=fixture_pager) }}
+        <h3 style="margin-top:1.5rem">
+          Empty state (<code>empty_msg</code>)
+        </h3>
+        {{ item_list([], gallery_item_row, "gallery-item-list-empty", empty_msg="No items found.") }}
+      </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# FRAMEWORK: NAVIGATION                                        #}
+      {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="toolbar">
+        <h2>Toolbar</h2>
+        <p>
+          <small>Rendered via <code>_shared/_toolbar.html</code> → <code>page_toolbar()</code>. every list and detail page uses this.</small>
+        </p>
+        <h3>List toolbar (heading + filter link + create)</h3>
+        {% call page_toolbar(heading="Clinicians", search_url=entity_url('clinician') ~ '/search', active_filters=(("Kind", "Referral"), ("State", "CA"))) %}
+          <li>
+            <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
+          </li>
+        {% endcall %}
+        <h3 style="margin-top:1rem">Detail toolbar (heading + edit)</h3>
+        {% call page_toolbar(heading="Dr. Jane Smith") %}
+          <li>
+            <a href="{{ entity_form_url('clinician', id=1) }}"
+               role="button"
+               class="secondary outline">Edit</a>
+          </li>
+        {% endcall %}
+      </section>
+      <section class="gallery-section" id="breadcrumb">
+        <h2>Breadcrumb</h2>
+        <p>
+          <small>Rendered via <code>_shared/_breadcrumb.html</code> → <code>breadcrumb()</code>. single back-link to the deepest clickable parent.</small>
+        </p>
+        {{ breadcrumb(fixture_breadcrumb) }}
+      </section>
+      <section class="gallery-section" id="pagination">
+        <h2>Pagination</h2>
+        <p>
+          <small>Rendered via <code>_shared/pagination.html</code> → <code>pagination()</code>. emits nothing on single-page results.</small>
+        </p>
+        {{ pagination(fixture_page_meta, "kind=referral") }}
+      </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# FRAMEWORK: FORMS                                             #}
+      {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="checkboxes">
+        <h2>Search checkboxes</h2>
+        <p>
+          <small>Rendered via <code>_shared/forms.html</code> → <code>filter_checkbox()</code>. used in filter sidebars and search pages.</small>
+        </p>
+        <h3>Single-column (default)</h3>
+        <fieldset class="search-checkbox-fieldset">
+          {{ icon_legend('filter', 'Kind') }}
+          {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
+          {{ filter_checkbox("kind", "clinician_opening", "Opening", checked=False) }}
+          {{ filter_checkbox("kind", "program_intake", "Intake", checked=False) }}
+        </fieldset>
+        <h3>
+          Grid layout (<code>.search-checkbox-grid</code>)
+        </h3>
+        <fieldset class="search-checkbox-fieldset search-checkbox-grid">
+          {{ icon_legend('map-pin', 'State') }}
+          {% for abbr, label in [("CA", "California"), ("NY", "New York"), ("TX", "Texas"), ("FL", "Florida"), ("WA", "Washington"), ("OR", "Oregon")] %}
+            {{ filter_checkbox("state", abbr, label, checked=(abbr == "CA") ) }}
+          {% endfor %}
+        </fieldset>
+      </section>
       <section class="gallery-section" id="forms">
         <h2>Form fields</h2>
         <p>
@@ -393,64 +535,8 @@ it's dev-only chrome that should never ship to production. #}
           {{ actions("Create clinician", cancel_url=entity_url('clinician') ) }}
         </div>
       </section>
-      <section class="gallery-section" id="toolbar">
-        <h2>Toolbar</h2>
-        <p>
-          <small>Rendered via <code>_shared/_toolbar.html</code> → <code>page_toolbar()</code>. every list and detail page uses this.</small>
-        </p>
-        <h3>List toolbar (heading + filter link + create)</h3>
-        {% call page_toolbar(heading="Clinicians", search_url=entity_url('clinician') ~ '/search', active_filters=(("Kind", "Referral"), ("State", "CA"))) %}
-          <li>
-            <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
-          </li>
-        {% endcall %}
-        <h3 style="margin-top:1rem">Detail toolbar (heading + edit)</h3>
-        {% call page_toolbar(heading="Dr. Jane Smith") %}
-          <li>
-            <a href="{{ entity_form_url('clinician', id=1) }}"
-               role="button"
-               class="secondary outline">Edit</a>
-          </li>
-        {% endcall %}
-      </section>
-      <section class="gallery-section" id="breadcrumb">
-        <h2>Breadcrumb</h2>
-        <p>
-          <small>Rendered via <code>_shared/_breadcrumb.html</code> → <code>breadcrumb()</code>. single back-link to the deepest clickable parent.</small>
-        </p>
-        {{ breadcrumb(fixture_breadcrumb) }}
-      </section>
-      <section class="gallery-section" id="pagination">
-        <h2>Pagination</h2>
-        <p>
-          <small>Rendered via <code>_shared/pagination.html</code> → <code>pagination()</code>. emits nothing on single-page results.</small>
-        </p>
-        {{ pagination(fixture_page_meta, "kind=referral") }}
-      </section>
-      <section class="gallery-section" id="checkboxes">
-        <h2>Search checkboxes</h2>
-        <p>
-          <small>Rendered via <code>_shared/forms.html</code> → <code>filter_checkbox()</code>. used in filter sidebars and search pages.</small>
-        </p>
-        <h3>Single-column (default)</h3>
-        <fieldset class="search-checkbox-fieldset">
-          {{ icon_legend('filter', 'Kind') }}
-          {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
-          {{ filter_checkbox("kind", "clinician_opening", "Opening", checked=False) }}
-          {{ filter_checkbox("kind", "program_intake", "Intake", checked=False) }}
-        </fieldset>
-        <h3>
-          Grid layout (<code>.search-checkbox-grid</code>)
-        </h3>
-        <fieldset class="search-checkbox-fieldset search-checkbox-grid">
-          {{ icon_legend('map-pin', 'State') }}
-          {% for abbr, label in [("CA", "California"), ("NY", "New York"), ("TX", "Texas"), ("FL", "Florida"), ("WA", "Washington"), ("OR", "Oregon")] %}
-            {{ filter_checkbox("state", abbr, label, checked=(abbr == "CA") ) }}
-          {% endfor %}
-        </fieldset>
-      </section>
       {# ═══════════════════════════════════════════════════════════ #}
-      {# DOMAIN COMPONENTS                                            #}
+      {# DOMAIN: POSTS                                                #}
       {# CSS lives in src/domain/static/css/domain.css               #}
       {# ═══════════════════════════════════════════════════════════ #}
       <section class="gallery-section" id="type-tags">
@@ -524,6 +610,9 @@ it's dev-only chrome that should never ship to production. #}
           </li>
         </ul>
       </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# DOMAIN: CLINICIANS                                           #}
+      {# ═══════════════════════════════════════════════════════════ #}
       <section class="gallery-section" id="credentials">
         <h2>Credential rows</h2>
         <p>
@@ -553,6 +642,9 @@ it's dev-only chrome that should never ship to production. #}
           </div>
         </div>
       </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# DOMAIN: LAYOUTS                                              #}
+      {# ═══════════════════════════════════════════════════════════ #}
       <section class="gallery-section" id="browse-layout">
         <h2>Browse layout</h2>
         <p>

@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from fastapi import APIRouter, HTTPException, Request
 
 from src.framework.config import settings
+from src.framework.dispatch.pagination import Page, Pager
 from src.framework.http.responses import APIResponse
 
 router = APIRouter(tags=["dev"])
@@ -32,6 +33,13 @@ def _fixture_page_meta():
     )
 
 
+def _fixture_pager():
+    return Pager(
+        page=Page(page=2, per_page=15, has_prev=True, has_next=True),
+        base_query="",
+    )
+
+
 @router.get("/dev/components")
 async def component_gallery(request: Request):
     """Render every macro and CSS component with fixture data."""
@@ -40,6 +48,7 @@ async def component_gallery(request: Request):
 
     context = {
         "fixture_page_meta": _fixture_page_meta(),
+        "fixture_pager": _fixture_pager(),
         "fixture_choices": [
             ("opt1", "Option one"),
             ("opt2", "Option two"),
@@ -55,6 +64,26 @@ async def component_gallery(request: Request):
         "fixture_breadcrumb": [
             {"label": "Clinicians", "href": "/clinicians"},
             {"label": "Dr. Jane Smith", "href": None},
+        ],
+        "fixture_item_list_items": [
+            SimpleNamespace(
+                id=1,
+                name="Dr. Jane Smith",
+                subtitle="Sunrise Therapy · San Francisco, CA",
+                type="Clinician",
+            ),
+            SimpleNamespace(
+                id=2,
+                name="Acme Counseling Center",
+                subtitle="Oakland, CA",
+                type="Organization",
+            ),
+            SimpleNamespace(
+                id=3,
+                name="Pacific Wellness Group",
+                subtitle="Berkeley, CA",
+                type="Program",
+            ),
         ],
     }
 
