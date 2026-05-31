@@ -11,7 +11,7 @@
    `with context` lets the form-field macros auto-resolve `error=` /
    `current=` from the `form_errors` / `form_values` injected into
    the render context by `mount_create` on a 422. #}
-{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -21,23 +21,18 @@
    owns. Superusers see every Org. The "create one first" hint lives
    in `_shared/form_copy.html::org_picker_help`. #}
 {% call form_with_errors(action=entity_url('program'), method="post") %}
-  <fieldset>
-    <legend>Program</legend>
+  {% call form_section("Program") %}
     {{ entity_select_field("org_id", "Organization", organizations, help=org_picker_help() ) }}
     {{ field_for(schema, "name", "Name") }}
     {{ field_for(schema, "description", "Description", required=false) }}
-  </fieldset>
-  <fieldset>
-    <legend>Where and when</legend>
+  {% endcall %}
+  {% call form_section("Where and when") %}
     {{ field_for(schema, "state_preference", "State served", required=false) }}
-    <div class="grid">
-      {{ text_field("start_date", "Start date", required=false, type="date") }}
-      {{ text_field("end_date", "End date", required=false, type="date") }}
-    </div>
-  </fieldset>
-  <fieldset>
-    <legend>Intake</legend>
+    {{ text_field("start_date", "Start date", required=false, type="date") }}
+    {{ text_field("end_date", "End date", required=false, type="date") }}
+  {% endcall %}
+  {% call form_section("Intake") %}
     {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=true, required=false) }}
-  </fieldset>
+  {% endcall %}
   {{ actions(entity_create_label('program') , cancel_url=entity_url('program')) }}
 {% endcall %}

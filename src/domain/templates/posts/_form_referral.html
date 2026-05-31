@@ -23,7 +23,7 @@ which FastAPI/Pydantic parses as a list.
    re-render (see `POST_ENTITY.form_error_render` + the docstring
    at the top of `_shared/form_fields.html`). No per-field error or
    value threading is required at the callsite below. #}
-{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, time_grid_field, multi_select_field, field_for with context -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, field_for, form_section with context -%}
 {%- from "_shared/form_copy.html" import modality_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro referral_form(hx_method, action, submit_label, post=None, schema=None, cancel_url=None) -%}
@@ -43,79 +43,63 @@ which FastAPI/Pydantic parses as a list.
        current user's owned clinicians. Each option value is the
        clinician id; the label is the affiliated org name, mirroring
        the PA form's practice-picker pattern. #}
-    <label for="referring_clinician_id">
-      Referring clinician *
+    {%- set _cr_fv = (form_values|default({})).get('referring_clinician_id') -%}
+    <label class="form-field" for="referring_clinician_id">
+      <span class="form-field-label">Referring clinician</span>
       <select id="referring_clinician_id" name="referring_clinician_id" required>
         {%- for c in current_user.clinicians %}
           {%- set outer_first = loop.first %}
           {%- for aff in c.affiliations %}
+            {%- set is_fv_match = _cr_fv and _cr_fv|string == c.id|string and loop.first -%}
+            {%- set is_edit_match = not _cr_fv and d and d.referring_clinician_id == c.id and loop.first -%}
+            {%- set is_create_default = not _cr_fv and not d and outer_first and loop.first -%}
             <option value="{{ c.id }}"
-                    {% if (d and d.referring_clinician_id == c.id and loop.first) or (not d and outer_first and loop.first) %}selected{% endif %}>
+                    {% if is_fv_match or is_edit_match or is_create_default %}selected{% endif %}>
               {{ aff.org.name }}
             </option>
           {%- endfor %}
         {%- endfor %}
       </select>
     </label>
-    <label for="subject">
-      Subject <small>(optional — leave blank to auto-generate)</small>
-      <input type="text"
-             name="subject"
-             id="subject"
-             maxlength="120"
-             value="{{ (form_values|default({}) ).get('subject') or (d.subject if d else '') or '' }}" />
-    </label>
-    <fieldset>
-      <legend>Client location</legend>
-      <div class="grid">
-        {{ text_field("location_city", "City", current=d.location_city if d else None) }}
-        {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-        {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
-      </div>
-      <div class="grid">
-        {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
-        {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
-      </div>
-      {{ time_grid_field("desired_times", "Desired times", current=d.desired_times if d else None) }}
-    </fieldset>
-    <fieldset>
-      <legend>Client demographics</legend>
+    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
+    {% call form_section("Client location") %}
+      {{ text_field("location_city", "City", current=d.location_city if d else None) }}
+      {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
+      {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
+      {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
+      {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+      {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
+    {% endcall %}
+    {% call form_section("Client demographics") %}
       {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
       {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
       {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
-    </fieldset>
+    {% endcall %}
     {{ textarea_field("description", "About the client", current=d.description if d else None, help="Anything else a clinician needs to know. Please don't include identifying details.") }}
-    <fieldset>
-      <legend>Services</legend>
+    {% call form_section("Services") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
-    </fieldset>
+    {% endcall %}
     {# Insurance: two controls. `network_preference` is the referrer's
      posture (always set); `insurance_carrier` is the client's carrier
      (optional — null when network_preference='no_preference'). The
-     carrier <div> is hidden whenever no_preference is selected; a tiny
-     inline script (below) toggles on change. Server-side, the
-     ReferralCreate schema accepts a null carrier with any
-     network_preference, so the hidden control just leaves the field
+     carrier field is hidden whenever no_preference is selected; a tiny
+     inline script (below) toggles on change. `hidden=` goes on the
+     `.form-field` label directly so no wrapper div disrupts the grid.
+     Server-side, the ReferralCreate schema accepts a null carrier with
+     any network_preference, so the hidden control just leaves the field
      unset rather than enforcing the invariant on the wire. #}
-    <fieldset>
-      <legend>Insurance</legend>
-      <div class="grid">
-        {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
-        <div data-cr-carrier
-             {% if d and d.network_preference == "no_preference" %}hidden{% endif %}>
-          {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false) }}
-        </div>
-      </div>
-    </fieldset>
+    {% call form_section("Insurance") %}
+      {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
+      {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false, hidden=(d and d.network_preference == "no_preference") ) }}
+    {% endcall %}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   </form>
   <script>
-  // Hide the insurance_carrier control when the referrer has no
-  // preference — the field is meaningless in that branch.
   (function () {
     var sel = document.querySelector('select[name="network_preference"]');
-    var wrap = document.querySelector('[data-cr-carrier]');
+    var carrier = document.querySelector('select[name="insurance_carrier"]');
+    var wrap = carrier && carrier.closest('.form-field');
     if (!sel || !wrap) return;
     function sync() {
       if (sel.value === 'no_preference') {

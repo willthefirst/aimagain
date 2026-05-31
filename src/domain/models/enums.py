@@ -194,9 +194,9 @@ INSURANCE_CARRIERS: Final[tuple[str, ...]] = InsuranceCarrier.values()
 # axes are their own vocabularies; the combined slot tuple/labels below
 # derive from them so the grid stays single-sourced.
 #
-# `DesiredTimeDay` carries two labels: `.label` is the long form (read
-# views, slot labels) and `.short_label` is the one/two-char row header for
-# the compact `time_grid_field` checkbox grid (M/T/W/Th/F/Sat/Sun).
+# `DesiredTimeDay` carries two labels: `.label` is the long form used in
+# slot labels (e.g. "Monday AM") and `.short_label` is a compact abbreviation
+# (M/T/W/Th/F/Sat/Sun) available for display contexts that need it.
 class DesiredTimeDay(LabeledChoice):
     short_label: str
 
@@ -329,9 +329,8 @@ LANGUAGE_LABELS: Final[dict[str, str]] = Language.labels()
 NETWORK_PREFERENCE_LABELS: Final[dict[str, str]] = NetworkPreference.labels()
 INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = InsuranceCarrier.labels()
 # Per-axis labels for the desired-times grid. The form-render macro uses these
-# for the row (day) and column headers. Days carry two labels: the long
-# `.label` (read views, slot labels below) and the compact `.short_label`
-# row-header (M/T/W/Th/F/Sat/Sun) for the `time_grid_field` checkbox grid.
+# Days carry two labels: the long `.label` (read views, slot labels below)
+# and the compact `.short_label` abbreviation (M/T/W/Th/F/Sat/Sun).
 DESIRED_TIME_DAY_LABELS: Final[dict[str, str]] = DesiredTimeDay.labels()
 DESIRED_TIME_DAY_SHORT_LABELS: Final[dict[str, str]] = {
     m.value: m.short_label for m in DesiredTimeDay

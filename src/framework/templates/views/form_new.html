@@ -18,7 +18,8 @@ Child contract:
   Required blocks:
     resource_label — short string label for the collection segment
                      of the breadcrumb (e.g. "Clinicians").
-    content        — the `<form>` body.
+    form_content   — the `<form>` body (rendered inside the
+                     `entity-form-page` wrapper).
 
   Required context:
     resource_url    — URL the collection segment links to (e.g.
@@ -49,10 +50,12 @@ as a second crumb between collection and the H1).
   {% call page_toolbar(heading=create_heading) %}
   {% endcall %}
 {% endblock %}
-{# `entity-form-page` carries the shared visual contract for entity
+{% block content %}
+  {# `entity-form-page` carries the shared visual contract for entity
    create/edit pages: caps the form width on large screens via
    `--form-max-width` and brackets the form-action cluster. See
    `src/framework/templates/README.md` § "Entity form pages". #}
-<div class="entity-form-page">
-  {% block content %}{% endblock %}
-</div>
+  <div class="entity-form-page">
+    {% block form_content %}{% endblock %}
+  </div>
+{% endblock %}

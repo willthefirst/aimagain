@@ -26,7 +26,8 @@ Child contract:
                      `entity_edit_label(spec.name, kind=...)` via the
                      form handler) so it reads "Edit clinician
                      opening" instead of "Edit <row identity>".
-    content        — the `<form>` body. By convention forms keep a
+    form_content   — the `<form>` body (rendered inside the
+                     `entity-form-page` wrapper). By convention forms keep a
                      `<a class="secondary outline">Cancel</a>` linking
                      to `resource_detail_url` so abandoning an edit is
                      a one-click affordance (see project chrome rule in
@@ -65,7 +66,9 @@ Child contract:
   {% call page_toolbar(heading=edit_heading) %}
   {% endcall %}
 {% endblock %}
-{# `entity-form-page` — see `views/form_new.html`. #}
-<div class="entity-form-page">
-  {% block content %}{% endblock %}
-</div>
+{% block content %}
+  {# `entity-form-page` — see `views/form_new.html`. #}
+  <div class="entity-form-page">
+    {% block form_content %}{% endblock %}
+  </div>
+{% endblock %}

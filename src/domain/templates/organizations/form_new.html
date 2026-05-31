@@ -17,7 +17,7 @@ a sibling file with that exact name. The full page below includes it.
 {% extends "views/form_new.html" %}
 {%- from "_shared/_picker.html" import picker -%}
 {% block resource_label %}Organizations{% endblock %}
-{% block content %}
+{% block form_content %}
   {%- set selected_type = request.query_params.get('type', '') -%}
   {% if not selected_type %}
     {# Type picker: shown when no ?type= param is present.  Each card links

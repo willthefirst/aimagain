@@ -11,7 +11,7 @@
    `with context` lets the form-field macros auto-resolve per-field
    `error=` / `current=` from the `form_errors` / `form_values`
    injected by `mount_create` on a 422. #}
-{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import cost_help, npi_help, org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -20,16 +20,12 @@
      `Clinician` row and follow the person across affiliations. Kept in
      their own fieldset so the form reads "who is this clinician" →
      "where do they practice" top-to-bottom. #}
-  <fieldset>
-    <legend>Clinician</legend>
-    <div class="grid">
-      {{ field_for(schema, "first_name", "First name") }}
-      {{ field_for(schema, "last_name", "Last name") }}
-    </div>
+  {% call form_section("Clinician") %}
+    {{ field_for(schema, "first_name", "First name") }}
+    {{ field_for(schema, "last_name", "Last name") }}
     {{ field_for(schema, "npi", "NPI", required=false, help=npi_help() ) }}
-  </fieldset>
-  <fieldset>
-    <legend>Practice</legend>
+  {% endcall %}
+  {% call form_section("Practice") %}
     {# Solo-practice toggle (#699): when checked, the create handler
        auto-creates a solo-practice Org from the clinician's name so
        the user doesn't have to visit /organizations/form first. The
@@ -41,33 +37,25 @@
              id="solo_practice"
              name="solo_practice"
              value="true"
-             onchange=" var orgRow = document.getElementById('org-row'); var orgSel = orgRow.querySelector('select'); orgRow.hidden = this.checked; orgSel.required = !this.checked; " />
+             onchange="var f=document.getElementById('org_id').closest('.form-field');f.hidden=this.checked;f.querySelector('select').required=!this.checked;" />
     </label>
-    <div id="org-row">{{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help() ) }}</div>
-    <div class="grid">
-      {{ field_for(schema, "location_city", "City") }}
-      {{ field_for(schema, "location_state", "State") }}
-      {{ field_for(schema, "location_zip", "ZIP") }}
-    </div>
-  </fieldset>
-  <fieldset>
-    <legend>Session availability</legend>
-    <div class="grid">
-      {{ field_for(schema, "in_person_sessions", "In-person sessions", current="yes") }}
-      {{ field_for(schema, "virtual_sessions", "Virtual sessions", current="yes") }}
-    </div>
-  </fieldset>
+    {{ entity_select_field("org_id", "Organization", orgs, help=org_picker_help() ) }}
+    {{ field_for(schema, "location_city", "City") }}
+    {{ field_for(schema, "location_state", "State") }}
+    {{ field_for(schema, "location_zip", "ZIP") }}
+  {% endcall %}
+  {% call form_section("Session availability") %}
+    {{ field_for(schema, "in_person_sessions", "In-person sessions", current="yes") }}
+    {{ field_for(schema, "virtual_sessions", "Virtual sessions", current="yes") }}
+  {% endcall %}
   {# Insurance & payment. `in_network_carriers` is a multi-select — an
      empty selection means "no in-network". `accepts_out_of_network` is
      independent. No cross-field invariant. #}
-  <fieldset>
-    <legend>Insurance &amp; payment</legend>
+  {% call form_section("Insurance & payment") %}
     {{ field_for(schema, "in_network_carriers", "In-network carriers") }}
-    <div class="grid">
-      {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
-      {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
-    </div>
+    {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
+    {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
     {{ text_field("cost", "Cost", required=false, help=cost_help() ) }}
-  </fieldset>
+  {% endcall %}
   {{ actions(entity_create_label('clinician') , cancel_url=entity_url('clinician')) }}
 {% endcall %}

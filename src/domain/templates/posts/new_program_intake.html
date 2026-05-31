@@ -1,7 +1,7 @@
 {% extends "views/form_new.html" %}
 {% from "posts/_form_program_intake.html" import intake_form %}
 {% block resource_label %}Posts{% endblock %}
-{% block content %}
+{% block form_content %}
   {% if not current_user.programs %}
     <p>
       Create a program first — every intake is tied to one. <a href="{{ entity_form_url('program') }}">Create a program.</a>

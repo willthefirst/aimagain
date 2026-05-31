@@ -6,7 +6,7 @@
    path silently no-ops on error and the user sees a blank form. #}
 {% from "posts/_form_clinician_opening.html" import opening_form with context %}
 {% block resource_label %}Posts{% endblock %}
-{% block content %}
+{% block form_content %}
   {% if not current_user.clinicians %}
     {% include "posts/_shared/_require_clinician_profile.html" %}
   {% else %}
