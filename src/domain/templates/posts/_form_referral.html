@@ -91,7 +91,7 @@ which FastAPI/Pydantic parses as a list.
      unset rather than enforcing the invariant on the wire. #}
     {% call form_section("Insurance") %}
       {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
-      {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false, hidden=(d and d.network_preference == "no_preference")) }}
+      {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false, hidden=(d and d.network_preference == "no_preference") ) }}
     {% endcall %}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   </form>
