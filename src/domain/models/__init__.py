@@ -19,6 +19,7 @@ from .enums import (
     US_STATES,
 )
 from .favorites.user_favorite import UserFavorite
+from .org_representations.org_representation import OrgRepresentation
 from .organizations.organization import Organization
 from .posts.intake_detail import IntakeDetail
 from .posts.opening_detail import OpeningDetail
@@ -45,6 +46,7 @@ __all__ = [
     "LOCATION_AVAILABILITY_OPTIONS",
     "NETWORK_PREFERENCES",
     "ORGANIZATION_TYPES",
+    "OrgRepresentation",
     "Organization",
     "POST_KIND_BY_DETAIL_MODEL",
     "POST_KIND_NAMES",
