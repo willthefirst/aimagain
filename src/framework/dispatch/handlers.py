@@ -16,6 +16,7 @@ from src.framework.dispatch.entity_spec import EntitySpec
 from src.framework.dispatch.filters import Filter
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
+    Pager,
     base_query,
     offset_for,
     paginate,
@@ -24,6 +25,7 @@ from src.framework.dispatch.pagination import (
 from src.framework.http.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.rendering.projections import project_view
+from src.framework.rendering.templating import set_viewer
 
 
 def _assert_kind_lock(spec: EntitySpec, target: Any) -> None:
@@ -1002,20 +1004,18 @@ async def handle_list(
             spec.model, order_by=spec.list_order_by, **list_kwargs
         )
 
-    items, page_meta = paginate(items_plus_one, page=page_number, per_page=per_page)
+    items, page = paginate(items_plus_one, page=page_number, per_page=per_page)
+    set_viewer(requesting_user)
 
     context: dict[str, Any] = {
         "request": request,
         spec.url_collection: items,
-        # Shared partials (e.g. `_shared/posts/_item.html`) take the URL
-        # family name as a macro arg; setting it once in context lets
-        # the list template call `{{ post_item(post, entity_name) }}`
-        # without repeating the kind string everywhere.
+        # Shared partials take the URL family name as a macro arg.
         "entity_name": spec.name,
+        "resource_label": spec.url_collection.capitalize(),
         "current_user": requesting_user,
         "can_admin_actions": is_admin(requesting_user),
-        "page_meta": page_meta,
-        "paginator_base_query": base_query(request),
+        "pager": Pager(page=page, base_query=base_query(request)),
     }
     # Filter echo — the list page's filter form preselects the active
     # value by reading ``selected_<name>`` from the context. The raw

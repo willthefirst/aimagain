@@ -1,8 +1,11 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_item_list.html" import item_list -%}
 {# Subresource list — three-segment breadcrumb instead of the default
-   single-segment `resource_label`. #}
+   single-segment `resource_label`. Suppress the auto-injected label so
+   the breadcrumb carries all the navigation context. #}
+{% block resource_label %}{% endblock %}
 {% block breadcrumb %}
   {{ breadcrumb([
     ("Users", entity_url('user') ),
@@ -18,19 +21,16 @@
   {% endif %}
 {% endblock %}
 {% block content %}
-  {% if clinicians %}
-    <section id="user-clinicians-list">
-      <ul class="entity-list">
-        {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
-        </ul>
-      </section>
-    {% else %}
-      <p id="user-clinicians-empty">
-        {% if is_self %}
-          You have not created any clinician entries yet.
-        {% else %}
-          This user has no clinician entries yet.
-        {% endif %}
-      </p>
-    {% endif %}
-  {% endblock %}
+  {%- set _empty %}
+    <p id="user-clinicians-empty">
+      {% if is_self %}
+        You have not created any clinician entries yet.
+      {% else %}
+        This user has no clinician entries yet.
+      {% endif %}
+    </p>
+  {%- endset %}
+  {{ item_list(clinicians, clinician_card, "user-clinicians-list",
+    empty=_empty,
+    pager=pager) }}
+{% endblock %}

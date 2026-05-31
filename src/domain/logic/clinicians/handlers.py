@@ -20,12 +20,14 @@ from src.domain.models import (
 from src.framework.authz import assert_fk_ownership, list_visible_to
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
+    Pager,
     base_query,
     offset_for,
     paginate,
     parse_page,
 )
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
+from src.framework.rendering.templating import set_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -119,15 +121,15 @@ async def handle_list_user_clinicians(
         offset=offset_for(page_number, per_page),
         limit=per_page + 1,
     )
-    clinicians, page_meta = paginate(
+    clinicians, page = paginate(
         clinicians_plus_one, page=page_number, per_page=per_page
     )
+    set_viewer(requesting_user)
     return {
         "request": request,
         "target_user": target_user,
         "clinicians": clinicians,
         "is_self": user_id == requesting_user.id,
         "current_user": requesting_user,
-        "page_meta": page_meta,
-        "paginator_base_query": base_query(request),
+        "pager": Pager(page=page, base_query=base_query(request)),
     }

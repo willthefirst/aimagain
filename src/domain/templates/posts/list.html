@@ -1,7 +1,7 @@
 {% extends "views/list.html" %}
 {%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "posts/_shared/_filter_form.html" import filter_form -%}
-{%- from "_shared/pagination.html" import pagination -%}
+{%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {% block resource_label %}Posts{% endblock %}
 {% block toolbar %}
@@ -14,29 +14,23 @@
 {% block actions %}{% endblock %}
 {% block content %}
   {%- set _list_url = entity_url("post") -%}
-  <div class="posts-browse-layout">
-    <aside class="posts-filter-sidebar">
-      <hgroup>
-        <a href="{{ entity_url("post") }}/search">Filters
-          {% if active_filter_count %}({{ active_filter_count }}){% endif %}
-        </a>
-      </hgroup>
-      <div class="posts-filter-form">{{ filter_form(_list_url, filter_values) }}</div>
-    </aside>
-    <div class="posts-results">
-      {% if posts %}
-        <section id="posts-list">
-          <ul class="post-feed-list">
-            {%- for post in posts %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
-            </ul>
-          </section>
-        {% else %}
-          {{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
-                    link_href=entity_url(entity_name) if active_filter_count else None
-          ) }}
-        {% endif %}
-        {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("") ) }}{%- endif %}
-        </div>
+  {%- set _empty %}{{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
+    link_href=entity_url("post") if active_filter_count else none
+    ) }}{%- endset %}
+    <div class="posts-browse-layout">
+      <aside class="posts-filter-sidebar">
+        <hgroup>
+          <a href="{{ entity_url("post") }}/search">Filters
+            {% if active_filter_count %}({{ active_filter_count }}){% endif %}
+          </a>
+        </hgroup>
+        <div class="posts-filter-form">{{ filter_form(_list_url, filter_values) }}</div>
+      </aside>
+      <div class="posts-results">
+        {{ item_list(posts, post_feed_row, "posts-list", "post-feed-list",
+                empty=_empty,
+                pager=pager) }}
       </div>
-    {% endblock %}
-    {% block after_content %}{% endblock %}
+    </div>
+  {% endblock %}
+  {% block after_content %}{% endblock %}

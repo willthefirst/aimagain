@@ -18,20 +18,17 @@ The macro reads view data via the `post_card_view(post)` global and the
 Parameters
   post        — any `Post` ORM instance (referral / clinician_opening /
                 program_intake).
-  entity_name — URL family string ("post" — the single whole-supertype
-                family); passed unchanged to `entity_url()`.
   show_poster — when False the poster-name item is suppressed (useful for
                 "My active posts" where the viewer is the poster).
                 Defaults to True.
 
 CSS lives in the `<style>` block of `src/framework/templates/base.html`
 under the "Feed rows" section. #}
-{% macro post_feed_row(post, entity_name, show_poster=True) -%}
+{% macro post_feed_row(post, show_poster=True) -%}
 {%- set view = post_card_view(post) -%}
 {%- set headline = post_feed_headline(post) -%}
 {%- set kind_class = "referral" if post.kind == "referral" else ("intake" if post.kind == "program_intake" else "opening") -%}
 {%- set kind_label = "Referral" if post.kind == "referral" else ("Intake" if post.kind == "program_intake" else "Opening") -%}
-<li>
 <article class="post-feed-row" data-kind="{{ post.kind }}">
 {# ── Header: pill · poster · timestamp ───────────────────────── #}
 <div class="post-feed-header">
@@ -53,7 +50,7 @@ under the "Feed rows" section. #}
 </span>
 </div>
 {# ── Headline ─────────────────────────────────────────────────── #}
-<a href="{{ entity_url(entity_name, id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
+<a href="{{ entity_url('post', id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
 {# ── Meta strip ───────────────────────────────────────────────── #}
 <div class="post-feed-meta">
 {# Item 1 ── Geography #}
@@ -113,7 +110,6 @@ under the "Feed rows" section. #}
 {%- endif -%}
 </div>
 </article>
-</li>
 {%- endmacro %}
 {% macro post_feed_empty(message="No recent posts match your filters.", link_href=None, link_label="See all recent activity →") -%}
 <article class="post-feed-empty">

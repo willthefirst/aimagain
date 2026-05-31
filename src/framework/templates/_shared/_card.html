@@ -53,17 +53,15 @@ For a card that needs a footer, emit `<footer>...</footer>` inside the
 caller body — Pico will tint it automatically.
 #}
 {% macro card(id, headline_url, headline, subtitle=None, data_kind=None) -%}
-  <li>
-    <article class="entity-card"
-             data-row-id="{{ id }}"
-             {% if data_kind %}data-kind="{{ data_kind }}"{% endif %}>
-      <header>
-        <h3>
-          <a href="{{ headline_url }}">{{ headline }}</a>
-        </h3>
-        {%- if subtitle %}<small class="meta">{{ subtitle }}</small>{%- endif %}
-      </header>
-      {{ caller() }}
-    </article>
-  </li>
+  <article class="entity-card"
+           data-row-id="{{ id }}"
+           {% if data_kind %}data-kind="{{ data_kind }}"{% endif %}>
+    <header>
+      <h3>
+        <a href="{{ headline_url }}">{{ headline }}</a>
+      </h3>
+      {%- if subtitle %}<small class="meta">{{ subtitle }}</small>{%- endif %}
+    </header>
+    {{ caller() }}
+  </article>
 {%- endmacro %}

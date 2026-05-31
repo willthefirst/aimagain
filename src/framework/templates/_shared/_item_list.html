@@ -1,0 +1,45 @@
+{# Generic list container.
+
+Renders a <section>/<ul> wrapper, adds <li> around each rendered item,
+shows an empty state when the collection is empty, and appends pagination.
+
+Row macros passed as `row` should render their item's visual appearance only —
+no <li> wrapping; this macro owns that.
+
+Args
+----
+items        — the collection to iterate
+row          — single-arg callable (macro) that renders one item without <li>
+section_id   — id for the wrapping <section>
+list_class   — CSS class on the <ul>; defaults to "entity-list" (the standard
+               entity-card grid). Pass "post-feed-list" for feed-row layouts.
+empty_msg    — plain-text message for the <p> shown when items is empty;
+               sufficient for most list pages. Use empty= when the empty state
+               needs markup (links, buttons).
+empty        — pre-rendered empty-state markup (capture with {% set %} in the
+               caller); takes precedence over empty_msg when both are given.
+pager        — Pager object from handle_list; omit to suppress pagination.
+#}
+{%- from "_shared/pagination.html" import pagination -%}
+{% macro item_list(items, row, section_id,
+  list_class="entity-list",
+  empty_msg=none,
+  empty=none,
+  pager=none) %}
+  {%- if items %}
+    <section id="{{ section_id }}">
+      <ul class="{{ list_class }}">
+        {%- for item in items %}<li>{{ row(item) }}</li>{%- endfor %}
+      </ul>
+    </section>
+    {{- pagination(pager.page, pager.base_query) if pager -}}
+  {%- else %}
+    {% if empty %}
+      {{ empty }}
+    {% elif empty_msg %}
+      <p>{{ empty_msg }}</p>
+    {% else %}
+      <p>No items found.</p>
+    {% endif %}
+  {%- endif %}
+{% endmacro %}

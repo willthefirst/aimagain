@@ -1,52 +1,46 @@
 {% extends "base.html" %}
 {%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
-{% block title %}Home{% endblock %}
-{% block content %}
-  <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
-    <a href="{{ entity_form_url("post") }}?kind=referral"
-       role="button"
-       class="outline">+ Post a referral</a>
-    <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
-       role="button"
-       class="outline">+ Post an opening</a>
-  </section>
-  {% if my_posts %}
-    <section>
-      <header style="display: flex;
-                     justify-content: space-between;
-                     align-items: baseline">
-        <h2>My active posts</h2>
-        <a href="{{ entity_url('post') }}">See all</a>
-      </header>
-      <ul class="post-feed-list">
-        {%- for post in my_posts -%}
-          {{ post_feed_row(post, "post", show_poster=False) }}
-        {%- endfor -%}
-      </ul>
+{%- from "_shared/_item_list.html" import item_list -%}
+{%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
+  {% block title %}Home{% endblock %}
+  {% block content %}
+    <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
+      <a href="{{ entity_form_url("post") }}?kind=referral"
+         role="button"
+         class="outline">+ Post a referral</a>
+      <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+         role="button"
+         class="outline">+ Post an opening</a>
     </section>
-  {% endif %}
-  {% if network_posts %}
-    <section>
-      <header style="display: flex;
-                     justify-content: space-between;
-                     align-items: baseline">
-        <h2>Recent in the network</h2>
-        <a href="{{ entity_url('post') }}">See all</a>
-      </header>
-      <p style="font-size: 0.875rem;
-                color: var(--pico-muted-color);
-                margin-bottom: 1rem">
-        {# djlint:off #}
+    {% if my_posts %}
+      <section>
+        <header style="display: flex;
+                       justify-content: space-between;
+                       align-items: baseline">
+          <h2>My active posts</h2>
+          <a href="{{ entity_url('post') }}">See all</a>
+        </header>
+        {{ item_list(my_posts, _no_poster_row, "my-posts-list", "post-feed-list") }}
+      </section>
+    {% endif %}
+    {% if network_posts %}
+      <section>
+        <header style="display: flex;
+                       justify-content: space-between;
+                       align-items: baseline">
+          <h2>Recent in the network</h2>
+          <a href="{{ entity_url('post') }}">See all</a>
+        </header>
+        <p style="font-size: 0.875rem;
+                  color: var(--pico-muted-color);
+                  margin-bottom: 1rem">
+          {# djlint:off #}
         Last 7 days, filtered to your saved searches and practice profile
         {%- if network_filter_chips %} — {{ network_filter_chips | join(" · ") }}{% endif %}.
         <a href="{{ entity_url('post') }}">Adjust filters</a>
-        {# djlint:on #}
-      </p>
-      <ul class="post-feed-list">
-        {%- for post in network_posts -%}
-          {{ post_feed_row(post, "post") }}
-        {%- endfor -%}
-      </ul>
-    </section>
-  {% endif %}
-{% endblock %}
+          {# djlint:on #}
+        </p>
+        {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
+      </section>
+    {% endif %}
+  {% endblock %}
