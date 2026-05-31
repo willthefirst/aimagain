@@ -43,28 +43,25 @@ which FastAPI/Pydantic parses as a list.
        current user's owned clinicians. Each option value is the
        clinician id; the label is the affiliated org name, mirroring
        the PA form's practice-picker pattern. #}
-    <label for="referring_clinician_id">
-      Referring clinician *
+    {%- set _cr_fv = (form_values|default({})).get('referring_clinician_id') -%}
+    <label class="form-field" for="referring_clinician_id">
+      <span class="form-field-label">Referring clinician</span>
       <select id="referring_clinician_id" name="referring_clinician_id" required>
         {%- for c in current_user.clinicians %}
           {%- set outer_first = loop.first %}
           {%- for aff in c.affiliations %}
+            {%- set is_fv_match = _cr_fv and _cr_fv|string == c.id|string and loop.first -%}
+            {%- set is_edit_match = not _cr_fv and d and d.referring_clinician_id == c.id and loop.first -%}
+            {%- set is_create_default = not _cr_fv and not d and outer_first and loop.first -%}
             <option value="{{ c.id }}"
-                    {% if (d and d.referring_clinician_id == c.id and loop.first) or (not d and outer_first and loop.first) %}selected{% endif %}>
+                    {% if is_fv_match or is_edit_match or is_create_default %}selected{% endif %}>
               {{ aff.org.name }}
             </option>
           {%- endfor %}
         {%- endfor %}
       </select>
     </label>
-    <label for="subject">
-      Subject <small>(optional — leave blank to auto-generate)</small>
-      <input type="text"
-             name="subject"
-             id="subject"
-             maxlength="120"
-             value="{{ (form_values|default({}) ).get('subject') or (d.subject if d else '') or '' }}" />
-    </label>
+    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     <fieldset>
       <legend>Client location</legend>
       <div class="grid">
