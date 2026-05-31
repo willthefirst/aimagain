@@ -1,10 +1,15 @@
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Text
+from functools import partial
+
+from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import BaseModel
 
+from ..enums import NPI_MATCH_STATUSES, named_check_in
+
 _TABLE = "clinicians"
+_ck = partial(named_check_in, _TABLE)
 
 _NPI_FORMAT_CHECK = CheckConstraint(
     "npi IS NULL OR (length(npi) = 10 "
@@ -38,7 +43,10 @@ class Clinician(BaseModel):
     """
 
     __tablename__ = _TABLE
-    __table_args__ = (_NPI_FORMAT_CHECK,)
+    __table_args__ = (
+        _NPI_FORMAT_CHECK,
+        _ck("npi_match_status", NPI_MATCH_STATUSES),
+    )
 
     owner_id = Column(
         Uuid(as_uuid=True),
@@ -50,6 +58,32 @@ class Clinician(BaseModel):
     npi = Column(Text, nullable=True)
     first_name = Column(Text, nullable=True)
     last_name = Column(Text, nullable=True)
+
+    # NPPES Type-1 match state. Source-of-truth field for Claim A: the
+    # `verifications` table is the event log; this column is the cache
+    # `capabilities.clinician_verified(user)` reads. `none` = no NPI
+    # submitted, `pending` = worker hasn't resolved yet, `matched` =
+    # NPPES legal-name match cleared the threshold, `mismatch` = admin
+    # closed a soft mismatch (per handoff §10.1, the worker never
+    # auto-transitions to `mismatch`).
+    npi_match_status = Column(
+        Text, nullable=False, server_default="none", default="none"
+    )
+    npi_verified_at = Column(TIMESTAMP, nullable=True)
+
+    # Denormalized cache of Claim A. Recomputed by
+    # `recompute_clinician_claim(...)` on every transition that changes
+    # `npi_match_status` or any `ClinicianLicensure.status`. Lets the
+    # capabilities predicate run without joining licensures every read.
+    clinician_verified = Column(
+        Boolean, nullable=False, server_default="0", default=False
+    )
+    verified_at = Column(TIMESTAMP, nullable=True)
+    # First-ever verification timestamp; preserved across regressions.
+    # Drives `capabilities.can_read_full_feed(...)` retention rule per
+    # handoff §7.1: once verified, the user keeps full feed access even
+    # if a license later lapses.
+    ever_verified_at = Column(TIMESTAMP, nullable=True)
 
     affiliations = relationship(
         "Affiliation",

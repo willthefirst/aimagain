@@ -124,6 +124,8 @@ MIGRATED_VALUES = {
     ),
     # Value-only vocabulary — labels fall back to the storage value.
     e.VerificationStatus: ("verified", "needs_review", "failed"),
+    e.NpiMatchStatus: ("none", "pending", "matched", "mismatch"),
+    e.LicenseStatus: ("active", "expired", "pending"),
     e.ClientAgeGroup: (
         "children_0_5",
         "children_6_10",
@@ -175,6 +177,10 @@ ALIAS_BINDINGS = [
     (e.CERTIFICATION_TYPES_LABELS, e.CertificationType, "labels"),
     # Value-only — only a values alias exists (no `*_LABELS` dict).
     (e.VERIFICATION_STATUSES, e.VerificationStatus, "values"),
+    (e.NPI_MATCH_STATUSES, e.NpiMatchStatus, "values"),
+    (e.NPI_MATCH_STATUS_LABELS, e.NpiMatchStatus, "labels"),
+    (e.LICENSE_STATUSES, e.LicenseStatus, "values"),
+    (e.LICENSE_STATUS_LABELS, e.LicenseStatus, "labels"),
     # Multi-attribute vocabularies — the standard-kind aliases still bind to
     # `.values()` / `.labels()` / `.icons()`; the extra-attribute derivations
     # (`*_BY_KEY`, `*_SINGULAR`, `*_SHORT_LABELS`, composite slots) are pinned

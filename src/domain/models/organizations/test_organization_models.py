@@ -136,3 +136,67 @@ async def test_child_org_self_references_parent(
         assert loaded is not None
         assert loaded.parent_org_id == parent.id
         assert loaded.root_org_id == parent.root_org_id == parent.id
+
+
+# --- Claim B Type-2 NPI + verification columns ----------------------------
+
+
+async def test_org_verification_defaults(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Newly-created Org lands in "no Type-2 NPI yet" state: `npi=None`,
+    `npi_match_status='none'`, `org_verified=False`."""
+    user = create_test_user()
+    org = _make_org(user)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+            session.add(org)
+
+    async with db_test_session_manager() as session:
+        loaded = (
+            (
+                await session.execute(
+                    select(Organization).filter(Organization.id == org.id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert loaded.npi is None
+        assert loaded.npi_match_status == "none"
+        assert loaded.org_verified is False
+        assert loaded.verified_at is None
+        assert loaded.authorized_official_name is None
+
+
+async def test_org_npi_format_check_rejects_short_value(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Mirror of `clinicians.npi` 10-digit GLOB CHECK — the Type-2 NPI
+    column inherits the same shape constraint."""
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+
+    bad = _make_org(user, npi="12345")
+    async with db_test_session_manager() as session:
+        with pytest.raises(IntegrityError):
+            async with session.begin():
+                session.add(bad)
+
+
+async def test_org_npi_match_status_check_rejects_unknown(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+
+    bogus = _make_org(user, npi_match_status="not_a_real_value")
+    async with db_test_session_manager() as session:
+        with pytest.raises(IntegrityError):
+            async with session.begin():
+                session.add(bogus)

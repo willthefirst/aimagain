@@ -27,6 +27,7 @@ from src.domain.models import (
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
+    LICENSE_STATUSES,
     LICENSE_TYPES,
     US_STATES,
 )
@@ -49,6 +50,13 @@ async def generate_licensures(
     for c_index, clinician in enumerate(clinicians):
         n = rng.int(lo, hi)
         for k in range(n):
+            # Round-robin `status` so every CHECK-vocabulary value is
+            # represented. `attested_at` is populated whenever the row
+            # has been attested (any of `active`/`pending` could have
+            # been the result of a positive attestation; `expired` is
+            # the natural pre-attestation state).
+            status = rng.round_robin(LICENSE_STATUSES, flat_index)
+            attested = status == "active"
             row = ClinicianLicensure(
                 id=deterministic_uuid("ClinicianLicensure", c_index, k),
                 clinician_id=clinician.id,
@@ -59,6 +67,13 @@ async def generate_licensures(
                     None
                     if rng.bool(0.3)
                     else rng.date_within_years(years_back=0, years_forward=5)
+                ),
+                status=status,
+                attested_active=attested,
+                attested_at=(
+                    rng.date_within_years(years_back=1, years_forward=0)
+                    if attested
+                    else None
                 ),
             )
             await session.merge(row)

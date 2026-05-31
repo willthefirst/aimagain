@@ -232,3 +232,73 @@ async def test_invalid_license_type_violates_check_constraint(
                         issuing_state="IL",
                     )
                 )
+
+
+async def test_licensure_status_defaults_to_pending(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Newly inserted licensure rows default to `status='pending'` and
+    `attested_active=False`. The Phase 8 nightly worker transitions
+    `status` to `active` / `expired` based on `expiration_date` +
+    `attested_active`."""
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+            clinician = _make_clinician(user)
+            session.add(clinician)
+        clinician_id = clinician.id
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(
+                ClinicianLicensure(
+                    clinician_id=clinician_id,
+                    license_type="lcsw",
+                    license_number="X-1",
+                    issuing_state="IL",
+                )
+            )
+
+    async with db_test_session_manager() as session:
+        loaded = (
+            (
+                await session.execute(
+                    select(ClinicianLicensure).filter(
+                        ClinicianLicensure.clinician_id == clinician_id
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert loaded.status == "pending"
+        assert loaded.attested_active is False
+        assert loaded.attested_at is None
+
+
+async def test_licensure_status_check_rejects_unknown(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`status` is held to the closed `LICENSE_STATUSES` vocab via
+    `ck_clinician_licensures_status`."""
+    user = create_test_user()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(user)
+            clinician = _make_clinician(user)
+            session.add(clinician)
+        clinician_id = clinician.id
+
+    with pytest.raises(IntegrityError):
+        async with db_test_session_manager() as session:
+            async with session.begin():
+                session.add(
+                    ClinicianLicensure(
+                        clinician_id=clinician_id,
+                        license_type="lcsw",
+                        license_number="X-1",
+                        issuing_state="IL",
+                        status="not_a_real_status",
+                    )
+                )
