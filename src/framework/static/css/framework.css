@@ -22,6 +22,7 @@ html { scrollbar-gutter: stable; font-size: 14px; }
   /* Flat geometry — no elevation, minimal radius */
   --pico-border-radius: 2px;
   --pico-box-shadow: none;
+  --pico-card-box-shadow: none;
 
   /* Primary = quiet institutional blue (info / link / opening) */
   --pico-primary: #1a6496;
@@ -42,6 +43,10 @@ html { scrollbar-gutter: stable; font-size: 14px; }
 /* Heading weights — restrained, not shouting */
 h1 { font-weight: 600; }
 h2, h3, h4, h5, h6 { font-weight: 500; }
+/* Pico defines --pico-card-box-shadow independently from --pico-box-shadow
+   and may set it via higher-specificity selectors in its theme rules.
+   Belt-and-suspenders: kill the shadow directly on the element. */
+article { box-shadow: none; }
 /* Entity list — <ul class="entity-list"> wraps every list of entity
    cards. Resets remove browser list chrome while keeping the <ul>/<li>
    in the accessibility tree so screen readers announce "list of N items".
