@@ -15,12 +15,16 @@ This module is a domain-logic predicate set: it reads `User`/`Clinician`/
 lives in `domain/logic/` (not `framework/`) because framework code may
 not import domain models — see `src/README.md` import discipline.
 
-Phase status: placeholder bodies. The data columns the production
-predicates will read (`Clinician.clinician_verified`, `Clinician.ever_verified_at`,
-`Organization.org_verified`, `OrgRepresentation.authority_status`) do not
-yet exist; this module returns conservative answers from the columns that
-do exist (`User.is_verified`, `Clinician.npi`). Phase 2 of the rollout
-tightens these reads once the schema lands.
+Phase status: production reads. `clinician_verified` consults the
+`Clinician.clinician_verified` denorm cache; `org_rep_verified(user, org)`
+walks `User.org_representations` against `Organization.org_verified`;
+feed read-access honors `Clinician.ever_verified_at` (the once-verified
+retention rule per handoff §7.1).
+
+The predicates remain duck-typed via `getattr` so test stubs (and any
+non-ORM Actor-like object) keep working without constructing real
+SQLAlchemy rows. Templates and routes both call into the same surface,
+so a visible affordance and its server-side gate can't disagree.
 """
 
 from __future__ import annotations
@@ -74,39 +78,73 @@ def email_verified(user: Any) -> bool:
 
 
 def clinician_verified(user: Any) -> bool:
-    """Claim A: NPPES Type-1 name-matched + ≥1 active license.
-
-    Placeholder: returns True when the user has emailed-verified AND owns
-    at least one Clinician with a non-null `npi`. Phase 2 will read
-    `Clinician.clinician_verified` (the denorm cache) once that column
-    exists; until then, an NPI on file is the best signal available.
-    """
+    """Claim A: NPPES Type-1 name-matched + ≥1 active license. Reads the
+    `Clinician.clinician_verified` denorm cache so the predicate doesn't
+    re-derive from `npi_match_status` + licensure status per call. The
+    cache is recomputed by `recompute_clinician_claim(...)` on every
+    transition that touches its inputs."""
     if not email_verified(user):
         return False
     clinicians = getattr(user, "clinicians", None) or ()
-    return any(getattr(c, "npi", None) for c in clinicians)
+    return any(getattr(c, "clinician_verified", False) for c in clinicians)
+
+
+def _verified_active_reps(user: Any) -> tuple[Any, ...]:
+    """Filter `user.org_representations` to currently-verified, non-
+    archived rows. Used by `any_org_rep_verified` / `org_rep_verified` /
+    `claim_state` so the predicate set has a single way to read this."""
+    reps = getattr(user, "org_representations", None) or ()
+    return tuple(
+        r
+        for r in reps
+        if getattr(r, "authority_status", None) == "verified"
+        and getattr(r, "archived_at", None) is None
+    )
 
 
 def org_rep_verified(user: Any, org: Any) -> bool:
-    """Claim B per (user, org). Placeholder: always False until the
-    OrgRepresentation table lands in Phase 1 / Phase 4."""
-    return False
+    """Claim B for `(user, org)`. Requires:
+
+    1. The user's email is verified (floor for every claim).
+    2. The org's Type-2 NPI is `Organization.org_verified` (cached when
+       NPPES confirms — verified once per org).
+    3. The user holds a `verified` + non-archived `OrgRepresentation`
+       for this org.
+    """
+    if not email_verified(user):
+        return False
+    if not getattr(org, "org_verified", False):
+        return False
+    org_id = getattr(org, "id", None)
+    if org_id is None:
+        return False
+    return any(
+        getattr(r, "org_id", None) == org_id for r in _verified_active_reps(user)
+    )
 
 
 def any_org_rep_verified(user: Any) -> bool:
-    """True iff the user holds Claim B for at least one org. Placeholder:
-    always False until OrgRepresentation lands."""
-    return False
+    """True iff the user holds at least one verified, non-archived
+    OrgRepresentation. Skips the per-org `org_verified` gate — Claim B
+    by-any-org is a coarser check that the feed and chrome use to know
+    whether the user has *some* org-rep status, regardless of which
+    specific org is in scope."""
+    if not email_verified(user):
+        return False
+    return bool(_verified_active_reps(user))
 
 
 def can_read_full_feed(user: Any) -> bool:
     """Feed-teaser gate per handoff §7.1: full feed once any claim is
     verified; once-verified users retain read access after a lapse
-    (`ever_verified_at`). Phase 0 placeholder: gate on current Claim A
-    only — `ever_verified_at` doesn't exist yet."""
+    (`ever_verified_at`). New users see the blurred teaser until they
+    clear the first verification."""
     if user is None:
         return False
-    return clinician_verified(user) or any_org_rep_verified(user)
+    if clinician_verified(user) or any_org_rep_verified(user):
+        return True
+    clinicians = getattr(user, "clinicians", None) or ()
+    return any(getattr(c, "ever_verified_at", None) for c in clinicians)
 
 
 def can_post_referral(user: Any) -> bool:
@@ -134,18 +172,22 @@ def can_post_program_intake(user: Any, org: Any) -> bool:
 
 def can_post_org_referral(user: Any, org: Any, clinician: Any) -> bool:
     """Posting an org-attributed referral requires Claim B for the org
-    AND the target clinician must have an active Affiliation to the org.
-    Placeholder: always False until OrgRepresentation lands."""
-    return False
+    AND the target clinician must have an active Affiliation to the org
+    (handoff §4.3 / §10.5)."""
+    if not org_rep_verified(user, org):
+        return False
+    org_id = getattr(org, "id", None)
+    affiliations = getattr(clinician, "affiliations", None) or ()
+    return any(getattr(a, "org_id", None) == org_id for a in affiliations)
 
 
 def directory_listed(clinician: Any) -> bool:
     """A clinician is shown in the public directory iff their Claim A is
     verified (handoff §4.3: `directory.listed = clinician_verified`).
-    Placeholder: presence of an NPI on the clinician row."""
+    Reads the `Clinician.clinician_verified` denorm cache."""
     if clinician is None:
         return False
-    return bool(getattr(clinician, "npi", None))
+    return bool(getattr(clinician, "clinician_verified", False))
 
 
 def can_save_favorite(user: Any) -> bool:
@@ -155,13 +197,24 @@ def can_save_favorite(user: Any) -> bool:
 
 def claim_state(user: Any) -> ClaimState:
     """Aggregate the per-claim flags into one object the profile-hub mode
-    dispatcher consumes."""
+    dispatcher consumes.
+
+    `b` is the set of org IDs the user is a verified rep for; the
+    profile hub's mode dispatcher reads `not state.a and not state.b`
+    to land on `setup` mode. `lapsed` tracking (license expiry,
+    authority revocation) lands when Phase 3 introduces the per-
+    transition recompute helpers; until then it stays empty so the
+    hub never spuriously surfaces a `re-verify` mode.
+    """
     if user is None:
         return ClaimState()
+    rep_org_ids = frozenset(
+        getattr(r, "org_id", None) for r in _verified_active_reps(user)
+    ) - {None}
     return ClaimState(
         a=clinician_verified(user),
-        b=frozenset(),  # Phase 2 populates from OrgRepresentation rows.
-        lapsed=(),  # Phase 2 populates from license-expiry + authority-revoked signals.
+        b=rep_org_ids,
+        lapsed=(),
     )
 
 
