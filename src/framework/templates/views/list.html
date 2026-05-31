@@ -17,14 +17,21 @@ Toolbar row contents (left-to-right):
 Child contract:
 
   Required blocks:
-    resource_label — short string label for the toolbar `<h1>`
-                     and the page title (e.g. "Clinicians").
-                     Plain text, no markup.
-    content        — the list body (typically a
-                     `<section id="<collection>-list">` of
-                     `<article class="entity-card">` items rendered
-                     via `_shared/_card.html`; see `posts/list.html`
-                     for the canonical example).
+    resource_label — short string label for the toolbar `<h1>`.
+                     Plain text, no markup. Defaults to
+                     `spec.url_collection.capitalize()` injected by
+                     `handle_list` — most child templates omit this
+                     block entirely. Override when the page label
+                     differs from the collection name (e.g. a custom
+                     subresource heading), or suppress with an empty
+                     block to hide the h1.
+    content        — the list body. Use the `item_list` macro from
+                     `_shared/_item_list.html` — it wraps items in
+                     `<section>/<ul>/<li>`, handles the empty state,
+                     and renders pagination. Pass a single-arg row
+                     macro (e.g. `clinician_card`) as `row`; define
+                     a local adapter when the underlying macro needs
+                     extra args (see `posts/list.html`).
 
   Optional blocks:
     actions        — toolbar action `<menu>` content (Create
@@ -41,14 +48,13 @@ Child contract:
 
   Context the framework's `handle_list` injects (children don't set
   these by hand):
-    active_filters, search_url, page_meta, paginator_base_query.
+    active_filters, search_url, resource_label, pager.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
-{%- from "_shared/pagination.html" import pagination -%}
 {% block toolbar %}
   {%- set label %}
-    {% block resource_label %}{% endblock %}
+    {% block resource_label %}{{ resource_label | default("") }}{% endblock %}
   {% endset -%}
   {%- set actions_body %}
     {% block actions %}{% endblock %}
@@ -67,6 +73,4 @@ Child contract:
   {% endcall %}
 {% endblock %}
 {% block content %}{% endblock %}
-{% block after_content %}
-  {%- if page_meta is defined %}{{ pagination(page_meta, paginator_base_query|default("") ) }}{%- endif %}
-  {% endblock %}
+{% block after_content %}{% endblock %}

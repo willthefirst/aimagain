@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from contextvars import ContextVar
 from datetime import date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+if TYPE_CHECKING:
+    from src.framework.actor import Actor
 
 from src.framework.config import settings
 from src.framework.observability import observability
@@ -92,6 +98,28 @@ _env.globals["entity_edit_label"] = entity_edit_label
 _env.globals["entity_filter_label"] = entity_filter_label
 _env.filters["format_post_date"] = format_post_date
 _env.filters["days_ago"] = days_ago
+
+# Per-request viewer — set by list handlers before rendering so that macros
+# (which can't access template context variables) can call viewer_is_admin().
+_viewer_var: ContextVar[Actor | None] = ContextVar("_viewer", default=None)
+
+
+def set_viewer(user: Actor | None) -> None:
+    """Set the current viewer for the duration of the current async task."""
+    _viewer_var.set(user)
+
+
+def viewer_is_admin() -> bool:
+    """Return True when the current viewer is a superuser.
+
+    Registered as the ``viewer_is_admin`` template global so macros can
+    check admin capability without receiving it as an explicit argument.
+    """
+    u = _viewer_var.get()
+    return u is not None and bool(getattr(u, "is_superuser", False))
+
+
+_env.globals["viewer_is_admin"] = viewer_is_admin
 
 
 def register_template_globals(**kwargs: Any) -> None:

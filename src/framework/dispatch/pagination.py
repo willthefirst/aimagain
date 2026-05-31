@@ -73,6 +73,20 @@ def offset_for(page: int, per_page: int) -> int:
     return (page - 1) * per_page
 
 
+@dataclass(frozen=True)
+class Pager:
+    """Pagination state for list-view templates.
+
+    Bundles the ``Page`` snapshot and the base query string so templates
+    receive pagination state as one argument rather than two.  Pass as
+    ``pager=pager`` to ``item_list``; call
+    ``pagination(pager.page, pager.base_query)`` when rendering directly.
+    """
+
+    page: Page
+    base_query: str = ""
+
+
 def base_query(request: Request) -> str:
     """Return the request's query string with `page` stripped.
 
