@@ -2,8 +2,9 @@
    viewport render at the same width as pages that overflow —
    otherwise the layout shifts horizontally when a scrollbar
    appears (notably on macOS with "Always show scrollbars"). */
-html { scrollbar-gutter: stable; }
+html { scrollbar-gutter: stable; font-size: 14px; }
 :root {
+  /* Spacing & rhythm */
   --pico-spacing: 0.75rem;
   --pico-form-element-spacing-vertical: 0.5rem;
   --pico-form-element-spacing-horizontal: 0.75rem;
@@ -11,11 +12,41 @@ html { scrollbar-gutter: stable; }
   --pico-typography-spacing-vertical: 0.5rem;
   --pico-block-spacing-vertical: 0.75rem;
   --pico-block-spacing-horizontal: 1rem;
-  --pico-font-size-h1: 1.75rem;
-  --pico-font-size-h2: 1.375rem;
-  --pico-font-size-h3: 1.125rem;
+
+  /* Heading sizes — tight, information-forward */
+  --pico-font-size-h1: 1.5rem;
+  --pico-font-size-h2: 1.25rem;
+  --pico-font-size-h3: 1.0625rem;
   --pico-font-size-h4: 1rem;
+
+  /* Flat geometry — no elevation, minimal radius */
+  --pico-border-radius: 2px;
+  --pico-box-shadow: none;
+  --pico-card-box-shadow: none;
+
+  /* Primary = quiet institutional blue (info / link / opening) */
+  --pico-primary: #1a6496;
+  --pico-primary-background: #1a6496;
+  --pico-primary-hover: #145380;
+  --pico-primary-focus: rgba(26, 100, 150, 0.18);
+  --pico-primary-inverse: #ffffff;
+
+  /* Neutral palette */
+  --pico-color: #1e2530;
+  --pico-muted-color: #5f6b7a;
+  --pico-muted-border-color: #dde1e7;
+
+  /* Semantic accents — one each for warning and success */
+  --color-warning: #b45309;
+  --color-success: #166534;
 }
+/* Heading weights — restrained, not shouting */
+h1 { font-weight: 600; }
+h2, h3, h4, h5, h6 { font-weight: 500; }
+/* Pico defines --pico-card-box-shadow independently from --pico-box-shadow
+   and may set it via higher-specificity selectors in its theme rules.
+   Belt-and-suspenders: kill the shadow directly on the element. */
+article { box-shadow: none; }
 /* Entity list — <ul class="entity-list"> wraps every list of entity
    cards. Resets remove browser list chrome while keeping the <ul>/<li>
    in the accessibility tree so screen readers announce "list of N items".
@@ -105,7 +136,7 @@ dl {
   margin: 0;
 }
 dl > div { display: contents; }
-dt { font-weight: 600; }
+dt { font-weight: 500; }
 dd { margin: 0; }
 @media (max-width: 640px) {
   dl { grid-template-columns: 1fr; row-gap: 0.5rem; }
@@ -191,7 +222,7 @@ dd { margin: 0; }
   padding: 0;
   border: 0;
 }
-.form-field-label { font-weight: 600; }
+.form-field-label { font-weight: 500; }
 /* "(optional)" indicator rendered by every form-field macro when
    `required=False`. Reads as muted secondary text next to the
    label so it's visually clear the field can be left blank
@@ -482,7 +513,7 @@ td > menu > li > [role="button"] {
    every page via the default `{% block footer %}` body. */
 footer.container { text-align: center; }
 fieldset { border: none; padding: 0; margin: 0 0 1.25rem; }
-legend { font-size: 0.8em; text-transform: uppercase; color: var(--pico-muted-color); font-weight: 500; padding: 0; }
+legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); font-weight: 500; padding: 0; }
 /* Primary nav — brand always visible; links in a <details> so mobile
    can collapse them behind a hamburger toggle. */
 #primary-nav {
