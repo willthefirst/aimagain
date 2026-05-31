@@ -3,6 +3,9 @@
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 
+# Per-worktree host port assignment (written by `dev worktree add`, read by `dev up`)
+.worktree-port
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
