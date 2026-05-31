@@ -92,6 +92,23 @@ def test_add_prints_dev_up_hint(tmp_path: Path, capsys) -> None:
     assert str(repo / ".claude" / "worktrees" / "issue-707") in out
 
 
+def test_add_copies_env_when_present(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    (repo / ".env").write_text("SECRET=abc\n")
+    cmd = WorktreeCommands(_FakeRunner(repo))
+    assert cmd.add("707", base="origin/main") == 0
+    assert (
+        repo / ".claude" / "worktrees" / "issue-707" / ".env"
+    ).read_text() == "SECRET=abc\n"
+
+
+def test_add_skips_env_copy_when_absent(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    cmd = WorktreeCommands(_FakeRunner(repo))
+    assert cmd.add("707", base="origin/main") == 0
+    assert not (repo / ".claude" / "worktrees" / "issue-707" / ".env").exists()
+
+
 def test_add_refuses_when_path_exists(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     cmd = WorktreeCommands(_FakeRunner(repo))
