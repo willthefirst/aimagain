@@ -1,6 +1,37 @@
 """Tests for `src/framework/http/middleware.py`."""
 
-from .middleware import _strip_empty_pairs
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
+from fastapi.testclient import TestClient
+
+from .middleware import StaticNoCacheMiddleware, _strip_empty_pairs
+
+
+def _make_client() -> TestClient:
+    app = FastAPI()
+    app.add_middleware(StaticNoCacheMiddleware)
+
+    @app.get("/static/fw/css/framework.css")
+    def static_css():
+        return PlainTextResponse("body{}")
+
+    @app.get("/page")
+    def page():
+        return PlainTextResponse("hi")
+
+    return TestClient(app)
+
+
+def test_static_path_gets_no_store():
+    client = _make_client()
+    r = client.get("/static/fw/css/framework.css")
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_non_static_path_unaffected():
+    client = _make_client()
+    r = client.get("/page")
+    assert "cache-control" not in r.headers
 
 
 def test_strip_empty_value():
