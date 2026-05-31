@@ -342,6 +342,24 @@ emitted attribute string. #}
     {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid, error=error) }}
   {%- endif -%}
 {%- endmacro %}
+{# ---- form section ------------------------------------------------- #}
+{# Canonical `<fieldset>` + `<legend>` wrapper for a named group of
+   fields. Replaces hand-written fieldsets in every form template so
+   the section chrome is defined once and layout changes apply
+   everywhere.
+
+   Usage:
+     {% call form_section("Client location") %}
+       {{ text_field("location_city", "City") }}
+       {{ select_field("location_state", "State", US_STATES) }}
+     {% endcall %}
+#}
+{% macro form_section(title) -%}
+  <fieldset class="form-section">
+    <legend>{{ title }}</legend>
+    {{ caller() }}
+  </fieldset>
+{%- endmacro %}
 {# ---- specialized widgets ------------------------------------------ #}
 {# Day × time-of-day checkbox grid. One checkbox per (day, part) pair;
    all share the same `name` so the json-enc-arrays extension serializes
