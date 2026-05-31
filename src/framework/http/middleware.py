@@ -7,6 +7,33 @@ where the convention belongs, instead of every handler remembering it.
 
 from typing import Callable
 
+from starlette.datastructures import MutableHeaders
+
+
+class StaticNoCacheMiddleware:
+    """Add ``Cache-Control: no-store`` to every ``/static/`` response.
+
+    Prevents the browser from caching CSS/JS/font assets between reloads
+    so edits are visible without a hard refresh. Only mount this in
+    development — production static assets should be far-future cached.
+    """
+
+    def __init__(self, app: Callable):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path", "").startswith("/static/"):
+
+            async def send_no_cache(message):
+                if message["type"] == "http.response.start":
+                    headers = MutableHeaders(scope=message)
+                    headers["Cache-Control"] = "no-store"
+                await send(message)
+
+            await self.app(scope, receive, send_no_cache)
+        else:
+            await self.app(scope, receive, send)
+
 
 class StripEmptyQueryParamsMiddleware:
     """Treat ``?key=`` (and bare ``?key``) as if the key were absent.
