@@ -31,3 +31,15 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         lazy="selectin",
         viewonly=True,
     )
+    # Reverse of `OrgRepresentation.user_id`. Drives Claim B in the
+    # capability predicates (`capabilities.any_org_rep_verified(user)`,
+    # `capabilities.org_rep_verified(user, org)`,
+    # `capabilities.claim_state(user)`). Lazy selectin so a single
+    # `user`-shaped read picks up the rep set without a follow-up query
+    # — same pattern as `clinicians` / `programs`.
+    org_representations = relationship(
+        "OrgRepresentation",
+        foreign_keys="OrgRepresentation.user_id",
+        lazy="selectin",
+        viewonly=True,
+    )
