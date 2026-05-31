@@ -46,7 +46,7 @@ def _render(env: Environment, body: str) -> str:
     it so tests can stay focused on the macro call under test.
     """
     template = textwrap.dedent(f"""\
-        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, radio_bool_field -%}}
+        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, radio_bool_field -%}}
         {body}
         """)
     return env.from_string(template).render()
@@ -283,6 +283,90 @@ def test_entity_select_field_preselects_current() -> None:
     assert selected.attributes.get("value") == "2"
 
 
+# --- composite_select_field -----------------------------------------------
+
+
+def test_composite_select_field_renders_option_per_tuple() -> None:
+    """`options=[(value, label), ...]` produces one `<option>` per tuple
+    in iteration order, with no implicit dedupe — flatten-nested call
+    sites depend on getting both occurrences emitted."""
+    html = _render(
+        _make_env(),
+        '{{ composite_select_field("clinician_id", "Practice",'
+        ' [("c1", "Acme"), ("c1", "Beta"), ("c2", "Gamma")]) }}',
+    )
+    tree = HTMLParser(html)
+    opts = tree.css('select[name="clinician_id"] option')
+    # placeholder + 3 tuples
+    assert len(opts) == 4
+    assert [o.text().strip() for o in opts[1:]] == ["Acme", "Beta", "Gamma"]
+    assert [o.attributes.get("value") for o in opts[1:]] == ["c1", "c1", "c2"]
+
+
+def test_composite_select_field_default_first_selects_first_when_no_current() -> None:
+    """`default_first=true` + no current/form_value → first option is
+    `selected` and no `--` placeholder is emitted. This is the
+    create-mode contract for the clinician practice pickers."""
+    html = _render(
+        _make_env(),
+        '{{ composite_select_field("x", "X",'
+        ' [("a", "A"), ("b", "B")], default_first=true) }}',
+    )
+    tree = HTMLParser(html)
+    opts = tree.css('select[name="x"] option')
+    assert len(opts) == 2
+    assert "selected" in opts[0].attributes
+    assert "selected" not in opts[1].attributes
+
+
+def test_composite_select_field_first_match_wins_on_duplicate_values() -> None:
+    """When `current` matches a value that appears multiple times in
+    `options`, only the FIRST occurrence is marked `selected` — keeps
+    the visible selection stable for nested-flatten pickers (a clinician
+    with two affiliations shouldn't render two `selected` options on
+    the same value)."""
+    html = _render(
+        _make_env(),
+        '{{ composite_select_field("x", "X",'
+        ' [("c1", "Acme"), ("c1", "Beta"), ("c2", "Gamma")], current="c1") }}',
+    )
+    tree = HTMLParser(html)
+    selected = tree.css('select[name="x"] option[selected]')
+    assert len(selected) == 1
+    assert selected[0].text().strip() == "Acme"
+
+
+def test_composite_select_field_required_no_current_emits_placeholder() -> None:
+    """Default mode (no `default_first`, no `current`) renders Pico's
+    disabled `--` placeholder so the user is forced to pick — same
+    behavior as `entity_select_field` for required selects."""
+    html = _render(
+        _make_env(),
+        '{{ composite_select_field("x", "X", [("a", "A")]) }}',
+    )
+    tree = HTMLParser(html)
+    placeholder = tree.css_first('select[name="x"] option[disabled]')
+    assert placeholder is not None
+    assert "selected" in placeholder.attributes
+    assert placeholder.text().strip() == "--"
+
+
+def test_composite_select_field_current_wins_over_default_first() -> None:
+    """If both `current` and `default_first=true` are set, `current`
+    selects the matching option — `default_first` only kicks in when
+    no current/form_value is set. Pins the precedence so the create-
+    mode default doesn't override a validation-rerender's form_value."""
+    html = _render(
+        _make_env(),
+        '{{ composite_select_field("x", "X",'
+        ' [("a", "A"), ("b", "B")], current="b", default_first=true) }}',
+    )
+    tree = HTMLParser(html)
+    selected = tree.css('select[name="x"] option[selected]')
+    assert len(selected) == 1
+    assert selected[0].attributes.get("value") == "b"
+
+
 # --- optional indicator ---------------------------------------------------
 
 
@@ -368,7 +452,7 @@ def _render_macro(macro_call: str) -> "HTMLParser":
     template = (
         '{%- from "_shared/form_fields.html" import text_field, textarea_field,'
         " url_field, select_field, multi_select_field, entity_select_field,"
-        " field_for -%}\n"
+        " composite_select_field, field_for -%}\n"
         f"{macro_call}"
     )
     return HTMLParser(env.from_string(template).render())
@@ -396,6 +480,11 @@ _INPUT_MACROS = [
     (
         "entity_select_field",
         '{{ entity_select_field("x", "X", entities, error="bad") }}',
+        "select",
+    ),
+    (
+        "composite_select_field",
+        '{{ composite_select_field("x", "X", [("1", "Alpha")], error="bad") }}',
         "select",
     ),
 ]
@@ -554,7 +643,7 @@ def _render_macro_with_context(macro_call: str, **context: dict) -> "HTMLParser"
     template = (
         '{%- from "_shared/form_fields.html" import text_field, textarea_field,'
         " url_field, select_field, multi_select_field, entity_select_field,"
-        " field_for with context -%}\n"
+        " composite_select_field, field_for with context -%}\n"
         f"{macro_call}"
     )
     return HTMLParser(env.from_string(template).render(**context))
@@ -573,6 +662,11 @@ _AUTO_RESOLVE_MACROS = [
     (
         "entity_select_field",
         '{{ entity_select_field("x", "X", entities) }}',
+        "select",
+    ),
+    (
+        "composite_select_field",
+        '{{ composite_select_field("x", "X", [("1", "Alpha")]) }}',
         "select",
     ),
 ]
@@ -674,6 +768,12 @@ _AUTO_RESOLVE_VALUE_CASES = [
     (
         "entity_select_field",
         '{{ entity_select_field("x", "X", entities) }}',
+        "1",
+        _select_selected_check(["1"]),
+    ),
+    (
+        "composite_select_field",
+        '{{ composite_select_field("x", "X", [("1", "Alpha")]) }}',
         "1",
         _select_selected_check(["1"]),
     ),
