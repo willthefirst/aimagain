@@ -11,7 +11,9 @@
 {% block content %}
   {% if clinicians %}
     <section id="clinicians-list">
-      {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
+      <ul class="entity-list">
+        {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
+        </ul>
       </section>
     {% else %}
       <p>No clinicians found.</p>

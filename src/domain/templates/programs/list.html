@@ -10,24 +10,26 @@
 {% block content %}
   {% if programs %}
     <section id="programs-list">
-      {%- for program in programs %}
-        {%- set subtitle %}
-          <span>{{ "Accepting referrals" if program.accepting_referrals else "Not accepting referrals" }}</span>
-          {%- if program.state_preference %}<span>{{ program.state_preference }}</span>{%- endif %}
-        {%- endset %}
-        {% call card(
-          id=program.id,
-          headline_url=entity_url('program', id=program.id),
-          headline=program.name,
-          subtitle=subtitle) -%}
-          <section class="entity-facts">
-            <dl>
-              {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>
-            {% endcall %}
-          </dl>
-        </section>
-      {%- endcall %}
-    {%- endfor %}
+      <ul class="entity-list">
+        {%- for program in programs %}
+          {%- set subtitle %}
+            <span>{{ "Accepting referrals" if program.accepting_referrals else "Not accepting referrals" }}</span>
+            {%- if program.state_preference %}<span>{{ program.state_preference }}</span>{%- endif %}
+          {%- endset %}
+          {% call card(
+            id=program.id,
+            headline_url=entity_url('program', id=program.id),
+            headline=program.name,
+            subtitle=subtitle) -%}
+            <section class="entity-facts">
+              <dl>
+                {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>
+              {% endcall %}
+            </dl>
+          </section>
+        {%- endcall %}
+      {%- endfor %}
+    </ul>
   </section>
 {% else %}
   {# Empty state owns its own CTA so the next action is in the eye-line of

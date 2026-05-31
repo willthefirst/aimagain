@@ -26,7 +26,9 @@
     <div class="posts-results">
       {% if posts %}
         <section id="posts-list">
-          {%- for post in posts %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
+          <ul class="post-feed-list">
+            {%- for post in posts %}{{ post_feed_row(post, entity_name) }}{%- endfor %}
+            </ul>
           </section>
         {% else %}
           {{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",

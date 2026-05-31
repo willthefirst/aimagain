@@ -4,7 +4,9 @@
 {% block content %}
   {% if clinicians %}
     <section id="favorites-list">
-      {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
+      <ul class="entity-list">
+        {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
+        </ul>
       </section>
     {% else %}
       <p id="favorites-empty">
