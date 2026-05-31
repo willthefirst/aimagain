@@ -59,8 +59,8 @@ def test_base_context_regular_user():
 
 
 def test_base_context_claim_a_verified_user():
-    """A user with a verified Clinician (placeholder: any clinician with
-    an `npi`) flips `claims.a` to True. Pins the wiring between
+    """A user with a `clinician_verified=True` cache on at least one
+    `Clinician` flips `claims.a` to True. Pins the wiring between
     `base_context()` and `capabilities.claim_state()` — Phase 5's
     profile-hub mode dispatcher reads this same shape."""
     user = SimpleNamespace(
@@ -68,11 +68,41 @@ def test_base_context_claim_a_verified_user():
         username="alice",
         is_superuser=False,
         is_verified=True,
-        clinicians=[SimpleNamespace(npi="1234567890")],
+        clinicians=[
+            SimpleNamespace(
+                npi="1234567890",
+                clinician_verified=True,
+                ever_verified_at=None,
+            )
+        ],
+        org_representations=[],
     )
     ctx = base_context(user)
     assert ctx["claims"] == {"a": True, "b": []}
     assert ctx["any_claim_lapsed"] is False
+
+
+def test_base_context_claim_b_coordinator():
+    """A program coordinator (no clinician profile) with a verified
+    OrgRepresentation gets `claims.b` populated with the org id."""
+    org_id = uuid.uuid4()
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="dana",
+        is_superuser=False,
+        is_verified=True,
+        clinicians=[],
+        org_representations=[
+            SimpleNamespace(
+                org_id=org_id,
+                authority_status="verified",
+                archived_at=None,
+            )
+        ],
+    )
+    ctx = base_context(user)
+    assert ctx["claims"]["a"] is False
+    assert ctx["claims"]["b"] == [org_id]
 
 
 def test_base_context_unverified_user_surfaces_for_nag_banner():

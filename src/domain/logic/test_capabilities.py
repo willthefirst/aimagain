@@ -18,7 +18,10 @@ from src.domain.logic import capabilities
 
 
 def _user(
-    *, is_verified: bool = False, clinicians: list | None = None
+    *,
+    is_verified: bool = False,
+    clinicians: list | None = None,
+    org_representations: list | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
@@ -26,11 +29,41 @@ def _user(
         username="test",
         is_verified=is_verified,
         clinicians=clinicians or [],
+        org_representations=org_representations or [],
     )
 
 
-def _clinician(*, npi: str | None = None) -> SimpleNamespace:
-    return SimpleNamespace(npi=npi)
+def _clinician(
+    *,
+    npi: str | None = None,
+    clinician_verified: bool = False,
+    ever_verified_at=None,
+    affiliations: list | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        npi=npi,
+        clinician_verified=clinician_verified,
+        ever_verified_at=ever_verified_at,
+        affiliations=affiliations or [],
+    )
+
+
+def _org(*, org_verified: bool = True) -> SimpleNamespace:
+    return SimpleNamespace(id=uuid4(), org_verified=org_verified)
+
+
+def _rep(
+    *,
+    org_id,
+    authority_status: str = "verified",
+    archived_at=None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        org_id=org_id,
+        authority_status=authority_status,
+        archived_at=archived_at,
+    )
 
 
 # ---------- email_verified ------------------------------------------------
@@ -70,40 +103,137 @@ def test_clinician_verified_no_clinicians():
     assert capabilities.clinician_verified(_user(is_verified=True)) is False
 
 
-def test_clinician_verified_clinician_without_npi():
+def test_clinician_verified_clinician_with_npi_but_cache_false():
+    """An NPI on file is no longer sufficient; the `clinician_verified`
+    denorm cache must also be True (post-NPPES match + license attest)."""
+    user = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=False)],
+    )
+    assert capabilities.clinician_verified(user) is False
+
+
+def test_clinician_verified_clinician_without_clinician_verified_cache():
     user = _user(is_verified=True, clinicians=[_clinician(npi=None)])
     assert capabilities.clinician_verified(user) is False
 
 
 def test_clinician_verified_requires_email_verified():
-    user = _user(is_verified=False, clinicians=[_clinician(npi="1234567890")])
+    user = _user(
+        is_verified=False,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
     assert capabilities.clinician_verified(user) is False
 
 
 def test_clinician_verified_with_npi():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
-    assert capabilities.clinician_verified(user) is True
-
-
-def test_clinician_verified_any_clinician_with_npi_suffices():
     user = _user(
         is_verified=True,
-        clinicians=[_clinician(npi=None), _clinician(npi="9876543210")],
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
     assert capabilities.clinician_verified(user) is True
 
 
-# ---------- Claim B placeholders (always False until Phase 1/4) -----------
+def test_clinician_verified_any_verified_clinician_suffices():
+    """A user can own multiple `Clinician` rows; one with the
+    `clinician_verified` cache set is enough."""
+    user = _user(
+        is_verified=True,
+        clinicians=[
+            _clinician(npi=None, clinician_verified=False),
+            _clinician(npi="9876543210", clinician_verified=True),
+        ],
+    )
+    assert capabilities.clinician_verified(user) is True
 
 
-def test_org_rep_verified_placeholder_false():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
-    org = SimpleNamespace(id=uuid4())
+# ---------- Claim B (OrgRepresentation-backed) ----------------------------
+
+
+def test_org_rep_verified_requires_org_verified():
+    """Even a verified rep against an unverified org returns False —
+    Claim B requires both `Organization.org_verified` and a verified
+    `OrgRepresentation` row."""
+    org = _org(org_verified=False)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
     assert capabilities.org_rep_verified(user, org) is False
 
 
-def test_any_org_rep_verified_placeholder_false():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
+def test_org_rep_verified_requires_verified_authority_status():
+    """A pending or rejected representation does NOT confer Claim B."""
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="pending")],
+    )
+    assert capabilities.org_rep_verified(user, org) is False
+
+
+def test_org_rep_verified_ignores_archived_rows():
+    """Per handoff §10.8 archived rows pause authority — they don't
+    count toward Claim B."""
+    import datetime as _dt
+
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[
+            _rep(
+                org_id=org.id,
+                authority_status="verified",
+                archived_at=_dt.datetime(2026, 1, 1),
+            )
+        ],
+    )
+    assert capabilities.org_rep_verified(user, org) is False
+
+
+def test_org_rep_verified_happy_path():
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    assert capabilities.org_rep_verified(user, org) is True
+
+
+def test_org_rep_verified_different_org_id_misses():
+    """A verified rep for org A does NOT confer Claim B for org B."""
+    other_org = _org(org_verified=True)
+    target_org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=other_org.id, authority_status="verified")],
+    )
+    assert capabilities.org_rep_verified(user, target_org) is False
+
+
+def test_any_org_rep_verified_true_with_verified_rep():
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    assert capabilities.any_org_rep_verified(user) is True
+
+
+def test_any_org_rep_verified_false_when_only_pending():
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=uuid4(), authority_status="pending")],
+    )
+    assert capabilities.any_org_rep_verified(user) is False
+
+
+def test_any_org_rep_verified_requires_email_verified():
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=False,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
     assert capabilities.any_org_rep_verified(user) is False
 
 
@@ -119,41 +249,105 @@ def test_can_read_full_feed_unverified_clinician_false():
 
 
 def test_can_read_full_feed_verified_clinician_true():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
+    user = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
     assert capabilities.can_read_full_feed(user) is True
 
 
+def test_can_read_full_feed_ever_verified_retains_access():
+    """Per handoff §7.1: once a user has been verified, they retain
+    feed read-access after a regression. A clinician with
+    `clinician_verified=False` but `ever_verified_at` set still passes."""
+    import datetime as _dt
+
+    user = _user(
+        is_verified=True,
+        clinicians=[
+            _clinician(
+                npi="1234567890",
+                clinician_verified=False,
+                ever_verified_at=_dt.datetime(2026, 1, 1),
+            )
+        ],
+    )
+    assert capabilities.can_read_full_feed(user) is True
+
+
+def test_can_read_full_feed_org_rep_unlocks_for_user_without_clinician():
+    """A program coordinator with no Type-1 NPI but a verified org rep
+    gets full feed access — handoff §3, §7.1."""
+    org = _org(org_verified=True)
+    coordinator = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    assert capabilities.can_read_full_feed(coordinator) is True
+
+
 def test_can_post_referral_tracks_clinician_verified():
-    verified = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
+    verified = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
     unverified = _user(is_verified=True)
     assert capabilities.can_post_referral(verified) is True
     assert capabilities.can_post_referral(unverified) is False
 
 
 def test_can_post_opening_tracks_clinician_verified():
-    verified = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
+    verified = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
     unverified = _user(is_verified=True)
     assert capabilities.can_post_opening(verified) is True
     assert capabilities.can_post_opening(unverified) is False
 
 
 def test_can_message_tracks_clinician_verified():
-    verified = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
+    verified = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
     assert capabilities.can_message(verified) is True
     assert capabilities.can_message(None) is False
 
 
-def test_can_post_program_intake_placeholder_false():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
-    org = SimpleNamespace(id=uuid4())
+def test_can_post_program_intake_requires_claim_b_for_target_org():
+    org = _org(org_verified=True)
+    other_org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=other_org.id, authority_status="verified")],
+    )
+    # Verified rep for `other_org`, but the post targets `org` — denied.
     assert capabilities.can_post_program_intake(user, org) is False
+    # Same user posting against `other_org` is allowed.
+    assert capabilities.can_post_program_intake(user, other_org) is True
 
 
-def test_can_post_org_referral_placeholder_false():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
-    org = SimpleNamespace(id=uuid4())
-    clinician = _clinician(npi="1234567890")
-    assert capabilities.can_post_org_referral(user, org, clinician) is False
+def test_can_post_org_referral_requires_clinician_affiliation():
+    """Per handoff §10.5: org-attributed referrals require the target
+    clinician to have an active Affiliation to the org. Claim B alone
+    is not enough — the org must be allowed to speak for the clinician
+    in question."""
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    # Clinician with no affiliation to the target org → denied.
+    unaffiliated = _clinician(clinician_verified=True)
+    assert capabilities.can_post_org_referral(user, org, unaffiliated) is False
+
+    # Affiliated clinician → allowed.
+    affiliated = _clinician(
+        clinician_verified=True,
+        affiliations=[SimpleNamespace(org_id=org.id)],
+    )
+    assert capabilities.can_post_org_referral(user, org, affiliated) is True
 
 
 # ---------- directory_listed ----------------------------------------------
@@ -163,12 +357,19 @@ def test_directory_listed_none_false():
     assert capabilities.directory_listed(None) is False
 
 
-def test_directory_listed_clinician_without_npi_false():
-    assert capabilities.directory_listed(_clinician(npi=None)) is False
+def test_directory_listed_unverified_clinician_false():
+    """NPI presence alone is no longer enough; the `clinician_verified`
+    denorm cache must be True (post-NPPES + license attest)."""
+    assert capabilities.directory_listed(_clinician(npi="1234567890")) is False
 
 
-def test_directory_listed_clinician_with_npi_true():
-    assert capabilities.directory_listed(_clinician(npi="1234567890")) is True
+def test_directory_listed_verified_clinician_true():
+    assert (
+        capabilities.directory_listed(
+            _clinician(npi="1234567890", clinician_verified=True)
+        )
+        is True
+    )
 
 
 # ---------- can_save_favorite (only email_verified) -----------------------
@@ -194,11 +395,54 @@ def test_claim_state_anon_empty():
 
 
 def test_claim_state_a_only():
-    user = _user(is_verified=True, clinicians=[_clinician(npi="1234567890")])
+    user = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
     s = capabilities.claim_state(user)
     assert s.a is True
     assert s.b == frozenset()
     assert s.lapsed == ()
+
+
+def test_claim_state_b_only_coordinator():
+    """A user with only verified `OrgRepresentation` rows (no clinician)
+    lands at `a=False` + `b={org_id, ...}`."""
+    org_a = _org(org_verified=True)
+    org_b = _org(org_verified=True)
+    coordinator = _user(
+        is_verified=True,
+        org_representations=[
+            _rep(org_id=org_a.id, authority_status="verified"),
+            _rep(org_id=org_b.id, authority_status="verified"),
+        ],
+    )
+    s = capabilities.claim_state(coordinator)
+    assert s.a is False
+    assert s.b == frozenset({org_a.id, org_b.id})
+
+
+def test_claim_state_b_excludes_pending_and_archived():
+    """Only verified, non-archived rows count toward `b`."""
+    import datetime as _dt
+
+    pending_org = _org(org_verified=True)
+    archived_org = _org(org_verified=True)
+    active_org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[
+            _rep(org_id=pending_org.id, authority_status="pending"),
+            _rep(
+                org_id=archived_org.id,
+                authority_status="verified",
+                archived_at=_dt.datetime(2026, 1, 1),
+            ),
+            _rep(org_id=active_org.id, authority_status="verified"),
+        ],
+    )
+    s = capabilities.claim_state(user)
+    assert s.b == frozenset({active_org.id})
 
 
 def test_claim_state_b_set_is_frozenset():
