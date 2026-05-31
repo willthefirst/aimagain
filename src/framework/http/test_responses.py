@@ -28,6 +28,12 @@ def test_base_context_anonymous():
         # Anonymous users don't get the verify nag — default True so
         # the banner stays silent.
         "current_user_is_verified": True,
+        # Claim-aware chrome (claim-based verification rollout) — anon
+        # holds no claims and has no lapsed claims.
+        "claims": {"a": False, "b": []},
+        "claim_a_lapsed": False,
+        "claim_b_lapsed_orgs": [],
+        "any_claim_lapsed": False,
     }
 
 
@@ -43,7 +49,30 @@ def test_base_context_regular_user():
         "current_user_id": user_id,
         "has_clinician_profile": False,
         "current_user_is_verified": True,
+        # No clinicians on this stub → Claim A is False; OrgRepresentation
+        # placeholders keep `b` empty.
+        "claims": {"a": False, "b": []},
+        "claim_a_lapsed": False,
+        "claim_b_lapsed_orgs": [],
+        "any_claim_lapsed": False,
     }
+
+
+def test_base_context_claim_a_verified_user():
+    """A user with a verified Clinician (placeholder: any clinician with
+    an `npi`) flips `claims.a` to True. Pins the wiring between
+    `base_context()` and `capabilities.claim_state()` — Phase 5's
+    profile-hub mode dispatcher reads this same shape."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="alice",
+        is_superuser=False,
+        is_verified=True,
+        clinicians=[SimpleNamespace(npi="1234567890")],
+    )
+    ctx = base_context(user)
+    assert ctx["claims"] == {"a": True, "b": []}
+    assert ctx["any_claim_lapsed"] is False
 
 
 def test_base_context_unverified_user_surfaces_for_nag_banner():
