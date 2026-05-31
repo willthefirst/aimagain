@@ -6,13 +6,13 @@
 {%- from "_shared/forms.html" import icon_legend, filter_checkbox -%}
 {% macro filter_form(list_url, filter_values) %}
   <form method="get" action="{{ list_url }}">
-    {#-- 1. Type --#}
+    {#-- 1. Kind --#}
     <fieldset class="posts-filter-section">
-      {{ icon_legend('tag', 'Type') }}
+      {{ icon_legend('filter', 'Kind') }}
       {%- for v, l in (
-        ("referral", "Client referrals"),
-        ("clinician_opening", "Clinician openings"),
-        ("program_intake", "Program intakes"),
+        ("referral", "Referral"),
+        ("clinician_opening", "Opening"),
+        ("program_intake", "Intake"),
         ) %}
         {{ filter_checkbox('kind', v, l, checked=(v in (filter_values.get("kind") or []))
         )
