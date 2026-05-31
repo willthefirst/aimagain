@@ -14,6 +14,14 @@ Used by both `posts/new_clinician_opening.html` (create) and
 The `clinician_id` FK on the OpeningDetail links this announcement to
 the clinician whose practice it describes. The wrapper templates redirect
 to the clinician-create flow when `current_user.clinicians` is empty.
+
+Field order:
+  1. Which practice — establishes context for the whole form
+  2. About — description, referral instructions, website
+  3. Availability — desired times / schedule notes
+  4. Who you serve — age groups, languages, genders
+  5. Services & approach — services, treatment settings, modalities
+  6. Subject — optional, auto-generates; last because most users skip it
 #}
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected into
@@ -40,7 +48,6 @@ to the clinician-create flow when `current_user.clinicians` is empty.
   {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="clinician_opening" />
-    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {# Practice picker. A Clinician may carry multiple Affiliations
      (clinician × org practice-role rows); the dropdown labels each
      option by the affiliation's org name so a clinician who works at
@@ -66,14 +73,17 @@ to the clinician-create flow when `current_user.clinicians` is empty.
       {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
       {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
     {% endcall %}
-    {% call form_section("Featured services") %}
-      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
-      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
+    {% call form_section("Who you serve") %}
       {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
       {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
       {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
     {% endcall %}
+    {% call form_section("Services & approach") %}
+      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
+      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
+    {% endcall %}
+    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   </form>
 {%- endmacro -%}
