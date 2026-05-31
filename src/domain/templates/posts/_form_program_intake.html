@@ -17,15 +17,36 @@ The wrapper templates `posts/new_program_intake.html` /
 `posts/edit_program_intake.html` redirect to the program-create flow
 when `current_user.programs` is empty, so this macro always renders
 with at least one Program available.
+
+Field order:
+  1. Which program — establishes context for the whole form
+  2. About — description, referral instructions, website
+  3. Availability — desired times / schedule notes
+  4. Who you serve — age groups, languages, genders
+  5. Services & approach — services, treatment settings, modalities
+  6. Subject — optional, auto-generates; last because most users skip it
 #}
+{# `with context` lets the form_fields macros auto-resolve per-field
+   `error=`/`current=` from the `form_errors`/`form_values` injected
+   into the render context by `mount_create` on a validation-failure
+   re-render (see `POST_ENTITY.form_error_render` + the docstring at
+   the top of `_shared/form_fields.html`). No per-field error or value
+   threading is required at the callsite. #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section with context -%}
 {%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro intake_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.intake_detail if post else None -%}
-  <form hx-{{ hx_method }}="{{ action }}">
+  {# `hx-target="this" hx-swap="outerHTML"` for the error-rerender path;
+     bundled into `_hx_attrs` because `hx-{{ hx_method }}` is a
+     templated attribute *name* and djlint mis-wraps when the line
+     exceeds its budget. `hx-target-4xx`/`hx-swap-4xx` activate the
+     `response-targets` extension (loaded in `base.html`) so a 422
+     validation-error response — the status `mount_create` returns
+     on a Pydantic failure — still swaps the form fragment in place. #}
+  {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
+  <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="program_intake" />
-    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {# Program picker — uses `composite_select_field` because the
      option label is a "<Program> · <Org>" composite derived from
      `p.organization.name`, not a flat attribute on `p`. Mirrors the
@@ -46,14 +67,17 @@ with at least one Program available.
       {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
       {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
     {% endcall %}
-    {% call form_section("Featured services") %}
-      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
-      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
+    {% call form_section("Who you serve") %}
       {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
       {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
       {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
     {% endcall %}
+    {% call form_section("Services & approach") %}
+      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
+      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
+    {% endcall %}
+    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   </form>
 {%- endmacro -%}

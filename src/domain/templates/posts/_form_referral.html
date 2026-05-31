@@ -8,9 +8,15 @@ Used by both `posts/new_referral.html` (create, no prefill) and
   - `submit_label`: the visible submit-button text
   - `post`: the persisted Post (for edit) or `None` (for create)
 
-Field set follows `notes/forms_spec.md` Form 1. Field order, labels,
-and required/optional state all live here in one place; new vs edit
-difference is the prefill, not the structure.
+Field order:
+  1. Referring clinician — establishes who is making the referral
+  2. About the client — narrative context before structured fields
+  3. Client demographics — age, language, gender
+  4. Client location — where / what format
+  5. Availability — when (split from location; parallels opening/intake)
+  6. Services needed — what kind of help
+  7. Insurance — payer posture
+  8. Subject — optional, auto-generates; last because most users skip it
 
 The `desired_times` checkbox grid sends form-encoded data with multiple
 values for the same field name. The form naturally encodes multiple
@@ -53,22 +59,23 @@ which FastAPI/Pydantic parses as a list.
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("referring_clinician_id", "Referring clinician", _practices.opts, current=d.referring_clinician_id if d else None, default_first=true) }}
-    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
+    {{ textarea_field("description", "About the client", current=d.description if d else None, help="Anything else a clinician needs to know. Please don't include identifying details.") }}
+    {% call form_section("Client demographics") %}
+      {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
+      {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
+      {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
+    {% endcall %}
     {% call form_section("Client location") %}
       {{ text_field("location_city", "City", current=d.location_city if d else None) }}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
       {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
       {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
       {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+    {% endcall %}
+    {% call form_section("Availability") %}
       {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
     {% endcall %}
-    {% call form_section("Client demographics") %}
-      {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
-      {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
-      {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
-    {% endcall %}
-    {{ textarea_field("description", "About the client", current=d.description if d else None, help="Anything else a clinician needs to know. Please don't include identifying details.") }}
-    {% call form_section("Services") %}
+    {% call form_section("Services needed") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
     {% endcall %}
@@ -85,6 +92,7 @@ which FastAPI/Pydantic parses as a list.
       {{ select_field("network_preference", "Network preference", NETWORK_PREFERENCES, labels=NETWORK_PREFERENCE_LABELS, current=d.network_preference if d else None, placeholder=true) }}
       {{ select_field("insurance_carrier", "Insurance carrier", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carrier if d else None, placeholder=true, required=false, hidden=(d and d.network_preference == "no_preference") ) }}
     {% endcall %}
+    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   </form>
   <script>
