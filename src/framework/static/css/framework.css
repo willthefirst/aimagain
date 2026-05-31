@@ -13,11 +13,6 @@ html { scrollbar-gutter: stable; font-size: 14px; }
   --pico-block-spacing-vertical: 0.75rem;
   --pico-block-spacing-horizontal: 1rem;
 
-  /* Heading sizes — tight, information-forward */
-  --pico-font-size-h1: 1.5rem;
-  --pico-font-size-h2: 1.25rem;
-  --pico-font-size-h3: 1.0625rem;
-  --pico-font-size-h4: 1rem;
 
   /* Flat geometry — no elevation, minimal radius */
   --pico-border-radius: 2px;
@@ -40,13 +35,16 @@ html { scrollbar-gutter: stable; font-size: 14px; }
   --color-warning: #b45309;
   --color-success: #166534;
 }
-/* Heading weights — restrained, not shouting */
-h1 { font-weight: 600; }
-h2, h3, h4, h5, h6 { font-weight: 500; }
+/* Heading sizes and weights — tight, not shouting. Pico hardcodes these on
+   the element; custom properties have no effect so we override directly. */
+h1 { font-size: 1.5rem; font-weight: 600; }
+h2 { font-size: 1.25rem; font-weight: 500; }
+h3 { font-size: 1.0625rem; font-weight: 500; }
+h4, h5, h6 { font-size: 1rem; font-weight: 500; }
 /* Pico defines --pico-card-box-shadow independently from --pico-box-shadow
    and may set it via higher-specificity selectors in its theme rules.
    Belt-and-suspenders: kill the shadow directly on the element. */
-article { box-shadow: none; }
+article { box-shadow: none; margin-bottom: 0; }
 /* Entity list — <ul class="entity-list"> wraps every list of entity
    cards. Resets remove browser list chrome while keeping the <ul>/<li>
    in the accessibility tree so screen readers announce "list of N items".
