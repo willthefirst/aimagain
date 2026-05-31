@@ -15,6 +15,7 @@ Two trigger points cover the real load paths:
   global.
 """
 
+from src.domain.logic import capabilities
 from src.domain.logic.clinicians.view import clinician_card_view
 from src.domain.logic.posts.schema import (
     ClinicianOpeningCreate,
@@ -108,6 +109,13 @@ register_template_globals(
     # `clinicians/detail.html` reads from — see its docstring in
     # `src.domain.logic.clinicians.view`.
     clinician_card_view=clinician_card_view,
+    # `capabilities` is the single-source-of-truth predicate module
+    # (`src.domain.logic.capabilities`) registered as a Jinja namespace
+    # so templates can write
+    # `{% if capabilities.can_post_referral(current_user) %}...`.
+    # The same predicates are called from route `write_authz` paths, so
+    # the visible-button and server-side block can't disagree.
+    capabilities=capabilities,
 )
 
 # Register the choice-tuple → labels-dict mapping that `field_spec` uses

@@ -37,7 +37,18 @@ def base_context(user: Actor | None) -> dict:
     users are auto-verified on registration
     (see `src.auth_config.UserManager.on_after_register`) so the
     banner is silent for the seed flow.
+
+    `claims`, `claim_a_lapsed`, `claim_b_lapsed_orgs`, `any_claim_lapsed`
+    power the claim-aware chrome (`_verify_banner.html`, the profile-hub
+    mode header, the `/home` "Finish setup" / "Action needed" sub-states).
+    They flow through `claim_state(...)` in `src.domain.logic.capabilities`
+    so the single-source-of-truth predicate set computes them once per
+    request. The import is lazy to keep this framework module from taking
+    a hard `domain/` import.
     """
+    from src.domain.logic.capabilities import claim_state
+
+    state = claim_state(user)
     return {
         "is_authenticated": user is not None,
         "is_admin": is_admin(user),
@@ -47,6 +58,10 @@ def base_context(user: Actor | None) -> dict:
         "current_user_is_verified": (
             True if user is None else bool(getattr(user, "is_verified", True))
         ),
+        "claims": {"a": state.a, "b": list(state.b)},
+        "claim_a_lapsed": False,
+        "claim_b_lapsed_orgs": [],
+        "any_claim_lapsed": bool(state.lapsed),
     }
 
 
