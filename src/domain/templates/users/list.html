@@ -1,44 +1,37 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
-{% block resource_label %}Users{% endblock %}
+{%- from "_shared/_item_list.html" import item_list -%}
+{%- macro user_card(user) %}
+  {%- set status_subtitle %}
+    <span>
+      {% if user.is_active %}
+        Active
+      {% else %}
+        Deactivated
+      {% endif %}
+    </span>
+  {%- endset %}
+  {%- call card(
+    id=user.id,
+    headline_url=entity_url('user', id=user.id),
+    headline=user.username,
+    subtitle=status_subtitle) -%}
+    {# Admin actions live in the card footer. viewer_is_admin() reads the
+       request-scoped viewer set by handle_list, so user_card stays a
+       single-arg callable compatible with item_list. #}
+    {%- if viewer_is_admin() %}
+      <footer>
+        <menu>
+          {%- with target_user = user, can_admin_actions = true -%}
+            {%- include "users/_admin_actions.html" -%}
+          {%- endwith -%}
+        </menu>
+      </footer>
+    {%- endif %}
+  {%- endcall %}
+{%- endmacro %}
 {% block content %}
-  {% if users %}
-    <section id="user-list">
-      <ul class="entity-list">
-        {%- for user in users %}
-          {%- set status_subtitle %}
-            <span>
-              {% if user.is_active %}
-                Active
-              {% else %}
-                Deactivated
-              {% endif %}
-            </span>
-          {%- endset %}
-          {% call card(
-            id=user.id,
-            headline_url=entity_url('user', id=user.id),
-            headline=user.username,
-            subtitle=status_subtitle) -%}
-            {# Admin actions live in the card footer. The partial renders
-     nothing when `can_admin_actions` is False (e.g. a non-admin
-     viewer). `<menu>` parent gives the `<li>` children valid HTML
-     structure — same shape `_admin_actions.html` expects on the
-     detail page's toolbar. #}
-            {%- if can_admin_actions %}
-              <footer>
-                <menu>
-                  {%- with target_user = user, can_admin_actions = can_admin_actions -%}
-                    {%- include "users/_admin_actions.html" -%}
-                  {%- endwith -%}
-                </menu>
-              </footer>
-            {%- endif %}
-          {%- endcall %}
-        {%- endfor %}
-      </ul>
-    </section>
-  {% else %}
-    <p>No users found.</p>
-  {% endif %}
+  {{ item_list(users, user_card, "user-list",
+    empty_msg="No users found.",
+    pager=pager) }}
 {% endblock %}

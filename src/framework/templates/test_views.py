@@ -701,3 +701,56 @@ def test_primary_nav_omits_login_link_for_anonymous_visitors() -> None:
         assert (
             tree.css_first('#primary-nav span[aria-current="page"]') is None
         ), f"expected no Login indicator on {path}"
+
+
+def test_list_view_resource_label_auto_fills_from_context() -> None:
+    """``handle_list`` injects ``resource_label`` from the spec; child
+    templates that don't override ``{% block resource_label %}`` get the
+    injected value automatically — no per-template block needed."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        resource_label="Clinicians",
+    )
+
+    toolbar_h1 = HTMLParser(html).css_first("div.toolbar h1")
+    assert toolbar_h1 is not None
+    assert toolbar_h1.text(strip=True) == "Clinicians"
+
+
+def test_list_view_block_override_takes_precedence_over_context_label() -> None:
+    """An explicit ``{% block resource_label %}`` override wins over the
+    context-injected value — used by pages whose display name differs from
+    the spec's ``url_collection`` (e.g. posts overriding toolbar entirely)."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}My Custom Label{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        resource_label="Would Be Overridden",
+    )
+
+    toolbar_h1 = HTMLParser(html).css_first("div.toolbar h1")
+    assert toolbar_h1 is not None
+    assert toolbar_h1.text(strip=True) == "My Custom Label"

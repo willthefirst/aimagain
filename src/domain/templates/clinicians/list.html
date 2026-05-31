@@ -1,6 +1,6 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
-{% block resource_label %}Clinicians{% endblock %}
+{%- from "_shared/_item_list.html" import item_list -%}
 {% block actions %}
   {% if is_authenticated %}
     <li>
@@ -9,13 +9,7 @@
   {% endif %}
 {% endblock %}
 {% block content %}
-  {% if clinicians %}
-    <section id="clinicians-list">
-      <ul class="entity-list">
-        {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
-        </ul>
-      </section>
-    {% else %}
-      <p>No clinicians found.</p>
-    {% endif %}
-  {% endblock %}
+  {{ item_list(clinicians, clinician_card, "clinicians-list",
+    empty_msg="No clinicians found.",
+    pager=pager) }}
+{% endblock %}

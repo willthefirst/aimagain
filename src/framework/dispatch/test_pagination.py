@@ -108,3 +108,22 @@ def test_page_next_and_prev_numbers() -> None:
 def test_page_prev_clamps_at_one() -> None:
     page = Page(page=1, per_page=25, has_prev=False, has_next=True)
     assert page.prev_page == 1
+
+
+def test_pager_bundles_page_and_base_query() -> None:
+    """``Pager`` is a frozen bundle of ``Page`` + base query string so
+    templates receive pagination state as one argument rather than two."""
+    from src.framework.dispatch.pagination import Pager
+
+    page = Page(page=2, per_page=15, has_prev=True, has_next=False)
+    pager = Pager(page=page, base_query="kind=referral")
+    assert pager.page is page
+    assert pager.base_query == "kind=referral"
+
+
+def test_pager_defaults_base_query_to_empty() -> None:
+    from src.framework.dispatch.pagination import Pager
+
+    page = Page(page=1, per_page=15, has_prev=False, has_next=False)
+    pager = Pager(page=page)
+    assert pager.base_query == ""
