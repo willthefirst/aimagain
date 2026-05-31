@@ -50,6 +50,7 @@ from . import (  # noqa: E402,F401
     clinicians,
     credentials,
     favorites,
+    org_representations,
     organizations,
     posts,
     programs,

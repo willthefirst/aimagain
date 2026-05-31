@@ -139,6 +139,14 @@ MIGRATED_VALUES = {
         "email_confirmed",
     ),
     e.VerificationSubjectType: ("clinician", "organization"),
+    e.OrgRepresentationRole: ("coordinator", "admin", "owner"),
+    e.AuthorityMethod: (
+        "authorized_official",
+        "domain_email",
+        "rep_approval",
+        "admin_review",
+    ),
+    e.AuthorityStatus: ("pending", "verified", "rejected"),
     e.ClientAgeGroup: (
         "children_0_5",
         "children_6_10",
@@ -196,6 +204,12 @@ ALIAS_BINDINGS = [
     (e.LICENSE_STATUS_LABELS, e.LicenseStatus, "labels"),
     (e.VERIFICATION_EVENT_TYPES, e.VerificationEventType, "values"),
     (e.VERIFICATION_SUBJECT_TYPES, e.VerificationSubjectType, "values"),
+    (e.ORG_REPRESENTATION_ROLES, e.OrgRepresentationRole, "values"),
+    (e.ORG_REPRESENTATION_ROLE_LABELS, e.OrgRepresentationRole, "labels"),
+    (e.AUTHORITY_METHODS, e.AuthorityMethod, "values"),
+    (e.AUTHORITY_METHOD_LABELS, e.AuthorityMethod, "labels"),
+    (e.AUTHORITY_STATUSES, e.AuthorityStatus, "values"),
+    (e.AUTHORITY_STATUS_LABELS, e.AuthorityStatus, "labels"),
     # Multi-attribute vocabularies — the standard-kind aliases still bind to
     # `.values()` / `.labels()` / `.icons()`; the extra-attribute derivations
     # (`*_BY_KEY`, `*_SINGULAR`, `*_SHORT_LABELS`, composite slots) are pinned

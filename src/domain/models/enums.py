@@ -527,6 +527,56 @@ class VerificationSubjectType(LabeledChoice):
 VERIFICATION_SUBJECT_TYPES: Final[tuple[str, ...]] = VerificationSubjectType.values()
 
 
+# Role a user plays within an `OrgRepresentation` (User↔Org link).
+# Per handoff §5.3: `coordinator` is the base role (can post program
+# intakes / org-attributed referrals); `admin` adds the ability to
+# approve additional reps (`rep_approval` path); `owner` is the
+# first-claim authority (typically the solo practitioner whose name
+# matches the org's NPPES Authorized Official).
+class OrgRepresentationRole(LabeledChoice):
+    coordinator = "coordinator", "Coordinator", "clipboard-list"
+    admin = "admin", "Admin", "shield"
+    owner = "owner", "Owner", "building"
+
+
+ORG_REPRESENTATION_ROLES: Final[tuple[str, ...]] = OrgRepresentationRole.values()
+ORG_REPRESENTATION_ROLE_LABELS: Final[dict[str, str]] = OrgRepresentationRole.labels()
+
+
+# How a user proves they may act for an organization. Per handoff §6:
+# `authorized_official` — NPPES Authorized-Official name-match (auto;
+# covers most solos & small practices); `domain_email` — verified email
+# at the org's domain (v1 stub); `rep_approval` — an existing verified
+# rep approves a new one (cheap, scales group practices); `admin_review`
+# — fallback when neither auto-path applies.
+class AuthorityMethod(LabeledChoice):
+    authorized_official = (
+        "authorized_official",
+        "NPPES Authorized Official match",
+    )
+    domain_email = "domain_email", "Verified org-domain email"
+    rep_approval = "rep_approval", "Approved by an existing rep"
+    admin_review = "admin_review", "Admin review"
+
+
+AUTHORITY_METHODS: Final[tuple[str, ...]] = AuthorityMethod.values()
+AUTHORITY_METHOD_LABELS: Final[dict[str, str]] = AuthorityMethod.labels()
+
+
+# Status of an `OrgRepresentation.authority_status`. `pending` is the
+# default at insert; the `authority` state axis (admin override) flips
+# to `verified` or `rejected`. Revocation archives the row via
+# `archived_at` rather than deleting (handoff §10.8).
+class AuthorityStatus(LabeledChoice):
+    pending = "pending", "Pending", "loader"
+    verified = "verified", "Verified", "shield-check"
+    rejected = "rejected", "Rejected", "shield-alert"
+
+
+AUTHORITY_STATUSES: Final[tuple[str, ...]] = AuthorityStatus.values()
+AUTHORITY_STATUS_LABELS: Final[dict[str, str]] = AuthorityStatus.labels()
+
+
 def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     """SQL fragment for a `column IN (...)` CHECK constraint, rendered
     from a tuple. Used by per-kind detail tables so the DB-level

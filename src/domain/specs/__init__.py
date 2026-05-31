@@ -23,6 +23,7 @@ from .clinician import CLINICIAN_ENTITY
 from .clinician_certification import CERTIFICATION_ENTITY
 from .clinician_education import EDUCATION_ENTITY
 from .clinician_licensure import LICENSURE_ENTITY
+from .org_representation import ORG_REPRESENTATION_ENTITY
 from .organization import ORGANIZATION_ENTITY
 from .posts import POST_ENTITY
 from .program import PROGRAM_ENTITY
@@ -40,6 +41,7 @@ ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
     LICENSURE_ENTITY,
     USER_ENTITY,
     FAVORITE_ENTITY,
+    ORG_REPRESENTATION_ENTITY,
 )
 
 __all__ = [
@@ -51,6 +53,7 @@ __all__ = [
     "FAVORITE_ENTITY",
     "LICENSURE_ENTITY",
     "ORGANIZATION_ENTITY",
+    "ORG_REPRESENTATION_ENTITY",
     "POST_ENTITY",
     "PROGRAM_ENTITY",
     "USER_ENTITY",
