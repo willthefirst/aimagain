@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import entity_select_field, radio_bool_field, select_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, form_section, radio_bool_field, select_field, text_field -%}
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Programs{% endblock %}
@@ -11,24 +11,19 @@
    the user doesn't own it, so the form doesn't silently drop the
    FK on submit). #}
   <form hx-patch="{{ entity_url('program', id=program.id) }}">
-    <fieldset>
-      <legend>Identity</legend>
+    {% call form_section("Identity") %}
       {{ entity_select_field("org_id", "Organization", organizations, current=program.org_id, help=org_picker_help() ) }}
       {{ text_field("name", "Name", current=program.name) }}
       {{ text_field("description", "Description", current=program.description, required=false) }}
-    </fieldset>
-    <fieldset>
-      <legend>Where and when</legend>
+    {% endcall %}
+    {% call form_section("Where and when") %}
       {{ select_field("state_preference", "State served", US_STATES, current=program.state_preference, required=false, placeholder=true) }}
-      <div class="grid">
-        {{ text_field("start_date", "Start date", current=program.start_date, required=false, type="date") }}
-        {{ text_field("end_date", "End date", current=program.end_date, required=false, type="date") }}
-      </div>
-    </fieldset>
-    <fieldset>
-      <legend>Intake</legend>
+      {{ text_field("start_date", "Start date", current=program.start_date, required=false, type="date") }}
+      {{ text_field("end_date", "End date", current=program.end_date, required=false, type="date") }}
+    {% endcall %}
+    {% call form_section("Intake") %}
       {{ radio_bool_field("accepting_referrals", "Accepting referrals?", current=program.accepting_referrals, required=false) }}
-    </fieldset>
+    {% endcall %}
     {{ actions("Save changes",
         cancel_url=entity_url('program', id=program.id) ,
     delete_url=entity_url('program', id=program.id),
