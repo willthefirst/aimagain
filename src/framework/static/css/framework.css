@@ -25,7 +25,9 @@ ul.entity-list {
   padding: 0;
   margin: 0;
 }
-ul.entity-list > li { padding: 0; }
+/* Pico v2 sets list-style-type on <li> itself, not the <ul>, so the
+   parent reset doesn't cascade — mirror the rule on the child. */
+ul.entity-list > li { list-style: none; padding: 0; }
 /* Card chrome (background, border, padding, rounded corners,
    tinted header/footer bands) is reserved for items inside a
    possible list of items — post-list cards, the per-affiliation
