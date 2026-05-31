@@ -22,6 +22,7 @@ from src.domain.models import Affiliation, Clinician, Organization, User
 from src.domain.models.enums import (
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
+    NPI_MATCH_STATUSES,
     US_STATES,
 )
 
@@ -40,6 +41,18 @@ async def generate_clinicians(
     out: list[Clinician] = []
     for i in range(counts.CLINICIAN_COUNT):
         cid = deterministic_uuid("Clinician", i)
+        # Round-robin `NPI_MATCH_STATUSES` so every CHECK-vocabulary
+        # value appears in the dataset. Whichever bucket the row falls
+        # into drives whether `clinician_verified` and the
+        # `*_verified_at` timestamps get filled (a `matched` row is the
+        # post-NPPES happy path; `none` is pre-submit).
+        match_status = rng.round_robin(NPI_MATCH_STATUSES, i)
+        clinician_verified = match_status == "matched"
+        verified_ts = (
+            rng.date_within_years(years_back=1, years_forward=0)
+            if clinician_verified
+            else None
+        )
         row = Clinician(
             id=cid,
             owner_id=users[i % len(users)].id,
@@ -48,6 +61,11 @@ async def generate_clinicians(
             npi=(None if rng.bool(0.4) else COLUMN_VOCAB["npi"](rng, i)),
             first_name=(None if rng.bool(0.1) else COLUMN_VOCAB["first_name"](rng, i)),
             last_name=(None if rng.bool(0.1) else COLUMN_VOCAB["last_name"](rng, i)),
+            npi_match_status=match_status,
+            npi_verified_at=verified_ts,
+            clinician_verified=clinician_verified,
+            verified_at=verified_ts,
+            ever_verified_at=verified_ts,
         )
         await session.merge(row)
         out.append(row)

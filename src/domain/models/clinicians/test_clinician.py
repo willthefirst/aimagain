@@ -197,3 +197,68 @@ async def test_setting_clinician_names_persists(session):
     await session.refresh(clinician)
     assert clinician.first_name == "Gina"
     assert clinician.last_name == "Hart"
+
+
+# --- Claim A verification columns -----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_clinician_verification_defaults(session):
+    """A freshly created Clinician without explicit verification kwargs
+    should land in the "no claim yet" state: `npi_match_status='none'`,
+    `clinician_verified=False`, and the timestamp columns NULL."""
+    user = _make_user("hank")
+    org = _make_org("Acme", user.id)
+    clinician = _make_clinician(owner=user, org=org)
+    session.add_all([user, org, clinician])
+    await session.flush()
+    await session.refresh(clinician)
+    assert clinician.npi_match_status == "none"
+    assert clinician.clinician_verified is False
+    assert clinician.npi_verified_at is None
+    assert clinician.verified_at is None
+    assert clinician.ever_verified_at is None
+
+
+@pytest.mark.asyncio
+async def test_clinician_npi_match_status_check_constraint_rejects_unknown(session):
+    """The `ck_clinicians_npi_match_status` CHECK keeps the column on
+    the closed `NpiMatchStatus` vocab — defense in depth behind the
+    Python enum."""
+    user = _make_user("ivy")
+    org = _make_org("Acme", user.id)
+    clinician = _make_clinician(owner=user, org=org)
+    session.add_all([user, org, clinician])
+    await session.flush()
+
+    clinician.npi_match_status = "not_a_real_value"
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_clinician_verification_columns_persist(session):
+    """Round-trip: setting the verification cache columns persists
+    through flush + refresh. The Phase 3 `recompute_clinician_claim`
+    helper writes through these same attrs."""
+    import datetime as _dt
+
+    user = _make_user("jane")
+    org = _make_org("Acme", user.id)
+    clinician = _make_clinician(owner=user, org=org, npi="1234567890")
+    session.add_all([user, org, clinician])
+    await session.flush()
+
+    now = _dt.datetime(2026, 1, 1, 12, 0, 0)
+    clinician.npi_match_status = "matched"
+    clinician.npi_verified_at = now
+    clinician.clinician_verified = True
+    clinician.verified_at = now
+    clinician.ever_verified_at = now
+    await session.flush()
+    await session.refresh(clinician)
+    assert clinician.npi_match_status == "matched"
+    assert clinician.npi_verified_at == now
+    assert clinician.clinician_verified is True
+    assert clinician.verified_at == now
+    assert clinician.ever_verified_at == now
