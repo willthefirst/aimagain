@@ -57,13 +57,18 @@ async def test_consumer_clinician_create_form_submits(
     }
     # `first_name`, `last_name`, `npi`, and `cost` are empty text
     # inputs — the browser includes empty-valued text inputs in the
-    # form body. The bool radios for `accepts_out_of_network` /
-    # `sliding_scale` are not pre-checked on the create form, so
-    # they're absent. The carrier multi-select is similarly empty.
-    # `org_id` carries the Organization picked from the dropdown
-    # (#524); the stub server seeds one Org. The "Clinician" fieldset
-    # holds the person-level fields and renders first, so
-    # `first_name`, `last_name`, `npi` serialize ahead of `org_id`.
+    # form body. The `accepts_out_of_network` checkbox is pre-checked
+    # by the template (`current=true`); `sliding_scale` is not
+    # pre-checked. Both render via `checkbox_field`, which emits a
+    # sibling `<input type="hidden" value="false">` before each
+    # checkbox so default-true booleans round-trip — checked submits
+    # both `false` and `true` (last wins at the parser; see
+    # `src/framework/http/forms.py`), unchecked submits just `false`.
+    # The carrier multi-select is empty. `org_id` carries the
+    # Organization picked from the dropdown (#524); the stub server
+    # seeds one Org. The "Clinician" fieldset holds the person-level
+    # fields and renders first, so `first_name`, `last_name`, `npi`
+    # serialize ahead of `org_id`.
     expected_request_body = (
         "first_name="
         "&last_name="
@@ -74,6 +79,9 @@ async def test_consumer_clinician_create_form_submits(
         "&location_zip=11201"
         "&in_person_sessions=yes"
         "&virtual_sessions=please_contact"
+        "&accepts_out_of_network=false"
+        "&accepts_out_of_network=true"
+        "&sliding_scale=false"
         "&cost="
     )
 

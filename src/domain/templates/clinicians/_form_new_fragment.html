@@ -11,7 +11,7 @@
    `with context` lets the form-field macros auto-resolve per-field
    `error=` / `current=` from the `form_errors` / `form_values`
    injected by `mount_create` on a 422. #}
-{%- from "_shared/form_fields.html" import entity_select_field, field_for, radio_bool_field, text_field, form_section with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, checkbox_field, text_field, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import cost_help, npi_help, org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -53,8 +53,8 @@
      independent. No cross-field invariant. #}
   {% call form_section("Insurance & payment") %}
     {{ field_for(schema, "in_network_carriers", "In-network carriers") }}
-    {{ radio_bool_field("accepts_out_of_network", "Accepts out-of-network?", required=false) }}
-    {{ radio_bool_field("sliding_scale", "Sliding scale?", required=false) }}
+    {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network patients", current=true) }}
+    {{ checkbox_field('sliding_scale', 'Offers sliding scale') }}
     {{ text_field("cost", "Cost", required=false, help=cost_help() ) }}
   {% endcall %}
   {{ actions(entity_create_label('clinician') , cancel_url=entity_url('clinician')) }}
