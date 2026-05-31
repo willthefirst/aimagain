@@ -11,16 +11,24 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from src.domain.models.enums import VERIFICATION_STATUSES
+from src.domain.models.enums import (
+    VERIFICATION_EVENT_TYPES,
+    VERIFICATION_STATUSES,
+    VERIFICATION_SUBJECT_TYPES,
+)
 from src.framework.schema_validators import ReadProjection, WirePayload
 
 
 class VerificationRead(ReadProjection):
     id: uuid.UUID
-    clinician_id: uuid.UUID
+    subject_type: str
+    clinician_id: uuid.UUID | None = None
+    org_id: uuid.UUID | None = None
+    event_type: str
     status: str
     flags: list[str] = []
     nppes_result: dict[str, Any] | None = None
+    evidence: dict[str, Any] | None = None
     oig_match: bool
     name_match_score: float | None = None
     created_at: datetime
@@ -32,9 +40,13 @@ class VerificationCreate(WirePayload):
     `handlers.py` (#528 / A4) from the NPPES / OIG check results and the
     scoring function. Not accepted from any wire surface."""
 
-    clinician_id: uuid.UUID
+    subject_type: Literal[*VERIFICATION_SUBJECT_TYPES] = "clinician"
+    clinician_id: uuid.UUID | None = None
+    org_id: uuid.UUID | None = None
+    event_type: Literal[*VERIFICATION_EVENT_TYPES] = "npi_resolved"
     status: Literal[*VERIFICATION_STATUSES]
     flags: list[str] = []
     nppes_result: dict[str, Any] | None = None
+    evidence: dict[str, Any] | None = None
     oig_match: bool = False
     name_match_score: float | None = None

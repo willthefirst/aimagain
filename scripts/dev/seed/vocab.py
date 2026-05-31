@@ -699,6 +699,16 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
         # value here is meaningless — the column is only populated by
         # `run_org_verification` against real NPPES responses.
         "authorized_official_name",
+        # `verifications.subject_type` is covered by its own IN-CHECK
+        # (closed vocab via `VerificationSubjectType`); the polymorphic
+        # subject-shape CHECK is a cross-column XOR that the
+        # `verifications` seed override satisfies by construction. The
+        # per-column drift lint sees only the first lowercase word in
+        # the shape CHECK SQL (`clinician_id`, after skipping
+        # `(subject_type` which has a non-alnum char), so we
+        # acknowledge it here. `clinician_id` is an FK populated from
+        # the parent-row pool, not via COLUMN_VOCAB.
+        "clinician_id",
     }
 )
 

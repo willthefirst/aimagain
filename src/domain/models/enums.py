@@ -493,6 +493,40 @@ LICENSE_STATUSES: Final[tuple[str, ...]] = LicenseStatus.values()
 LICENSE_STATUS_LABELS: Final[dict[str, str]] = LicenseStatus.labels()
 
 
+# Closed vocab of state transitions that append a `Verification` event
+# row. Mirrors handoff §9: every transition that recomputes a claim flag
+# writes one row of this `event_type` with the relevant `evidence`
+# payload. The pipeline-end NPPES write currently in
+# `run_clinician_verification` is `npi_resolved`; admin overrides go
+# through `admin_verify`/`admin_suspend`; org authority transitions go
+# through `authority_proven` / `authority_revoked` / `role_set`. Value-
+# only — `.labels()` falls back to the storage value.
+class VerificationEventType(LabeledChoice):
+    npi_submitted = "npi_submitted"
+    npi_resolved = "npi_resolved"
+    license_attested = "license_attested"
+    license_expired = "license_expired"
+    authority_proven = "authority_proven"
+    authority_revoked = "authority_revoked"
+    role_set = "role_set"
+    admin_verify = "admin_verify"
+    admin_suspend = "admin_suspend"
+    email_confirmed = "email_confirmed"
+
+
+VERIFICATION_EVENT_TYPES: Final[tuple[str, ...]] = VerificationEventType.values()
+
+
+# Discriminator vocab for the polymorphic `Verification` row. Drives the
+# CHECK ensuring exactly one of (`clinician_id`, `org_id`) is set.
+class VerificationSubjectType(LabeledChoice):
+    clinician = "clinician"
+    organization = "organization"
+
+
+VERIFICATION_SUBJECT_TYPES: Final[tuple[str, ...]] = VerificationSubjectType.values()
+
+
 def check_in_tuple_sql(column: str, values: tuple[str, ...]) -> str:
     """SQL fragment for a `column IN (...)` CHECK constraint, rendered
     from a tuple. Used by per-kind detail tables so the DB-level

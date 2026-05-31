@@ -126,6 +126,19 @@ MIGRATED_VALUES = {
     e.VerificationStatus: ("verified", "needs_review", "failed"),
     e.NpiMatchStatus: ("none", "pending", "matched", "mismatch"),
     e.LicenseStatus: ("active", "expired", "pending"),
+    e.VerificationEventType: (
+        "npi_submitted",
+        "npi_resolved",
+        "license_attested",
+        "license_expired",
+        "authority_proven",
+        "authority_revoked",
+        "role_set",
+        "admin_verify",
+        "admin_suspend",
+        "email_confirmed",
+    ),
+    e.VerificationSubjectType: ("clinician", "organization"),
     e.ClientAgeGroup: (
         "children_0_5",
         "children_6_10",
@@ -181,6 +194,8 @@ ALIAS_BINDINGS = [
     (e.NPI_MATCH_STATUS_LABELS, e.NpiMatchStatus, "labels"),
     (e.LICENSE_STATUSES, e.LicenseStatus, "values"),
     (e.LICENSE_STATUS_LABELS, e.LicenseStatus, "labels"),
+    (e.VERIFICATION_EVENT_TYPES, e.VerificationEventType, "values"),
+    (e.VERIFICATION_SUBJECT_TYPES, e.VerificationSubjectType, "values"),
     # Multi-attribute vocabularies — the standard-kind aliases still bind to
     # `.values()` / `.labels()` / `.icons()`; the extra-attribute derivations
     # (`*_BY_KEY`, `*_SINGULAR`, `*_SHORT_LABELS`, composite slots) are pinned
