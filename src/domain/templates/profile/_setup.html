@@ -1,0 +1,55 @@
+{# Setup mode — first-run goal picker per wireframe L1.
+
+   Renders two cards (Claim A / Claim B). In Phase-5-skeleton these are
+   informational + a link to the existing user-detail page where NPI /
+   license / org-representation rows can be created via the framework's
+   generic CRUD. The follow-up PR introduces inline POST endpoints
+   (`POST /clinicians/{id}/npi`, `POST /organizations/{id}/npi`) that
+   land the row, flip `npi_match_status='pending'`, and swap the card
+   into a "Verifying…" pill via HTMX.
+
+   Per handoff §8.1 / wireframe L5: when a user only wants Claim B,
+   the Claim A card stays visible but in a disabled / "not needed"
+   state — never hidden. The card IS the affordance; inputs simply
+   aren't there until the user opts in.
+#}
+<section>
+  <p>
+    <strong>What do you want to do on Bedlam Connect?</strong>
+  </p>
+  <article id="claim-a-card">
+    <header>
+      <strong>Refer &amp; take clients as a clinician</strong>
+      <small style="display: block; color: var(--pico-muted-color);">Claim A — verify your individual NPI and license</small>
+    </header>
+    <p>To list clinicians under your account and post referrals or openings, add a verified clinician profile.</p>
+    {% if clinicians %}
+      <p>
+        <small>You have {{ clinicians|length }} clinician profile(s) on file.
+          <a href="{{ entity_url('user', id='me') }}">Manage</a></small>
+      </p>
+    {% else %}
+      <a href="{{ entity_url('user', id='me') }}"
+         role="button"
+         class="outline">+ Add a clinician profile</a>
+    {% endif %}
+  </article>
+  <article id="claim-b-card">
+    <header>
+      <strong>Post on behalf of an organization</strong>
+      <small style="display: block; color: var(--pico-muted-color);">
+        Claim B — represent an organization with a Type-2 NPI
+      </small>
+    </header>
+    <p>To post program intakes or org-attributed referrals, become a verified representative of an organization.</p>
+    {% if org_representations %}
+      <p>
+        <small>You have {{ org_representations|length }} representation(s) on file.</small>
+      </p>
+    {% else %}
+      <p style="color: var(--pico-muted-color);">
+        <small>Coordinator path — coming soon. The org's NPI is verified once; you prove you're authorized to speak for it via Authorized-Official match, domain email, or admin review.</small>
+      </p>
+    {% endif %}
+  </article>
+</section>

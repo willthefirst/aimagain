@@ -31,7 +31,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     keeping all links visible inline on desktop via CSS.
 
     The "Create clinician" chrome CTA was removed in #697 — the
-    /users/me onboarding checklist is the discoverable entry point."""
+    /profile hub is the discoverable entry point."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
@@ -41,8 +41,8 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
     # Brand link is a direct child of the nav element.
     assert tree.css_first('#primary-nav > a[href="/"]') is not None
-    # Profile link is in the collapsible nav menu.
-    assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
+    # Profile link points at the dedicated Profile Hub.
+    assert tree.css_first('#primary-nav a[href="/profile"]') is not None
     # The four authed-chrome destinations render in this exact order
     # inside #nav-menu. Sign-out is the `#` placeholder href on the
     # `<a hx-post>` that drives the HTMX POST.
@@ -51,7 +51,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert nav_hrefs == [
         "/home",
         "/posts",
-        "/users/me",
+        "/profile",
         "#",
     ]
 
@@ -115,8 +115,6 @@ async def test_list_users_empty(
 
     tree = HTMLParser(response.text)
     assert "No users found" in tree.body.text()
-    link_node = tree.css_first(f'a[href*="/users"]')
-    assert link_node is not None, "Refresh link not found"
 
 
 async def test_list_users_multiple_users(
@@ -713,21 +711,22 @@ async def test_base_template_preloads_lucide_icon_font(
 # --- Chrome: nav active state -------------------------------------------
 
 
-async def test_primary_nav_marks_profile_active_on_users_me_subpaths(
+async def test_primary_nav_marks_profile_active_on_profile_hub(
     authenticated_client: AsyncClient,
 ):
-    """The Profile link in the primary nav points at `/users/me` and
-    carries `aria-current="page"` on any `/users/me/*` path —
-    `/users/me/favorites` is the canonical case but the rule covers
-    every nested profile sub-route."""
-    response = await authenticated_client.get("/users/me/favorites")
+    """The Profile link in the primary nav points at the dedicated
+    `/profile` hub and carries `aria-current="page"` when the user is
+    on it. The legacy `/users/me` detail page is still reachable by
+    URL but is no longer chrome-promoted (the active-state rule
+    follows the chrome promotion, not the underlying entity)."""
+    response = await authenticated_client.get("/profile")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
+    profile_link = tree.css_first('#primary-nav a[href="/profile"]')
     assert (
         profile_link is not None
         and profile_link.attributes.get("aria-current") == "page"
-    ), "expected Profile link to carry aria-current=page on /users/me subpaths"
+    ), "expected Profile link to carry aria-current=page on /profile"
 
 
 # --- Activation endpoint -------------------------------------------------

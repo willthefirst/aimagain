@@ -123,7 +123,10 @@
        `/posts?kind=referral` (the "find new clients" journey home —
        see `src/main.py:read_root` for the bias rationale) and unauthed
        users to the login page — safe on either side of the auth gate. #}
-    {%- set _profile_path = entity_url('user', id='me') -%}
+    {# `/profile` is the dedicated Profile Hub (bespoke route — see
+       `src/domain/routes/profile.py`). The legacy `/users/me` detail
+       page is still reachable by URL but isn't chrome-promoted. #}
+    {%- set _profile_path = "/profile" -%}
     {%- set _on_profile = is_authenticated and (request.url.path == _profile_path or request.url.path.startswith(_profile_path + '/')) -%}
     {# Section shortcuts. The primary nav promotes the unified `/posts`
        feed, which lists every post kind (referrals, clinician openings,
@@ -155,8 +158,7 @@
                    {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>
               </li>
               <li>
-                <a href="{{ entity_url('user', id='me') }}"
-                   {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
+                <a href="/profile" {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
               </li>
               <li>
                 <a href="#" hx-post="/auth/sign-out">Sign out</a>
