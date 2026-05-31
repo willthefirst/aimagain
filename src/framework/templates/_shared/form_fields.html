@@ -104,9 +104,11 @@ to override the schema-derived default.
 Picking an organization, a parent organization, a program — anywhere
 a form posts a foreign key to another resource — use
 `entity_select_field`. It takes a list of objects with `.id` + `.name`
-(or pass `option_template_attr` to name a different display attribute).
-Composite-label cases (e.g. "<Program> · <Org>") pre-build a list of
-`(id, label)` tuples and pass that via `options=...` instead.
+(or pass `value_attr`/`label_attr` to name different attributes).
+Composite labels (e.g. "<Program> · <Org>") and nested-flatten cases
+(one option per `(clinician, affiliation)` pair) don't fit a flat
+`.attr` shape — for those, build a list of `(value, label)` tuples at
+the call site and pass it to `composite_select_field`.
 
 #}
 {# ---- helpers (internal) ------------------------------------------- #}
@@ -246,9 +248,9 @@ emitted attribute string. #}
 
    `entities` is a sequence of objects with `.id` and `.name` (or
    another attribute pair — pass `value_attr`/`label_attr` to override).
-   For composite labels (e.g. "<Program> · <Org>"), build the list in
-   the route handler as `[(id, "Program · Org"), ...]` tuples and pass
-   `options=that_list` to `select_field` directly instead.
+   For composite labels (e.g. "<Program> · <Org>") or nested-flatten
+   cases, build a `(value, label)` tuple list at the call site and use
+   `composite_select_field` instead.
 
    `blank_label=None` (default) renders Pico's disabled "--" placeholder
    when the field is required and unset; pass `blank_label="(root — no
@@ -287,63 +289,110 @@ emitted attribute string. #}
     {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
-{# ---- radio groups ------------------------------------------------- #}
-{# Yes / No radio pair. `<fieldset>` + `<legend>` is the accessible
-   substitute for `<label>` when one logical question owns multiple
-   inputs. Each radio carries `aria-describedby` so screen readers
-   announce the helper text on either selection. #}
-{% macro radio_bool_field(name, label, current=None, required=True, help=None) -%}
-  <fieldset class="form-field">
-    <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
-    <div class="form-field-control">
-      <label class="form-field-inline">
-        <input type="radio"
-               name="{{ name }}"
-               value="true"
-               {% if current is sameas true %}checked{% endif %}
-               {% if required %}required{% endif %}
-               {% if help %}aria-describedby="{{ name }}-helper"{% endif %} />
-        Yes
-      </label>
-      <label class="form-field-inline">
-        <input type="radio"
-               name="{{ name }}"
-               value="false"
-               {% if current is sameas false %}checked{% endif %}
-               {% if required %}required{% endif %}
-               {% if help %}aria-describedby="{{ name }}-helper"{% endif %} />
-        No
-      </label>
-      {{- _help_small(name, help) }}
-    </div>
-  </fieldset>
-{%- endmacro %}
-{# ---- schema-driven dispatch --------------------------------------- #}
-{# Reads `field_spec(schema, name)` and delegates to the right inner
-   macro. `current`, `required`, `help`, `invalid` pass through. Pass
-   `required=false` to override the schema-derived default (e.g. an
-   optional filter on a field that's required for create). #}
-{% macro field_for(schema, name, label, current=None, required=None, help=None, invalid=None, error=None) -%}
+{# `<select>` populated from a pre-built list of `(value, label)` tuples.
+   Use when the option label can't be expressed as a flat attribute on a
+   single entity — composite labels (`"<Program> · <Org>"`) or a flatten
+   across a nested relation (one option per `(clinician, affiliation)`
+   pair, with the clinician id repeated as the value). For the flat case
+   (label is one attribute on each entity) use `entity_select_field`.
+
+   `options` is an iterable of `(value, label)` 2-tuples. Order matters:
+   the **first** option whose value matches the resolved `current` is
+   the one marked `selected`. Same-value duplicates that come later in
+   the list are emitted un-selected — this lets a caller flatten
+   `clinician × affiliations` without two `selected` attrs landing on
+   the same value (which would otherwise let the browser pick the last).
+
+   `default_first=true` makes the first option the default selection
+   when neither `current` nor `form_values[name]` is set — used by the
+   create-mode pickers that always want a non-empty initial selection.
+   With `default_first=false` (the default), a missing current renders
+   Pico's disabled "--" placeholder when the field is required. #}
+{% macro composite_select_field(name, label, options, current=None, required=True, default_first=False, help=None, invalid=None, error=None) -%}
   {%- set _form_errors = form_errors|default({}, true) -%}
   {%- set _form_values = form_values|default({}, true) -%}
   {%- set error = error if error is not none else _form_errors.get(name) -%}
   {%- set current = _form_values[name] if name in _form_values else current -%}
-  {%- set spec = field_spec(schema, name) -%}
-  {%- set is_required = spec.required if required is none else required -%}
-  {%- if spec.kind == "select" -%}
-    {{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true, help=help, invalid=invalid, error=error) }}
-  {%- elif spec.kind == "multi_select" -%}
-    {{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current, help=help, invalid=invalid, error=error) }}
-  {%- elif spec.kind == "textarea" -%}
-    {{ textarea_field(name, label, current=current, required=is_required, help=help, invalid=invalid, error=error) }}
-  {%- elif spec.kind == "url" -%}
-    {{ url_field(name, label, current=current, required=is_required, help=help, invalid=invalid, error=error) }}
-  {%- elif spec.kind == "text" -%}
-    {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid, error=error) }}
-  {%- endif -%}
-{%- endmacro %}
-{# ---- form section ------------------------------------------------- #}
-{# Canonical `<fieldset>` + `<legend>` wrapper for a named group of
+  {%- set current_s = current|string if current is not none else "" -%}
+  {%- set aria_invalid = true if error else invalid -%}
+  {%- set ns = namespace(matched=false) -%}
+  <label class="form-field" for="{{ name }}">
+    <span class="form-field-label">{{ _field_label(label, required) }}</span>
+    <select id="{{ name }}"
+            name="{{ name }}"
+            {% if required %}required{% endif %}
+            {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+            {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
+      {%- if not default_first and required and not current_s %}<option value="" disabled selected>--</option>{%- endif %}
+      {%- for v, l in options %}
+        {%- set vs = v|string -%}
+        {%- set is_current_match = current_s and current_s == vs and not ns.matched -%}
+        {%- set is_default = default_first and not current_s and loop.first -%}
+        {%- if is_current_match or is_default %}{%- set ns.matched = true -%}{%- endif -%}
+          <option value="{{ v }}"
+                  {% if is_current_match or is_default %}selected{% endif %}>{{ l }}</option>
+        {%- endfor %}
+      </select>
+      {{- _help_small(name, help, error) }}
+    </label>
+  {%- endmacro %}
+  {# ---- radio groups ------------------------------------------------- #}
+  {# Yes / No radio pair. `<fieldset>` + `<legend>` is the accessible
+   substitute for `<label>` when one logical question owns multiple
+   inputs. Each radio carries `aria-describedby` so screen readers
+   announce the helper text on either selection. #}
+  {% macro radio_bool_field(name, label, current=None, required=True, help=None) -%}
+    <fieldset class="form-field">
+      <legend class="form-field-label">{{ _field_label(label, required) }}</legend>
+      <div class="form-field-control">
+        <label class="form-field-inline">
+          <input type="radio"
+                 name="{{ name }}"
+                 value="true"
+                 {% if current is sameas true %}checked{% endif %}
+                 {% if required %}required{% endif %}
+                 {% if help %}aria-describedby="{{ name }}-helper"{% endif %} />
+          Yes
+        </label>
+        <label class="form-field-inline">
+          <input type="radio"
+                 name="{{ name }}"
+                 value="false"
+                 {% if current is sameas false %}checked{% endif %}
+                 {% if required %}required{% endif %}
+                 {% if help %}aria-describedby="{{ name }}-helper"{% endif %} />
+          No
+        </label>
+        {{- _help_small(name, help) }}
+      </div>
+    </fieldset>
+  {%- endmacro %}
+  {# ---- schema-driven dispatch --------------------------------------- #}
+  {# Reads `field_spec(schema, name)` and delegates to the right inner
+   macro. `current`, `required`, `help`, `invalid` pass through. Pass
+   `required=false` to override the schema-derived default (e.g. an
+   optional filter on a field that's required for create). #}
+  {% macro field_for(schema, name, label, current=None, required=None, help=None, invalid=None, error=None) -%}
+    {%- set _form_errors = form_errors|default({}, true) -%}
+    {%- set _form_values = form_values|default({}, true) -%}
+    {%- set error = error if error is not none else _form_errors.get(name) -%}
+    {%- set current = _form_values[name] if name in _form_values else current -%}
+    {%- set spec = field_spec(schema, name) -%}
+    {%- set is_required = spec.required if required is none else required -%}
+    {%- if spec.kind == "select" -%}
+      {{ select_field(name, label, spec.choices, labels=spec.labels, current=current, required=is_required, placeholder=true, help=help, invalid=invalid, error=error) }}
+    {%- elif spec.kind == "multi_select" -%}
+      {{ multi_select_field(name, label, spec.choices, labels=spec.labels, current=current, help=help, invalid=invalid, error=error) }}
+    {%- elif spec.kind == "textarea" -%}
+      {{ textarea_field(name, label, current=current, required=is_required, help=help, invalid=invalid, error=error) }}
+    {%- elif spec.kind == "url" -%}
+      {{ url_field(name, label, current=current, required=is_required, help=help, invalid=invalid, error=error) }}
+    {%- elif spec.kind == "text" -%}
+      {{ text_field(name, label, current=current, required=is_required, pattern=spec.pattern, maxlength=spec.maxlength, help=help, invalid=invalid, error=error) }}
+    {%- endif -%}
+  {%- endmacro %}
+  {# ---- form section ------------------------------------------------- #}
+  {# Canonical `<fieldset>` + `<legend>` wrapper for a named group of
    fields. Replaces hand-written fieldsets in every form template so
    the section chrome is defined once and layout changes apply
    everywhere.
@@ -354,14 +403,14 @@ emitted attribute string. #}
        {{ select_field("location_state", "State", US_STATES) }}
      {% endcall %}
 #}
-{% macro form_section(title) -%}
-  <fieldset class="form-section">
-    <legend>{{ title }}</legend>
-    {{ caller() }}
-  </fieldset>
-{%- endmacro %}
-{# ---- specialized widgets ------------------------------------------ #}
-{# Day × time-of-day checkbox grid. One checkbox per (day, part) pair;
+  {% macro form_section(title) -%}
+    <fieldset class="form-section">
+      <legend>{{ title }}</legend>
+      {{ caller() }}
+    </fieldset>
+  {%- endmacro %}
+  {# ---- specialized widgets ------------------------------------------ #}
+  {# Day × time-of-day checkbox grid. One checkbox per (day, part) pair;
    all share the same `name` so the json-enc-arrays extension serializes
    them as a single JSON array of `<day>_<part>` tokens. `current` is an
    iterable of currently-selected tokens (`[]` on create, the persisted
