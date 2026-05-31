@@ -12,6 +12,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from src.jobs.hello_world import run_hello_world
 from src.jobs.nightly_verification import run_nightly_verification
 from src.jobs.scheduler import make_scheduler, register_jobs
+from src.jobs.verify_pending_npis import run_verify_pending_npis
 
 
 def test_register_jobs_adds_hello_world_with_interval_trigger():
@@ -61,3 +62,27 @@ def test_register_jobs_respects_nightly_cron_env(monkeypatch):
     # Cheapest assertion that proves the env var threaded through:
     # the parsed cron expression includes our minute spec.
     assert "*/5" in str(nightly.trigger)
+
+
+def test_register_jobs_adds_verify_pending_npis_with_interval_trigger():
+    scheduler = make_scheduler()
+    register_jobs(scheduler)
+
+    job = scheduler.get_job("verify_pending_npis")
+    assert job is not None
+    assert job.func is run_verify_pending_npis
+    assert isinstance(job.trigger, IntervalTrigger)
+    assert job.coalesce is True
+    assert job.max_instances == 1
+    # Default cadence is 300s (prod baseline).
+    assert job.trigger.interval.total_seconds() == 300
+
+
+def test_register_jobs_respects_verify_pending_npis_interval_env(monkeypatch):
+    monkeypatch.setenv("JOBS_VERIFY_PENDING_NPIS_INTERVAL_SEC", "60")
+
+    scheduler = make_scheduler()
+    register_jobs(scheduler)
+
+    job = scheduler.get_job("verify_pending_npis")
+    assert job.trigger.interval.total_seconds() == 60
