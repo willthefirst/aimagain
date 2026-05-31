@@ -85,3 +85,103 @@ async def nppes_lookup(npi: str, *, http: httpx.AsyncClient) -> NppesResult:
         last_name=last if isinstance(last, str) else None,
         raw=payload,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class NppesOrgResult:
+    """Outcome of a Type-2 NPPES lookup. Mirrors `NppesResult` for the
+    org case: `org_name` drives the org-name similarity score against
+    `Organization.name`; `authorized_official_name` is what the
+    `authorized_official` authority-method path matches against the
+    requesting user's verified `Clinician` legal name (handoff §6)."""
+
+    found: bool
+    org_name: str | None
+    authorized_official_name: str | None
+    raw: dict[str, Any] | None
+
+
+_ORG_NOT_FOUND = NppesOrgResult(
+    found=False, org_name=None, authorized_official_name=None, raw=None
+)
+
+
+async def nppes_lookup_type2(npi: str, *, http: httpx.AsyncClient) -> NppesOrgResult:
+    """Look up a Type-2 (organizational) NPI against NPPES.
+
+    Same degraded-on-failure contract as `nppes_lookup`: the function
+    never raises so the orchestrator always gets a `Verification` row.
+    NPPES distinguishes Type-1 from Type-2 via the `enumeration_type`
+    field on the result (`"NPI-2"` for orgs); if the lookup returns a
+    Type-1 we treat it as not-found for org purposes — calling code
+    should never pass a Type-1 NPI here.
+
+    The Type-2 payload's `basic` block has different fields than Type-1:
+    `organization_name` instead of `first_name`/`last_name`, plus
+    `authorized_official_first_name` / `authorized_official_last_name` /
+    `authorized_official_middle_name` for the AO name-match path.
+    """
+    try:
+        response = await http.get(
+            _NPPES_ENDPOINT,
+            params={
+                "version": _NPPES_VERSION,
+                "number": npi,
+                "enumeration_type": "NPI-2",
+            },
+            timeout=_DEFAULT_TIMEOUT_SECONDS,
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("nppes_lookup_type2(%s): request failed: %s", npi, exc)
+        return _ORG_NOT_FOUND
+
+    if response.status_code >= 400:
+        logger.warning(
+            "nppes_lookup_type2(%s): unexpected status %s",
+            npi,
+            response.status_code,
+        )
+        return _ORG_NOT_FOUND
+
+    try:
+        payload: dict[str, Any] = response.json()
+    except ValueError as exc:
+        logger.warning("nppes_lookup_type2(%s): non-JSON payload: %s", npi, exc)
+        return _ORG_NOT_FOUND
+
+    results = payload.get("results") or []
+    if not results:
+        return NppesOrgResult(
+            found=False,
+            org_name=None,
+            authorized_official_name=None,
+            raw=payload,
+        )
+
+    result0 = results[0] or {}
+    if result0.get("enumeration_type") not in (None, "NPI-2"):
+        # Defensive: NPPES returned a Type-1 record despite the
+        # `enumeration_type=NPI-2` filter. Treat as not-found for org
+        # purposes; the worker logs and the row stays `pending`.
+        logger.warning(
+            "nppes_lookup_type2(%s): enumeration_type=%s (expected NPI-2)",
+            npi,
+            result0.get("enumeration_type"),
+        )
+        return NppesOrgResult(
+            found=False, org_name=None, authorized_official_name=None, raw=payload
+        )
+
+    basic = result0.get("basic") or {}
+    org_name = basic.get("organization_name")
+    ao_first = basic.get("authorized_official_first_name") or ""
+    ao_middle = basic.get("authorized_official_middle_name") or ""
+    ao_last = basic.get("authorized_official_last_name") or ""
+    ao_parts = [p.strip() for p in (ao_first, ao_middle, ao_last) if p and p.strip()]
+    ao_name = " ".join(ao_parts) if ao_parts else None
+    return NppesOrgResult(
+        found=True,
+        org_name=org_name if isinstance(org_name, str) else None,
+        authorized_official_name=ao_name,
+        raw=payload,
+    )
