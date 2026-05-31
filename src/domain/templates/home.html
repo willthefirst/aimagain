@@ -18,11 +18,11 @@
         <h2>My active posts</h2>
         <a href="{{ entity_url('post') }}">See all</a>
       </header>
-      <article class="post-feed-list">
+      <ul class="post-feed-list">
         {%- for post in my_posts -%}
           {{ post_feed_row(post, "post", show_poster=False) }}
         {%- endfor -%}
-      </article>
+      </ul>
     </section>
   {% endif %}
   {% if network_posts %}
@@ -42,11 +42,11 @@
         <a href="{{ entity_url('post') }}">Adjust filters</a>
         {# djlint:on #}
       </p>
-      <article class="post-feed-list">
+      <ul class="post-feed-list">
         {%- for post in network_posts -%}
           {{ post_feed_row(post, "post") }}
         {%- endfor -%}
-      </article>
+      </ul>
     </section>
   {% endif %}
 {% endblock %}

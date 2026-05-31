@@ -469,54 +469,60 @@ it's dev-only chrome that should never ship to production. #}
         <p>
           <small>CSS classes in <code>domain.css</code>. template macro: <code>posts/_shared/_feed_row.html</code> → <code>post_feed_row()</code>.</small>
         </p>
-        <div class="post-feed-list">
-          <article class="post-feed-row" data-kind="referral">
-            <div class="post-feed-header">
-              <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
-              <span class="post-feed-byline">
-                <small>A . Stone</small>
-                <small>2h ago</small>
-              </span>
-            </div>
-            <a href="#" class="post-feed-headline-text"><strong>Adult female (25–64) — psychotherapy, DBT</strong></a>
-            <div class="post-feed-meta">
-              <span><i class="icon-map-pin"></i>San Francisco, CA</span>
-              <span><i class="icon-monitor"></i>In-person · Telehealth</span>
-              <span><i class="icon-shield"></i>Aetna</span>
-            </div>
-          </article>
-          <article class="post-feed-row" data-kind="clinician_opening">
-            <div class="post-feed-header">
-              <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
-              <span class="post-feed-byline">
-                <small>B . Chen</small>
-                <small>1d ago</small>
-              </span>
-            </div>
-            <a href="#"
-               class="post-feed-headline-text post-feed-headline-text:visited"><strong>Sunrise Therapy — psychotherapy, outpatient</strong></a>
-            <div class="post-feed-meta">
-              <span><i class="icon-map-pin"></i>Oakland, CA</span>
-              <span><i class="icon-layers"></i>Outpatient</span>
-              <span><i class="icon-shield"></i>Blue Cross · Aetna</span>
-            </div>
-          </article>
-          <article class="post-feed-row post-feed-row--interest"
-                   data-kind="program_intake">
-            <div class="post-feed-header">
-              <span class="post-feed-type-tag post-feed-type-tag--intake">Intake</span>
-              <span class="post-feed-byline">
-                <small>C . Rivera</small>
-                <small>3d ago</small>
-              </span>
-            </div>
-            <a href="#" class="post-feed-headline-text"><strong>Healing Path DBT Program — DBT, group therapy</strong></a>
-            <div class="post-feed-meta">
-              <span><i class="icon-map-pin"></i>Berkeley, CA</span>
-              <span><i class="icon-layers"></i>Outpatient · Intensive outpatient</span>
-            </div>
-          </article>
-        </div>
+        <ul class="post-feed-list">
+          <li>
+            <article class="post-feed-row" data-kind="referral">
+              <div class="post-feed-header">
+                <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+                <span class="post-feed-byline">
+                  <small>A . Stone</small>
+                  <small>2h ago</small>
+                </span>
+              </div>
+              <a href="#" class="post-feed-headline-text"><strong>Adult female (25–64) — psychotherapy, DBT</strong></a>
+              <div class="post-feed-meta">
+                <span><i class="icon-map-pin"></i>San Francisco, CA</span>
+                <span><i class="icon-monitor"></i>In-person · Telehealth</span>
+                <span><i class="icon-shield"></i>Aetna</span>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="post-feed-row" data-kind="clinician_opening">
+              <div class="post-feed-header">
+                <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+                <span class="post-feed-byline">
+                  <small>B . Chen</small>
+                  <small>1d ago</small>
+                </span>
+              </div>
+              <a href="#"
+                 class="post-feed-headline-text post-feed-headline-text:visited"><strong>Sunrise Therapy — psychotherapy, outpatient</strong></a>
+              <div class="post-feed-meta">
+                <span><i class="icon-map-pin"></i>Oakland, CA</span>
+                <span><i class="icon-layers"></i>Outpatient</span>
+                <span><i class="icon-shield"></i>Blue Cross · Aetna</span>
+              </div>
+            </article>
+          </li>
+          <li>
+            <article class="post-feed-row post-feed-row--interest"
+                     data-kind="program_intake">
+              <div class="post-feed-header">
+                <span class="post-feed-type-tag post-feed-type-tag--intake">Intake</span>
+                <span class="post-feed-byline">
+                  <small>C . Rivera</small>
+                  <small>3d ago</small>
+                </span>
+              </div>
+              <a href="#" class="post-feed-headline-text"><strong>Healing Path DBT Program — DBT, group therapy</strong></a>
+              <div class="post-feed-meta">
+                <span><i class="icon-map-pin"></i>Berkeley, CA</span>
+                <span><i class="icon-layers"></i>Outpatient · Intensive outpatient</span>
+              </div>
+            </article>
+          </li>
+        </ul>
       </section>
       <section class="gallery-section" id="credentials">
         <h2>Credential rows</h2>
@@ -569,28 +575,32 @@ it's dev-only chrome that should never ship to production. #}
             </form>
           </aside>
           <div class="posts-results">
-            <div class="post-feed-list">
-              <article class="post-feed-row">
-                <div class="post-feed-header">
-                  <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
-                  <span class="post-feed-byline"><small>2h ago</small></span>
-                </div>
-                <a href="#" class="post-feed-headline-text"><strong>Adult female (25–64) — psychotherapy</strong></a>
-                <div class="post-feed-meta">
-                  <span><i class="icon-map-pin"></i>San Francisco, CA</span>
-                </div>
-              </article>
-              <article class="post-feed-row">
-                <div class="post-feed-header">
-                  <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
-                  <span class="post-feed-byline"><small>1d ago</small></span>
-                </div>
-                <a href="#" class="post-feed-headline-text"><strong>Sunrise Therapy — outpatient</strong></a>
-                <div class="post-feed-meta">
-                  <span><i class="icon-map-pin"></i>Oakland, CA</span>
-                </div>
-              </article>
-            </div>
+            <ul class="post-feed-list">
+              <li>
+                <article class="post-feed-row">
+                  <div class="post-feed-header">
+                    <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+                    <span class="post-feed-byline"><small>2h ago</small></span>
+                  </div>
+                  <a href="#" class="post-feed-headline-text"><strong>Adult female (25–64) — psychotherapy</strong></a>
+                  <div class="post-feed-meta">
+                    <span><i class="icon-map-pin"></i>San Francisco, CA</span>
+                  </div>
+                </article>
+              </li>
+              <li>
+                <article class="post-feed-row">
+                  <div class="post-feed-header">
+                    <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+                    <span class="post-feed-byline"><small>1d ago</small></span>
+                  </div>
+                  <a href="#" class="post-feed-headline-text"><strong>Sunrise Therapy — outpatient</strong></a>
+                  <div class="post-feed-meta">
+                    <span><i class="icon-map-pin"></i>Oakland, CA</span>
+                  </div>
+                </article>
+              </li>
+            </ul>
           </div>
         </div>
       </section>
