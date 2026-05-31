@@ -40,27 +40,29 @@ to the clinician-create flow when `current_user.clinicians` is empty.
   {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="clinician_opening" />
-    <label for="subject">
-      Subject <small>(optional — leave blank to auto-generate)</small>
-      <input type="text"
-             name="subject"
-             id="subject"
-             maxlength="120"
-             value="{{ (form_values|default({}) ).get('subject') or (d.subject if d else '') or '' }}" />
-    </label>
+    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {# Practice picker. A Clinician may carry multiple Affiliations
      (clinician × org practice-role rows); the dropdown labels each
      option by the affiliation's org name so a clinician who works at
      two practices sees both options. Each option's value is the
-     clinician id; the label comes from the affiliation's org. #}
-    <label for="clinician_id">
-      Which practice?
+     clinician id; the label comes from the affiliation's org. Hand-
+     written rather than via `entity_select_field` because the option
+     label is sourced from a nested `affiliations` loop, not a flat
+     attribute on the clinician — mirrors `_form_referral.html`'s
+     referring_clinician_id picker. The `.form-field` + `.form-field-label`
+     wrapper slots it into the canonical 2-column grid. #}
+    {%- set _cid_fv = (form_values|default({})).get('clinician_id') -%}
+    <label class="form-field" for="clinician_id">
+      <span class="form-field-label">Which practice?</span>
       <select id="clinician_id" name="clinician_id" required>
         {%- for c in current_user.clinicians %}
           {%- set outer_first = loop.first %}
           {%- for aff in c.affiliations %}
+            {%- set is_fv_match = _cid_fv and _cid_fv|string == c.id|string and loop.first -%}
+            {%- set is_edit_match = not _cid_fv and d and d.clinician_id == c.id and loop.first -%}
+            {%- set is_create_default = not _cid_fv and not d and outer_first and loop.first -%}
             <option value="{{ c.id }}"
-                    {% if (d and d.clinician_id == c.id and loop.first) or (not d and outer_first and loop.first) %}selected{% endif %}>
+                    {% if is_fv_match or is_edit_match or is_create_default %}selected{% endif %}>
               {{ aff.org.name }}
             </option>
           {%- endfor %}
