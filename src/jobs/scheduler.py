@@ -13,6 +13,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from src.jobs.hello_world import run_hello_world
 from src.jobs.nightly_verification import run_nightly_verification
+from src.jobs.verify_pending_npis import run_verify_pending_npis
 
 
 def make_scheduler() -> AsyncIOScheduler:
@@ -38,6 +39,21 @@ def register_jobs(scheduler: AsyncIOScheduler) -> None:
         run_nightly_verification,
         trigger=CronTrigger.from_crontab(nightly_cron),
         id="nightly_verification",
+        coalesce=True,
+        max_instances=1,
+    )
+
+    # Pending-NPI drainer — runs on a short interval (default ~300s in
+    # prod, the env var lets dev dial down to 60s for a near-instant
+    # Profile Hub "Verifying…" → matched transition). Same coalesce /
+    # max_instances story as `nightly_verification`.
+    pending_interval_sec = int(
+        os.getenv("JOBS_VERIFY_PENDING_NPIS_INTERVAL_SEC", "300")
+    )
+    scheduler.add_job(
+        run_verify_pending_npis,
+        trigger=IntervalTrigger(seconds=pending_interval_sec),
+        id="verify_pending_npis",
         coalesce=True,
         max_instances=1,
     )

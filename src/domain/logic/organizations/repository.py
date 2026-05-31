@@ -16,6 +16,8 @@ read the tree but won't widen the writer surface.
 import uuid
 from typing import Any, Sequence
 
+from sqlalchemy import select
+
 from src.domain.models import Organization
 from src.framework.http.exceptions import NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
@@ -30,6 +32,17 @@ class OrganizationRepository(BaseRepository):
         ownership is the boundary for who may attach Clinicians, mirroring
         ``Organization.write_authz``)."""
         return await self.list_owned_by(Organization, user_id)
+
+    async def list_pending_npi(self) -> Sequence[Organization]:
+        """Orgs with `npi_match_status == 'pending'` — the work queue
+        for the NPI worker's Type-2 path. Mirror of
+        `ClinicianRepository.list_pending_npi` for Claim B."""
+        return await self._list(
+            select(Organization).filter(
+                Organization.npi_match_status == "pending",
+                Organization.deleted_at.is_(None),
+            )
+        )
 
     async def _resolve_root_id(
         self, parent_org_id: uuid.UUID | None
