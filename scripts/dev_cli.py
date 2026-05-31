@@ -51,6 +51,26 @@ class CLIRunner:
         # can still override by exporting COMPOSE_PROJECT_NAME themselves;
         # we only set it when nothing else has.
         self.compose_project_name = self._derive_compose_project_name()
+        # Per-worktree ports (see #1007). Each worktree stores its assigned
+        # host port in .worktree-port; main checkout defaults to 8000/35729.
+        self.app_port, self.livereload_port = self._derive_ports()
+
+    def _derive_ports(self) -> "tuple[int, int]":
+        # Worktrees store their assigned host ports in .worktree-port
+        # (written by `dev worktree add`). The main checkout has no such
+        # file and uses the defaults. Format: "<app_port> <livereload_port>".
+        port_file = self.project_root / ".worktree-port"
+        if port_file.exists():
+            try:
+                parts = port_file.read_text().split()
+                app_port = int(parts[0])
+                livereload_port = (
+                    int(parts[1]) if len(parts) > 1 else 35729 + (app_port - 8000)
+                )
+                return app_port, livereload_port
+            except (ValueError, IndexError):
+                pass
+        return 8000, 35729
 
     def _derive_compose_project_name(self) -> str:
         # docker-compose project names must be lowercase alnum + `-`/`_`,
@@ -64,6 +84,8 @@ class CLIRunner:
     def _compose_env(self, extra: Optional[dict] = None) -> dict:
         env = os.environ.copy()
         env.setdefault("COMPOSE_PROJECT_NAME", self.compose_project_name)
+        env.setdefault("APP_PORT", str(self.app_port))
+        env.setdefault("LIVERELOAD_PORT", str(self.livereload_port))
         if extra:
             env.update(extra)
         return env
@@ -182,6 +204,10 @@ class DevCommands:
 
     def up(self, build: bool = False, detach: bool = False) -> int:
         print("🛠️ Starting development environment...")
+        app_port = self.runner.app_port
+        lr_port = self.runner.livereload_port
+        print(f"   App:        http://localhost:{app_port}")
+        print(f"   LiveReload: http://localhost:{lr_port}")
 
         cmd = ["docker", "compose", "-f", DOCKER_COMPOSE_DEV_FILE, "up"]
         if build:
@@ -645,8 +671,9 @@ class PlaywrightCommands:
         print("\nNext steps:")
         print("  1. Start the dev server:    dev up")
         print("  2. Seed the dev DB:         dev seed")
+        port = self.runner.app_port
         print("  3. Log in (bookmark this):")
-        print("       http://localhost:8000/dev/login-as-seed-user")
+        print(f"       http://localhost:{port}/dev/login-as-seed-user")
         print(
             "     Visiting it sets the session cookie for the seed admin user "
             "and redirects to /posts."
@@ -728,9 +755,29 @@ class WorktreeCommands:
         if result.returncode != 0:
             print(result.stderr.rstrip())
             return result.returncode
+        app_port = self._assign_worktree_port()
+        lr_port = 35729 + (app_port - 8000)
+        (path / ".worktree-port").write_text(f"{app_port} {lr_port}\n")
         print(f"✅ Worktree ready: {path}")
         print(f"   Branch: {branch}")
+        print(f"   App port: {app_port}  →  http://localhost:{app_port}")
         return 0
+
+    def _assign_worktree_port(self) -> int:
+        # Find the lowest unused port starting from 8001 by scanning all
+        # existing .worktree-port files under the worktrees root.
+        used: set = set()
+        wt_root = self._worktrees_root()
+        if wt_root.is_dir():
+            for port_file in wt_root.glob("*/.worktree-port"):
+                try:
+                    used.add(int(port_file.read_text().split()[0]))
+                except (ValueError, IndexError):
+                    pass
+        port = 8001
+        while port in used:
+            port += 1
+        return port
 
     def _looks_like_uuid(self, name: str) -> bool:
         # Heuristic: 6+ consecutive hex chars and no human-meaningful

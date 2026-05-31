@@ -109,7 +109,7 @@ main() {
     setup_database
     run_migrations
     start_livereload_server
-    echo "🔥 Dev server: http://0.0.0.0:8000 (hot reload + LiveReload on :$LIVERELOAD_PORT)"
+    echo "🔥 Dev server: http://localhost:${APP_PORT:-8000} (hot reload + LiveReload on :$LIVERELOAD_PORT)"
     start_fastapi_dev
 }
 

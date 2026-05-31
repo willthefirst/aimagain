@@ -10,7 +10,6 @@ subprocess.run env.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from scripts.dev_cli import CLIRunner
@@ -24,6 +23,7 @@ def _make_runner_at(root: Path) -> CLIRunner:
     runner = CLIRunner.__new__(CLIRunner)
     runner.project_root = root
     runner.compose_project_name = runner._derive_compose_project_name()
+    runner.app_port, runner.livereload_port = runner._derive_ports()
     return runner
 
 
