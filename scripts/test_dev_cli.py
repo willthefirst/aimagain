@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 
-from scripts.dev_cli import CLIRunner, SeedCommands, TestCommands
+from scripts.dev_cli import CLIRunner, SeedCommands, TestCommands, WorktreeCommands
 
 
 def test_clirunner_resolves_project_root_from_cwd(tmp_path: Path, monkeypatch):
@@ -279,3 +279,88 @@ def test_run_tests_affected_empty_selection_skips_pytest(monkeypatch):
     rc = TestCommands(runner, quality).run_tests(affected=True, skip_lint=True)
     assert rc == 0
     assert runner.last_cmd is None
+
+
+# ---------------------------------------------------------------------------
+# CLIRunner._derive_ports  (issue #1007)
+# ---------------------------------------------------------------------------
+
+
+def test_derive_ports_defaults_when_no_port_file(tmp_path: Path, monkeypatch):
+    """Main checkout (no .worktree-port) returns the standard defaults."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'fake'\n")
+    monkeypatch.chdir(tmp_path)
+    runner = CLIRunner()
+    assert runner.app_port == 8000
+    assert runner.livereload_port == 35729
+
+
+def test_derive_ports_reads_port_file(tmp_path: Path, monkeypatch):
+    """Worktree with .worktree-port uses the stored ports."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'fake'\n")
+    (tmp_path / ".worktree-port").write_text("8002 35731\n")
+    monkeypatch.chdir(tmp_path)
+    runner = CLIRunner()
+    assert runner.app_port == 8002
+    assert runner.livereload_port == 35731
+
+
+def test_derive_ports_falls_back_on_corrupt_port_file(tmp_path: Path, monkeypatch):
+    """Corrupt .worktree-port silently falls back to defaults."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'fake'\n")
+    (tmp_path / ".worktree-port").write_text("not-a-number\n")
+    monkeypatch.chdir(tmp_path)
+    runner = CLIRunner()
+    assert runner.app_port == 8000
+    assert runner.livereload_port == 35729
+
+
+def test_compose_env_injects_ports(tmp_path: Path, monkeypatch):
+    """`_compose_env` injects APP_PORT and LIVERELOAD_PORT."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'fake'\n")
+    (tmp_path / ".worktree-port").write_text("8003 35732\n")
+    monkeypatch.chdir(tmp_path)
+    runner = CLIRunner()
+    env = runner._compose_env()
+    assert env["APP_PORT"] == "8003"
+    assert env["LIVERELOAD_PORT"] == "35732"
+
+
+# ---------------------------------------------------------------------------
+# WorktreeCommands._assign_worktree_port  (issue #1007)
+# ---------------------------------------------------------------------------
+
+
+def _make_worktree_runner(tmp_path: Path, monkeypatch) -> CLIRunner:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'fake'\n")
+    monkeypatch.chdir(tmp_path)
+    return CLIRunner()
+
+
+def test_assign_worktree_port_starts_at_8001(tmp_path: Path, monkeypatch):
+    """First worktree gets port 8001."""
+    runner = _make_worktree_runner(tmp_path, monkeypatch)
+    wt_cmds = WorktreeCommands(runner)
+    assert wt_cmds._assign_worktree_port() == 8001
+
+
+def test_assign_worktree_port_skips_used_ports(tmp_path: Path, monkeypatch):
+    """Ports already taken by existing .worktree-port files are skipped."""
+    runner = _make_worktree_runner(tmp_path, monkeypatch)
+    wt_root = tmp_path / ".claude" / "worktrees"
+    (wt_root / "issue-1").mkdir(parents=True)
+    (wt_root / "issue-2").mkdir(parents=True)
+    (wt_root / "issue-1" / ".worktree-port").write_text("8001 35730\n")
+    (wt_root / "issue-2" / ".worktree-port").write_text("8002 35731\n")
+    wt_cmds = WorktreeCommands(runner)
+    assert wt_cmds._assign_worktree_port() == 8003
+
+
+def test_assign_worktree_port_ignores_corrupt_sibling(tmp_path: Path, monkeypatch):
+    """A corrupt sibling .worktree-port is skipped without raising."""
+    runner = _make_worktree_runner(tmp_path, monkeypatch)
+    wt_root = tmp_path / ".claude" / "worktrees"
+    (wt_root / "issue-bad").mkdir(parents=True)
+    (wt_root / "issue-bad" / ".worktree-port").write_text("oops\n")
+    wt_cmds = WorktreeCommands(runner)
+    assert wt_cmds._assign_worktree_port() == 8001

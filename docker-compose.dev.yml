@@ -4,16 +4,17 @@ services:
       context: .
       dockerfile: deployment/docker/Dockerfile
       target: development
-    container_name: bedlam-connect-dev
     restart: unless-stopped
     ports:
-      - '8000:8000'
-      - '35729:35729' # LiveReload server port for development hot reloading
+      - '${APP_PORT:-8000}:8000'
+      - '${LIVERELOAD_PORT:-35729}:35729'
     environment:
       - SECRET=${SECRET}
       - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/bedlam-connect.db}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
       - DISABLE_SCHEDULER=1
+      - APP_PORT=${APP_PORT:-8000}
+      - LIVERELOAD_PORT=${LIVERELOAD_PORT:-35729}
     volumes:
       - ./data:/app/data
       - ./src:/app/src
