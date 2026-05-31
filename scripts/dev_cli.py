@@ -4,6 +4,7 @@
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -758,6 +759,9 @@ class WorktreeCommands:
         app_port = self._assign_worktree_port()
         lr_port = 35729 + (app_port - 8000)
         (path / ".worktree-port").write_text(f"{app_port} {lr_port}\n")
+        root_env = self.runner.project_root / ".env"
+        if root_env.exists():
+            shutil.copy(root_env, path / ".env")
         print(f"✅ Worktree ready: {path}")
         print(f"   Branch: {branch}")
         print(f"   App port: {app_port}  →  http://localhost:{app_port}")
