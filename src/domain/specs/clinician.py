@@ -21,6 +21,8 @@ from src.domain.logic.clinicians.schema import (
     ClinicianCreate,
     ClinicianRead,
     ClinicianUpdate,
+    ClinicianVerificationAuditSnapshot,
+    ClinicianVerificationStateUpdate,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
@@ -35,12 +37,14 @@ from src.domain.models.enums import (
     LICENSE_TYPES_LABELS,
     US_STATES,
 )
+from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     Redirects,
     RouteSet,
+    StateAxis,
     Templates,
 )
 from src.framework.dispatch.filters import ChoiceFilter
@@ -135,4 +139,23 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
         "CERTIFICATION_TYPES": CERTIFICATION_TYPES,
         "CERTIFICATION_TYPES_LABELS": CERTIFICATION_TYPES_LABELS,
     },
+    state_axes=(
+        # Admin override of `npi_match_status`. The inline NPI-submit
+        # route auto-flips `failed`/`needs_review` to `mismatch` so the
+        # row settles in a terminal state; this axis is how admin
+        # closes the loop on edge cases (`matched` accepts, `mismatch`
+        # rejects definitively, `pending` re-queues for the next
+        # submit attempt).
+        StateAxis(
+            name="verification",
+            body_schema=ClinicianVerificationStateUpdate,
+            action=AuditAction.SET_CLINICIAN_VERIFICATION_STATE,
+            handler_path=(
+                "src.domain.logic.clinicians.handlers."
+                "handle_set_clinician_verification_state"
+            ),
+            audit_snapshot=ClinicianVerificationAuditSnapshot,
+            forbid_self=False,
+        ),
+    ),
 )

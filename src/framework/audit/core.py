@@ -91,6 +91,15 @@ class AuditAction(str, Enum):
     # `attested_active=True` + recomputes the license `status` and the
     # owning clinician's Claim-A cache.
     SET_LICENSE_ATTESTATION = "set_license_attestation"
+    # Admin override of `Clinician.npi_match_status` /
+    # `Organization.npi_match_status`. Used to close out a `mismatch`
+    # the worker landed on (admin says "actually this person IS who
+    # they claim — flip to matched") OR to re-queue (`pending`, worker
+    # picks up again). Per-row state-axis surface so the audit trail
+    # carries the override action distinctly from the worker's
+    # `npi_resolved` events.
+    SET_CLINICIAN_VERIFICATION_STATE = "set_clinician_verification_state"
+    SET_ORG_VERIFICATION_STATE = "set_org_verification_state"
 
 
 Verb = Literal["create", "update", "delete"]

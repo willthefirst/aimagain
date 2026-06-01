@@ -24,23 +24,6 @@ class ClinicianRepository(BaseRepository):
     ) -> Sequence[Clinician]:
         return await self.list_owned_by(Clinician, user_id, offset=offset, limit=limit)
 
-    async def list_for_verification(self) -> Sequence[Clinician]:
-        return await self._list(
-            select(Clinician).filter(Clinician.deleted_at.is_(None))
-        )
-
-    async def list_pending_npi(self) -> Sequence[Clinician]:
-        """Clinicians with `npi_match_status == 'pending'` — the work
-        queue for the NPI worker job. Picks up rows after an end-user
-        submission (`POST /clinicians/{id}/npi`) and any admin-driven
-        re-submit. Excludes soft-deleted rows."""
-        return await self._list(
-            select(Clinician).filter(
-                Clinician.npi_match_status == "pending",
-                Clinician.deleted_at.is_(None),
-            )
-        )
-
     async def list_clinicians(
         self,
         *,

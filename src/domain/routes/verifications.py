@@ -1,15 +1,16 @@
 """Bespoke router for the verification-related endpoints.
 
-`Verification` has no EntitySpec — there's no public CRUD surface; the
-nightly + pending-NPI workers write most rows. This file hosts:
+`Verification` has no EntitySpec — there's no public CRUD surface.
+This file hosts:
 
 - the admin-only manual retrigger (POST /clinicians/{id}/verifications)
 - the end-user NPI submit endpoints (POST /clinicians/{id}/npi and
   POST /organizations/{id}/npi) the Profile Hub's `_claim_a_card` /
-  `_claim_b_card` POST against. Setting the NPI here flips
-  `npi_match_status` to `'pending'`, appends a `Verification` event
-  of type `npi_submitted`, and returns; the pending-NPI worker
-  (`src/jobs/verify_pending_npis.py`) drains the row within ~5min.
+  `_claim_b_card` POST against. Setting the NPI here calls NPPES
+  synchronously and writes the resolved state through to
+  `npi_match_status` (`matched` / `mismatch` / `none`) before the
+  response returns — no worker, no polling, no "Verifying…" pending
+  state for the UI to follow up on.
 
 The bespoke shape follows `auth_pages` / `favorites` (see
 `src/domain/routes/README.md` § "Bespoke routes"); wired into
@@ -23,6 +24,7 @@ narrower verb on the same resource.
 
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel, field_validator
 
@@ -36,7 +38,12 @@ from src.domain.logic.organizations.repository import (
     get_organization_repository,
 )
 from src.domain.logic.verifications.events import record_verification_event
-from src.domain.logic.verifications.handlers import handle_create_clinician_verification
+from src.domain.logic.verifications.handlers import (
+    HTTP_TIMEOUT_SECONDS,
+    handle_create_clinician_verification,
+    run_clinician_verification,
+    run_org_verification,
+)
 from src.domain.logic.verifications.repository import (
     VerificationRepository,
     get_verification_repository,
@@ -45,7 +52,6 @@ from src.domain.models import Clinician, Organization, User
 from src.framework.audit.repository import AuditRepository
 from src.framework.authz import is_owner_or_admin
 from src.framework.http.exceptions import (
-    BadRequestError,
     ForbiddenError,
     NotFoundError,
 )
@@ -113,13 +119,20 @@ async def submit_clinician_npi(
     audit_repo: AuditRepository = Depends(get_audit_repository),
     requesting_user: User = Depends(current_active_user),
 ) -> Response:
-    """User-driven Type-1 NPI submission.
+    """User-driven Type-1 NPI submission. Synchronous:
 
-    Sets `Clinician.npi` to the validated value, flips
-    `npi_match_status='pending'`, and appends a `Verification` event
-    of type `npi_submitted`. The pending-NPI worker drains the row
-    within ~5min; the Profile Hub's `_claim_a_card` HTMX-swaps a
-    "Verifying…" pill in the meantime.
+    1. Persist `Clinician.npi`.
+    2. Append a `Verification` event of type `npi_submitted` (the
+       user-action log entry — distinct from the NPPES-result event
+       the pipeline writes next).
+    3. Run `run_clinician_verification(...)` inline — calls NPPES,
+       writes a second `Verification` row (`npi_resolved`), and flips
+       `npi_match_status` to its final state (`matched` /
+       `mismatch` / `none`) in the same transaction.
+
+    By the time the response returns, the row is settled. The Profile
+    Hub renders the resolved state directly — no polling, no
+    intermediate "Verifying…" pill.
 
     Authz: the requesting user must own the clinician (or be admin).
     """
@@ -129,25 +142,7 @@ async def submit_clinician_npi(
     if not is_owner_or_admin(clinician, requesting_user):
         raise ForbiddenError(detail="Cannot submit NPI for this clinician")
 
-    # Block re-submission while the prior NPI is still being resolved —
-    # the worker would otherwise keep running the same lookup with no
-    # user-visible benefit. Admin override is fine because admins
-    # already bypass the ownership check above.
-    if (
-        clinician.npi_match_status == "pending"
-        and clinician.npi
-        and clinician.npi != body.npi
-        and not requesting_user.is_superuser
-    ):
-        raise BadRequestError(
-            detail=(
-                "An NPI submission for this clinician is already in flight. "
-                "Wait for the worker to resolve it, or have an admin override."
-            )
-        )
-
     clinician.npi = body.npi
-    clinician.npi_match_status = "pending"
     await record_verification_event(
         verification_repo=verification_repo,
         audit_repo=audit_repo,
@@ -158,7 +153,15 @@ async def submit_clinician_npi(
         evidence={"npi": body.npi},
         actor_id=requesting_user.id,
     )
-    await clinician_repo.session.commit()
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+        await run_clinician_verification(
+            clinician_id=clinician.id,
+            verification_repo=verification_repo,
+            clinician_repo=clinician_repo,
+            audit_repo=audit_repo,
+            http=http,
+            actor_id=requesting_user.id,
+        )
     return refreshed_response()
 
 
@@ -176,31 +179,18 @@ async def submit_organization_npi(
     requesting_user: User = Depends(current_active_user),
 ) -> Response:
     """User-driven Type-2 (organizational) NPI submission. Mirror of
-    `submit_clinician_npi` for Claim B. The org's Type-2 NPI is
-    verified once per Organization (handoff §6) — subsequent
-    representatives prove authority through `OrgRepresentation`, not
-    by re-submitting the NPI."""
+    `submit_clinician_npi` for Claim B — synchronous: NPPES runs
+    inline and the row is settled before the response returns. The
+    org's Type-2 NPI is verified once per Organization (handoff §6) —
+    subsequent representatives prove authority through
+    `OrgRepresentation`, not by re-submitting the NPI."""
     org = await org_repo.get_by_model_id(Organization, organization_id)
     if org is None:
         raise NotFoundError(detail="Organization not found")
     if not is_owner_or_admin(org, requesting_user):
         raise ForbiddenError(detail="Cannot submit NPI for this organization")
 
-    if (
-        org.npi_match_status == "pending"
-        and org.npi
-        and org.npi != body.npi
-        and not requesting_user.is_superuser
-    ):
-        raise BadRequestError(
-            detail=(
-                "An NPI submission for this organization is already in flight. "
-                "Wait for the worker to resolve it, or have an admin override."
-            )
-        )
-
     org.npi = body.npi
-    org.npi_match_status = "pending"
     await record_verification_event(
         verification_repo=verification_repo,
         audit_repo=audit_repo,
@@ -211,7 +201,15 @@ async def submit_organization_npi(
         evidence={"npi": body.npi},
         actor_id=requesting_user.id,
     )
-    await org_repo.session.commit()
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+        await run_org_verification(
+            org_id=org.id,
+            verification_repo=verification_repo,
+            org_repo=org_repo,
+            audit_repo=audit_repo,
+            http=http,
+            actor_id=requesting_user.id,
+        )
     return refreshed_response()
 
 

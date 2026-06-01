@@ -229,3 +229,98 @@ async def handle_set_license_attestation(
     recompute_clinician_claim(clinician)
     await repo.session.commit()
     return licensure
+
+
+async def handle_set_clinician_verification_state(
+    clinician_id: UUID,
+    payload: BaseModel,
+    repo: ClinicianRepository,
+    verification_repo: VerificationRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+):
+    """Admin-only state-axis handler for
+    `PUT /clinicians/{id}/verification`.
+
+    Forces `Clinician.npi_match_status` to the supplied state without
+    going through the NPPES pipeline. Three valid transitions:
+
+    - **`matched`** — admin accepts a row the worker landed as
+      `mismatch`. Sets `npi_verified_at=NOW()`, recomputes the Claim-A
+      cache (which sets `verified_at` + `ever_verified_at`).
+    - **`mismatch`** — admin explicitly rejects (e.g. after manual
+      NPPES audit). Row stays out of the worker queue.
+    - **`pending`** — admin re-queues the row. Clears
+      `npi_verified_at` so the worker treats the next attempt as
+      fresh.
+
+    The cache recompute always runs; the audit row carries
+    `SET_CLINICIAN_VERIFICATION_STATE` so the override is
+    distinguishable from worker-driven `npi_resolved` events in the
+    audit trail. A `Verification` event of type `admin_verify` /
+    `admin_suspend` is appended for the matched / mismatch
+    transitions so the event log records who closed the loop.
+    """
+    from datetime import datetime, timezone
+
+    from src.domain.logic.verifications.events import record_verification_event
+    from src.domain.logic.verifications.handlers import recompute_clinician_claim
+    from src.domain.specs.clinician import CLINICIAN_ENTITY
+    from src.framework.audit.core import record_audit
+
+    if not requesting_user.is_superuser:
+        raise ForbiddenError(
+            detail="Setting clinician verification state is admin-only"
+        )
+
+    clinician = await repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail="Clinician not found")
+
+    axis = CLINICIAN_ENTITY.state_axis("verification")
+    snapshot = axis.audit_snapshot_fn
+    before = snapshot(clinician)
+
+    target_state = payload.state
+    clinician.npi_match_status = target_state
+    if target_state == "matched":
+        clinician.npi_verified_at = datetime.now(timezone.utc)
+        verification_event: str | None = "admin_verify"
+    elif target_state == "mismatch":
+        verification_event = "admin_suspend"
+    else:
+        # `pending` — clear the verified timestamp so the worker's
+        # next attempt isn't gated on the stale value.
+        clinician.npi_verified_at = None
+        verification_event = None
+
+    recompute_clinician_claim(clinician)
+
+    await record_audit(
+        audit_repo,
+        actor_id=requesting_user.id,
+        resource_type=CLINICIAN_ENTITY.audit.type,
+        resource_id=clinician.id,
+        action=axis.action,
+        before=before,
+        after=snapshot(clinician),
+    )
+    if verification_event is not None:
+        await record_verification_event(
+            verification_repo=verification_repo,
+            audit_repo=audit_repo,
+            subject_type="clinician",
+            clinician_id=clinician.id,
+            event_type=verification_event,
+            status="verified" if target_state == "matched" else "failed",
+            evidence={"actor_id": str(requesting_user.id)},
+            actor_id=requesting_user.id,
+        )
+    await repo.session.commit()
+    logger.info(
+        "clinician.verification: id=%s state=%s actor=%s",
+        clinician.id,
+        target_state,
+        requesting_user.id,
+    )
+    return clinician
