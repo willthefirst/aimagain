@@ -190,7 +190,10 @@ def make_edit_form_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    from src.framework.dispatch.handlers import _EDIT_FORM_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _EDIT_FORM_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(
         spec,
@@ -298,7 +301,10 @@ def make_new_form_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    from src.framework.dispatch.handlers import _NEW_FORM_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _NEW_FORM_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(
         spec,

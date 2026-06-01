@@ -161,6 +161,9 @@ async def handle_delete(
 
 
 def make_delete_handler(spec: EntitySpec):
-    from src.framework.dispatch.handlers import _DELETE_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _DELETE_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(spec, _DELETE_SHAPE, handle_delete)

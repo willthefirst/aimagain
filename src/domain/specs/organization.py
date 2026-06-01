@@ -22,9 +22,9 @@ from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
-    Redirects,
     RouteSet,
 )
+from src.framework.dispatch.redirects import Redirects
 
 _organization_form_redirect = Redirects.to_edit_form("organizations", "organization_id")
 

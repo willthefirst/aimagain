@@ -206,7 +206,10 @@ def make_update_handler(
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_repos: tuple[tuple[str, type], ...] = (),
 ):
-    from src.framework.dispatch.handlers import _UPDATE_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _UPDATE_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(
         spec,

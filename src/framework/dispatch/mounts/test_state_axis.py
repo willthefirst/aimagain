@@ -1,18 +1,8 @@
-"""Residual tests for `src/framework/dispatch/handlers.py`.
+"""Tests for `_wrap_state_axis_with_self_guard` from `resource_routes.py`.
 
-All handler tests (delete, create, update, form, detail, list) have been
-migrated to colocated per-mount test files:
-
-  - mounts/test_delete.py
-  - mounts/test_create.py
-  - mounts/test_update.py
-  - mounts/test_form.py
-  - mounts/test_detail.py
-  - mounts/test_list.py
-
-This file retains only the StateAxis wrapper tests, which test
-`_wrap_state_axis_with_self_guard` from `resource_routes.py` — a
-mount-time wrapper that doesn't belong in any of the above.
+These tests are colocated with the state_axis mount because the wrapper
+is a mount-time concern: it's applied when a ``StateAxis(forbid_self=True)``
+axis is mounted onto a route, not inside any per-verb handler.
 """
 
 from types import SimpleNamespace

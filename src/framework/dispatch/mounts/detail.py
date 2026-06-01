@@ -211,7 +211,10 @@ def make_detail_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    from src.framework.dispatch.handlers import _DETAIL_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _DETAIL_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(
         spec, _DETAIL_SHAPE, handle_detail, extras=extras, extra_repos=extra_repos

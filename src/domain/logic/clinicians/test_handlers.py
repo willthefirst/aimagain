@@ -38,7 +38,9 @@ from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.framework.audit.core import AuditAction
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
-from src.framework.dispatch.handlers import handle_create, handle_detail, handle_list
+from src.framework.dispatch.mounts.create import handle_create
+from src.framework.dispatch.mounts.detail import handle_detail
+from src.framework.dispatch.mounts.list_ import handle_list
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 from tests.helpers import (
     create_test_user,
