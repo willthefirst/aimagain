@@ -37,15 +37,17 @@ _LEIE_FIXTURE = (
 @pytest.fixture(autouse=True)
 def _patch_external_apis(monkeypatch):
     """Point OIG at the local LEIE fixture, and replace
-    `httpx.AsyncClient` *inside the handlers module* with a mock-
-    transport variant. The handler calls
-    `async with httpx.AsyncClient(timeout=...) as http:`; monkeypatching
-    the symbol there lets the route test exercise the full stack without
-    hitting NPPES."""
+    `httpx.AsyncClient` with a mock-transport variant. The admin
+    retrigger opens its client from `handlers.httpx.AsyncClient`; the
+    inline NPI submit routes open theirs from
+    `routes.verifications.httpx.AsyncClient`. Patch both module
+    references so a route test exercises the full sync verification
+    stack without hitting NPPES."""
     monkeypatch.setenv("LEIE_CSV_PATH", str(_LEIE_FIXTURE))
     oig_module._reset_cache_for_tests()
 
     from src.domain.logic.verifications import handlers as handlers_mod
+    from src.domain.routes import verifications as verifications_route_mod
 
     def _payload(npi: str) -> dict[str, Any]:
         return {
@@ -63,6 +65,7 @@ def _patch_external_apis(monkeypatch):
             super().__init__(transport=httpx.MockTransport(_handler))
 
     monkeypatch.setattr(handlers_mod.httpx, "AsyncClient", _StubAsyncClient)
+    monkeypatch.setattr(verifications_route_mod.httpx, "AsyncClient", _StubAsyncClient)
     yield
     oig_module._reset_cache_for_tests()
 
@@ -171,14 +174,21 @@ async def _seed_clinician_owned_by(
         return clinician.id
 
 
-async def test_clinician_npi_submit_owner_flips_to_pending(
+async def test_clinician_npi_submit_owner_runs_verification_inline(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The owner of a Clinician can submit an NPI; the column gets the
-    value, `npi_match_status='pending'`, and a `Verification` event of
-    type `npi_submitted` is appended."""
+    """The owner of a Clinician can submit an NPI; NPPES runs inline
+    (mocked) and the row is settled before the response returns. Both
+    the `npi_submitted` user-action event and the `npi_resolved`
+    NPPES-result event are persisted in one transaction.
+
+    The mock NPPES fixture returns names that don't match the seeded
+    clinician's, so the pipeline scores `needs_review` and (per the
+    PR-19 rule) the cache flips to `mismatch` rather than staying at
+    `pending`. The point of the assertion is "no pending state
+    leaked" — the synchronous path settled the row."""
     from src.domain.models import Clinician, Verification
 
     clinician_id = await _seed_clinician_owned_by(
@@ -193,8 +203,8 @@ async def test_clinician_npi_submit_owner_flips_to_pending(
     async with db_test_session_manager() as session:
         loaded = await session.get(Clinician, clinician_id)
         assert loaded.npi == "1234567890"
-        assert loaded.npi_match_status == "pending"
-        events = (
+        assert loaded.npi_match_status != "pending"
+        submitted = (
             (
                 await session.execute(
                     select(Verification).filter(
@@ -206,8 +216,21 @@ async def test_clinician_npi_submit_owner_flips_to_pending(
             .scalars()
             .all()
         )
-        assert len(events) == 1
-        assert events[0].evidence == {"npi": "1234567890"}
+        assert len(submitted) == 1
+        assert submitted[0].evidence == {"npi": "1234567890"}
+        resolved = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.clinician_id == clinician_id,
+                        Verification.event_type == "npi_resolved",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(resolved) == 1
 
 
 async def test_clinician_npi_submit_non_owner_gets_403(
@@ -256,47 +279,44 @@ async def test_clinician_npi_submit_422_for_malformed_npi(
     assert response.status_code == 422
 
 
-async def test_clinician_npi_submit_blocks_in_flight_change(
+async def test_clinician_npi_submit_replaces_prior_value(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Re-submitting a *different* NPI while the prior one is `pending`
-    is rejected — the worker would otherwise lose track. Same NPI
-    re-submit IS allowed (idempotent retry path)."""
+    """With the sync pipeline, every submit re-runs NPPES against the
+    fresh value — there is no "in-flight" state to protect, so a
+    different NPI on a follow-up POST is accepted and overwrites the
+    first."""
     from src.domain.models import Clinician
 
     clinician_id = await _seed_clinician_owned_by(
         db_test_session_manager, logged_in_user.id
     )
-    # First submit lands in pending.
     response = await authenticated_client.post(
         f"/clinicians/{clinician_id}/npi", json={"npi": "1234567890"}
     )
     assert response.status_code == 200
 
-    # Second submit with a different NPI while still pending → 400.
     response = await authenticated_client.post(
         f"/clinicians/{clinician_id}/npi", json={"npi": "9876543210"}
-    )
-    assert response.status_code == 400
-
-    # Idempotent re-submit of the same value while pending IS allowed.
-    response = await authenticated_client.post(
-        f"/clinicians/{clinician_id}/npi", json={"npi": "1234567890"}
     )
     assert response.status_code == 200
     async with db_test_session_manager() as session:
         loaded = await session.get(Clinician, clinician_id)
-        assert loaded.npi == "1234567890"
+        assert loaded.npi == "9876543210"
 
 
-async def test_org_npi_submit_owner_flips_to_pending(
+async def test_org_npi_submit_owner_runs_verification_inline(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Mirror of clinician submit, for the Type-2 org NPI."""
+    """Mirror of `test_clinician_npi_submit_owner_runs_verification_inline`
+    for the Type-2 org NPI. The mock NPPES transport returns a Type-1
+    payload (no `enumeration_type: 'NPI-2'`), so the Type-2 lookup
+    treats it as not-found and the org cache settles at `mismatch`.
+    The check here is that no pending state leaks past the response."""
     from src.domain.models import Organization, Verification
     from tests.helpers import make_organization_row
 
@@ -312,8 +332,8 @@ async def test_org_npi_submit_owner_flips_to_pending(
     async with db_test_session_manager() as session:
         loaded = await session.get(Organization, org.id)
         assert loaded.npi == "1234567890"
-        assert loaded.npi_match_status == "pending"
-        events = (
+        assert loaded.npi_match_status != "pending"
+        submitted = (
             (
                 await session.execute(
                     select(Verification).filter(
@@ -325,7 +345,20 @@ async def test_org_npi_submit_owner_flips_to_pending(
             .scalars()
             .all()
         )
-        assert len(events) == 1
+        assert len(submitted) == 1
+        resolved = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.org_id == org.id,
+                        Verification.event_type == "npi_resolved",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(resolved) == 1
 
 
 # --- License attestation -------------------------------------------------

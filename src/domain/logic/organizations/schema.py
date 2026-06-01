@@ -18,6 +18,8 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
+from pydantic import BaseModel
+
 from src.domain.models.enums import ORGANIZATION_TYPES
 from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
@@ -58,3 +60,21 @@ class OrganizationUpdate(PartialUpdate):
     name: StrippedText | None = None
     type: Literal[*ORGANIZATION_TYPES] | None = None
     parent_org_id: uuid.UUID | None = None
+
+
+# --- Admin verification-state axis ---------------------------------------
+
+
+class OrganizationVerificationStateUpdate(BaseModel):
+    """Body for `PUT /organizations/{id}/verification` — admin override
+    of `npi_match_status`. Same vocab + semantics as the Clinician-side
+    axis (see `ClinicianVerificationStateUpdate`)."""
+
+    state: Literal["matched", "mismatch", "pending"]
+
+
+class OrganizationVerificationAuditSnapshot(ReadProjection):
+    """Audit `before`/`after` for the `/organizations/{id}/verification`
+    axis. Captures only the column the axis mutates."""
+
+    npi_match_status: str

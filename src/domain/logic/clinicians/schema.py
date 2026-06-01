@@ -37,7 +37,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BeforeValidator, Field, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, model_validator
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
@@ -315,3 +315,32 @@ class ClinicianUpdate(FlatLocationSchema, PartialUpdate):
     in_network_carriers: InNetworkCarriersField | None = None
     sliding_scale: bool | None = None
     cost: StrippedOptionalText = None
+
+
+# --- Admin verification-state axis ---------------------------------------
+
+
+class ClinicianVerificationStateUpdate(BaseModel):
+    """Body for `PUT /clinicians/{id}/verification` — admin override of
+    `npi_match_status`.
+
+    `matched` — admin accepts; the Claim-A cache is recomputed from
+    licensures.
+    `mismatch` — admin rejects definitively.
+    `pending` — admin clears the result so the next user-driven NPI
+    submit re-runs NPPES cleanly (`npi_verified_at` is also cleared so
+    the fresh attempt isn't gated on the stale timestamp).
+
+    `none` is intentionally NOT in the vocab — admin shouldn't be able
+    to flip a row to "never submitted" via this axis (the column reads
+    as the user's own state and `none` would mis-represent that).
+    """
+
+    state: Literal["matched", "mismatch", "pending"]
+
+
+class ClinicianVerificationAuditSnapshot(ReadProjection):
+    """Audit `before`/`after` for the `/clinicians/{id}/verification`
+    axis. Captures only the column the axis mutates."""
+
+    npi_match_status: str

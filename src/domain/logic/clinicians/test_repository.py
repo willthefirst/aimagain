@@ -551,37 +551,6 @@ async def test_list_clinicians_combined_filter_is_anded(
         assert [p.id for p in clinicians] == [keep_id]
 
 
-async def test_list_for_verification_returns_non_deleted_clinicians(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """Eligibility for nightly verification is `deleted_at IS NULL` — see
-    `ClinicianRepository.list_for_verification` docstring for the rationale.
-    """
-    import datetime
-
-    user_a = await _seed_user(db_test_session_manager)
-    user_b = await _seed_user(db_test_session_manager)
-    user_c = await _seed_user(db_test_session_manager)
-
-    kept_a = await _seed_clinician(db_test_session_manager, owner_id=user_a.id)
-    kept_b = await _seed_clinician(
-        db_test_session_manager, owner_id=user_b.id, practice_name="Other"
-    )
-    deleted = await _seed_clinician(
-        db_test_session_manager, owner_id=user_c.id, practice_name="Gone"
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            row = await session.get(Clinician, deleted.id)
-            row.deleted_at = datetime.datetime.now(datetime.timezone.utc)
-
-    async with db_test_session_manager() as session:
-        repo = ClinicianRepository(session)
-        eligible = await repo.list_for_verification()
-        assert {p.id for p in eligible} == {kept_a.id, kept_b.id}
-
-
 async def test_list_clinicians_distinct_when_multiple_licensures_match(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

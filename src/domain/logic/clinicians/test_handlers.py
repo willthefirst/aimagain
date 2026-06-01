@@ -652,3 +652,204 @@ async def test_clinician_form_extras_edit_path_passes_target(
             organization_repo=org_repo,
         )
         assert "orgs" in result
+
+
+# --- Admin verification-state axis ---------------------------------------
+
+
+async def test_set_clinician_verification_state_matched_writes_audit_and_event(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Admin flips a clinician to `matched`. Cache updates,
+    `npi_verified_at` is set, a `SET_CLINICIAN_VERIFICATION_STATE`
+    audit row lands, and an `admin_verify` Verification event is
+    appended."""
+    from src.domain.logic.clinicians.handlers import (
+        handle_set_clinician_verification_state,
+    )
+    from src.domain.logic.clinicians.schema import ClinicianVerificationStateUpdate
+    from src.domain.models import Verification
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    owner = await _seed_user(db_test_session_manager)
+    clinician_id, *_ = await _seed_clinician(db_test_session_manager, user_id=owner.id)
+
+    async with db_test_session_manager() as session:
+        clinician_repo = ClinicianRepository(session)
+        verification_repo = VerificationRepository(session)
+        audit_repo = AuditRepository(session)
+        await handle_set_clinician_verification_state(
+            clinician_id=clinician_id,
+            payload=ClinicianVerificationStateUpdate(state="matched"),
+            repo=clinician_repo,
+            verification_repo=verification_repo,
+            audit_repo=audit_repo,
+            requesting_user=admin,
+        )
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Clinician, clinician_id)
+        assert loaded.npi_match_status == "matched"
+        assert loaded.npi_verified_at is not None
+
+        rows = await _audit_rows_for(
+            db_test_session_manager,
+            resource_type=CLINICIAN_ENTITY.audit.type,
+            resource_id=clinician_id,
+        )
+        actions = {r.action for r in rows}
+        assert AuditAction.SET_CLINICIAN_VERIFICATION_STATE.value in actions
+
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.clinician_id == clinician_id,
+                        Verification.event_type == "admin_verify",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
+
+
+async def test_set_clinician_verification_state_mismatch_records_admin_suspend(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    from src.domain.logic.clinicians.handlers import (
+        handle_set_clinician_verification_state,
+    )
+    from src.domain.logic.clinicians.schema import ClinicianVerificationStateUpdate
+    from src.domain.models import Verification
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    owner = await _seed_user(db_test_session_manager)
+    clinician_id, *_ = await _seed_clinician(db_test_session_manager, user_id=owner.id)
+
+    async with db_test_session_manager() as session:
+        await handle_set_clinician_verification_state(
+            clinician_id=clinician_id,
+            payload=ClinicianVerificationStateUpdate(state="mismatch"),
+            repo=ClinicianRepository(session),
+            verification_repo=VerificationRepository(session),
+            audit_repo=AuditRepository(session),
+            requesting_user=admin,
+        )
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Clinician, clinician_id)
+        assert loaded.npi_match_status == "mismatch"
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.clinician_id == clinician_id,
+                        Verification.event_type == "admin_suspend",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
+
+
+async def test_set_clinician_verification_state_pending_clears_verified_at(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Re-queueing to `pending` clears `npi_verified_at` and records
+    no Verification event (the row hasn't resolved to anything yet)."""
+    import datetime
+
+    from src.domain.logic.clinicians.handlers import (
+        handle_set_clinician_verification_state,
+    )
+    from src.domain.logic.clinicians.schema import ClinicianVerificationStateUpdate
+    from src.domain.models import Verification
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    owner = await _seed_user(db_test_session_manager)
+    clinician_id, *_ = await _seed_clinician(db_test_session_manager, user_id=owner.id)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            row = await session.get(Clinician, clinician_id)
+            row.npi_match_status = "matched"
+            row.npi_verified_at = datetime.datetime.now(datetime.timezone.utc)
+
+    async with db_test_session_manager() as session:
+        await handle_set_clinician_verification_state(
+            clinician_id=clinician_id,
+            payload=ClinicianVerificationStateUpdate(state="pending"),
+            repo=ClinicianRepository(session),
+            verification_repo=VerificationRepository(session),
+            audit_repo=AuditRepository(session),
+            requesting_user=admin,
+        )
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Clinician, clinician_id)
+        assert loaded.npi_match_status == "pending"
+        assert loaded.npi_verified_at is None
+        admin_events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.clinician_id == clinician_id,
+                        Verification.event_type.in_(["admin_verify", "admin_suspend"]),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert admin_events == []
+
+
+async def test_set_clinician_verification_state_non_admin_forbidden(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    from src.domain.logic.clinicians.handlers import (
+        handle_set_clinician_verification_state,
+    )
+    from src.domain.logic.clinicians.schema import ClinicianVerificationStateUpdate
+
+    non_admin = await _seed_user(db_test_session_manager)
+    clinician_id, *_ = await _seed_clinician(
+        db_test_session_manager, user_id=non_admin.id
+    )
+
+    async with db_test_session_manager() as session:
+        with pytest.raises(ForbiddenError):
+            await handle_set_clinician_verification_state(
+                clinician_id=clinician_id,
+                payload=ClinicianVerificationStateUpdate(state="matched"),
+                repo=ClinicianRepository(session),
+                verification_repo=VerificationRepository(session),
+                audit_repo=AuditRepository(session),
+                requesting_user=non_admin,
+            )
+
+
+async def test_set_clinician_verification_state_404_for_missing(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    from src.domain.logic.clinicians.handlers import (
+        handle_set_clinician_verification_state,
+    )
+    from src.domain.logic.clinicians.schema import ClinicianVerificationStateUpdate
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+
+    async with db_test_session_manager() as session:
+        with pytest.raises(NotFoundError):
+            await handle_set_clinician_verification_state(
+                clinician_id=uuid.uuid4(),
+                payload=ClinicianVerificationStateUpdate(state="matched"),
+                repo=ClinicianRepository(session),
+                verification_repo=VerificationRepository(session),
+                audit_repo=AuditRepository(session),
+                requesting_user=admin,
+            )

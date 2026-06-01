@@ -110,3 +110,220 @@ async def test_form_extras_edit_path_excludes_self(
         ids = {o.id for o in result["parent_org_options"]}
         assert self_id not in ids
         assert sibling_id in ids
+
+
+# --- Admin verification-state axis ---------------------------------------
+
+
+async def test_set_org_verification_state_matched_writes_audit_and_event(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Admin flips an org to `matched`. Cache updates, `verified_at`
+    is set, a `SET_ORG_VERIFICATION_STATE` audit row lands, and an
+    `admin_verify` Verification event is appended."""
+    from sqlalchemy import select
+
+    from src.domain.logic.organizations.handlers import (
+        handle_set_org_verification_state,
+    )
+    from src.domain.logic.organizations.schema import (
+        OrganizationVerificationStateUpdate,
+    )
+    from src.domain.logic.verifications.repository import VerificationRepository
+    from src.domain.models import Verification
+    from src.domain.specs.organization import ORGANIZATION_ENTITY
+    from src.framework.audit.core import AuditAction
+    from src.framework.audit.log import AuditLog
+    from src.framework.audit.repository import AuditRepository
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    owner = await _seed_user(db_test_session_manager)
+    org_id = await _seed_org(db_test_session_manager, owner_id=owner.id, name="Acme")
+
+    async with db_test_session_manager() as session:
+        await handle_set_org_verification_state(
+            organization_id=org_id,
+            payload=OrganizationVerificationStateUpdate(state="matched"),
+            repo=OrganizationRepository(session),
+            verification_repo=VerificationRepository(session),
+            audit_repo=AuditRepository(session),
+            requesting_user=admin,
+        )
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Organization, org_id)
+        assert loaded.npi_match_status == "matched"
+        assert loaded.verified_at is not None
+
+        audit_rows = (
+            (
+                await session.execute(
+                    select(AuditLog).filter(
+                        AuditLog.resource_type == ORGANIZATION_ENTITY.audit.type,
+                        AuditLog.resource_id == org_id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert AuditAction.SET_ORG_VERIFICATION_STATE.value in {
+            r.action for r in audit_rows
+        }
+
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.org_id == org_id,
+                        Verification.event_type == "admin_verify",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
+
+
+async def test_set_org_verification_state_mismatch_records_admin_suspend(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    from sqlalchemy import select
+
+    from src.domain.logic.organizations.handlers import (
+        handle_set_org_verification_state,
+    )
+    from src.domain.logic.organizations.schema import (
+        OrganizationVerificationStateUpdate,
+    )
+    from src.domain.logic.verifications.repository import VerificationRepository
+    from src.domain.models import Verification
+    from src.framework.audit.repository import AuditRepository
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    owner = await _seed_user(db_test_session_manager)
+    org_id = await _seed_org(db_test_session_manager, owner_id=owner.id, name="Acme")
+
+    async with db_test_session_manager() as session:
+        await handle_set_org_verification_state(
+            organization_id=org_id,
+            payload=OrganizationVerificationStateUpdate(state="mismatch"),
+            repo=OrganizationRepository(session),
+            verification_repo=VerificationRepository(session),
+            audit_repo=AuditRepository(session),
+            requesting_user=admin,
+        )
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Organization, org_id)
+        assert loaded.npi_match_status == "mismatch"
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.org_id == org_id,
+                        Verification.event_type == "admin_suspend",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
+
+
+async def test_set_org_verification_state_pending_clears_verified_at(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    import datetime
+
+    from src.domain.logic.organizations.handlers import (
+        handle_set_org_verification_state,
+    )
+    from src.domain.logic.organizations.schema import (
+        OrganizationVerificationStateUpdate,
+    )
+    from src.domain.logic.verifications.repository import VerificationRepository
+    from src.framework.audit.repository import AuditRepository
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+    owner = await _seed_user(db_test_session_manager)
+    org_id = await _seed_org(db_test_session_manager, owner_id=owner.id, name="Acme")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            row = await session.get(Organization, org_id)
+            row.npi_match_status = "matched"
+            row.verified_at = datetime.datetime.now(datetime.timezone.utc)
+
+    async with db_test_session_manager() as session:
+        await handle_set_org_verification_state(
+            organization_id=org_id,
+            payload=OrganizationVerificationStateUpdate(state="pending"),
+            repo=OrganizationRepository(session),
+            verification_repo=VerificationRepository(session),
+            audit_repo=AuditRepository(session),
+            requesting_user=admin,
+        )
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Organization, org_id)
+        assert loaded.npi_match_status == "pending"
+        assert loaded.verified_at is None
+
+
+async def test_set_org_verification_state_non_admin_forbidden(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    from src.domain.logic.organizations.handlers import (
+        handle_set_org_verification_state,
+    )
+    from src.domain.logic.organizations.schema import (
+        OrganizationVerificationStateUpdate,
+    )
+    from src.domain.logic.verifications.repository import VerificationRepository
+    from src.framework.audit.repository import AuditRepository
+    from src.framework.http.exceptions import ForbiddenError
+
+    non_admin = await _seed_user(db_test_session_manager)
+    org_id = await _seed_org(
+        db_test_session_manager, owner_id=non_admin.id, name="Acme"
+    )
+
+    async with db_test_session_manager() as session:
+        with pytest.raises(ForbiddenError):
+            await handle_set_org_verification_state(
+                organization_id=org_id,
+                payload=OrganizationVerificationStateUpdate(state="matched"),
+                repo=OrganizationRepository(session),
+                verification_repo=VerificationRepository(session),
+                audit_repo=AuditRepository(session),
+                requesting_user=non_admin,
+            )
+
+
+async def test_set_org_verification_state_404_for_missing(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    from src.domain.logic.organizations.handlers import (
+        handle_set_org_verification_state,
+    )
+    from src.domain.logic.organizations.schema import (
+        OrganizationVerificationStateUpdate,
+    )
+    from src.domain.logic.verifications.repository import VerificationRepository
+    from src.framework.audit.repository import AuditRepository
+    from src.framework.http.exceptions import NotFoundError
+
+    admin = await _seed_user(db_test_session_manager, is_superuser=True)
+
+    async with db_test_session_manager() as session:
+        with pytest.raises(NotFoundError):
+            await handle_set_org_verification_state(
+                organization_id=uuid.uuid4(),
+                payload=OrganizationVerificationStateUpdate(state="matched"),
+                repo=OrganizationRepository(session),
+                verification_repo=VerificationRepository(session),
+                audit_repo=AuditRepository(session),
+                requesting_user=admin,
+            )
