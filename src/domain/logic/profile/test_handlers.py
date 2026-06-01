@@ -1,0 +1,139 @@
+"""Tests for the Profile Hub mode dispatch.
+
+`resolve_profile_mode` is a pure function of the user's `ClaimState`
+(no DB reads, no `setup_goals` column — the goal-picker is
+recomputed each load per the design trade-off resolved during plan
+mode).
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from uuid import uuid4
+
+from src.domain.logic.profile.handlers import (
+    MODE_ADD_CLAIM,
+    MODE_MANAGE,
+    MODE_REVERIFY,
+    MODE_SETUP,
+    PROFILE_MODES,
+    build_profile_context,
+    resolve_profile_mode,
+)
+
+
+def _user(
+    *,
+    is_verified: bool = True,
+    clinicians: list | None = None,
+    org_representations: list | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        username="alice",
+        is_superuser=False,
+        is_verified=is_verified,
+        clinicians=clinicians or [],
+        org_representations=org_representations or [],
+    )
+
+
+def _clinician(*, clinician_verified: bool = False, ever_verified_at=None):
+    return SimpleNamespace(
+        id=uuid4(),
+        npi="1234567890",
+        clinician_verified=clinician_verified,
+        ever_verified_at=ever_verified_at,
+        affiliations=[],
+    )
+
+
+def _rep(*, authority_status: str = "verified"):
+    return SimpleNamespace(
+        org_id=uuid4(),
+        authority_status=authority_status,
+        archived_at=None,
+    )
+
+
+def test_no_claim_user_lands_in_setup():
+    assert resolve_profile_mode(_user()) == MODE_SETUP
+
+
+def test_verified_clinician_lands_in_manage():
+    user = _user(clinicians=[_clinician(clinician_verified=True)])
+    assert resolve_profile_mode(user) == MODE_MANAGE
+
+
+def test_org_rep_only_user_lands_in_manage():
+    """Per handoff §5 / wireframe L5: a coordinator with no Type-1 NPI
+    but verified Claim B reaches manage mode without ever passing
+    through setup."""
+    user = _user(org_representations=[_rep()])
+    assert resolve_profile_mode(user) == MODE_MANAGE
+
+
+def test_add_claim_intent_routes_to_add_claim_when_verified():
+    """The `?intent=add_claim` query-string param (set by the
+    "Add a capability" CTA) routes a verified user to add-a-claim mode
+    instead of manage."""
+    user = _user(clinicians=[_clinician(clinician_verified=True)])
+    assert resolve_profile_mode(user, intent="add_claim") == MODE_ADD_CLAIM
+
+
+def test_add_claim_intent_ignored_when_no_claims():
+    """A user with no claims at all still lands in `setup` even if the
+    URL includes `?intent=add_claim` — there's nothing to add ON TOP
+    of yet. The hub re-derives mode from claim state; the intent is a
+    routing hint, not an override."""
+    assert resolve_profile_mode(_user(), intent="add_claim") == MODE_SETUP
+
+
+def test_profile_modes_constant_matches_module_constants():
+    """Cross-check that the `PROFILE_MODES` tuple exposed for templates
+    stays in lockstep with the individual constants — a missing entry
+    here would silently drop a mode from a `{% for m in profile_modes %}`
+    rendering."""
+    assert set(PROFILE_MODES) == {
+        MODE_SETUP,
+        MODE_MANAGE,
+        MODE_ADD_CLAIM,
+        MODE_REVERIFY,
+    }
+
+
+def test_lapsed_claim_routes_to_re_verify():
+    """If `ClaimState.lapsed` is non-empty, mode flips to `re-verify`
+    even when Claim A or Claim B is still partially live — the wireframe
+    L7 banner needs a dedicated mode so the partial can highlight which
+    capabilities are paused. Phase 5 doesn't yet populate `lapsed` (the
+    recompute helpers in Phase 3 left it empty until the re-verify
+    detection lands); this test pins the dispatch so when `lapsed`
+    starts firing, the mode flip is automatic."""
+    user = _user(clinicians=[_clinician(clinician_verified=True)])
+    # Inject a synthetic lapsed reason via a stub claim_state — calling
+    # resolve_profile_mode indirectly through monkeypatching would be
+    # heavier than just confirming the rule reads `state.lapsed` first.
+    from src.domain.logic import capabilities
+
+    original = capabilities.claim_state
+    try:
+        capabilities.claim_state = lambda u: capabilities.ClaimState(
+            a=True, b=frozenset(), lapsed=("claim_a_lapsed",)
+        )
+        assert resolve_profile_mode(user) == MODE_REVERIFY
+    finally:
+        capabilities.claim_state = original
+
+
+def test_build_profile_context_exposes_mode_and_lists():
+    user = _user(
+        clinicians=[_clinician(clinician_verified=True)],
+        org_representations=[_rep()],
+    )
+    ctx = build_profile_context(user)
+    assert ctx["mode"] == MODE_MANAGE
+    assert ctx["clinicians"] == user.clinicians
+    assert ctx["org_representations"] == user.org_representations
+    assert ctx["claim_state"].a is True
+    assert len(ctx["claim_state"].b) == 1
