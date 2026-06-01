@@ -40,6 +40,8 @@ from src.domain.logic.organizations.repository import (
 from src.domain.logic.profile.handlers import (
     build_profile_context,
     handle_clinician_create,
+    handle_clinician_details_update,
+    handle_clinician_identity_update,
     handle_clinician_license_create,
 )
 from src.domain.logic.verifications.repository import (
@@ -79,9 +81,9 @@ async def profile_clinician_create(
     first_name: str | None = Form(default=None),
     last_name: str | None = Form(default=None),
     npi: str | None = Form(default=None),
-    location_city: str = Form(...),
-    location_state: str = Form(...),
-    location_zip: str = Form(...),
+    location_city: str | None = Form(default=None),
+    location_state: str | None = Form(default=None),
+    location_zip: str | None = Form(default=None),
     requesting_user: User = Depends(current_active_user),
     clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
     organization_repo: OrganizationRepository = Depends(get_organization_repository),
@@ -149,6 +151,85 @@ async def profile_clinician_license_create(
     )
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
+        content={},
+        headers={"HX-Redirect": "/profile"},
+    )
+
+
+@profile_pages_router.post(
+    "/profile/clinician/{clinician_id}/identity",
+    name="profile:clinician_identity_update",
+)
+async def profile_clinician_identity_update(
+    clinician_id: UUID,
+    first_name: str | None = Form(default=None),
+    last_name: str | None = Form(default=None),
+    npi: str | None = Form(default=None),
+    requesting_user: User = Depends(current_active_user),
+    clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
+    verification_repo: VerificationRepository = Depends(get_verification_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
+) -> Any:
+    """Update a clinician's name + NPI and immediately re-run NPI
+    verification.  Presented as an inline form on /profile when the
+    initial verification returned a mismatch — keeps the user on /profile
+    rather than bouncing them to the full clinician-edit page.
+    """
+    await handle_clinician_identity_update(
+        clinician_id=clinician_id,
+        first_name=first_name,
+        last_name=last_name,
+        npi=npi,
+        requesting_user=requesting_user,
+        clinician_repo=clinician_repo,
+        verification_repo=verification_repo,
+        audit_repo=audit_repo,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={},
+        headers={"HX-Redirect": "/profile"},
+    )
+
+
+@profile_pages_router.post(
+    "/profile/clinician/{clinician_id}/details",
+    name="profile:clinician_details_update",
+)
+async def profile_clinician_details_update(
+    clinician_id: UUID,
+    location_city: str | None = Form(default=None),
+    location_state: str | None = Form(default=None),
+    location_zip: str | None = Form(default=None),
+    in_person_sessions: str | None = Form(default=None),
+    virtual_sessions: str | None = Form(default=None),
+    accepts_out_of_network: bool | None = Form(default=None),
+    sliding_scale: bool | None = Form(default=None),
+    cost: str | None = Form(default=None),
+    requesting_user: User = Depends(current_active_user),
+    clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
+) -> Any:
+    """Patch a clinician's location / availability / insurance from the
+    profile hub's "complete your profile" section.  Returns the user to
+    /profile after saving so the hub reflects the updated state.
+    """
+    await handle_clinician_details_update(
+        clinician_id=clinician_id,
+        location_city=location_city,
+        location_state=location_state,
+        location_zip=location_zip,
+        in_person_sessions=in_person_sessions,
+        virtual_sessions=virtual_sessions,
+        accepts_out_of_network=accepts_out_of_network,
+        sliding_scale=sliding_scale,
+        cost=cost,
+        requesting_user=requesting_user,
+        clinician_repo=clinician_repo,
+        audit_repo=audit_repo,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
         content={},
         headers={"HX-Redirect": "/profile"},
     )

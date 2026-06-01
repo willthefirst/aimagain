@@ -215,7 +215,7 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     # the flat input into a nested ``location`` block before validation
     # so the ``Location`` value object owns the cleaning rules; the
     # ``@model_serializer`` below unrolls it back to flat on dump.
-    location: Location
+    location: Location | None = None
     in_person_sessions: str
     virtual_sessions: str
     accepts_out_of_network: bool
@@ -266,7 +266,7 @@ class ClinicianCreate(FlatLocationSchema, WirePayload):
     # via `Clinician.__init__`'s kwarg peeling.
     first_name: StrippedOptionalText = None
     last_name: StrippedOptionalText = None
-    location: Location
+    location: Location | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
     # Insurance posture. `in_network_carriers` is the set the practice

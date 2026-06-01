@@ -20,15 +20,15 @@ def test_both_consumer_tables_carry_the_three_location_columns():
 
 
 def test_location_columns_are_not_null_on_each_table():
-    """Both consumers want ``NOT NULL`` on the three columns at the
-    ORM layer. A bare ``Column(...)`` on a mixin is shared across
-    subclasses and the nullability silently inverts on the second
-    consumer — keep the invariant pinned here so a regression surfaces
-    immediately."""
-    for cls in (ClinicianAffiliation, ReferralDetail):
-        for name in ("location_city", "location_state", "location_zip"):
-            col = cls.__table__.c[name]
-            assert col.nullable is False, f"{cls.__name__}.{name} is nullable"
+    """ReferralDetail keeps ``NOT NULL`` on the three location columns.
+    ClinicianAffiliation allows ``NULL`` (location is deferred in the
+    fast-path onboarding wizard; users fill it in via "Complete your profile").
+    Pin both explicitly so a regression in either direction surfaces immediately."""
+    for name in ("location_city", "location_state", "location_zip"):
+        ref_col = ReferralDetail.__table__.c[name]
+        assert ref_col.nullable is False, f"ReferralDetail.{name} must be NOT NULL"
+        aff_col = ClinicianAffiliation.__table__.c[name]
+        assert aff_col.nullable is True, f"ClinicianAffiliation.{name} must be nullable"
 
 
 def test_check_constraint_is_table_prefixed_per_consumer():

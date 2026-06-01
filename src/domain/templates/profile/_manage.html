@@ -2,7 +2,14 @@
    profile header with claim badges, status rows for clinician identity
    and org representation with direct "Manage →" edit links, and a
    "+ New post" CTA when verified.
+
+   Also renders a "Complete your profile" section when optional practice
+   details (location, availability, insurance) have not been filled in
+   yet — deferred from the fast-path onboarding wizard.
 #}
+{%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{%- from "_shared/actions.html" import actions -%}
 <section>
   <header>
     <hgroup>
@@ -96,5 +103,59 @@
          role="button"
          class="outline">+ Post an opening</a>
     </section>
+  {% endif %}
+  {# ------------------------------------------------------------------ #}
+  {# Complete your profile — deferred practice details                   #}
+  {# ------------------------------------------------------------------ #}
+  {% if clinicians %}
+    {% set _c = clinicians[0] %}
+    {% set _missing_location = not _c.location_city or not _c.location_state %}
+    {% if _missing_location %}
+      <article id="complete-profile">
+        <header>
+          <strong>Complete your profile</strong>
+          <small style="display: block; color: var(--pico-muted-color);">
+            Add practice details to help clients find you — fill in what you like, whenever you like.
+          </small>
+        </header>
+        {# Location ---------------------------------------------------- #}
+        <details {% if _missing_location %}open{% endif %}>
+          <summary>
+            <strong>Location</strong>
+          </summary>
+          {% call form_with_errors(action="/profile/clinician/" ~ _c.id|string ~ "/details", method="post") %}
+            <div class="grid">
+              {{ text_field("location_city", "City", value=_c.location_city or "") }}
+              {{ select_field("location_state", "State", US_STATES, current=_c.location_state, placeholder=true) }}
+              {{ text_field("location_zip", "ZIP", value=_c.location_zip or "", pattern="\\d{5}", maxlength=5) }}
+            </div>
+            {{ actions("Save location") }}
+          {% endcall %}
+        </details>
+        {# Availability ------------------------------------------------ #}
+        <details>
+          <summary>
+            <strong>Session availability</strong>
+          </summary>
+          {% call form_with_errors(action="/profile/clinician/" ~ _c.id|string ~ "/details", method="post") %}
+            {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=_c.in_person_sessions) }}
+            {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=_c.virtual_sessions) }}
+            {{ actions("Save availability") }}
+          {% endcall %}
+        </details>
+        {# Insurance / payment ----------------------------------------- #}
+        <details>
+          <summary>
+            <strong>Insurance &amp; payment</strong>
+          </summary>
+          {% call form_with_errors(action="/profile/clinician/" ~ _c.id|string ~ "/details", method="post") %}
+            {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network insurance", checked=_c.accepts_out_of_network) }}
+            {{ checkbox_field("sliding_scale", "Sliding scale available", checked=_c.sliding_scale) }}
+            {{ text_field("cost", "Session cost (optional)", value=_c.cost or "", required=false) }}
+            {{ actions("Save payment info") }}
+          {% endcall %}
+        </details>
+      </article>
+    {% endif %}
   {% endif %}
 </section>

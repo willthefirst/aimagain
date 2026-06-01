@@ -98,9 +98,9 @@ async def handle_clinician_create(
     first_name: str | None,
     last_name: str | None,
     npi: str | None,
-    location_city: str,
-    location_state: str,
-    location_zip: str,
+    location_city: str | None,
+    location_state: str | None,
+    location_zip: str | None,
     requesting_user: User,
     clinician_repo: Any,
     organization_repo: Any,
@@ -111,9 +111,9 @@ async def handle_clinician_create(
     NPI verification inline.
 
     Hardcodes ``solo_practice=True`` so the user doesn't need to pick
-    an org during onboarding. Session/in_person defaults to "yes" via
-    the schema. The caller returns ``HX-Redirect: /profile`` so the hub
-    re-renders with the new clinician's NPPES state already reflected.
+    an org during onboarding. Location is optional — callers that omit
+    it (the fast-path wizard) pass ``None`` for all three fields; users
+    can fill location in later from "complete your profile".
     """
     from src.domain.logic.clinicians.handlers import (
         _assert_clinician_payload_org_ownership,
@@ -152,6 +152,121 @@ async def handle_clinician_create(
         clinician_repo=clinician_repo,
         verification_audit_repo=audit_repo,
     )
+    return clinician
+
+
+async def handle_clinician_identity_update(
+    *,
+    clinician_id: UUID,
+    first_name: str | None,
+    last_name: str | None,
+    npi: str | None,
+    requesting_user: User,
+    clinician_repo: Any,
+    verification_repo: Any,
+    audit_repo: Any,
+) -> Any:
+    """Update a clinician's identity fields (name + NPI) and re-run NPI
+    verification inline.  Used by the profile hub's inline retry form
+    when the initial verification returned a mismatch — the user can
+    correct their name or NPI without leaving /profile.
+    """
+    from src.domain.logic.clinicians.handlers import after_create_clinician_verification
+    from src.domain.models import Clinician
+    from src.framework.authz import is_owner_or_admin
+    from src.framework.http.exceptions import ForbiddenError, NotFoundError
+
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail="Clinician not found")
+    if not is_owner_or_admin(clinician, requesting_user):
+        raise ForbiddenError(detail="Cannot update this clinician")
+
+    fields: dict[str, Any] = {}
+    if first_name is not None:
+        fields["first_name"] = first_name or None
+    if last_name is not None:
+        fields["last_name"] = last_name or None
+    if npi is not None:
+        fields["npi"] = npi or None
+
+    if fields:
+        clinician = await clinician_repo.patch(clinician, **fields)
+
+    await after_create_clinician_verification(
+        row=clinician,
+        payload=clinician,
+        requesting_user=requesting_user,
+        verification_repo=verification_repo,
+        clinician_repo=clinician_repo,
+        verification_audit_repo=audit_repo,
+    )
+    return clinician
+
+
+async def handle_clinician_details_update(
+    *,
+    clinician_id: UUID,
+    location_city: str | None,
+    location_state: str | None,
+    location_zip: str | None,
+    in_person_sessions: str | None,
+    virtual_sessions: str | None,
+    accepts_out_of_network: bool | None,
+    sliding_scale: bool | None,
+    cost: str | None,
+    requesting_user: User,
+    clinician_repo: Any,
+    audit_repo: Any,
+) -> Any:
+    """Patch a clinician's practice details (location / availability /
+    insurance) from the profile hub's "complete your profile" section.
+    Only non-None fields are written; the call is a no-op if all args
+    are None.
+    """
+    from src.domain.models import Clinician
+    from src.domain.specs.clinician import CLINICIAN_ENTITY
+    from src.framework.audit.core import mutate
+    from src.framework.authz import is_owner_or_admin
+    from src.framework.http.exceptions import ForbiddenError, NotFoundError
+
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail="Clinician not found")
+    if not is_owner_or_admin(clinician, requesting_user):
+        raise ForbiddenError(detail="Cannot update this clinician")
+
+    fields: dict[str, Any] = {}
+    # Location: patch all three or none — partial location is not useful.
+    if (
+        location_city is not None
+        and location_state is not None
+        and location_zip is not None
+    ):
+        fields["location_city"] = location_city or None
+        fields["location_state"] = location_state or None
+        fields["location_zip"] = location_zip or None
+    if in_person_sessions is not None:
+        fields["in_person_sessions"] = in_person_sessions
+    if virtual_sessions is not None:
+        fields["virtual_sessions"] = virtual_sessions
+    if accepts_out_of_network is not None:
+        fields["accepts_out_of_network"] = accepts_out_of_network
+    if sliding_scale is not None:
+        fields["sliding_scale"] = sliding_scale
+    if cost is not None:
+        fields["cost"] = cost or None
+
+    if fields:
+        async with mutate(
+            clinician_repo,
+            audit_repo,
+            actor=requesting_user,
+            target=clinician,
+            resource=CLINICIAN_ENTITY.audit,
+            verb="update",
+        ):
+            await clinician_repo.patch(clinician, **fields)
     return clinician
 
 

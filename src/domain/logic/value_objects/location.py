@@ -133,8 +133,20 @@ def gather_flat_location(data: Any) -> Any:
         for sub in _LOCATION_SUBFIELDS:
             key = f"location_{sub}"
             if key in data:
-                nested[sub] = data[key]
-        out["location"] = nested
+                v = data[key]
+                # Empty string from a blank form field → treat as absent
+                if isinstance(v, str) and not v.strip():
+                    v = None
+                nested[sub] = v
+        # When every subfield is absent or None the clinician has no location
+        # yet.  Setting location=None lets schemas with `location: Location |
+        # None = None` accept the payload without 422-ing on missing required
+        # subfields.  Partial location (some fields present, some None) is
+        # forwarded as-is so LocationPartial updates work correctly.
+        if all(nested.get(sub) is None for sub in _LOCATION_SUBFIELDS):
+            out["location"] = None
+        else:
+            out["location"] = nested
         return out
     # Attribute-bag branch: SimpleNamespace (contract-test mocks),
     # SQLAlchemy rows from older code paths that didn't pick up the
@@ -149,8 +161,15 @@ def gather_flat_location(data: Any) -> Any:
     }
     if not flat_attrs:
         return data
+    # Mirrors the dict branch: all-None subfields mean "no location yet"
+    # (deferred onboarding path) — set location=None so Location | None
+    # schemas accept the payload without 422-ing on missing required subfields.
+    if all(v is None for v in flat_attrs.values()):
+        location_value: dict | None = None
+    else:
+        location_value = flat_attrs
     try:
-        setattr(data, "location", flat_attrs)
+        setattr(data, "location", location_value)
     except (AttributeError, TypeError):
         # Immutable / slot-bound bags can't take new attrs; downstream
         # validation will surface a helpful error.
@@ -177,8 +196,17 @@ def flatten_location_on_dump(model: BaseModel, data: dict[str, Any]) -> dict[str
     touched ``location.city`` produces ``{"location_city": ...}`` and
     not ``{"location_city": ..., "location_state": None, "location_zip": None}``.
     """
-    nested = data.pop("location", None)
+    _absent = object()
+    nested = data.pop("location", _absent)
+    if nested is _absent:
+        # `location` key was absent (e.g. model_dump(exclude_unset=True) on an
+        # Update that didn't touch location) — leave the dict untouched.
+        return data
     if nested is None:
+        # location was explicitly None — write explicit nulls so the wire shape
+        # is stable (consumers always see location_city / _state / _zip, just null).
+        for sub in _LOCATION_SUBFIELDS:
+            data[f"location_{sub}"] = None
         return data
     if not isinstance(nested, dict):
         # Shouldn't happen in practice, but be defensive — restore the
