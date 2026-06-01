@@ -110,7 +110,7 @@ async def register_request_handler(
         # Mirrors the pattern in src/domain/routes/dev_auth.py.
         login_response = await auth_backend.login(get_strategy(), created_user)
         login_response.status_code = 200
-        login_response.headers["HX-Redirect"] = "/users/me"
+        login_response.headers["HX-Redirect"] = "/profile"
         return login_response
 
     return created_user
