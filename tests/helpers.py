@@ -292,6 +292,13 @@ def certification_payload(**overrides: Any) -> dict[str, Any]:
 def make_clinician(*, owner_id: UUID, **overrides: Any) -> Clinician:
     """Build a `Clinician` ORM row with CHECK-valid defaults.
 
+    Defaults `clinician_verified=True` + `npi_match_status='matched'` so
+    rows are directory-visible by default — handoff §4.3 / §10.6 filter
+    the directory on `clinician_verified OR ever_verified_at`. Tests that
+    specifically exercise unverified-clinician paths pass
+    `clinician_verified=False` (and `npi_match_status='none'` if they
+    want the column to read as "never submitted").
+
     ``Clinician.org_id`` is NOT NULL. Callers persisting the returned row
     must pass ``org_id=<existing-org.id>`` in ``overrides`` (Org persisted
     separately via ``make_organization_row`` + ``session.add``), or use
@@ -299,7 +306,14 @@ def make_clinician(*, owner_id: UUID, **overrides: Any) -> Clinician:
     one call. Bare ORM constructors without an ``org_id`` will trip the
     NOT NULL constraint at flush time.
     """
-    return Clinician(owner_id=owner_id, **{**_CLINICIAN_DEFAULTS, **overrides})
+    verified_defaults = {
+        "clinician_verified": True,
+        "npi_match_status": "matched",
+    }
+    return Clinician(
+        owner_id=owner_id,
+        **{**_CLINICIAN_DEFAULTS, **verified_defaults, **overrides},
+    )
 
 
 def make_organization_row(
