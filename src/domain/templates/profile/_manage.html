@@ -125,9 +125,9 @@
           </summary>
           {% call form_with_errors(action="/profile/clinician/" ~ _c.id|string ~ "/details", method="post") %}
             <div class="grid">
-              {{ text_field("location_city", "City", value=_c.location_city or "") }}
+              {{ text_field("location_city", "City", current=_c.location_city or "") }}
               {{ select_field("location_state", "State", US_STATES, current=_c.location_state, placeholder=true) }}
-              {{ text_field("location_zip", "ZIP", value=_c.location_zip or "", pattern="\\d{5}", maxlength=5) }}
+              {{ text_field("location_zip", "ZIP", current=_c.location_zip or "", pattern="\\d{5}", maxlength=5) }}
             </div>
             {{ actions("Save location") }}
           {% endcall %}
@@ -151,7 +151,7 @@
           {% call form_with_errors(action="/profile/clinician/" ~ _c.id|string ~ "/details", method="post") %}
             {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network insurance", checked=_c.accepts_out_of_network) }}
             {{ checkbox_field("sliding_scale", "Sliding scale available", checked=_c.sliding_scale) }}
-            {{ text_field("cost", "Session cost (optional)", value=_c.cost or "", required=false) }}
+            {{ text_field("cost", "Session cost (optional)", current=_c.cost or "", required=false) }}
             {{ actions("Save payment info") }}
           {% endcall %}
         </details>
