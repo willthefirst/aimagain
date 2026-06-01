@@ -85,6 +85,12 @@ class AuditAction(str, Enum):
     UPDATE_ORG_REPRESENTATION = "update_org_representation"
     DELETE_ORG_REPRESENTATION = "delete_org_representation"
     SET_ORG_REPRESENTATION_AUTHORITY = "set_org_representation_authority"
+    # State-axis action on `ClinicianLicensure` (owned subentity of
+    # `Clinician`). The first consumer of `mount_state_axis` with
+    # `spec.parent is not None` — re-attestation flips
+    # `attested_active=True` + recomputes the license `status` and the
+    # owning clinician's Claim-A cache.
+    SET_LICENSE_ATTESTATION = "set_license_attestation"
 
 
 Verb = Literal["create", "update", "delete"]

@@ -20,6 +20,7 @@ from src.framework.dispatch.entity_spec import (
     OWNER_OR_ADMIN,
     EntitySpec,
     RouteSet,
+    StateAxis,
 )
 
 
@@ -33,6 +34,7 @@ def make_clinician_credential_entity(
     read_schema: type[BaseModel],
     create_adapter: type[BaseModel] | TypeAdapter,
     update_adapter: type[BaseModel] | TypeAdapter,
+    state_axes: tuple[StateAxis, ...] = (),
 ) -> EntitySpec:
     """Build a credential-subentity `EntitySpec` from its varying pieces.
 
@@ -45,6 +47,12 @@ def make_clinician_credential_entity(
     constructor synthesizes `read_to_dict` from it and defaults
     `audit_snapshot` to it as well (credential audit snapshots are
     byte-identical to their read projection).
+
+    `state_axes` is the per-credential state-axis tuple. Only
+    `LICENSURE_ENTITY` uses it today (the `attestation` axis); the
+    other two credentials pass `()`. This is the parent-owned
+    subentity surface that landed when `mount_state_axis` gained
+    `spec.parent`-aware mounting.
     """
 
     return EntitySpec(
@@ -70,4 +78,5 @@ def make_clinician_credential_entity(
         create_redirect=_clinician_form_redirect,
         update_redirect=_clinician_form_redirect,
         delete_redirect=_clinician_form_redirect,
+        state_axes=state_axes,
     )

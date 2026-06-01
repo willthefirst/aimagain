@@ -388,8 +388,8 @@ async def test_license_attest_flips_to_active_and_updates_claim_cache(
         npi_match_status="matched",
         licensure_status="pending",
     )
-    response = await authenticated_client.post(
-        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    response = await authenticated_client.put(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attestation", json={}
     )
     assert response.status_code == 200
     assert response.headers.get("HX-Refresh") == "true"
@@ -423,8 +423,8 @@ async def test_license_attest_expired_keeps_status_expired(
         logged_in_user.id,
         expiration_in_past=True,
     )
-    response = await authenticated_client.post(
-        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    response = await authenticated_client.put(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attestation", json={}
     )
     assert response.status_code == 200
     async with db_test_session_manager() as session:
@@ -446,8 +446,8 @@ async def test_license_attest_records_verification_event(
     clinician_id, licensure_id = await _seed_clinician_with_licensure(
         db_test_session_manager, logged_in_user.id
     )
-    await authenticated_client.post(
-        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    await authenticated_client.put(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attestation", json={}
     )
     async with db_test_session_manager() as session:
         events = (
@@ -477,8 +477,8 @@ async def test_license_attest_non_owner_403(
     clinician_id, licensure_id = await _seed_clinician_with_licensure(
         db_test_session_manager, other_owner.id
     )
-    response = await authenticated_client.post(
-        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    response = await authenticated_client.put(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attestation", json={}
     )
     assert response.status_code == 403
 
@@ -501,7 +501,7 @@ async def test_license_attest_404_when_licensure_belongs_to_other_clinician(
     _, licensure_id_b = await _seed_clinician_with_licensure(
         db_test_session_manager, other_owner.id
     )
-    response = await authenticated_client.post(
-        f"/clinicians/{clinician_id_a}/licensures/{licensure_id_b}/attest"
+    response = await authenticated_client.put(
+        f"/clinicians/{clinician_id_a}/licensures/{licensure_id_b}/attestation", json={}
     )
     assert response.status_code == 404
