@@ -15,17 +15,18 @@
       {% endif %}
     </p>
   </header>
-  {# Mode dispatch. Phase 5 skeleton ships `setup` and `manage`
-     partials; the `add-a-claim` and `re-verify` partials are wired up
-     in follow-up PRs (the route handler already resolves into them so
-     the dispatch is a one-line add). #}
+  {# Mode dispatch. All four modes have dedicated partials:
+     * `_setup.html`     — wireframe L1, no-claim goal picker.
+     * `_manage.html`    — wireframe L4, ≥1 claim verified.
+     * `_add_claim.html` — wireframe L6, additive unlock framing.
+     * `_reverify.html`  — wireframe L7, lapsed-claim Fix CTA. #}
   {% if mode == "setup" %}
     {% include "profile/_setup.html" %}
   {% elif mode == "manage" %}
     {% include "profile/_manage.html" %}
   {% elif mode == "add-a-claim" %}
-    {% include "profile/_manage.html" %}
+    {% include "profile/_add_claim.html" %}
   {% elif mode == "re-verify" %}
-    {% include "profile/_manage.html" %}
+    {% include "profile/_reverify.html" %}
   {% endif %}
 {% endblock %}
