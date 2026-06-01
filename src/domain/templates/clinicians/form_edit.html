@@ -101,9 +101,10 @@
     <h2>Licensures</h2>
     {% call(lic) credential_list(clinician.licensures, "No licensures yet.") %}
       {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
+            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None, lic.status | title],
       delete_url=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string,
       delete_confirm="Remove this licensure?",
+      attest_url=(entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/attestation") if not lic.attested_active else None,
       ) }}
     {% endcall %}
     {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/licensures", "Add licensure", "Add licensure") %}
