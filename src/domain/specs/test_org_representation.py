@@ -24,11 +24,15 @@ def test_auth_deps_authenticated_and_policy_owner_or_admin():
     assert ORG_REPRESENTATION_ENTITY.auth_policy is OWNER_OR_ADMIN
 
 
-def test_routes_crud_only_no_collection_views():
-    """Phase 1: API-only. The Profile Hub (Phase 5) owns rendering;
-    no generic list/detail/form pages ship here yet."""
+def test_routes_update_delete_only_no_collection_views():
+    """API-only routes. `create=False` because the bespoke handler
+    `handle_create_org_representation` (with per-authority-method
+    dispatch) owns POST `/org_representations`; the framework's
+    generic create would land every row at `authority_status='pending'`
+    and miss the `authorized_official` auto-verify happy path."""
     r = ORG_REPRESENTATION_ENTITY.routes
-    assert (r.create, r.update, r.delete) == (True, True, True)
+    assert r.create is False
+    assert (r.update, r.delete) == (True, True)
     assert (r.list, r.detail, r.form_new, r.form_edit) == (False, False, False, False)
 
 

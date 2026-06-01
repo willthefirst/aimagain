@@ -62,7 +62,11 @@ ORG_REPRESENTATION_ENTITY: Final[EntitySpec] = EntitySpec(
     # Phase 1: API surface only. The Profile Hub (Phase 5) renders the
     # list/detail/form views via its own per-mode partials — no generic
     # collection page here yet, so we don't ship placeholder templates.
-    routes=RouteSet(create=True, update=True, delete=True),
+    # `create=False` opts out of the framework's generic create so the
+    # bespoke `handle_create_org_representation` (which dispatches on
+    # `authority_method`) owns POST `/org_representations`. Update +
+    # delete still flow through the generic factories.
+    routes=RouteSet(update=True, delete=True),
     state_axes=(
         StateAxis(
             name="authority",
