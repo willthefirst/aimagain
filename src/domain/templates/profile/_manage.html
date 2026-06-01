@@ -1,11 +1,7 @@
 {# Manage mode — user holds ≥1 verified claim. Per wireframe L4:
-   profile header with claim badges, three editable rows (Clinician
-   identity / Org representation / Specialties·insurance·ages), and a
-   `+ New post` CTA when Claim A is verified.
-
-   Phase 5 skeleton renders the claim badges + verification status rows;
-   inline edit forms and the profile-strength meter land in the follow-
-   up PR alongside the NPI submit endpoints.
+   profile header with claim badges, status rows for clinician identity
+   and org representation with direct "Manage →" edit links, and a
+   "+ New post" CTA when verified.
 #}
 <section>
   <header>
@@ -15,83 +11,90 @@
         {% if claim_state.a %}
           <span style="font-size: 0.875rem;
                        color: var(--pico-primary);
-                       margin-left: 0.5rem"><i class="icon-shield-check"></i> Verified clinician</span>
+                       margin-left: 0.5rem">
+            <i class="icon-shield-check"></i> Verified clinician
+          </span>
         {% endif %}
         {% if claim_state.b %}
-        <span style="font-size: 0.875rem;
-                     color: var(--pico-primary);
-                     margin-left: 0.5rem"><i class="icon-building"></i>
-      Represents {{ claim_state.b|length }} org(s)</span>
-    {% endif %}
-  </h2>
-</hgroup>
-{% if any_claim_lapsed %}
-  <p style="color: var(--pico-color-yellow-600);
-            background: var(--pico-color-yellow-100);
-            padding: 0.5rem 1rem;
-            border-radius: 4px">
-    <i class="icon-alert-triangle"></i> Action needed — one of your claims has lapsed.
-  </p>
-{% endif %}
-</header>
-<article>
-  <header>
-    {# title-case-ignore: "Claim A" is a user-facing label for the two-claim model #}
-    <strong>Clinician identity (Claim A)</strong>
-  </header>
-  {% if claim_state.a %}
-    <p>
-      <i class="icon-check"></i> Verified
-    </p>
-    <ul>
-      {% for c in clinicians %}
-        <li>
-          {{ c.first_name or "" }} {{ c.last_name or "" }} —
-          {% if c.npi %}
-            NPI {{ c.npi }}
-          {% else %}
-            no NPI
-          {% endif %}
-          ·
-          <a href="{{ entity_url('clinician', id=c.id) }}">View</a>
-        </li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    {# title-case-ignore: "Clinician" is the entity name, kept capitalized #}
-    <p>Not verified. Add a Clinician profile + license to claim this.</p>
-    <a href="{{ entity_url('user', id='me') }}"
-       role="button"
-       class="outline">Manage clinicians</a>
-  {% endif %}
-</article>
-<article>
-  <header>
-    {# title-case-ignore: "Claim B" is a user-facing label for the two-claim model #}
-    <strong>Organization representation (Claim B)</strong>
-  </header>
-  {% if claim_state.b %}
-    <p>
-      <i class="icon-check"></i> Representing
-      {{ claim_state.b|length }} organization(s)
-    </p>
-    <ul>
-      {% for rep in org_representations %}
-        {% if rep.authority_status == "verified" and rep.archived_at is none %}
-          <li>{{ rep.org.name if rep.org else rep.org_id }} — {{ rep.role }}</li>
+          <span style="font-size: 0.875rem;
+                       color: var(--pico-primary);
+                       margin-left: 0.5rem">
+            <i class="icon-building"></i> Represents {{ claim_state.b|length }} org(s)
+          </span>
         {% endif %}
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p style="color: var(--pico-muted-color);">Not currently representing any organization.</p>
+      </h2>
+    </hgroup>
+    {% if any_claim_lapsed %}
+      <p style="color: var(--pico-color-yellow-600);
+                background: var(--pico-color-yellow-100);
+                padding: 0.5rem 1rem;
+                border-radius: 4px">
+        <i class="icon-alert-triangle"></i> Action needed — one of your claims has lapsed.
+      </p>
+    {% endif %}
+  </header>
+  <article>
+    <header style="display: flex;
+                   justify-content: space-between;
+                   align-items: baseline">
+      <strong>Clinician identity</strong>
+      {% if clinicians %}
+        <a href="{{ entity_url('clinician', id=clinicians[0].id) }}/form"
+           style="font-size: 0.875rem">Manage →</a>
+      {% endif %}
+    </header>
+    {% if claim_state.a %}
+      <p>
+        <i class="icon-check"></i> Verified
+      </p>
+      <ul style="margin: 0; padding-left: 1.25rem;">
+        {% for c in clinicians %}
+          <li>
+            {{ c.first_name or "" }} {{ c.last_name or "" }}
+            {%- if c.npi %}· NPI {{ c.npi }}{% endif %}
+            {%- set _active = c.licensures | selectattr('status', 'equalto', 'active') | list -%}
+            {%- if _active %}· {{ _active|length }} active license(s){% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color: var(--pico-muted-color);">
+        Not yet verified. Add a clinician profile and active license to unlock posting.
+      </p>
+      {% if clinicians %}
+        <a href="{{ entity_url('clinician', id=clinicians[0].id) }}/form"
+           role="button"
+           class="outline">Continue setup</a>
+      {% endif %}
+    {% endif %}
+  </article>
+  <article>
+    <header style="display: flex;
+                   justify-content: space-between;
+                   align-items: baseline">
+      <strong>Organization representation</strong>
+    </header>
+    {% if claim_state.b %}
+      <p>
+        <i class="icon-check"></i> Representing {{ claim_state.b|length }} organization(s)
+      </p>
+      <ul style="margin: 0; padding-left: 1.25rem;">
+        {% for rep in org_representations %}
+          {% if rep.authority_status == "verified" and rep.archived_at is none %}
+            <li>{{ rep.org.name if rep.org else rep.org_id }} — {{ rep.role }}</li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color: var(--pico-muted-color);">Not currently representing any organization.</p>
+    {% endif %}
+  </article>
+  {% if claim_state.a %}
+    <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
+      <a href="{{ entity_form_url("post") }}?kind=referral" role="button">+ Post a referral</a>
+      <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+         role="button"
+         class="outline">+ Post an opening</a>
+    </section>
   {% endif %}
-</article>
-{% if claim_state.a %}
-  <section style="display: flex; gap: 1rem;">
-    <a href="{{ entity_form_url("post") }}?kind=referral" role="button">+ Post a referral</a>
-    <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
-       role="button"
-       class="outline">+ Post an opening</a>
-  </section>
-{% endif %}
 </section>
