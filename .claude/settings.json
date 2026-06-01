@@ -38,7 +38,8 @@
     "allow": [
       "Bash(dev worktree add *)",
       "Bash(dev worktree list)",
-      "Bash(dev worktree gc *)"
+      "Bash(dev worktree gc *)",
+      "Write(.claude/commands/*)"
     ]
   },
   "mcpServers": {

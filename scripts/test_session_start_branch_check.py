@@ -82,6 +82,74 @@ def test_warns_loudly_on_main_branch(tmp_path: Path) -> None:
     assert "git worktree add" in result.stderr
 
 
+def test_auto_pulls_on_clean_main_with_remote(tmp_path: Path) -> None:
+    # Set up a bare remote + a clone so the working repo has a tracking branch.
+    bare = tmp_path / "bare.git"
+    bare.mkdir()
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(bare)],
+        check=True,
+        capture_output=True,
+    )
+
+    repo = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", str(bare), str(repo)], check=True, capture_output=True
+    )
+    _git(repo, "config", "user.email", "t@t")
+    _git(repo, "config", "user.name", "t")
+    _git(repo, "config", "commit.gpgsign", "false")
+    (repo / "pyproject.toml").write_text("[project]\nname='t'\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "init")
+    _git(repo, "push", "origin", "main")
+
+    copy = _install_hook(repo)
+
+    result = subprocess.run(
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
+    )
+    assert result.returncode == 0
+    assert "⚡" in result.stderr
+    assert "pulling latest" in result.stderr.lower()
+
+
+def test_skips_auto_pull_on_clean_main_without_remote(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    copy = _install_hook(repo)
+
+    result = subprocess.run(
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
+    )
+    assert result.returncode == 0
+    assert "⚡" not in result.stderr
+
+
+def test_skips_auto_pull_on_dirty_main(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    copy = _install_hook(repo)
+    (repo / "dirty.txt").write_text("dirty")
+
+    result = subprocess.run(
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
+    )
+    assert result.returncode == 0
+    assert "⚡" not in result.stderr
+    assert "file(s) modified" in result.stderr
+
+
+def test_skips_auto_pull_on_feature_branch(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    copy = _install_hook(repo)
+    _git(repo, "checkout", "-b", "fix/123-something")
+
+    result = subprocess.run(
+        [sys.executable, str(copy)], capture_output=True, text=True, cwd=repo
+    )
+    assert result.returncode == 0
+    assert "⚡" not in result.stderr
+
+
 def test_surfaces_dirty_state_and_stashes(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path)
     copy = _install_hook(repo)
