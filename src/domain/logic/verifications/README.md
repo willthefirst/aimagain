@@ -9,14 +9,15 @@ Persistence + pure-function primitives for the clinician verification pipeline. 
 - `nppes.py` — `nppes_lookup(npi, *, http)` against the public CMS registry. Errors / timeouts degrade to `NppesResult(found=False, raw=None)` plus a logged warning — never raises.
 - `oig.py` — `oig_check(*, first_name, last_name, npi)` against the OIG/LEIE exclusion list (loaded from a CSV on disk). Module-level cache by absolute path; missing CSV degrades to "no match" with a single startup warning.
 - `scoring.py` — `score_verification(...)` table-driven rules over `(NppesResult, OigResult, clinician name)` → `Score(status, flags, name_match_score)`. No I/O.
-- `handlers.py` — `run_clinician_verification(...)` orchestrator + `handle_create_clinician_verification(...)` admin-only retrigger. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
+- `handlers.py` — NPPES pipeline: `run_clinician_verification(...)`, `run_org_verification(...)`, and their admin-only retrigger wrappers. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
+- `events.py` — `recompute_clinician_claim(clinician)`, `recompute_org_claim(org)`, and `record_verification_event(...)`. These three live outside the NPPES pipeline because they are called by `clinicians/handlers.py` and `org_representations/handlers.py` without any HTTP dependency. The recompute helpers are nearly pure (no I/O; they mutate their argument in place); `record_verification_event` is the single append-only writer for the non-NPPES §9 transitions.
 
-The orchestrator has two callers:
+The pipeline orchestrators have two callers each:
 
-1. **`handle_create_clinician_verification`** in this file (admin retrigger; `actor_id=requesting_user.id`).
+1. **`handle_create_clinician_verification` / `handle_create_org_verification`** in `handlers.py` (admin retrigger; `actor_id=requesting_user.id`).
 2. **`run_nightly_verification`** in [`../../../jobs/nightly_verification.py`](../../../jobs/nightly_verification.py) (daily APScheduler job; `actor_id=None`).
 
-(`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`.)
+(`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`/`.events`.)
 
 ## Why pure functions, not classes
 

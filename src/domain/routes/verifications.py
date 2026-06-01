@@ -35,10 +35,8 @@ from src.domain.logic.organizations.repository import (
     OrganizationRepository,
     get_organization_repository,
 )
-from src.domain.logic.verifications.handlers import (
-    handle_create_clinician_verification,
-    record_verification_event,
-)
+from src.domain.logic.verifications.events import record_verification_event
+from src.domain.logic.verifications.handlers import handle_create_clinician_verification
 from src.domain.logic.verifications.repository import (
     VerificationRepository,
     get_verification_repository,

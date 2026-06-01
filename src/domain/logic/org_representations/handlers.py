@@ -40,7 +40,7 @@ from src.domain.logic.org_representations.schema import (
     OrgRepresentationAuthorityUpdate,
     OrgRepresentationCreate,
 )
-from src.domain.logic.verifications.handlers import record_verification_event
+from src.domain.logic.verifications.events import record_verification_event
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.logic.verifications.scoring import _name_similarity
 from src.domain.models import Organization, OrgRepresentation, User
