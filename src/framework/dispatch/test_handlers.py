@@ -3220,3 +3220,131 @@ async def test_state_axis_forbid_self_wrapper_lets_other_targets_through():
     )
     assert result == "ok"
     assert inner_called is True
+
+
+# --- after_create framework tests ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_invokes_after_create_with_row_payload_user_and_repos():
+    """Happy path: `after_create` is awaited with `row=`, `payload=`,
+    `requesting_user=`, plus the declared typed repos. Audit row is
+    written after the hook runs (so any mutations the hook makes are
+    captured in the audit `after` snapshot)."""
+    audit_used = AuditedResource(
+        type="widget",
+        # Snapshot reads `practice_name` so the test can prove the
+        # hook's mutation lands in the audit `after` row.
+        snapshot=lambda obj: {
+            "id": str(obj.id),
+            "practice_name": obj.practice_name,
+        },
+        create=AuditAction.CREATE_USER,
+        update=AuditAction.UPDATE_USER,
+        delete=AuditAction.DELETE_USER,
+    )
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=audit_used,
+    )
+    repo = _create_fake_repo()
+    audit_repo = _FakeAuditRepo()
+    user = _user()
+    extra_repo = _StubOrgRepo()
+
+    seen: list[dict[str, _Any]] = []
+
+    async def hook(*, row, payload, requesting_user, organization_repo):
+        seen.append(
+            {
+                "row": row,
+                "payload": payload,
+                "user": requesting_user,
+                "org_repo": organization_repo,
+            }
+        )
+        # Mutate the row — the audit `after` snapshot fires AFTER this,
+        # so the mutation should be captured.
+        row.practice_name = "mutated-by-hook"
+
+    payload = _StandardPayload(practice_name="P", location_city="C")
+    created = await handle_create(
+        spec,
+        payload=payload,
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=user,
+        after_create=hook,
+        after_create_kwargs={"organization_repo": extra_repo},
+    )
+
+    assert len(seen) == 1
+    assert seen[0]["row"] is created
+    assert seen[0]["payload"] is payload
+    assert seen[0]["user"] is user
+    assert seen[0]["org_repo"] is extra_repo
+    assert created.practice_name == "mutated-by-hook"
+    assert len(repo.created_rows) == 1
+    assert len(audit_repo.calls) == 1
+    assert audit_repo.calls[0]["action"] == audit_used.create
+    # The audit `after` snapshot reflects the post-hook mutation.
+    assert audit_repo.calls[0]["after"]["practice_name"] == "mutated-by-hook"
+
+
+@pytest.mark.asyncio
+async def test_create_skips_after_create_when_not_supplied():
+    """`after_create=None` is the default — the create path still works
+    end-to-end without it (no audit-row regression for entities that
+    don't declare the hook)."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    repo = _create_fake_repo()
+    audit_repo = _FakeAuditRepo()
+    payload = _StandardPayload(practice_name="P", location_city="C")
+    created = await handle_create(
+        spec, payload=payload, repo=repo, audit_repo=audit_repo, requesting_user=_user()
+    )
+    assert created.practice_name == "P"
+    assert len(audit_repo.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_create_after_create_exception_rolls_back_transaction():
+    """If `after_create` raises, the `mutate(...)` context manager
+    propagates the exception and the audit row is NOT written. The
+    persisted row stays in the session (the framework relies on the
+    session's exception-rollback path, but the audit row's absence is
+    the contract this test pins)."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=_audit(),
+    )
+    repo = _create_fake_repo()
+    audit_repo = _FakeAuditRepo()
+
+    async def hook(*, row, payload, requesting_user):
+        raise ValueError("after_create rejected this row")
+
+    payload = _StandardPayload(practice_name="P", location_city="C")
+    with pytest.raises(ValueError, match="after_create rejected"):
+        await handle_create(
+            spec,
+            payload=payload,
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=_user(),
+            after_create=hook,
+        )
+    # No audit row written when the hook raises.
+    assert audit_repo.calls == []
