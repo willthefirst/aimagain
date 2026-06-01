@@ -1,4 +1,26 @@
-"""Generic dispatch handlers driven by EntitySpec."""
+"""Generic dispatch handlers driven by EntitySpec.
+
+Handler logic has moved to the corresponding per-verb mount files:
+
+  - ``handle_delete`` / ``make_delete_handler``  →  mounts/delete.py
+  - ``handle_create`` / ``make_create_handler``  →  mounts/create.py
+  - ``handle_update`` / ``make_update_handler``  →  mounts/update.py
+  - ``handle_get_edit_form`` / ``make_edit_form_handler``  →  mounts/form.py
+  - ``handle_get_new_form`` / ``make_new_form_handler``  →  mounts/form.py
+  - ``handle_detail`` / ``make_detail_handler``  →  mounts/detail.py
+  - ``handle_list`` / ``make_list_handler``  →  mounts/list_.py
+
+This module retains the shared factory infrastructure
+(``_FactoryShape``, ``_*_SHAPE`` constants, ``_param``,
+``_make_factory_handler``) that the per-verb ``make_*_handler``
+functions import lazily, and re-exports every public symbol so
+existing callers keep working without changes.
+
+The re-export shim will be deleted in a follow-up once all direct
+callers of ``handle_*`` (``src/domain/logic/users/test_handlers.py``
+and ``src/domain/logic/clinicians/test_handlers.py``) are updated to
+import from the individual mount files.
+"""
 
 import inspect
 from dataclasses import dataclass
@@ -9,12 +31,10 @@ from fastapi import Request
 from pydantic import BaseModel
 
 from src.framework.actor import Actor
-from src.framework.audit.core import mutate
 from src.framework.audit.repository import AuditRepository
-from src.framework.authz import is_admin
 from src.framework.dispatch.entity_spec import EntitySpec
 from src.framework.dispatch.filters import Filter
-from src.framework.dispatch.pagination import (
+from src.framework.dispatch.pagination import (  # noqa: F401
     DEFAULT_PAGE_SIZE,
     Pager,
     base_query,
@@ -22,355 +42,12 @@ from src.framework.dispatch.pagination import (
     paginate,
     parse_page,
 )
-from src.framework.http.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from src.framework.persistence.base_repository import BaseRepository
-from src.framework.rendering.projections import project_view
-from src.framework.rendering.templating import set_viewer
 
-
-def _assert_kind_lock(spec: EntitySpec, target: Any) -> None:
-    """For kind-locked / subset-supertype faces, raise 404 when
-    ``target.kind`` is outside the face's bound kind set.
-
-    - Kind-locked (`discriminator_value` set): single allowed value.
-    - Subset-supertype (`discriminator_values` set): subset of allowed
-      values.
-    - Whole-supertype (neither set): no lock; any kind passes.
-
-    Used by detail / update / delete / form_edit on kind-locked or
-    subset-supertype faces so a row of the wrong kind can never be
-    reached via that face's URL family. The whole-supertype face
-    (e.g. ``/posts/{id}``) has no kind-lock and resolves any kind.
-    The 404 surface (rather than 400) keeps the wrong-family URL
-    indistinguishable from a truly-missing row — a stronger boundary
-    than a leaky "exists but wrong family" signal."""
-    if spec.discriminator_value is None and spec.discriminator_values is None:
-        return
-    column = spec.discriminator.column
-    target_kind = getattr(target, column)
-    if spec.discriminator_value is not None:
-        ok = target_kind == spec.discriminator_value
-    else:
-        ok = target_kind in spec.discriminator_values
-    if not ok:
-        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-
-
-async def handle_delete(
-    spec: EntitySpec,
-    *,
-    target_id: UUID,
-    repo: BaseRepository,
-    audit_repo: AuditRepository,
-    requesting_user: Actor,
-    parent_id: UUID | None = None,
-) -> None:
-    """Generic delete handler driven by `spec`."""
-    if spec.audit is None:
-        raise ValueError(
-            f"handle_delete: spec {spec.name!r} has no audit binding; "
-            "delete operations must be audited."
-        )
-
-    target = await repo.get_by_model_id(spec.model, target_id)
-    if target is None:
-        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-    _assert_kind_lock(spec, target)
-
-    # Self-target guard for user-shaped entities — the comparison only
-    # matches when `target.id` IS the requesting user's id (i.e. the row
-    # is a user). For owned resources, target.id is a row UUID, so the
-    # comparison is harmless. See `EntitySpec.delete_forbid_self`.
-    if spec.delete_forbid_self and target.id == requesting_user.id:
-        raise ForbiddenError(
-            detail=f"Cannot delete your own {spec.name} via this endpoint"
-        )
-
-    if spec.parent is not None:
-        if parent_id is None:
-            raise ValueError(
-                f"handle_delete: spec {spec.name!r} has parent "
-                f"{spec.parent.name!r} but no parent_id was supplied."
-            )
-        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
-        if parent is None:
-            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
-        # Verify the URL's parent id matches the child's logical parent —
-        # otherwise `/parents/A/children/B` would silently mutate a child
-        # owned by parent B. Default convention: child holds `<parent.name>_id`
-        # equal to `parent.id`. Specs with a shared non-parent FK
-        # (e.g. clinician credentials FK to `clinicians.id`) override via
-        # `child_parent_match_attr`.
-        if spec.child_parent_match_attr is not None:
-            attr = spec.child_parent_match_attr
-            if getattr(target, attr) != getattr(parent, attr):
-                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-        else:
-            parent_fk_attr = spec.parent_fk_attr or f"{spec.parent.name}_id"
-            if getattr(target, parent_fk_attr) != parent_id:
-                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-        if spec.write_authz is not None:
-            spec.write_authz(parent, requesting_user, action=f"delete this {spec.name}")
-    else:
-        if spec.write_authz is not None:
-            spec.write_authz(target, requesting_user, action=f"delete this {spec.name}")
-
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=target,
-        resource=spec.audit,
-        verb="delete",
-    ):
-        await repo.delete(target)
-
-
-async def handle_create(
-    spec: EntitySpec,
-    *,
-    payload: BaseModel,
-    repo: BaseRepository,
-    audit_repo: AuditRepository,
-    requesting_user: Actor,
-    parent_id: UUID | None = None,
-    payload_authz: Callable[..., Awaitable[None]] | None = None,
-    payload_authz_kwargs: dict[str, Any] | None = None,
-    after_create: Callable[..., Awaitable[None]] | None = None,
-    after_create_kwargs: dict[str, Any] | None = None,
-) -> Any:
-    """Generic create handler driven by `spec`.
-
-    `payload_authz` (if supplied) is invoked AFTER the parent row has
-    been loaded and `write_authz` has run on it (if applicable), and
-    BEFORE the payload is used to build the model. The callable is
-    expected to raise `ForbiddenError` / `NotFoundError` on rejection;
-    `payload_authz_kwargs` supplies any spec-declared typed repo kwargs.
-    See `EntitySpec.payload_authz_path` for the contract.
-
-    `after_create` (if supplied) is invoked AFTER the row has been
-    persisted (it has an id) and BEFORE the audit `after`-snapshot is
-    taken. Use it to mutate the row's server-controlled columns based
-    on the payload, OR to do side effects in the same transaction
-    (e.g. record a `Verification` event). The hook receives `row=`,
-    `payload=`, `requesting_user=`, and `**after_create_kwargs`. See
-    `EntitySpec.after_create_path` for the contract."""
-    if spec.audit is None:
-        raise ValueError(
-            f"handle_create: spec {spec.name!r} has no audit binding; "
-            "create operations must be audited."
-        )
-
-    if spec.parent is not None:
-        if parent_id is None:
-            raise ValueError(
-                f"handle_create: spec {spec.name!r} has parent "
-                f"{spec.parent.name!r} but no parent_id was supplied."
-            )
-        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
-        if parent is None:
-            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
-        if spec.write_authz is not None:
-            spec.write_authz(parent, requesting_user, action=f"create this {spec.name}")
-        if payload_authz is not None:
-            await payload_authz(
-                payload=payload,
-                requesting_user=requesting_user,
-                **(payload_authz_kwargs or {}),
-            )
-        child = spec.model(**payload.model_dump())
-        created = await repo.add_child(parent, spec.url_collection, child)
-
-    elif spec.discriminator is not None:
-        if payload_authz is not None:
-            await payload_authz(
-                payload=payload,
-                requesting_user=requesting_user,
-                **(payload_authz_kwargs or {}),
-            )
-        kind = payload.kind
-        kind_spec = spec.discriminator[kind]
-        # Read detail fields off the serialized dump, not via
-        # ``getattr``, so wire-flat / schema-nested fields (e.g. the
-        # post-#451 ``location: Location`` value object on
-        # :class:`ReferralCreate`, which serializes back to flat
-        # ``location_city`` / ``location_state`` / ``location_zip`` keys
-        # via ``flatten_location_on_dump``) line up with the ORM
-        # model's flat columns enumerated in ``detail_fields``.
-        dump = payload.model_dump()
-        detail = kind_spec.detail_model(
-            **{f: dump[f] for f in kind_spec.detail_fields if f in dump}
-        )
-        parent_obj = spec.model(**{spec.discriminator.column: kind})
-        if spec.owner_attr is not None:
-            setattr(parent_obj, spec.owner_attr, requesting_user.id)
-        created = await repo.create_polymorphic(
-            parent_obj, detail, detail_relationship=kind_spec.detail_relationship
-        )
-
-    else:
-        if payload_authz is not None:
-            await payload_authz(
-                payload=payload,
-                requesting_user=requesting_user,
-                **(payload_authz_kwargs or {}),
-            )
-        # Inline-child collections (e.g. clinician's licensures /
-        # educations / certifications) come in on the payload alongside
-        # the parent's own fields. Exclude them from the parent
-        # constructor, persist the parent, then append each child via
-        # `repo.add_child` so the in-memory state stays coherent for
-        # the audit after-snapshot. Empty `spec.children` is the common
-        # case (most entities have no inline children) and the loop is
-        # a no-op.
-        inline_collections = tuple(c.url_collection for c in spec.children)
-        parent_fields = payload.model_dump(exclude=set(inline_collections))
-        instance = spec.model(**parent_fields)
-        if spec.owner_attr is not None:
-            setattr(instance, spec.owner_attr, requesting_user.id)
-        created = await repo.create(instance)
-        for child_spec in spec.children:
-            for item in getattr(payload, child_spec.url_collection, []) or []:
-                await repo.add_child(
-                    created,
-                    child_spec.url_collection,
-                    child_spec.model(**item.model_dump()),
-                )
-
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=created,
-        resource=spec.audit,
-        verb="create",
-    ):
-        # `after_create` runs inside the `mutate(...)` block — after
-        # persistence (so the row has an id) and before the audit
-        # `after`-snapshot is taken (so any row mutations the hook
-        # makes are reflected in the snapshot). Raises propagate; the
-        # context manager rolls back the transaction without writing
-        # the audit row.
-        if after_create is not None:
-            await after_create(
-                row=created,
-                payload=payload,
-                requesting_user=requesting_user,
-                **(after_create_kwargs or {}),
-            )
-    return created
-
-
-async def handle_update(
-    spec: EntitySpec,
-    *,
-    target_id: UUID,
-    payload: BaseModel,
-    repo: BaseRepository,
-    audit_repo: AuditRepository,
-    requesting_user: Actor,
-    parent_id: UUID | None = None,
-    payload_authz: Callable[..., Awaitable[None]] | None = None,
-    payload_authz_kwargs: dict[str, Any] | None = None,
-) -> Any:
-    """Generic update handler driven by `spec`.
-
-    `payload_authz` (if supplied) is invoked AFTER the target 404 check
-    and AFTER `write_authz` has run on parent-or-target, and BEFORE the
-    payload is consumed (discriminator dispatch / patch). When the
-    target 404s, the hook is never called — the 404 fires first. See
-    `EntitySpec.payload_authz_path` for the contract."""
-    if spec.audit is None:
-        raise ValueError(
-            f"handle_update: spec {spec.name!r} has no audit binding; "
-            "update operations must be audited."
-        )
-
-    target = await repo.get_by_model_id(spec.model, target_id)
-    if target is None:
-        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-    _assert_kind_lock(spec, target)
-
-    if spec.parent is not None:
-        if parent_id is None:
-            raise ValueError(
-                f"handle_update: spec {spec.name!r} has parent "
-                f"{spec.parent.name!r} but no parent_id was supplied."
-            )
-        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
-        if parent is None:
-            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
-        if spec.child_parent_match_attr is not None:
-            attr = spec.child_parent_match_attr
-            if getattr(target, attr) != getattr(parent, attr):
-                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-        else:
-            parent_fk_attr = spec.parent_fk_attr or f"{spec.parent.name}_id"
-            if getattr(target, parent_fk_attr) != parent_id:
-                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-        if spec.write_authz is not None:
-            spec.write_authz(parent, requesting_user, action=f"update this {spec.name}")
-    else:
-        if spec.write_authz is not None:
-            spec.write_authz(target, requesting_user, action=f"update this {spec.name}")
-
-    if payload_authz is not None:
-        await payload_authz(
-            payload=payload,
-            requesting_user=requesting_user,
-            **(payload_authz_kwargs or {}),
-        )
-
-    if spec.discriminator is not None:
-        payload_kind = payload.kind
-        target_kind = getattr(target, spec.discriminator.column)
-        if payload_kind != target_kind:
-            raise BadRequestError(
-                detail=(
-                    f"payload kind {payload_kind!r} does not match {spec.name} "
-                    f"kind {target_kind!r}; kind cannot be changed via PATCH"
-                )
-            )
-        kind_spec = spec.discriminator[target_kind]
-        detail = getattr(target, kind_spec.detail_relationship)
-        # ``model_dump(exclude_unset=True)`` picks up only the fields
-        # the client touched and — via the schema's flatten-on-dump
-        # ``model_serializer`` (post-#451) — re-projects any nested
-        # value-object fields (e.g. ``location: LocationPartial``)
-        # back to the flat column names ``detail_fields`` enumerates.
-        # Restrict to ``detail_fields`` so the discriminator (``kind``)
-        # and any other top-level keys never reach ``repo.patch``.
-        dump = payload.model_dump(exclude_unset=True)
-        update_fields = {f: dump[f] for f in kind_spec.detail_fields if f in dump}
-        async with mutate(
-            repo,
-            audit_repo,
-            actor=requesting_user,
-            target=target,
-            resource=spec.audit,
-            verb="update",
-        ):
-            await repo.patch(detail, **update_fields)
-        return target
-
-    update_fields = payload.model_dump(exclude_unset=True)
-    async with mutate(
-        repo,
-        audit_repo,
-        actor=requesting_user,
-        target=target,
-        resource=spec.audit,
-        verb="update",
-    ):
-        await repo.patch(target, **update_fields)
-    return target
-
-
-# Each `make_<verb>_handler` factory fabricates a callable with a typed
-# signature so the route mount layer's introspection can bind URL path
-# params, body adapters, query filters, and `Depends` to the right
-# handler kwargs. `_FactoryShape` encodes the per-verb differences and
-# `_make_factory_handler` builds the signature + wrapper once.
+# ---------------------------------------------------------------------------
+# Shared factory infrastructure
+# (kept here; per-verb make_*_handler functions import these lazily)
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -632,529 +309,48 @@ def _make_factory_handler(
     return _handler
 
 
-def make_delete_handler(spec: EntitySpec):
-    return _make_factory_handler(spec, _DELETE_SHAPE, handle_delete)
+# ---------------------------------------------------------------------------
+# Re-exports — public symbols now live in the per-verb mount files.
+# Import lazily to keep the module loadable before the mount package
+# has fully initialized (the per-verb files import back from here for
+# the factory infrastructure above).
+# ---------------------------------------------------------------------------
 
 
-def make_create_handler(
-    spec: EntitySpec,
-    *,
-    payload_authz: Callable[..., Awaitable[None]] | None = None,
-    payload_authz_repos: tuple[tuple[str, type], ...] = (),
-    after_create: Callable[..., Awaitable[None]] | None = None,
-    after_create_repos: tuple[tuple[str, type], ...] = (),
-):
-    return _make_factory_handler(
-        spec,
-        _CREATE_SHAPE,
-        handle_create,
-        payload_authz=payload_authz,
-        payload_authz_repos=payload_authz_repos,
-        after_create=after_create,
-        after_create_repos=after_create_repos,
-    )
-
-
-def make_update_handler(
-    spec: EntitySpec,
-    *,
-    payload_authz: Callable[..., Awaitable[None]] | None = None,
-    payload_authz_repos: tuple[tuple[str, type], ...] = (),
-):
-    return _make_factory_handler(
-        spec,
-        _UPDATE_SHAPE,
-        handle_update,
-        payload_authz=payload_authz,
-        payload_authz_repos=payload_authz_repos,
-    )
-
-
-async def handle_get_edit_form(
-    spec: EntitySpec,
-    *,
-    request: Request,
-    target_id: UUID,
-    repo: BaseRepository,
-    requesting_user: Actor,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Generic edit-form handler driven by `spec`.
-
-    When `extras` is set (threaded in by `make_edit_form_handler` from
-    the spec's `form_extras_path`), the callable is invoked with
-    ``target=<loaded row>``, ``request``, ``requesting_user``, and any
-    typed-repo kwargs declared via `form_extras_repos`. The returned
-    dict merges into the form context (last-write-wins, mirroring
-    `handle_detail` / `handle_list`)."""
-    target = await repo.get_by_model_id(spec.model, target_id)
-    if target is None:
-        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-    _assert_kind_lock(spec, target)
-    if spec.write_authz is not None:
-        spec.write_authz(target, requesting_user, action=f"edit this {spec.name}")
-
-    # `edit_heading` mirrors `create_heading` in `handle_get_new_form`:
-    # one funnel for the H1 string so the page H1 can't drift from the
-    # CTA that opened it. For polymorphic specs the kind is derived
-    # from the loaded target row (the spec's `discriminator_value` for
-    # kind-locked faces is the same value `_assert_kind_lock` just
-    # checked; subset-supertype faces use the row's stored kind).
-    from src.framework.rendering.labels import edit_label_for
-    from src.framework.rendering.route_urls import url_for_spec
-
-    edit_kind: str | None = None
-    if spec.discriminator is not None:
-        edit_kind = getattr(target, spec.discriminator.column)
-
-    # `resource_url` / `resource_detail_url` are derivable from the
-    # spec + the loaded target — every form-edit template used to set
-    # them via two `{% set %}` lines. Inject from the handler so child
-    # templates skip the boilerplate; same funnel `edit_heading` uses
-    # for the H1.
-    context: dict[str, Any] = {
-        "request": request,
-        spec.name: target,
-        "entity_name": spec.name,
-        "current_user": requesting_user,
-        "edit_heading": edit_label_for(spec, kind=edit_kind),
-        "resource_url": url_for_spec(spec),
-        "resource_detail_url": url_for_spec(spec, id=target.id),
-    }
-    # Spec-declared constants (enum labels, schema classes the form
-    # references, etc.) — same merge precedence as detail/list.
-    if spec.static_context:
-        context.update(spec.static_context)
-    if spec.discriminator is not None:
-        if spec.discriminator_value is not None:
-            # Kind-locked face: template defaults via
-            # `spec.templates.form_edit` (e.g. `referrals/form_edit.html`).
-            # Leave `template_name` unset so the mount layer falls back.
-            # `_assert_kind_lock` above already guarantees
-            # `target.kind == spec.discriminator_value` so the schema
-            # class can be picked unambiguously.
-            context["schema"] = spec.update_adapter_class
-        else:
-            kind = getattr(target, spec.discriminator.column)
-            context["template_name"] = spec.discriminator[kind].edit_template
-
-    if extras is not None:
-        extras_kwargs = {
-            "target": target,
-            "request": request,
-            "requesting_user": requesting_user,
-        }
-        if extra_kwargs:
-            extras_kwargs.update(extra_kwargs)
-        context.update(await extras(**extras_kwargs))
-
-    return context
-
-
-def make_edit_form_handler(
-    spec: EntitySpec,
-    *,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_repos: tuple[tuple[str, type], ...] = (),
-):
-    return _make_factory_handler(
-        spec,
-        _EDIT_FORM_SHAPE,
+def _lazy_imports():
+    from src.framework.dispatch.mounts.create import handle_create, make_create_handler
+    from src.framework.dispatch.mounts.delete import handle_delete, make_delete_handler
+    from src.framework.dispatch.mounts.detail import handle_detail, make_detail_handler
+    from src.framework.dispatch.mounts.form import (
         handle_get_edit_form,
-        extras=extras,
-        extra_repos=extra_repos,
-    )
-
-
-async def handle_get_new_form(
-    spec: EntitySpec,
-    *,
-    request: Request,
-    requesting_user: Actor,
-    kind: str | None = None,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Generic create-form handler driven by `spec`.
-
-    For polymorphic entities (those with a `discriminator`):
-      * `kind=None` (no `?kind=` on the URL) → don't set `template_name`,
-        so the route falls back to `spec.form_template` and renders the
-        picker template (conventionally `<collection>/form_new.html`).
-        The picker lists the available kinds; users pick one and round-
-        trip back to this handler with `?kind=…`.
-      * `kind=<value>` → set `template_name` to the kind's
-        `create_template` so the route renders the kind-specific form.
-    """
-    # `create_heading` is the H1 the generic `views/form_new.html` chrome
-    # renders. Computing it here — instead of letting each child template
-    # override `{% block current_label %}` — funnels every "Create X"
-    # string through one helper (`create_label_for` / its Jinja-global
-    # twin `entity_create_label`), so the page H1 and the button that
-    # opened it can't drift. The handler-side construction is half of
-    # the structural pin (the other half is the Jinja global on the
-    # CTAs); pinned by `tests/test_form_chrome_labels.py`.
-    from src.framework.rendering.labels import create_label_for
-    from src.framework.rendering.route_urls import url_for_spec
-
-    # `resource_url` is derivable from `spec.name` — every form-new
-    # template used to set it via a `{% set %}` line. Inject from the
-    # handler so child templates skip the boilerplate; same funnel
-    # `create_heading` uses for the H1.
-    context: dict[str, Any] = {
-        "request": request,
-        "entity_name": spec.name,
-        "current_user": requesting_user,
-        "create_heading": create_label_for(spec, kind=kind),
-        "resource_url": url_for_spec(spec),
-    }
-    if spec.static_context:
-        context.update(spec.static_context)
-    if spec.discriminator is not None:
-        if spec.discriminator_value is not None:
-            # Kind-locked face: the URL family is bound to one kind, so
-            # the picker step is skipped and the template defaults via
-            # `spec.templates.form_new` (e.g. `referrals/form_new.html`).
-            # Leave `template_name` unset so the mount layer falls back
-            # to the spec's default. The form_new template still needs
-            # the schema class for `field_for(schema, ...)`.
-            context["schema"] = spec.create_adapter_class
-        elif kind is not None:
-            # Subset-supertype face restricts `?kind=` to its declared
-            # subset — a user typing `?kind=<value-outside-subset>` must
-            # be rejected, not silently routed to that kind's template.
-            if (
-                spec.discriminator_values is not None
-                and kind not in spec.discriminator_values
-            ):
-                raise BadRequestError(
-                    detail=(
-                        f"kind={kind!r} is not one of {spec.name}'s subkinds "
-                        f"({list(spec.discriminator_values)!r})"
-                    )
-                )
-            context["template_name"] = spec.discriminator[kind].create_template
-        # When `kind is None` on a non-locked supertype, leave
-        # `template_name` unset so the route falls through to
-        # `spec.form_template` (the picker).
-    elif spec.create_adapter_class is not None:
-        # Non-polymorphic create forms render fields via
-        # `field_for(schema, ...)` (reads `schema.model_fields`); the
-        # spec's `create_adapter` is the TypeAdapter wrapper, so we bind
-        # the underlying class instead.
-        context["schema"] = spec.create_adapter_class
-
-    if extras is not None:
-        extras_kwargs = {
-            "target": None,
-            "request": request,
-            "requesting_user": requesting_user,
-        }
-        if extra_kwargs:
-            extras_kwargs.update(extra_kwargs)
-        context.update(await extras(**extras_kwargs))
-
-    return context
-
-
-def make_new_form_handler(
-    spec: EntitySpec,
-    *,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_repos: tuple[tuple[str, type], ...] = (),
-):
-    return _make_factory_handler(
-        spec,
-        _NEW_FORM_SHAPE,
         handle_get_new_form,
-        extras=extras,
-        extra_repos=extra_repos,
+        make_edit_form_handler,
+        make_new_form_handler,
     )
+    from src.framework.dispatch.mounts.list_ import handle_list, make_list_handler
+    from src.framework.dispatch.mounts.update import handle_update, make_update_handler
 
-
-async def handle_detail(
-    spec: EntitySpec,
-    *,
-    request: Request,
-    target_id: UUID,
-    repo: BaseRepository,
-    requesting_user: Actor | None,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Generic detail handler driven by `spec`; merges spec-driven
-    context with the entity's `extras` callable (last-write-wins)."""
-    target = await repo.get_by_model_id(spec.model, target_id)
-    if target is None:
-        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
-    _assert_kind_lock(spec, target)
-
-    from src.framework.rendering.route_urls import url_for_spec
-
-    context: dict[str, Any] = {
-        "request": request,
-        spec.name: target,
-        # Shared partials (e.g. `_shared/posts/_owner_actions.html`)
-        # read `entity_name` to build kind-aware URLs via
-        # `entity_url(entity_name, ...)`. Set on every detail render so
-        # included partials don't have to walk back through caller
-        # context.
-        "entity_name": spec.name,
-        "current_user": requesting_user,
-        # Detail templates' breadcrumb back-link to the collection
-        # used to set `resource_url` via a `{% set %}` line; inject
-        # here so child templates skip the boilerplate.
-        "resource_url": url_for_spec(spec),
+    return {
+        "handle_delete": handle_delete,
+        "make_delete_handler": make_delete_handler,
+        "handle_create": handle_create,
+        "make_create_handler": make_create_handler,
+        "handle_update": handle_update,
+        "make_update_handler": make_update_handler,
+        "handle_get_edit_form": handle_get_edit_form,
+        "make_edit_form_handler": make_edit_form_handler,
+        "handle_get_new_form": handle_get_new_form,
+        "make_new_form_handler": make_new_form_handler,
+        "handle_detail": handle_detail,
+        "make_detail_handler": make_detail_handler,
+        "handle_list": handle_list,
+        "make_list_handler": make_list_handler,
     }
-    if spec.can_write is not None:
-        context["can_edit"] = spec.can_write(target, requesting_user)
-
-    # Viewer-derived flags. `subject_attr` is the attribute on `target`
-    # whose value equals `requesting_user.id` when the viewer IS the
-    # subject — for `owner_attr=None` (users — the row IS the user), the
-    # rule reduces to `target.id == viewer.id`; for owned resources
-    # (clinician, post), it uses the owner FK. The uniform rule lets every
-    # entity inherit `is_self` / `can_admin_actions` without per-entity glue.
-    subject_attr = spec.owner_attr or "id"
-    is_self = (
-        requesting_user is not None
-        and getattr(target, subject_attr) == requesting_user.id
-    )
-    context["is_self"] = is_self
-    context["can_admin_actions"] = is_admin(requesting_user) and not is_self
-
-    if spec.private_field_predicate is not None:
-        context["can_view_private"] = bool(
-            spec.private_field_predicate(requesting_user, target)
-        )
-
-    if spec.public_fields:
-        context[f"target_{spec.name}"] = project_view(
-            target,
-            public_fields=spec.public_fields,
-            actor=requesting_user,
-            private_fields=spec.private_fields,
-            private_field_predicate=spec.private_field_predicate,
-        )
-
-    # Spec-declared constants — merged before extras so an extras
-    # callable can still override (last-write-wins, matching the
-    # framework's existing precedence rule).
-    if spec.static_context:
-        context.update(spec.static_context)
-
-    if extras is not None:
-        extras_kwargs = {
-            "target": target,
-            "request": request,
-            "requesting_user": requesting_user,
-        }
-        if extra_kwargs:
-            extras_kwargs.update(extra_kwargs)
-        context.update(await extras(**extras_kwargs))
-
-    return context
 
 
-def make_detail_handler(
-    spec: EntitySpec,
-    *,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_repos: tuple[tuple[str, type], ...] = (),
-):
-    return _make_factory_handler(
-        spec, _DETAIL_SHAPE, handle_detail, extras=extras, extra_repos=extra_repos
-    )
-
-
-def _active_filter_descriptors(
-    declared_filters: tuple[Filter, ...],
-    filter_values: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Build per-active-value tags for the active-filter strip.
-
-    Each tag is one ``(name, value, label)`` entry — multi-valued
-    filters fan out to one tag per selected value. The label is the
-    filter's display label paired with the choice's human label when
-    available (``"Languages: Spanish"``); free-text filters use the
-    raw value.
-    """
-    out: list[dict[str, Any]] = []
-    for f in declared_filters:
-        v = filter_values.get(f.name)
-        if v is None or v == "" or v == []:
-            continue
-        choice_labels = (
-            dict(f.choices) if getattr(f, "choices", None) else {}  # type: ignore[attr-defined]
-        )
-        values = v if isinstance(v, list) else [v]
-        for one in values:
-            human = choice_labels.get(one, str(one))
-            out.append(
-                {
-                    "name": f.name,
-                    "value": one,
-                    "label": f"{f.display_label}: {human}",
-                }
-            )
-    return out
-
-
-async def handle_list(
-    spec: EntitySpec,
-    *,
-    request: Request,
-    repo: BaseRepository,
-    requesting_user: Actor | None,
-    filter_values: dict[str, Any],
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Generic list handler driven by `spec`; prefers
-    ``repo.list_<collection>`` and falls through to ``repo.list_default``
-    when the bespoke method doesn't exist.
-
-    Pagination: parses `?page=N` from the request, asks the logic layer
-    for `per_page + 1` rows, and slices the probe off to compute
-    `has_next` without a separate count query. Per-page size is
-    `spec.page_size` if set, otherwise `DEFAULT_PAGE_SIZE`.
-    """
-    page_number = parse_page(request)
-    per_page = spec.page_size or DEFAULT_PAGE_SIZE
-    list_kwargs: dict[str, Any] = dict(filter_values)
-    # Kind-locked / subset-supertype face — bind `kind` to the face's
-    # discriminator. Kind-locked leaves stomp any user value (the URL
-    # family is bound to one kind regardless of `?kind=`). Subset faces
-    # respect a user-supplied `kind` filter when the spec declares one
-    # (intersecting the user's pick with the face's subset); when no
-    # user filter is set, fall back to the full subset.
-    if spec.discriminator_value is not None:
-        list_kwargs[spec.discriminator.column] = spec.discriminator_value
-    elif spec.discriminator_values is not None:
-        column = spec.discriminator.column
-        user_value = list_kwargs.get(column)
-        # Normalize user input to a set of kinds. The kind filter on a
-        # subset face is conventionally `multi=True` (a `ChoiceFilter`
-        # whose choices are the subset). Empty / unset → full subset.
-        if user_value:
-            if isinstance(user_value, list):
-                user_kinds = [k for k in user_value if k in spec.discriminator_values]
-            elif user_value in spec.discriminator_values:
-                user_kinds = [user_value]
-            else:
-                user_kinds = []
-        else:
-            user_kinds = []
-        # Empty intersection (user picked only kinds outside the subset,
-        # or didn't pick any) → use the full subset. The alternative
-        # (return zero rows when user's pick is invalid) is surprising;
-        # silently clamping matches kind-locked faces' behavior of
-        # ignoring ?kind=other.
-        list_kwargs[column] = user_kinds or list(spec.discriminator_values)
-    if spec.list_exclude_self and requesting_user is not None:
-        list_kwargs["exclude_self"] = requesting_user
-    list_kwargs["offset"] = offset_for(page_number, per_page)
-    list_kwargs["limit"] = per_page + 1
-    list_method = getattr(repo, f"list_{spec.url_collection}", None)
-    if list_method is not None:
-        items_plus_one = await list_method(**list_kwargs)
-    else:
-        if spec.list_order_by is None:
-            raise ValueError(
-                f"handle_list: spec {spec.name!r} has no list_order_by and "
-                f"no bespoke list_{spec.url_collection!s} method on the "
-                "repo — either declare list_order_by on the spec or add a "
-                f"list_{spec.url_collection!s}() method to the repo."
-            )
-        items_plus_one = await repo.list_default(
-            spec.model, order_by=spec.list_order_by, **list_kwargs
-        )
-
-    items, page = paginate(items_plus_one, page=page_number, per_page=per_page)
-    set_viewer(requesting_user)
-
-    context: dict[str, Any] = {
-        "request": request,
-        spec.url_collection: items,
-        # Shared partials take the URL family name as a macro arg.
-        "entity_name": spec.name,
-        "resource_label": spec.url_collection.capitalize(),
-        "current_user": requesting_user,
-        "can_admin_actions": is_admin(requesting_user),
-        "pager": Pager(page=page, base_query=base_query(request)),
-    }
-    # Filter echo — the list page's filter form preselects the active
-    # value by reading ``selected_<name>`` from the context. The raw
-    # dict is also injected as ``filter_values`` so list templates that
-    # render their own inline filter sidebar can read all active values
-    # in one place without unpacking each ``selected_*`` variable.
-    for fname, fvalue in filter_values.items():
-        context[f"selected_{fname}"] = fvalue
-    context["filter_values"] = filter_values
-    declared = spec.declared_filters
-    # `filters` stays for any legacy template still reading it.
-    context["filters"] = declared
-    # Active filter descriptors — each is `{name, value, label}`. The
-    # toolbar's filter link inlines a short summary of these
-    # (``Type: Seeking, Description: needle, +2 more filters``); when
-    # the list is empty, the link reads ``filters`` instead.
-    # Multi-value filters fan out (one descriptor per selected value).
-    context["active_filters"] = _active_filter_descriptors(declared, filter_values)
-    context["active_filter_count"] = len(context["active_filters"])
-    # Search-link URL forwards the current query string so the search
-    # page renders its form pre-populated. Only set when the spec opts
-    # into `routes.search`.
-    if spec.routes.search:
-        from urllib.parse import urlencode
-
-        from src.framework.rendering.labels import filter_label_for
-
-        active_pairs: list[tuple[str, str]] = []
-        for fname, fvalue in filter_values.items():
-            if fvalue is None or fvalue == "" or fvalue == []:
-                continue
-            if isinstance(fvalue, list):
-                for one in fvalue:
-                    active_pairs.append((fname, str(one)))
-            else:
-                active_pairs.append((fname, str(fvalue)))
-        qs = urlencode(active_pairs)
-        base = f"/{spec.url_collection}/search"
-        context["search_url"] = f"{base}?{qs}" if qs else base
-        # `filter_heading` is the canonical "Filter <plural>" string the
-        # toolbar's filter link reads when no filters are applied, and
-        # the search page's H1 reads on its own. Same helper feeds both
-        # surfaces — see `src/framework/rendering/labels.py`.
-        context["filter_heading"] = filter_label_for(spec)
-    else:
-        context["search_url"] = None
-        context["filter_heading"] = None
-
-    # Spec-declared constants — same merge precedence as handle_detail.
-    if spec.static_context:
-        context.update(spec.static_context)
-
-    if extras is not None:
-        extras_kwargs: dict[str, Any] = {
-            "items": items,
-            "request": request,
-            "requesting_user": requesting_user,
-            "filter_values": filter_values,
-        }
-        if extra_kwargs:
-            extras_kwargs.update(extra_kwargs)
-        context.update(await extras(**extras_kwargs))
-
-    return context
-
-
-def make_list_handler(
-    spec: EntitySpec,
-    *,
-    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
-    extra_repos: tuple[tuple[str, type], ...] = (),
-):
-    return _make_factory_handler(
-        spec, _LIST_SHAPE, handle_list, extras=extras, extra_repos=extra_repos
-    )
+def __getattr__(name: str) -> Any:
+    """Lazy re-export: resolve public handler symbols on first access."""
+    symbols = _lazy_imports()
+    if name in symbols:
+        return symbols[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -5,10 +5,16 @@ Lives below the per-verb files in the dependency graph: each
 specific verb module. Keeps the package free of cycles.
 """
 
-from typing import Any, Awaitable, Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from uuid import UUID
 
 from src.framework.dispatch.mounts._spec import QueryParam, ResourceSpec
+from src.framework.http.exceptions import NotFoundError
+
+if TYPE_CHECKING:
+    from src.framework.dispatch.entity_spec import EntitySpec
 
 
 def normalize_filters(filters: tuple[Any, ...]) -> tuple[QueryParam, ...]:
@@ -209,8 +215,8 @@ def owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[An
 
     Imported on demand to avoid a module-import cycle: this package is
     imported by ``src.framework.dispatch.entity_spec`` (for
-    ``ResourceSpec`` and ``QueryParam``), and ``src.framework.dispatch.
-    handlers`` imports ``EntitySpec``. Doing the import inside
+    ``ResourceSpec`` and ``QueryParam``), and the per-verb mount modules
+    import ``EntitySpec``. Doing the import inside
     ``mount_entity``'s owned-subentity branch breaks the cycle — by the
     time we reach this code at runtime, the logic module has finished
     initializing.
@@ -220,15 +226,15 @@ def owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[An
     per-kind ``create_template`` and the spec-injected ``?kind=``
     query param to pick the template at request time.
     """
-    from src.framework.dispatch.handlers import (
-        make_create_handler,
-        make_delete_handler,
-        make_detail_handler,
+    from src.framework.dispatch.mounts.create import make_create_handler
+    from src.framework.dispatch.mounts.delete import make_delete_handler
+    from src.framework.dispatch.mounts.detail import make_detail_handler
+    from src.framework.dispatch.mounts.form import (
         make_edit_form_handler,
-        make_list_handler,
         make_new_form_handler,
-        make_update_handler,
     )
+    from src.framework.dispatch.mounts.list_ import make_list_handler
+    from src.framework.dispatch.mounts.update import make_update_handler
 
     return {
         "create": make_create_handler,
@@ -239,3 +245,32 @@ def owned_factory_makers() -> dict[str, Callable[..., Callable[..., Awaitable[An
         "form_new": make_new_form_handler,
         "list": make_list_handler,
     }
+
+
+def assert_kind_lock(spec: EntitySpec, target: Any) -> None:
+    """For kind-locked / subset-supertype faces, raise 404 when
+    ``target.kind`` is outside the face's bound kind set.
+
+    - Kind-locked (`discriminator_value` set): single allowed value.
+    - Subset-supertype (`discriminator_values` set): subset of allowed
+      values.
+    - Whole-supertype (neither set): no lock; any kind passes.
+
+    Used by detail / update / delete / form_edit on kind-locked or
+    subset-supertype faces so a row of the wrong kind can never be
+    reached via that face's URL family. The whole-supertype face
+    (e.g. ``/posts/{id}``) has no kind-lock and resolves any kind.
+    The 404 surface (rather than 400) keeps the wrong-family URL
+    indistinguishable from a truly-missing row — a stronger boundary
+    than a leaky "exists but wrong family" signal.
+    """
+    if spec.discriminator_value is None and spec.discriminator_values is None:
+        return
+    column = spec.discriminator.column
+    target_kind = getattr(target, column)
+    if spec.discriminator_value is not None:
+        ok = target_kind == spec.discriminator_value
+    else:
+        ok = target_kind in spec.discriminator_values
+    if not ok:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")

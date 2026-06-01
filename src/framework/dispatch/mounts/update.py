@@ -1,18 +1,35 @@
-"""`mount_update` — `PATCH /<collection>/{<id_param>}`."""
+"""`mount_update` — `PATCH /<collection>/{<id_param>}`.
 
-from typing import Any, Awaitable, Callable
+Also owns `handle_update` and `make_update_handler` — the generic
+update handler and its factory, originally in `handlers.py`.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from uuid import UUID
 
 from fastapi import Request
+from pydantic import BaseModel
 
+from src.framework.actor import Actor
+from src.framework.audit.core import mutate
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.mounts._common import (
+    assert_kind_lock,
     call_handler_with,
     parent_path_param_pairs,
     path_segments_under_router,
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
+from src.framework.http.exceptions import BadRequestError, NotFoundError
 from src.framework.http.forms import parse_and_validate_form
 from src.framework.http.responses import updated_response
+from src.framework.persistence.base_repository import BaseRepository
+
+if TYPE_CHECKING:
+    from src.framework.dispatch.entity_spec import EntitySpec
 
 
 def mount_update(
@@ -76,3 +93,125 @@ def mount_update(
         response_builder=response_builder,
     )
     router.patch(path)(route_fn)
+
+
+async def handle_update(
+    spec: EntitySpec,
+    *,
+    target_id: UUID,
+    payload: BaseModel,
+    repo: BaseRepository,
+    audit_repo: AuditRepository,
+    requesting_user: Actor,
+    parent_id: UUID | None = None,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_kwargs: dict[str, Any] | None = None,
+) -> Any:
+    """Generic update handler driven by `spec`.
+
+    `payload_authz` (if supplied) is invoked AFTER the target 404 check
+    and AFTER `write_authz` has run on parent-or-target, and BEFORE the
+    payload is consumed (discriminator dispatch / patch). When the
+    target 404s, the hook is never called — the 404 fires first. See
+    `EntitySpec.payload_authz_path` for the contract."""
+    if spec.audit is None:
+        raise ValueError(
+            f"handle_update: spec {spec.name!r} has no audit binding; "
+            "update operations must be audited."
+        )
+
+    target = await repo.get_by_model_id(spec.model, target_id)
+    if target is None:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    assert_kind_lock(spec, target)
+
+    if spec.parent is not None:
+        if parent_id is None:
+            raise ValueError(
+                f"handle_update: spec {spec.name!r} has parent "
+                f"{spec.parent.name!r} but no parent_id was supplied."
+            )
+        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
+        if parent is None:
+            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        if spec.child_parent_match_attr is not None:
+            attr = spec.child_parent_match_attr
+            if getattr(target, attr) != getattr(parent, attr):
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        else:
+            parent_fk_attr = spec.parent_fk_attr or f"{spec.parent.name}_id"
+            if getattr(target, parent_fk_attr) != parent_id:
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        if spec.write_authz is not None:
+            spec.write_authz(parent, requesting_user, action=f"update this {spec.name}")
+    else:
+        if spec.write_authz is not None:
+            spec.write_authz(target, requesting_user, action=f"update this {spec.name}")
+
+    if payload_authz is not None:
+        await payload_authz(
+            payload=payload,
+            requesting_user=requesting_user,
+            **(payload_authz_kwargs or {}),
+        )
+
+    if spec.discriminator is not None:
+        payload_kind = payload.kind
+        target_kind = getattr(target, spec.discriminator.column)
+        if payload_kind != target_kind:
+            raise BadRequestError(
+                detail=(
+                    f"payload kind {payload_kind!r} does not match {spec.name} "
+                    f"kind {target_kind!r}; kind cannot be changed via PATCH"
+                )
+            )
+        kind_spec = spec.discriminator[target_kind]
+        detail = getattr(target, kind_spec.detail_relationship)
+        # ``model_dump(exclude_unset=True)`` picks up only the fields
+        # the client touched and — via the schema's flatten-on-dump
+        # ``model_serializer`` (post-#451) — re-projects any nested
+        # value-object fields (e.g. ``location: LocationPartial``)
+        # back to the flat column names ``detail_fields`` enumerates.
+        # Restrict to ``detail_fields`` so the discriminator (``kind``)
+        # and any other top-level keys never reach ``repo.patch``.
+        dump = payload.model_dump(exclude_unset=True)
+        update_fields = {f: dump[f] for f in kind_spec.detail_fields if f in dump}
+        async with mutate(
+            repo,
+            audit_repo,
+            actor=requesting_user,
+            target=target,
+            resource=spec.audit,
+            verb="update",
+        ):
+            await repo.patch(detail, **update_fields)
+        return target
+
+    update_fields = payload.model_dump(exclude_unset=True)
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=target,
+        resource=spec.audit,
+        verb="update",
+    ):
+        await repo.patch(target, **update_fields)
+    return target
+
+
+def make_update_handler(
+    spec: EntitySpec,
+    *,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_repos: tuple[tuple[str, type], ...] = (),
+):
+    from src.framework.dispatch.handlers import _UPDATE_SHAPE, _make_factory_handler
+
+    return _make_factory_handler(
+        spec,
+        _UPDATE_SHAPE,
+        handle_update,
+        payload_authz=payload_authz,
+        payload_authz_repos=payload_authz_repos,
+    )

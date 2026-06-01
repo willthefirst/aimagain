@@ -1,17 +1,33 @@
-"""`mount_delete` — `DELETE /<collection>/{<id_param>}`."""
+"""`mount_delete` — `DELETE /<collection>/{<id_param>}`.
 
-from typing import Any, Awaitable, Callable
+Also owns `handle_delete` and `make_delete_handler` — the generic
+delete handler and its factory, originally in `handlers.py`.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from uuid import UUID
 
 from fastapi import status
 
+from src.framework.actor import Actor
+from src.framework.audit.core import mutate
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.mounts._common import (
+    assert_kind_lock,
     call_handler_with,
     parent_path_param_pairs,
     path_segments_under_router,
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
+from src.framework.http.exceptions import ForbiddenError, NotFoundError
 from src.framework.http.responses import deleted_response
+from src.framework.persistence.base_repository import BaseRepository
+
+if TYPE_CHECKING:
+    from src.framework.dispatch.entity_spec import EntitySpec
 
 
 def mount_delete(
@@ -72,3 +88,79 @@ def mount_delete(
     )
 
     router.delete(path, status_code=status.HTTP_204_NO_CONTENT)(route_fn)
+
+
+async def handle_delete(
+    spec: EntitySpec,
+    *,
+    target_id: UUID,
+    repo: BaseRepository,
+    audit_repo: AuditRepository,
+    requesting_user: Actor,
+    parent_id: UUID | None = None,
+) -> None:
+    """Generic delete handler driven by `spec`."""
+    if spec.audit is None:
+        raise ValueError(
+            f"handle_delete: spec {spec.name!r} has no audit binding; "
+            "delete operations must be audited."
+        )
+
+    target = await repo.get_by_model_id(spec.model, target_id)
+    if target is None:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    assert_kind_lock(spec, target)
+
+    # Self-target guard for user-shaped entities — the comparison only
+    # matches when `target.id` IS the requesting user's id (i.e. the row
+    # is a user). For owned resources, target.id is a row UUID, so the
+    # comparison is harmless. See `EntitySpec.delete_forbid_self`.
+    if spec.delete_forbid_self and target.id == requesting_user.id:
+        raise ForbiddenError(
+            detail=f"Cannot delete your own {spec.name} via this endpoint"
+        )
+
+    if spec.parent is not None:
+        if parent_id is None:
+            raise ValueError(
+                f"handle_delete: spec {spec.name!r} has parent "
+                f"{spec.parent.name!r} but no parent_id was supplied."
+            )
+        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
+        if parent is None:
+            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        # Verify the URL's parent id matches the child's logical parent —
+        # otherwise `/parents/A/children/B` would silently mutate a child
+        # owned by parent B. Default convention: child holds `<parent.name>_id`
+        # equal to `parent.id`. Specs with a shared non-parent FK
+        # (e.g. clinician credentials FK to `clinicians.id`) override via
+        # `child_parent_match_attr`.
+        if spec.child_parent_match_attr is not None:
+            attr = spec.child_parent_match_attr
+            if getattr(target, attr) != getattr(parent, attr):
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        else:
+            parent_fk_attr = spec.parent_fk_attr or f"{spec.parent.name}_id"
+            if getattr(target, parent_fk_attr) != parent_id:
+                raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+        if spec.write_authz is not None:
+            spec.write_authz(parent, requesting_user, action=f"delete this {spec.name}")
+    else:
+        if spec.write_authz is not None:
+            spec.write_authz(target, requesting_user, action=f"delete this {spec.name}")
+
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=target,
+        resource=spec.audit,
+        verb="delete",
+    ):
+        await repo.delete(target)
+
+
+def make_delete_handler(spec: EntitySpec):
+    from src.framework.dispatch.handlers import _DELETE_SHAPE, _make_factory_handler
+
+    return _make_factory_handler(spec, _DELETE_SHAPE, handle_delete)
