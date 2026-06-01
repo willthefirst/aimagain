@@ -1,24 +1,25 @@
-"""Verification orchestrator + bespoke trigger endpoint handlers.
+"""NPPES verification pipeline handlers.
 
-Two pipelines + a per-claim cache recompute + an append-only event
-writer. The pipelines (`run_clinician_verification`,
-`run_org_verification`) own NPPES + scoring + persistence; the recompute
-helpers translate the latest event log + denormalized columns into the
-boolean cache the capability predicates read; `record_verification_event`
-appends the non-NPPES transitions from §9 (licensure attestation,
-authority grant/revoke, admin override) so the event history stays a
-single source of truth.
+Two pipelines that own NPPES lookup + scoring + persistence + denorm
+cache write-through.  The per-claim cache recompute helpers
+(`recompute_clinician_claim`, `recompute_org_claim`) and the append-only
+event writer (`record_verification_event`) live in `events.py` — they
+are imported from there by callers outside this pipeline.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any
 from uuid import UUID
 
 import httpx
 
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
+from src.domain.logic.verifications.events import (
+    VERIFICATION_RESOURCE,
+    _now,
+    recompute_clinician_claim,
+    recompute_org_claim,
+)
 from src.domain.logic.verifications.nppes import (
     NppesOrgResult,
     NppesResult,
@@ -27,20 +28,17 @@ from src.domain.logic.verifications.nppes import (
 )
 from src.domain.logic.verifications.oig import oig_check
 from src.domain.logic.verifications.repository import VerificationRepository
-from src.domain.logic.verifications.schema import VerificationRead
 from src.domain.logic.verifications.scoring import (
     Score,
     _name_similarity,
     score_verification,
 )
 from src.domain.models import Clinician, Organization, User, Verification
-from src.framework.audit.core import make_audited_resource, record_audit_for
+from src.framework.audit.core import record_audit_for
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)
-
-VERIFICATION_RESOURCE = make_audited_resource("verification", VerificationRead)
 
 HTTP_TIMEOUT_SECONDS = 10.0
 _NPPES_SKIPPED_FLAG = "nppes_skipped"
@@ -62,12 +60,6 @@ def _clinician_names(clinician: Clinician, owner: User | None) -> tuple[str, str
     if owner is None:
         return ("", "")
     return (owner.username or "", "")
-
-
-def _now() -> datetime:
-    """Single source of "now" for the orchestrator so tests can patch
-    one place if they need deterministic timestamps later."""
-    return datetime.now(timezone.utc)
 
 
 # ---------- Clinician (Claim A) pipeline ---------------------------------
@@ -308,125 +300,3 @@ async def handle_create_org_verification(
             http=http,
             actor_id=requesting_user.id,
         )
-
-
-# ---------- Claim-cache recompute helpers --------------------------------
-
-
-def recompute_clinician_claim(clinician: Clinician) -> None:
-    """Compute `Clinician.clinician_verified` + the timestamp triplet
-    (`verified_at`, `ever_verified_at`, regression detection) from the
-    current `npi_match_status` + the licensure set, then mutate the
-    clinician in place. The caller is responsible for committing the
-    enclosing transaction.
-
-    Claim A requires:
-      1. `npi_match_status == 'matched'`
-      2. at least one `ClinicianLicensure` with `status == 'active'`
-
-    `ever_verified_at` is set on the first transition to True and
-    preserved on regression — that's what powers the once-verified feed
-    retention rule (handoff §7.1).
-    """
-    matched = clinician.npi_match_status == "matched"
-    licensures = getattr(clinician, "licensures", None) or ()
-    has_active_license = any(
-        getattr(lic, "status", None) == "active" for lic in licensures
-    )
-    is_verified_now = matched and has_active_license
-
-    if is_verified_now:
-        if not clinician.clinician_verified:
-            clinician.verified_at = _now()
-        clinician.clinician_verified = True
-        if clinician.ever_verified_at is None:
-            clinician.ever_verified_at = clinician.verified_at or _now()
-    else:
-        clinician.clinician_verified = False
-        # Leave `verified_at` and `ever_verified_at` alone — the
-        # first-ever timestamp is preserved across regressions so the
-        # `can_read_full_feed` retention rule keeps working.
-
-
-def recompute_org_claim(org: Organization) -> None:
-    """Compute `Organization.org_verified` + `verified_at` from the
-    current `npi_match_status`. Symmetric with the Clinician side,
-    minus the licensure consideration (orgs don't hold licenses)."""
-    is_verified_now = org.npi_match_status == "matched"
-    if is_verified_now:
-        if not org.org_verified:
-            org.verified_at = _now()
-        org.org_verified = True
-    else:
-        org.org_verified = False
-
-
-# ---------- Append-only event writer -------------------------------------
-
-
-async def record_verification_event(
-    *,
-    verification_repo: VerificationRepository,
-    audit_repo: AuditRepository,
-    subject_type: str,
-    clinician_id: UUID | None = None,
-    org_id: UUID | None = None,
-    event_type: str,
-    status: str = "verified",
-    evidence: dict[str, Any] | None = None,
-    actor_id: UUID | None,
-) -> Verification:
-    """Single append-only writer for the non-NPPES §9 transitions
-    (`license_attested`, `license_expired`, `authority_proven`,
-    `authority_revoked`, `role_set`, `admin_verify`, `admin_suspend`,
-    `email_confirmed`). Records both a `Verification` row and a matching
-    audit entry in one transaction; the caller is responsible for the
-    enclosing `session.commit()`.
-
-    The NPPES-pipeline writes (`npi_submitted`, `npi_resolved`) go
-    through the dedicated `record_for_*` repository methods invoked
-    inside `run_clinician_verification` / `run_org_verification` instead
-    — they carry NPPES-specific fields (`nppes_result`, `oig_match`,
-    `name_match_score`) the non-NPPES events don't have.
-    """
-    if (clinician_id is None) == (org_id is None):
-        # Mirror the DB-level CHECK in Python so misuses fail loudly
-        # at the handler boundary rather than as a SQLite IntegrityError.
-        raise ValueError(
-            "record_verification_event requires exactly one of " "clinician_id / org_id"
-        )
-
-    if subject_type == "clinician":
-        assert clinician_id is not None  # narrowed by the XOR above
-        verification = await verification_repo.record_for_clinician(
-            clinician_id=clinician_id,
-            status=status,
-            flags=[],
-            nppes_result=None,
-            oig_match=False,
-            name_match_score=None,
-            event_type=event_type,
-            evidence=evidence,
-        )
-    else:
-        assert org_id is not None
-        verification = await verification_repo.record_for_org(
-            org_id=org_id,
-            status=status,
-            flags=[],
-            nppes_result=None,
-            name_match_score=None,
-            event_type=event_type,
-            evidence=evidence,
-        )
-
-    await record_audit_for(
-        audit_repo,
-        resource=VERIFICATION_RESOURCE,
-        verb="create",
-        actor_id=actor_id,
-        target_id=verification.id,
-        before=None,
-        after=VERIFICATION_RESOURCE.snapshot(verification),
-    )
-    return verification
