@@ -324,7 +324,7 @@ async def test_create_post_persists_parent_and_opening_detail(
         assert post_row is not None
         assert post_row.kind == "clinician_opening"
         assert detail_row is not None
-        # Practice name lives on the linked Clinician's primary Affiliation's Organization.
+        # Practice name lives on the linked Clinician's primary ClinicianAffiliation's Organization.
         assert detail_row.clinician_id == clinician.id
         assert detail_row.clinician.org.name == "Acme Health"
 

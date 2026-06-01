@@ -2,7 +2,7 @@
 
 The person behind a directory entry — license-holder, name on NPPES, owner of credentials.
 
-`Clinician` was carved out of `providers` over the `Provider → Clinician + Affiliation` split (issues #629, #635, #642). The credential sub-tables (`clinician_licensure.py`, `clinician_education.py`, `clinician_certification.py` — Python classes `ClinicianLicensure`, `ClinicianEducation`, `ClinicianCertification`) have their FK on `clinicians.id`; credentials are person-level (a license follows the person across affiliations). `Clinician` owns the credential relationships with `cascade="all, delete-orphan"`. See [`../affiliations/README.md`](../affiliations/README.md) for the practice-role side.
+`Clinician` was carved out of `providers` over the `Provider → Clinician + ClinicianAffiliation` split (issues #629, #635, #642). The credential sub-tables (`clinician_licensure.py`, `clinician_education.py`, `clinician_certification.py` — Python classes `ClinicianLicensure`, `ClinicianEducation`, `ClinicianCertification`) have their FK on `clinicians.id`; credentials are person-level (a license follows the person across affiliations). `Clinician` owns the credential relationships with `cascade="all, delete-orphan"`. See [`../clinician_affiliations/README.md`](../clinician_affiliations/README.md) for the practice-role side.
 
 ## Model-vs-UI vocabulary
 
@@ -10,7 +10,7 @@ This `Clinician` class is the **directory entry**: the row that `/clinicians/...
 
 ## Files
 
-- `clinician.py` — `Clinician`. Holds `npi` (`Text`, nullable; `ck_clinicians_npi_format` CHECK enforces NULL or exactly 10 ASCII digits — defense-in-depth behind the Pydantic `_validate_npi`). Owns the credential lists: `clinician.licensures` / `.educations` / `.certifications` (`cascade="all, delete-orphan"`, `lazy="selectin"`). Also owns `clinician.affiliations` (the per-(clinician × org) role rows). The NPPES verification pipeline reads `clinician.npi` directly.
+- `clinician.py` — `Clinician`. Holds `npi` (`Text`, nullable; `ck_clinicians_npi_format` CHECK enforces NULL or exactly 10 ASCII digits — defense-in-depth behind the Pydantic `_validate_npi`). Owns the credential lists: `clinician.licensures` / `.educations` / `.certifications` (`cascade="all, delete-orphan"`, `lazy="selectin"`). Also owns `clinician.clinician_affiliations` (the per-(clinician × org) role rows). The NPPES verification pipeline reads `clinician.npi` directly.
 - `clinician_licensure.py` — `ClinicianLicensure`. One row per professional license. FK `clinician_id` → `clinicians.id` (CASCADE). `license_type` CHECKs against `LICENSE_TYPES`; `issuing_state` CHECKs against `US_STATES`.
 - `clinician_education.py` — `ClinicianEducation`. One row per educational credential. FK `clinician_id` → `clinicians.id` (CASCADE). `education_type` CHECKs against `EDUCATION_TYPES`. `month_completed` stores `"YYYY-MM"` text.
 - `clinician_certification.py` — `ClinicianCertification`. One row per professional certification. FK `clinician_id` → `clinicians.id` (CASCADE). `certification_type` CHECKs against `CERTIFICATION_TYPES`.
@@ -27,4 +27,4 @@ This `Clinician` class is the **directory entry**: the row that `/clinicians/...
 
 ## Why a separate cluster
 
-A `Clinician` is *the person*; an `Affiliation` is *the person's role at one practice*. Separating them lets credentials live with the person (so adding a second affiliation doesn't fragment a license list) and lets per-(clinician × org) attributes vary independently across affiliations.
+A `Clinician` is *the person*; an `ClinicianAffiliation` is *the person's role at one practice*. Separating them lets credentials live with the person (so adding a second affiliation doesn't fragment a license list) and lets per-(clinician × org) attributes vary independently across affiliations.

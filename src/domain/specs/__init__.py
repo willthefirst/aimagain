@@ -18,8 +18,8 @@ and the audit-drift guard — they iterate this tuple.
 
 from src.framework.dispatch.entity_spec import EntitySpec
 
-from .affiliation import AFFILIATION_ENTITY
 from .clinician import CLINICIAN_ENTITY
+from .clinician_affiliation import CLINICIAN_AFFILIATION_ENTITY
 from .clinician_certification import CERTIFICATION_ENTITY
 from .clinician_education import EDUCATION_ENTITY
 from .clinician_licensure import LICENSURE_ENTITY
@@ -35,7 +35,7 @@ ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
     POST_ENTITY,
     PROGRAM_ENTITY,
     CLINICIAN_ENTITY,
-    AFFILIATION_ENTITY,
+    CLINICIAN_AFFILIATION_ENTITY,
     CERTIFICATION_ENTITY,
     EDUCATION_ENTITY,
     LICENSURE_ENTITY,
@@ -45,7 +45,7 @@ ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
 )
 
 __all__ = [
-    "AFFILIATION_ENTITY",
+    "CLINICIAN_AFFILIATION_ENTITY",
     "ALL_ENTITY_SPECS",
     "CERTIFICATION_ENTITY",
     "CLINICIAN_ENTITY",

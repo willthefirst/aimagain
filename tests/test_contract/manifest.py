@@ -126,7 +126,7 @@ CONTRACT_PAIRS: list[ContractPair] = [
     # `sliding_scale`, `cost`) write through Clinician per-role property
     # proxies to the primary (oldest) affiliation row — the wire shape
     # is unchanged. The sub-resource PATCH endpoint
-    # `PATCH /clinicians/{id}/affiliations/{aff_id}` exists but has no
+    # `PATCH /clinicians/{id}/clinician_affiliations/{aff_id}` exists but has no
     # consumer UI today, so it is intentionally not contract-tested.
     ContractPair(
         consumer_name="clinician-edit-form",

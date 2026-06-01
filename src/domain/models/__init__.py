@@ -5,7 +5,7 @@
 from src.framework.audit.log import AuditLog  # noqa: F401
 from src.framework.persistence.base_model import Base, BaseModel, metadata
 
-from .affiliations.affiliation import Affiliation
+from .clinician_affiliations.clinician_affiliation import ClinicianAffiliation
 from .clinicians.clinician import Clinician
 from .clinicians.clinician_certification import ClinicianCertification
 from .clinicians.clinician_education import ClinicianEducation
@@ -38,7 +38,7 @@ from .verifications.verification import Verification
 __all__ = [
     "Base",
     "BaseModel",
-    "Affiliation",
+    "ClinicianAffiliation",
     "CLIENT_AGE_GROUPS",
     "Clinician",
     "ReferralDetail",

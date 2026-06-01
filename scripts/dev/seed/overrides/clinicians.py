@@ -1,4 +1,4 @@
-"""Clinician + Affiliation overrides.
+"""Clinician + ClinicianAffiliation overrides.
 
 Cardinality:
   - CLINICIAN_COUNT Clinicians, each with `owner_id` assigned from the
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.models import Affiliation, Clinician, Organization, User
+from src.domain.models import Clinician, ClinicianAffiliation, Organization, User
 from src.domain.models.enums import (
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
@@ -108,21 +108,21 @@ def _city_for_state(rng: SeededRandom, state: str) -> str:
     return rng.choice(cities)
 
 
-@register(Affiliation)
+@register(ClinicianAffiliation)
 async def generate_affiliations(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
-) -> list[Affiliation]:
+) -> list[ClinicianAffiliation]:
     clinicians: list[Clinician] = pool.all("clinicians")
     orgs: list[Organization] = pool.all("organizations")
 
-    out: list[Affiliation] = []
+    out: list[ClinicianAffiliation] = []
     aff_index = 0
     for i, clinician in enumerate(clinicians):
         # Primary affiliation — deterministic ID keyed (clinician, 0).
-        primary_id = deterministic_uuid("Affiliation", i, 0)
+        primary_id = deterministic_uuid("ClinicianAffiliation", i, 0)
         kwargs = _affiliation_kwargs(rng, aff_index)
         kwargs["location_city"] = _city_for_state(rng, kwargs["location_state"])
-        primary = Affiliation(
+        primary = ClinicianAffiliation(
             id=primary_id,
             clinician_id=clinician.id,
             org_id=orgs[i % len(orgs)].id,
@@ -134,11 +134,11 @@ async def generate_affiliations(
 
         # ~25% of clinicians get a second affiliation at a different org.
         if rng.bool(counts.CLINICIAN_MULTI_AFFILIATION_RATE):
-            secondary_id = deterministic_uuid("Affiliation", i, 1)
+            secondary_id = deterministic_uuid("ClinicianAffiliation", i, 1)
             other_org = orgs[(i + 7) % len(orgs)]  # +7 to avoid same-org
             kwargs2 = _affiliation_kwargs(rng, aff_index)
             kwargs2["location_city"] = _city_for_state(rng, kwargs2["location_state"])
-            secondary = Affiliation(
+            secondary = ClinicianAffiliation(
                 id=secondary_id,
                 clinician_id=clinician.id,
                 org_id=other_org.id,

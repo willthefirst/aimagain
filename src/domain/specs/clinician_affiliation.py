@@ -1,7 +1,7 @@
-"""`AFFILIATION_ENTITY`: clinician × org practice-role sub-resource of Clinician.
+"""`CLINICIAN_AFFILIATION_ENTITY`: clinician × org practice-role sub-resource of Clinician.
 
 Owned subentity of Clinician. Routes nest under
-``/clinicians/{clinician_id}/affiliations/{affiliation_id}``. The
+``/clinicians/{clinician_id}/clinician_affiliations/{affiliation_id}``. The
 clinician edit page surfaces them as an inline list (same UX pattern
 as licensures — see `src/domain/specs/clinician_licensure.py`); each row
 is independently created, updated, or deleted via the framework's
@@ -16,13 +16,15 @@ a UNIQUE constraint on the FK column.
 
 from typing import Final
 
-from src.domain.logic.affiliations.repository import get_affiliation_repository
-from src.domain.logic.affiliations.schema import (
-    AffiliationCreate,
-    AffiliationRead,
-    AffiliationUpdate,
+from src.domain.logic.clinician_affiliations.repository import (
+    get_clinician_affiliation_repository,
 )
-from src.domain.models import Affiliation
+from src.domain.logic.clinician_affiliations.schema import (
+    ClinicianAffiliationCreate,
+    ClinicianAffiliationRead,
+    ClinicianAffiliationUpdate,
+)
+from src.domain.models import ClinicianAffiliation
 from src.domain.specs.clinician import CLINICIAN_ENTITY, _clinician_form_redirect
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
@@ -31,22 +33,22 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
 )
 
-AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
-    name="affiliation",
-    url_collection="affiliations",
-    id_param="affiliation_id",
-    model=Affiliation,
+CLINICIAN_AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
+    name="clinician_affiliation",
+    url_collection="clinician_affiliations",
+    id_param="clinician_affiliation_id",
+    model=ClinicianAffiliation,
     parent=CLINICIAN_ENTITY,
     # Default check compares `affiliation.clinician_id == parent.id`
     # (derived from `spec.parent.name` = "clinician"). That is exactly
     # the FK we have after removing `affiliations.provider_id`. No
     # override needed.
-    repo_dep=get_affiliation_repository,
+    repo_dep=get_clinician_affiliation_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
-    create_adapter=AffiliationCreate,
-    update_adapter=AffiliationUpdate,
-    read_schema=AffiliationRead,
+    create_adapter=ClinicianAffiliationCreate,
+    update_adapter=ClinicianAffiliationUpdate,
+    read_schema=ClinicianAffiliationRead,
     # Sub-row CRUD only — affiliations are managed inline on the
     # parent clinician's edit page; no independent list/detail surface.
     routes=RouteSet(create=True, update=True, delete=True),

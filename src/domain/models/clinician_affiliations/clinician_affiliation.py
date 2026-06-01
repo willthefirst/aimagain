@@ -9,11 +9,11 @@ from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import LOCATION_AVAILABILITY_OPTIONS, US_STATES, named_check_in
 
-_TABLE = "affiliations"
+_TABLE = "clinician_affiliations"
 _ck = partial(named_check_in, _TABLE)
 
 
-class Affiliation(LocationMixin, BaseModel):
+class ClinicianAffiliation(LocationMixin, BaseModel):
     """The clinician's role at one organization.
 
     Holds the practice-role attributes that vary per (clinician × org):
@@ -21,6 +21,12 @@ class Affiliation(LocationMixin, BaseModel):
     Person attributes (npi, credentials) live on `Clinician`; org
     metadata lives on `Organization`. A clinician may hold multiple
     affiliations (one per org/role instance).
+
+    Distinct from `OrgRepresentation` (User↔Org authority for Claim B
+    of the two-claim verification model). The relationship attribute
+    on `Clinician` stays `affiliations` since "the clinician's
+    affiliations" reads naturally; only the model class + table got
+    the disambiguating `Clinician` prefix.
     """
 
     __tablename__ = _TABLE
@@ -36,7 +42,7 @@ class Affiliation(LocationMixin, BaseModel):
         nullable=False,
     )
     clinician = relationship(
-        "Clinician", back_populates="affiliations", lazy="selectin"
+        "Clinician", back_populates="clinician_affiliations", lazy="selectin"
     )
 
     org_id = Column(

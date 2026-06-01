@@ -136,8 +136,8 @@ async def read_home(
     )
 
     network_filter_chips = []
-    if p and p.primary_affiliation:
-        aff = p.primary_affiliation
+    if p and p.primary_clinician_affiliation:
+        aff = p.primary_clinician_affiliation
         if aff.location_city:
             network_filter_chips.append(aff.location_city)
         if aff.in_network_carriers:

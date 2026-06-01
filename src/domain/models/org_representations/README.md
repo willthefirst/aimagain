@@ -2,11 +2,11 @@
 
 `OrgRepresentation` carries **Claim B** in the two-claim verification model: the User-↔-Organization link with authority semantics.
 
-## Why this isn't `Affiliation`
+## Why this isn't `ClinicianAffiliation`
 
 Both rows have a FK to `organizations.id`. They are not the same:
 
-| | `Affiliation` (`clinician_affiliations` someday) | `OrgRepresentation` |
+| | `ClinicianAffiliation` (`clinician_affiliations` someday) | `OrgRepresentation` |
 |---|---|---|
 | Subject | `Clinician` | `User` |
 | Carries | practice attrs (location, insurance, modality, sliding-scale, cost) | authority (role, authority_method, authority_status, approver) |

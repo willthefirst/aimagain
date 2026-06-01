@@ -63,7 +63,7 @@
   {% endif %}
 {% endblock %}
 {# Detail page uses stacked sections:
-   1. Affiliation cards — one per row in `view.affiliations`.
+   1. ClinicianAffiliation cards — one per row in `view.clinician_affiliations`.
    2. Credentials (licensures, educations, certifications) — person-level,
       shared across every affiliation, rendered once.
    `clinician_card_view` / `affiliation_card_view` collapse field references
@@ -73,14 +73,14 @@
    and the `subtitle` block above carries NPI. The page starts straight
    into the affiliation cards.
 
-   Stacked affiliation cards — one per row in `clinician.affiliations`.
+   Stacked affiliation cards — one per row in `clinician.clinician_affiliations`.
    Reads as "At <Org A>: ... · At <Org B>: ...". Each card links its
    heading to the owning Organization so the cross-resource navigation
    the old (single-card) layout exposed via the "Organization" facts
    row still works. The directory listing (`list.html`) is unchanged
    — it continues to read `view.practice_name` / the flat per-role
    keys off the primary affiliation; #642 PR 3 rolls it up. #}
-  {% for aff in view.affiliations %}
+  {% for aff in view.clinician_affiliations %}
     <article class="entity-card"
              data-testid="affiliation-card"
              data-affiliation-org-id="{{ aff.org_id }}">

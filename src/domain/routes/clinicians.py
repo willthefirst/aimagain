@@ -1,5 +1,7 @@
-from src.domain.specs.affiliation import AFFILIATION_ENTITY  # noqa: F401
 from src.domain.specs.clinician import CLINICIAN_ENTITY
+from src.domain.specs.clinician_affiliation import (  # noqa: F401
+    CLINICIAN_AFFILIATION_ENTITY,
+)
 from src.domain.specs.clinician_certification import CERTIFICATION_ENTITY  # noqa: F401
 from src.domain.specs.clinician_education import EDUCATION_ENTITY  # noqa: F401
 from src.domain.specs.clinician_licensure import LICENSURE_ENTITY  # noqa: F401

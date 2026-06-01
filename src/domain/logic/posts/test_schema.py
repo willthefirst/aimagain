@@ -664,7 +664,7 @@ def test_audit_snapshot_for_opening_post():
     assert snap["owner_id"] == str(owner_id)
     # The audit row records the FK to the Clinician, not the
     # dereferenced practice fields. Practice-name/location/sessions live
-    # on Clinician's Affiliation — snapshotted via that entity's audit path.
+    # on Clinician's ClinicianAffiliation — snapshotted via that entity's audit path.
     assert snap["clinician_id"] == detail_attrs["clinician_id"]
     assert "sliding_scale" not in snap
     assert "payment_situation" not in snap

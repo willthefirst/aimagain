@@ -172,12 +172,12 @@ def can_post_program_intake(user: Any, org: Any) -> bool:
 
 def can_post_org_referral(user: Any, org: Any, clinician: Any) -> bool:
     """Posting an org-attributed referral requires Claim B for the org
-    AND the target clinician must have an active Affiliation to the org
+    AND the target clinician must have an active ClinicianAffiliation to the org
     (handoff §4.3 / §10.5)."""
     if not org_rep_verified(user, org):
         return False
     org_id = getattr(org, "id", None)
-    affiliations = getattr(clinician, "affiliations", None) or ()
+    affiliations = getattr(clinician, "clinician_affiliations", None) or ()
     return any(getattr(a, "org_id", None) == org_id for a in affiliations)
 
 

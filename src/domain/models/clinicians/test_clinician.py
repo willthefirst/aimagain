@@ -88,11 +88,11 @@ async def test_clinician_construct_without_npi_stores_none():
 async def test_clinician_construct_with_existing_affiliation_skips_auto_create():
     """When the caller hands in existing affiliations, the constructor
     must NOT clobber them with a fresh one."""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     user = _make_user("carol")
     org = _make_org("Acme", user.id)
-    existing = Affiliation(
+    existing = ClinicianAffiliation(
         clinician_id=uuid.uuid4(),
         org_id=org.id,
         in_person_sessions="yes",
@@ -107,9 +107,9 @@ async def test_clinician_construct_with_existing_affiliation_skips_auto_create()
     clinician = Clinician(
         owner_id=user.id,
         npi="9876543210",
-        affiliations=[existing],
+        clinician_affiliations=[existing],
     )
-    assert clinician.affiliations == [existing]
+    assert clinician.clinician_affiliations == [existing]
     assert clinician.npi == "9876543210"
 
 
