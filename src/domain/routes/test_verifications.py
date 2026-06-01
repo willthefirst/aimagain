@@ -326,3 +326,182 @@ async def test_org_npi_submit_owner_flips_to_pending(
             .all()
         )
         assert len(events) == 1
+
+
+# --- License attestation -------------------------------------------------
+
+
+async def _seed_clinician_with_licensure(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    owner_id: uuid.UUID,
+    *,
+    npi_match_status: str = "matched",
+    licensure_status: str = "pending",
+    expiration_in_past: bool = False,
+):
+    """Seed a clinician + matching licensure with the row state needed
+    to exercise the attestation flow's claim-cache recompute."""
+    from datetime import date, timedelta
+
+    from src.domain.models import ClinicianLicensure
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(
+                owner_id=owner_id, npi="1234567890", first_name="Jane", last_name="Doe"
+            )
+            clinician.npi_match_status = npi_match_status
+            session.add(clinician)
+        clinician_id = clinician.id
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            licensure = ClinicianLicensure(
+                clinician_id=clinician_id,
+                license_type="lcsw",
+                license_number="X-1",
+                issuing_state="IL",
+                status=licensure_status,
+                expiration_date=(
+                    date.today() - timedelta(days=30)
+                    if expiration_in_past
+                    else date.today() + timedelta(days=365)
+                ),
+            )
+            session.add(licensure)
+        licensure_id = licensure.id
+    return clinician_id, licensure_id
+
+
+async def test_license_attest_flips_to_active_and_updates_claim_cache(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Attesting a licensure on a clinician whose NPI is already matched
+    flips the Claim-A cache to True via `recompute_clinician_claim`."""
+    from src.domain.models import Clinician, ClinicianLicensure
+
+    clinician_id, licensure_id = await _seed_clinician_with_licensure(
+        db_test_session_manager,
+        logged_in_user.id,
+        npi_match_status="matched",
+        licensure_status="pending",
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+
+    async with db_test_session_manager() as session:
+        loaded_lic = await session.get(ClinicianLicensure, licensure_id)
+        assert loaded_lic.attested_active is True
+        assert loaded_lic.attested_at is not None
+        assert loaded_lic.status == "active"
+
+        loaded_clin = await session.get(Clinician, clinician_id)
+        # NPI matched + license active → claim flips.
+        assert loaded_clin.clinician_verified is True
+        assert loaded_clin.ever_verified_at is not None
+
+
+async def test_license_attest_expired_keeps_status_expired(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Re-attesting a licensure whose `expiration_date` is in the past
+    still sets `attested_active=True` but `status` stays `expired` —
+    the attestation flag and the date both have to be valid for an
+    "active" cache. (Future: the worker can mark these `active` once
+    the user updates the expiration_date.)"""
+    from src.domain.models import ClinicianLicensure
+
+    clinician_id, licensure_id = await _seed_clinician_with_licensure(
+        db_test_session_manager,
+        logged_in_user.id,
+        expiration_in_past=True,
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    )
+    assert response.status_code == 200
+    async with db_test_session_manager() as session:
+        loaded = await session.get(ClinicianLicensure, licensure_id)
+        assert loaded.attested_active is True
+        assert loaded.status == "expired"
+
+
+async def test_license_attest_records_verification_event(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A `Verification` event of type `license_attested` is appended in
+    the same transaction — the event log is the source of truth for
+    "this attestation happened at time T."""
+    from src.domain.models import Verification
+
+    clinician_id, licensure_id = await _seed_clinician_with_licensure(
+        db_test_session_manager, logged_in_user.id
+    )
+    await authenticated_client.post(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    )
+    async with db_test_session_manager() as session:
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.clinician_id == clinician_id,
+                        Verification.event_type == "license_attested",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
+        assert events[0].evidence["licensure_id"] == str(licensure_id)
+
+
+async def test_license_attest_non_owner_403(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    other_owner = create_test_user(username=f"o-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other_owner)
+    clinician_id, licensure_id = await _seed_clinician_with_licensure(
+        db_test_session_manager, other_owner.id
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/licensures/{licensure_id}/attest"
+    )
+    assert response.status_code == 403
+
+
+async def test_license_attest_404_when_licensure_belongs_to_other_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """If the URL's clinician_id and licensure_id don't match (the
+    licensure belongs to someone else's clinician), respond 404 — not
+    403, to avoid leaking that the licensure exists at all."""
+    clinician_id_a, _ = await _seed_clinician_with_licensure(
+        db_test_session_manager, logged_in_user.id
+    )
+    other_owner = create_test_user(username=f"o-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other_owner)
+    _, licensure_id_b = await _seed_clinician_with_licensure(
+        db_test_session_manager, other_owner.id
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id_a}/licensures/{licensure_id_b}/attest"
+    )
+    assert response.status_code == 404
