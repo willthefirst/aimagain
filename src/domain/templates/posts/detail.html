@@ -25,14 +25,18 @@
 {% block content %}
   <section class="entity-card" data-kind="{{ post.kind }}">
     {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
-    {{ facts_block(view, expanded=True) }}
+    {{ facts_block(view, expanded=True, redacted=not can_read_full_feed) }}
     {%- if view.referral %}{{ how_to_refer(view) }}{%- endif %}
       <footer>
-        <a href="mailto:{{ post.owner.email }}"
-           target="_blank"
-           rel="noopener noreferrer"
-           role="button"
-           class="secondary outline">Email</a>
+        {% if can_read_full_feed %}
+          <a href="mailto:{{ post.owner.email }}"
+             target="_blank"
+             rel="noopener noreferrer"
+             role="button"
+             class="secondary outline">Email</a>
+        {% else %}
+          <a href="/profile" role="button" class="secondary outline">Verify to contact →</a>
+        {% endif %}
       </footer>
     </section>
   {% endblock %}

@@ -17,6 +17,15 @@
   {%- set _empty %}{{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
     link_href=entity_url("post") if active_filter_count else none
     ) }}{%- endset %}
+    {% if not can_read_full_feed %}
+      <p id="posts-verify-notice"
+         style="font-size: 0.875rem;
+                color: var(--pico-muted-color);
+                margin-bottom: 1rem">
+        Clinician names and contact details are hidden until you verify.
+        <a href="/profile">Complete verification →</a>
+      </p>
+    {% endif %}
     <div class="posts-browse-layout">
       <aside class="posts-filter-sidebar">
         <hgroup>
