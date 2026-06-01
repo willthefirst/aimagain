@@ -54,7 +54,7 @@ which FastAPI/Pydantic parses as a list.
        occurrence so the dropdown's displayed selection is stable. #}
     {%- set _practices = namespace(opts=[]) -%}
     {%- for c in current_user.clinicians -%}
-      {%- for aff in c.affiliations -%}
+      {%- for aff in c.clinician_affiliations -%}
         {%- set _practices.opts = _practices.opts + [(c.id, aff.org.name)] -%}
       {%- endfor -%}
     {%- endfor -%}

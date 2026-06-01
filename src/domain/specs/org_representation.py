@@ -1,10 +1,10 @@
 """`ORG_REPRESENTATION_ENTITY`: User↔Org authority carrier — Claim B.
 
 Per handoff §5.3 and the OrgRepresentation README, this is **not**
-`Affiliation`. The two co-exist on the same `Organization` and serve
+`ClinicianAffiliation`. The two co-exist on the same `Organization` and serve
 different purposes:
 
-- `Affiliation` = Clinician↔Org practice attrs (insurance, modality).
+- `ClinicianAffiliation` = Clinician↔Org practice attrs (insurance, modality).
 - `OrgRepresentation` = User↔Org authority (role, method, status).
 
 Routes mount as `/org_representations/{id}` (no subresource nesting —

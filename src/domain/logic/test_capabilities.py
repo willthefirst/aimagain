@@ -45,7 +45,12 @@ def _clinician(
         npi=npi,
         clinician_verified=clinician_verified,
         ever_verified_at=ever_verified_at,
-        affiliations=affiliations or [],
+        # The relationship attribute on `Clinician` is
+        # `clinician_affiliations` after the Phase-7-cleanup rename;
+        # the keyword arg here keeps the test-author-facing name short
+        # but the stub exposes the renamed attribute the predicate
+        # reads.
+        clinician_affiliations=affiliations or [],
     )
 
 
@@ -330,7 +335,7 @@ def test_can_post_program_intake_requires_claim_b_for_target_org():
 
 def test_can_post_org_referral_requires_clinician_affiliation():
     """Per handoff §10.5: org-attributed referrals require the target
-    clinician to have an active Affiliation to the org. Claim B alone
+    clinician to have an active ClinicianAffiliation to the org. Claim B alone
     is not enough — the org must be allowed to speak for the clinician
     in question."""
     org = _org(org_verified=True)

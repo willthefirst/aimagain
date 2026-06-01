@@ -12,7 +12,7 @@ class OpeningDetail(Base):
 
     Per-announcement fields live here. Practice-role attributes (location,
     insurance, modality) are on the linked `Clinician`'s primary
-    `Affiliation`; this row carries only fields that are per-announcement,
+    `ClinicianAffiliation`; this row carries only fields that are per-announcement,
     not steady-state practice properties.
     """
 

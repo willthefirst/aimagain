@@ -1,4 +1,4 @@
-"""Smoke tests for :class:`AffiliationRepository`.
+"""Smoke tests for :class:`ClinicianAffiliationRepository`.
 
 The repository is a thin shell over ``BaseRepository``; these tests
 pin that it actually registers with the FastAPI dependency machinery
@@ -18,11 +18,11 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from src.domain.logic.affiliations.repository import (
-    AffiliationRepository,
-    get_affiliation_repository,
+from src.domain.logic.clinician_affiliations.repository import (
+    ClinicianAffiliationRepository,
+    get_clinician_affiliation_repository,
 )
-from src.domain.models import Affiliation, Clinician, Organization, User
+from src.domain.models import Clinician, ClinicianAffiliation, Organization, User
 from src.framework.persistence.dependencies import (
     UnknownRepoTypeError,
     resolver_for,
@@ -36,23 +36,23 @@ async def session(db_test_session_manager: async_sessionmaker):
 
 
 def test_repository_registers_with_dispatch_registry():
-    """`register_repository(AffiliationRepository)` adds the class to
+    """`register_repository(ClinicianAffiliationRepository)` adds the class to
     the type → resolver registry so the framework's
-    `resolver_for(AffiliationRepository)` injection path succeeds for
+    `resolver_for(ClinicianAffiliationRepository)` injection path succeeds for
     the sub-resource handlers."""
     try:
-        resolver = resolver_for(AffiliationRepository)
+        resolver = resolver_for(ClinicianAffiliationRepository)
     except UnknownRepoTypeError as exc:
         pytest.fail(str(exc))
-    # `get_affiliation_repository` is the public binding the spec uses.
-    assert resolver is get_affiliation_repository
+    # `get_clinician_affiliation_repository` is the public binding the spec uses.
+    assert resolver is get_clinician_affiliation_repository
 
 
 @pytest.mark.asyncio
 async def test_repository_creates_and_fetches_affiliation(session):
     """End-to-end repo smoke: persist a Clinician (which auto-creates
-    one Affiliation via `Clinician.__init__`), then create a second
-    Affiliation through the repo and fetch both back."""
+    one ClinicianAffiliation via `Clinician.__init__`), then create a second
+    ClinicianAffiliation through the repo and fetch both back."""
     user_id = uuid.uuid4()
     user = User(
         id=user_id,
@@ -95,8 +95,8 @@ async def test_repository_creates_and_fetches_affiliation(session):
     session.add_all([user, org_a, org_b, clinician])
     await session.flush()
 
-    repo = AffiliationRepository(session)
-    new_aff = Affiliation(
+    repo = ClinicianAffiliationRepository(session)
+    new_aff = ClinicianAffiliation(
         clinician_id=clinician.id,
         org_id=org_b_id,
         location_city="Manhattan",
@@ -112,7 +112,7 @@ async def test_repository_creates_and_fetches_affiliation(session):
     persisted = await repo.create(new_aff)
     assert persisted.id is not None
 
-    fetched = await repo.get_by_model_id(Affiliation, persisted.id)
+    fetched = await repo.get_by_model_id(ClinicianAffiliation, persisted.id)
     assert fetched is not None
     assert fetched.org_id == org_b_id
     assert fetched.sliding_scale is True

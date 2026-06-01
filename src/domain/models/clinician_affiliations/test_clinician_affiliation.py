@@ -1,4 +1,4 @@
-"""Model-layer tests for :class:`Affiliation` and the 1:1 link to
+"""Model-layer tests for :class:`ClinicianAffiliation` and the 1:1 link to
 :class:`Clinician`.
 """
 
@@ -10,7 +10,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from src.domain.models import Affiliation, Clinician, Organization, User
+from src.domain.models import Clinician, ClinicianAffiliation, Organization, User
 
 
 def _make_user(username: str) -> User:
@@ -62,19 +62,19 @@ async def session(db_test_session_manager: async_sessionmaker):
 
 @pytest.mark.asyncio
 async def test_clinician_construct_auto_creates_affiliation_with_per_role_attrs():
-    """The Clinician constructor pre-populates a transient Affiliation
+    """The Clinician constructor pre-populates a transient ClinicianAffiliation
     with the same per-role attributes so the framework's generic create
     handler — which builds the model via
     `spec.model(**payload.model_dump())` — keeps producing rows that
-    reads can navigate to via `clinician.primary_affiliation`.
+    reads can navigate to via `clinician.primary_clinician_affiliation`.
     The transient row is the first / primary affiliation for the
     Clinician; additional affiliations can be added later via the inline
     list on the edit page."""
     user = _make_user("alice")
     org = _make_org("Acme", user.id)
     clinician = _make_clinician(owner=user, org=org)
-    assert len(clinician.affiliations) == 1
-    aff = clinician.primary_affiliation
+    assert len(clinician.clinician_affiliations) == 1
+    aff = clinician.primary_clinician_affiliation
     assert aff is not None
     assert aff.org_id == org.id
     assert aff.in_person_sessions == "yes"
@@ -86,7 +86,7 @@ async def test_clinician_construct_auto_creates_affiliation_with_per_role_attrs(
     assert aff.location_city == "Brooklyn"
     assert aff.location_state == "NY"
     assert aff.location_zip == "11201"
-    # Affiliation shares the Clinician directly.
+    # ClinicianAffiliation shares the Clinician directly.
     assert aff.clinician is clinician
 
 
@@ -95,7 +95,7 @@ async def test_clinician_construct_with_existing_affiliations_skips_auto_create(
     """Test fixtures wiring the join manually must not be clobbered."""
     user = _make_user("bob")
     org = _make_org("Acme", user.id)
-    existing = Affiliation(
+    existing = ClinicianAffiliation(
         clinician_id=uuid.uuid4(),
         org_id=org.id,
         in_person_sessions="yes",
@@ -104,16 +104,16 @@ async def test_clinician_construct_with_existing_affiliations_skips_auto_create(
         in_network_carriers=[],
         sliding_scale=False,
     )
-    clinician = _make_clinician(owner=user, org=org, affiliations=[existing])
-    assert clinician.affiliations == [existing]
-    assert clinician.primary_affiliation is existing
+    clinician = _make_clinician(owner=user, org=org, clinician_affiliations=[existing])
+    assert clinician.clinician_affiliations == [existing]
+    assert clinician.primary_clinician_affiliation is existing
 
 
 @pytest.mark.asyncio
 async def test_clinician_per_role_writes_land_on_affiliation():
     """The per-role columns live only on `affiliations`. The `Clinician`
     ORM class exposes each per-role attr as a `@property` whose setter
-    proxies through to `clinician.primary_affiliation`, so the
+    proxies through to `clinician.primary_clinician_affiliation`, so the
     framework's `repo.patch(clinician, location_city='Queens')` (which
     calls `setattr(clinician, ...)`) lands the write directly on the
     primary affiliation row. A Clinician may hold multiple Affiliations
@@ -123,7 +123,7 @@ async def test_clinician_per_role_writes_land_on_affiliation():
     user = _make_user("dave")
     org = _make_org("Acme", user.id)
     clinician = _make_clinician(owner=user, org=org)
-    aff = clinician.primary_affiliation
+    aff = clinician.primary_clinician_affiliation
     assert aff is not None
 
     clinician.location_city = "Queens"
@@ -147,7 +147,7 @@ async def test_clinician_per_role_writes_land_on_affiliation():
 
 @pytest.mark.asyncio
 async def test_clinician_affiliations_persist_via_cascade(session):
-    """`Clinician.affiliations` has `cascade="all, delete-orphan"`, so
+    """`Clinician.clinician_affiliations` has `cascade="all, delete-orphan"`, so
     persisting a Clinician with transient Affiliations flushes every
     row in one shot — no explicit `session.add(...)` per affiliation
     needed."""
@@ -157,8 +157,8 @@ async def test_clinician_affiliations_persist_via_cascade(session):
     session.add_all([user, org, clinician])
     await session.flush()
     await session.refresh(clinician)
-    assert len(clinician.affiliations) == 1
-    aff = clinician.primary_affiliation
+    assert len(clinician.clinician_affiliations) == 1
+    aff = clinician.primary_clinician_affiliation
     assert aff is not None
     assert aff.id is not None
     assert aff.clinician_id == clinician.id
@@ -169,7 +169,7 @@ async def test_clinician_supports_multiple_affiliations(session):
     """A Clinician may hold multiple Affiliations. Each row persists in
     the same transaction; the cascade rule still wipes them all on
     Clinician delete."""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     user = _make_user("erin")
     org_a = _make_org("Acme", user.id)
@@ -177,8 +177,8 @@ async def test_clinician_supports_multiple_affiliations(session):
     clinician = _make_clinician(owner=user, org=org_a)
     # Append a second affiliation at a different org with different
     # per-role attributes.
-    clinician.affiliations.append(
-        Affiliation(
+    clinician.clinician_affiliations.append(
+        ClinicianAffiliation(
             clinician=clinician,
             org_id=org_b.id,
             location_city="Manhattan",
@@ -195,31 +195,31 @@ async def test_clinician_supports_multiple_affiliations(session):
     session.add_all([user, org_a, org_b, clinician])
     await session.flush()
     await session.refresh(clinician)
-    assert len(clinician.affiliations) == 2
+    assert len(clinician.clinician_affiliations) == 2
     # Both rows point at the same Clinician.
-    assert all(a.clinician_id == clinician.id for a in clinician.affiliations)
+    assert all(a.clinician_id == clinician.id for a in clinician.clinician_affiliations)
 
 
 @pytest.mark.asyncio
 async def test_primary_affiliation_picks_oldest_by_created_at(session):
-    """`primary_affiliation` returns the oldest Affiliation by
-    ``created_at`` — the SQLAlchemy `order_by` on `Clinician.affiliations`
+    """`primary_clinician_affiliation` returns the oldest ClinicianAffiliation by
+    ``created_at`` — the SQLAlchemy `order_by` on `Clinician.clinician_affiliations`
     pins the ordering. The directory listing and the post-opening dropdown
     labels both dereference through this property so the per-row
     affiliation is deterministic."""
     import datetime as _dt
 
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     user = _make_user("frank")
     org_a = _make_org("Acme", user.id)
     org_b = _make_org("Beta", user.id)
     clinician = _make_clinician(owner=user, org=org_a)
-    older_aff = clinician.affiliations[0]
+    older_aff = clinician.clinician_affiliations[0]
     # Pin the older affiliation's created_at so the comparison is
     # deterministic regardless of flush clock resolution.
     older_aff.created_at = _dt.datetime(2024, 1, 1, tzinfo=_dt.timezone.utc)
-    newer = Affiliation(
+    newer = ClinicianAffiliation(
         clinician=clinician,
         org_id=org_b.id,
         location_city="Manhattan",
@@ -232,8 +232,8 @@ async def test_primary_affiliation_picks_oldest_by_created_at(session):
         sliding_scale=True,
     )
     newer.created_at = _dt.datetime(2025, 1, 1, tzinfo=_dt.timezone.utc)
-    clinician.affiliations.append(newer)
+    clinician.clinician_affiliations.append(newer)
     session.add_all([user, org_a, org_b, clinician])
     await session.flush()
     await session.refresh(clinician)
-    assert clinician.primary_affiliation is older_aff
+    assert clinician.primary_clinician_affiliation is older_aff

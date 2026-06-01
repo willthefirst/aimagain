@@ -27,9 +27,9 @@ class OrgRepresentation(BaseModel):
     """The user's authority to act for an organization — carrier of
     Claim B in the two-claim verification model.
 
-    Distinct from `Affiliation`:
+    Distinct from `ClinicianAffiliation`:
 
-    - `Affiliation` links **Clinician ↔ Organization** with practice
+    - `ClinicianAffiliation` links **Clinician ↔ Organization** with practice
       attrs (insurance posture, modality, location). It answers "where
       does this clinician practice?"
     - `OrgRepresentation` links **User ↔ Organization** with authority

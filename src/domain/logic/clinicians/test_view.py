@@ -10,8 +10,8 @@ from src.domain.logic.clinicians.view import (
 
 
 def _stub_affiliation(**overrides):
-    """Realistic Affiliation stub. Mirrors the per-role columns on the
-    real ``Affiliation`` ORM row plus the ``org`` relationship the
+    """Realistic ClinicianAffiliation stub. Mirrors the per-role columns on the
+    real ``ClinicianAffiliation`` ORM row plus the ``org`` relationship the
     view-model reads through.
 
     ``org`` defaults to a SimpleNamespace; pass ``org=None`` to drop the
@@ -46,8 +46,8 @@ def _stub_clinician(**overrides):
 
     ``affiliations`` defaults to an empty list — most tests pin the
     flat per-role keys (sourced via ``_role_attr`` from the stub's own
-    attributes or its ``primary_affiliation``) and don't care about the
-    stacked-sections list. Pass ``affiliations=[_stub_affiliation(...)]``
+    attributes or its ``primary_clinician_affiliation``) and don't care about the
+    stacked-sections list. Pass ``clinician_affiliations=[_stub_affiliation(...)]``
     when exercising the detail-page's per-affiliation rendering.
     """
     defaults = dict(
@@ -66,7 +66,7 @@ def _stub_clinician(**overrides):
         licensures=[],
         educations=[],
         certifications=[],
-        affiliations=[],
+        clinician_affiliations=[],
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -117,7 +117,7 @@ def test_insurance_summary_unions_carriers_across_affiliations():
     b = _stub_affiliation(
         in_network_carriers=["anthem_bcbs"], accepts_out_of_network=False
     )
-    p = _stub_clinician(affiliations=[a, b])
+    p = _stub_clinician(clinician_affiliations=[a, b])
     assert _insurance_summary(p) == "In-network (Aetna, Anthem / BCBS)"
 
 
@@ -126,7 +126,7 @@ def test_insurance_summary_dedupes_repeated_carriers():
     show ``Aetna, Aetna`` — carrier codes dedupe across the union."""
     a = _stub_affiliation(in_network_carriers=["aetna"], accepts_out_of_network=False)
     b = _stub_affiliation(in_network_carriers=["aetna"], accepts_out_of_network=False)
-    p = _stub_clinician(affiliations=[a, b])
+    p = _stub_clinician(clinician_affiliations=[a, b])
     assert _insurance_summary(p) == "In-network (Aetna)"
 
 
@@ -135,7 +135,7 @@ def test_insurance_summary_oon_if_any_affiliation_accepts():
     The roll-up still says Out-of-network (``any``, not ``all``)."""
     a = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=True)
     b = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=False)
-    p = _stub_clinician(affiliations=[a, b])
+    p = _stub_clinician(clinician_affiliations=[a, b])
     assert _insurance_summary(p) == "Out-of-network"
 
 
@@ -143,7 +143,7 @@ def test_insurance_summary_self_pay_when_all_affiliations_self_pay():
     """Every affiliation is self-pay-only → roll-up is ``Self-pay only``."""
     a = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=False)
     b = _stub_affiliation(in_network_carriers=[], accepts_out_of_network=False)
-    p = _stub_clinician(affiliations=[a, b])
+    p = _stub_clinician(clinician_affiliations=[a, b])
     assert _insurance_summary(p) == "Self-pay only"
 
 
@@ -158,7 +158,7 @@ def test_insurance_summary_appends_sliding_when_any_affiliation_has_it():
     b = _stub_affiliation(
         in_network_carriers=[], accepts_out_of_network=False, sliding_scale=True
     )
-    p = _stub_clinician(affiliations=[a, b])
+    p = _stub_clinician(clinician_affiliations=[a, b])
     assert _insurance_summary(p) == "In-network (Aetna) · sliding"
 
 
@@ -176,7 +176,7 @@ def test_insurance_summary_full_combination():
         accepts_out_of_network=True,
         sliding_scale=True,
     )
-    p = _stub_clinician(affiliations=[a, b])
+    p = _stub_clinician(clinician_affiliations=[a, b])
     assert (
         _insurance_summary(p)
         == "In-network (Aetna, Anthem / BCBS) · Out-of-network · sliding"
@@ -190,7 +190,7 @@ def test_insurance_summary_sliding_alone_with_self_pay():
     a = _stub_affiliation(
         in_network_carriers=[], accepts_out_of_network=False, sliding_scale=True
     )
-    p = _stub_clinician(affiliations=[a])
+    p = _stub_clinician(clinician_affiliations=[a])
     assert _insurance_summary(p) == "Self-pay only · sliding"
 
 
@@ -267,12 +267,12 @@ def test_view_returns_dict_for_jinja_attribute_access():
 
 def test_view_prefers_affiliation_over_legacy_clinician_columns():
     """Regression for #629 PR 3 — per-role attrs source from
-    ``clinician.primary_affiliation`` first, falling back to the legacy
+    ``clinician.primary_clinician_affiliation`` first, falling back to the legacy
     column on ``clinician`` only when the affiliation is absent or
     has no value for the field.
 
     After #642 PR 1, a Clinician may hold multiple Affiliations; the
-    view-model reads through ``primary_affiliation`` (the oldest by
+    view-model reads through ``primary_clinician_affiliation`` (the oldest by
     ``created_at``) so the listing's per-row dereferencing is
     deterministic — PR 3 (issue #642) collapses the listing to one
     row per Clinician with stacked affiliations. The test pins the
@@ -290,8 +290,8 @@ def test_view_prefers_affiliation_over_legacy_clinician_columns():
         location_zip="00000",
         in_network_carriers=[],
         accepts_out_of_network=False,
-        # `primary_affiliation` carries the post-PR-3 source of truth.
-        primary_affiliation=SimpleNamespace(
+        # `primary_clinician_affiliation` carries the post-PR-3 source of truth.
+        primary_clinician_affiliation=SimpleNamespace(
             in_person_sessions="yes",
             virtual_sessions="please_contact",
             sliding_scale=True,
@@ -313,7 +313,7 @@ def test_view_prefers_affiliation_over_legacy_clinician_columns():
     assert "New City" in v["full_address"]
     assert "CA" in v["full_address"]
     assert "90210" in v["full_address"]
-    # Affiliation has both Aetna in-network and accepts_oon=True →
+    # ClinicianAffiliation has both Aetna in-network and accepts_oon=True →
     # summary mentions both.
     assert "Aetna" in v["insurance_summary"]
     assert "Out-of-network" in v["insurance_summary"]
@@ -362,12 +362,12 @@ def test_affiliation_card_view_uses_explicit_org_when_passed():
     assert card["org_url"] == "/organizations/org-9"
 
 
-# --- clinician_card_view.affiliations -----------------------------------
+# --- clinician_card_view.clinician_affiliations -----------------------------------
 
 
 def test_view_returns_affiliations_list_one_per_row():
     """The detail page (#642 PR 2) renders one card per row in
-    ``clinician.affiliations``. The view-model exposes that as a list of
+    ``clinician.clinician_affiliations``. The view-model exposes that as a list of
     per-affiliation dicts so the template loops a single list — no
     template-side dereferencing of ``affiliation.org.name``."""
     aff_a = _stub_affiliation(
@@ -384,22 +384,22 @@ def test_view_returns_affiliations_list_one_per_row():
         sliding_scale=True,
         cost="$220/session",
     )
-    v = clinician_card_view(_stub_clinician(affiliations=[aff_a, aff_b]))
-    assert isinstance(v["affiliations"], list)
-    assert len(v["affiliations"]) == 2
-    assert v["affiliations"][0]["org_name"] == "Bedlam Health"
-    assert v["affiliations"][0]["org_url"] == "/organizations/org-a"
-    assert v["affiliations"][0]["sliding_scale_label"] == "No"
-    assert v["affiliations"][1]["org_name"] == "Wellspring"
-    assert v["affiliations"][1]["org_url"] == "/organizations/org-b"
-    assert v["affiliations"][1]["sliding_scale_label"] == "Yes"
-    assert v["affiliations"][1]["cost"] == "$220/session"
+    v = clinician_card_view(_stub_clinician(clinician_affiliations=[aff_a, aff_b]))
+    assert isinstance(v["clinician_affiliations"], list)
+    assert len(v["clinician_affiliations"]) == 2
+    assert v["clinician_affiliations"][0]["org_name"] == "Bedlam Health"
+    assert v["clinician_affiliations"][0]["org_url"] == "/organizations/org-a"
+    assert v["clinician_affiliations"][0]["sliding_scale_label"] == "No"
+    assert v["clinician_affiliations"][1]["org_name"] == "Wellspring"
+    assert v["clinician_affiliations"][1]["org_url"] == "/organizations/org-b"
+    assert v["clinician_affiliations"][1]["sliding_scale_label"] == "Yes"
+    assert v["clinician_affiliations"][1]["cost"] == "$220/session"
 
 
 def test_view_affiliations_is_empty_list_when_clinician_has_none():
-    """A Clinician with zero affiliations (e.g. after every Affiliation
+    """A Clinician with zero affiliations (e.g. after every ClinicianAffiliation
     was deleted via the inline list on the edit page — #642 PR 1)
     still returns a list, not ``None``, so the template's ``{% for %}``
     renders the empty case without an extra guard."""
-    v = clinician_card_view(_stub_clinician(affiliations=[]))
-    assert v["affiliations"] == []
+    v = clinician_card_view(_stub_clinician(clinician_affiliations=[]))
+    assert v["clinician_affiliations"] == []

@@ -6,7 +6,7 @@ The parent layer's conventions (BaseModel inheritance, FK CASCADE, migration wor
 
 ## Files
 
-- `organization.py` — `Organization`. Hierarchy via a nullable self-FK `parent_org_id` and a denormalized non-nullable `root_org_id`. Tied to a `User` via non-unique `owner_id` FK + CASCADE (one user may own many orgs). Enum column `type` CHECKs against `ORGANIZATION_TYPES` from [`../enums.py`](../enums.py). The Org→Clinician direction is reached through `Affiliation.org_id` (RESTRICT — deleting an Org with attached Affiliations fails loudly); there is no `Organization.clinicians` back-relationship. The `Organization.programs` collection (RESTRICT) remains for the Program child.
+- `organization.py` — `Organization`. Hierarchy via a nullable self-FK `parent_org_id` and a denormalized non-nullable `root_org_id`. Tied to a `User` via non-unique `owner_id` FK + CASCADE (one user may own many orgs). Enum column `type` CHECKs against `ORGANIZATION_TYPES` from [`../enums.py`](../enums.py). The Org→Clinician direction is reached through `ClinicianAffiliation.org_id` (RESTRICT — deleting an Org with attached Affiliations fails loudly); there is no `Organization.clinicians` back-relationship. The `Organization.programs` collection (RESTRICT) remains for the Program child.
 
 ## The `parent_org_id` + `root_org_id` invariant
 

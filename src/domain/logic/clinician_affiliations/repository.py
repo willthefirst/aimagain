@@ -1,4 +1,4 @@
-"""Repository for :class:`Affiliation` sub-resource CRUD.
+"""Repository for :class:`ClinicianAffiliation` sub-resource CRUD.
 
 The framework's generic create / update / delete handlers operate on
 the repository via the spec — the framework reads `EntitySpec.repo_dep`
@@ -17,8 +17,10 @@ from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
 
 
-class AffiliationRepository(BaseRepository):
+class ClinicianAffiliationRepository(BaseRepository):
     """Sub-resource of `Clinician` — see module docstring."""
 
 
-get_affiliation_repository = register_repository(AffiliationRepository)
+get_clinician_affiliation_repository = register_repository(
+    ClinicianAffiliationRepository
+)

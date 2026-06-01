@@ -15,7 +15,7 @@ edit page surfaces them as an inline list. The top-level
 fields it posts (`location_*`, sessions, insurance, `sliding_scale`,
 `cost`) are routed by Clinician per-role property proxies to the primary
 (oldest) affiliation row. The affiliation sub-resource PATCH endpoint
-(`PATCH /clinicians/{id}/affiliations/{aff_id}`) exists in the framework
+(`PATCH /clinicians/{id}/clinician_affiliations/{aff_id}`) exists in the framework
 but has no consumer UI today, so it is intentionally not contract-tested
 here — see #647.
 
