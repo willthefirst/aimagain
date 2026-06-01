@@ -511,3 +511,88 @@ async def test_create_form_preselects_first_clinician(
     assert str(clinician.id) in (
         options[0].attributes.get("value") or ""
     ), "selected option value should be the first clinician's id"
+
+
+# --- Anonymization gate (can_read_full_feed) ---------------------------------
+
+
+async def test_list_shows_verify_notice_for_unverified(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """Unverified users see a CTA on /posts directing them to complete
+    verification, since poster names and contact info are hidden."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    assert "posts-verify-notice" in response.text
+    assert "Complete verification" in response.text
+
+
+async def test_list_hides_verify_notice_for_verified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Verified users (Claim A active) see no verify-notice on /posts."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    assert "posts-verify-notice" not in response.text
+
+
+async def test_detail_hides_email_and_shows_cta_for_unverified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Unverified users see a 'Verify to contact' CTA on post detail instead
+    of the poster's email address — contact info is not sent to the browser."""
+    author = create_test_user(
+        username=f"detail-author-{uuid.uuid4()}",
+        email=f"detail-author-{uuid.uuid4()}@example.com",
+    )
+    post = _referral_post(owner_id=author.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    assert f"mailto:{author.email}" not in response.text
+    assert author.email not in response.text
+    assert "Verify to contact" in response.text
+
+
+async def test_detail_shows_email_for_verified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Verified users (Claim A active) see the poster's email button on the
+    post detail page."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    author_email = f"detail-author-{uuid.uuid4()}@example.com"
+    author = create_test_user(
+        username=f"detail-author-{uuid.uuid4()}",
+        email=author_email,
+    )
+    post = _referral_post(owner_id=author.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    assert f"mailto:{author_email}" in response.text
+    assert "Verify to contact" not in response.text

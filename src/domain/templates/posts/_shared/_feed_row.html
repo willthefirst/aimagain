@@ -35,6 +35,7 @@ under the "Feed rows" section. #}
 <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
 <span class="post-feed-byline">
 {%- if show_poster and post.owner -%}
+{%- if can_read_full_feed -%}
 {%- set _fn = post.owner.first_name -%}
 {%- set _ln = post.owner.last_name -%}
 {%- set _poster_name -%}
@@ -45,6 +46,9 @@ under the "Feed rows" section. #}
 {%- endif %}
 {%- endset -%}
 <small>{{ _poster_name | trim }}</small>
+{%- else -%}
+<small>Clinician</small>
+{%- endif -%}
 {%- endif -%}
 <small>{{ post.created_at | days_ago }}</small>
 </span>
