@@ -30,6 +30,7 @@ from src.domain.logic.verifications.oig import oig_check
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.logic.verifications.scoring import (
     Score,
+    VerificationStatus,
     _name_similarity,
     score_verification,
 )
@@ -316,3 +317,112 @@ async def handle_create_org_verification(
             http=http,
             actor_id=requesting_user.id,
         )
+
+
+# ---------- Demo bypass pipelines ----------------------------------------
+
+
+async def run_clinician_demo_verification(
+    *,
+    clinician_id: UUID,
+    demo_outcome: VerificationStatus,
+    verification_repo: VerificationRepository,
+    clinician_repo: ClinicianRepository,
+    audit_repo: AuditRepository,
+    actor_id: UUID | None,
+) -> Verification:
+    """Demo-mode Claim-A bypass.
+
+    Persists a Verification row with the caller-selected outcome without
+    calling NPPES or OIG. Only called when the clinician belongs to a demo
+    org — the route layer enforces that gate before dispatching here.
+    """
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail="Clinician not found")
+
+    verification = await verification_repo.record_for_clinician(
+        clinician_id=clinician.id,
+        status=demo_outcome,
+        flags=["demo_bypass"],
+        nppes_result=None,
+        oig_match=False,
+        name_match_score=None,
+        event_type="npi_resolved",
+        evidence={"demo": True, "selected_outcome": demo_outcome},
+    )
+    await record_audit_for(
+        audit_repo,
+        resource=VERIFICATION_RESOURCE,
+        verb="create",
+        actor_id=actor_id,
+        target_id=verification.id,
+        before=None,
+        after=VERIFICATION_RESOURCE.snapshot(verification),
+    )
+
+    if demo_outcome == "verified":
+        clinician.npi_match_status = "matched"
+        clinician.npi_verified_at = _now()
+    elif demo_outcome in ("failed", "needs_review"):
+        clinician.npi_match_status = "mismatch" if clinician.npi else "none"
+
+    recompute_clinician_claim(clinician)
+    await verification_repo.session.commit()
+    logger.info(
+        "verification.clinician.demo: id=%s outcome=%s actor=%s",
+        clinician.id,
+        demo_outcome,
+        actor_id,
+    )
+    return verification
+
+
+async def run_org_demo_verification(
+    *,
+    org_id: UUID,
+    demo_outcome: VerificationStatus,
+    verification_repo: VerificationRepository,
+    org_repo: OrganizationRepository,
+    audit_repo: AuditRepository,
+    actor_id: UUID | None,
+) -> Verification:
+    """Demo-mode Claim-B bypass. Mirror of `run_clinician_demo_verification`
+    for organizations. Only called when `org.is_demo` is True."""
+    org = await org_repo.get_by_model_id(Organization, org_id)
+    if org is None:
+        raise NotFoundError(detail="Organization not found")
+
+    verification = await verification_repo.record_for_org(
+        org_id=org.id,
+        status=demo_outcome,
+        flags=["demo_bypass"],
+        nppes_result=None,
+        name_match_score=None,
+        event_type="npi_resolved",
+        evidence={"demo": True, "selected_outcome": demo_outcome},
+    )
+    await record_audit_for(
+        audit_repo,
+        resource=VERIFICATION_RESOURCE,
+        verb="create",
+        actor_id=actor_id,
+        target_id=verification.id,
+        before=None,
+        after=VERIFICATION_RESOURCE.snapshot(verification),
+    )
+
+    if demo_outcome == "verified":
+        org.npi_match_status = "matched"
+    elif demo_outcome in ("failed", "needs_review"):
+        org.npi_match_status = "mismatch" if org.npi else "none"
+
+    recompute_org_claim(org)
+    await verification_repo.session.commit()
+    logger.info(
+        "verification.org.demo: id=%s outcome=%s actor=%s",
+        org.id,
+        demo_outcome,
+        actor_id,
+    )
+    return verification

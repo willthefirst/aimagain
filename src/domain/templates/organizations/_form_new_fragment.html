@@ -17,7 +17,7 @@
    wrapper bakes in the four hx-* attrs (`hx-target`, `hx-swap`,
    `hx-target-4xx`, `hx-swap-4xx`) and the `{{ form_banner() }}`
    placement, so the template stays focused on field declarations. #}
-{%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field, form_section with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, select_field, text_field, checkbox_field, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- set selected_type = request.query_params.get('type', '') -%}
@@ -36,6 +36,9 @@
         blank_label="(no parent)",
         required=false,
         help="Most organizations have no parent. Set one only if this is part of a larger network.",) }}
+    {% if current_user and current_user.is_superuser %}
+      {{ checkbox_field("is_demo", "Demo organization (bypasses real NPI verification)", required=false) }}
+    {% endif %}
   {% endcall %}
   {{ actions(entity_create_label('organization') , cancel_url=entity_url('organization')) }}
 {% endcall %}
