@@ -16,7 +16,10 @@ Read by:
 
 from typing import Final
 
-from src.domain.logic.clinicians.repository import get_clinician_repository
+from src.domain.logic.clinicians.repository import (
+    ClinicianRepository,
+    get_clinician_repository,
+)
 from src.domain.logic.clinicians.schema import (
     ClinicianCreate,
     ClinicianRead,
@@ -38,6 +41,7 @@ from src.domain.models.enums import (
     US_STATES,
 )
 from src.framework.audit.core import AuditAction
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -125,6 +129,18 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
         "src.domain.logic.clinicians.handlers._assert_clinician_payload_org_ownership"
     ),
     payload_authz_repos=(("organization_repo", OrganizationRepository),),
+    # Run NPI verification immediately after a clinician row is persisted.
+    # `verification_audit_repo` is the AuditRepository under a distinct
+    # name because `audit_repo` is a reserved factory-handler kwarg and
+    # cannot appear in `after_create_repos`.
+    after_create_path=(
+        "src.domain.logic.clinicians.handlers.after_create_clinician_verification"
+    ),
+    after_create_repos=(
+        ("verification_repo", VerificationRepository),
+        ("clinician_repo", ClinicianRepository),
+        ("verification_audit_repo", AuditRepository),
+    ),
     # Clinician templates render credential-type display labels and the
     # tuples behind the filter/select dropdowns. Tying them to the spec
     # (instead of Jinja globals) means a new credential-type tuple
