@@ -179,11 +179,6 @@
       </nav>
     </header>
     <main class="container">
-      {# Verify-email nag banner. Renders only when the authed user
-         has `is_verified=False` (see `_verify_banner.html`). Sits
-         above the breadcrumb so it's the first thing visible on
-         every page. #}
-      {% include "_shared/_verify_banner.html" %}
       {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
          `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
          Pages set their own location context; list pages and the
