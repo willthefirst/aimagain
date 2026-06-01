@@ -37,13 +37,14 @@ from src.domain.logic.organizations.repository import (
 )
 from src.domain.logic.verifications.handlers import (
     handle_create_clinician_verification,
+    recompute_clinician_claim,
     record_verification_event,
 )
 from src.domain.logic.verifications.repository import (
     VerificationRepository,
     get_verification_repository,
 )
-from src.domain.models import Clinician, Organization, User
+from src.domain.models import Clinician, ClinicianLicensure, Organization, User
 from src.framework.audit.repository import AuditRepository
 from src.framework.authz import is_owner_or_admin
 from src.framework.http.exceptions import (
@@ -214,4 +215,78 @@ async def submit_organization_npi(
         actor_id=requesting_user.id,
     )
     await org_repo.session.commit()
+    return refreshed_response()
+
+
+@verifications_api_router.post(
+    "/clinicians/{clinician_id}/licensures/{licensure_id}/attest",
+    status_code=status.HTTP_200_OK,
+    name="verifications:license_attest",
+)
+async def attest_license(
+    clinician_id: UUID,
+    licensure_id: UUID,
+    clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
+    verification_repo: VerificationRepository = Depends(get_verification_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
+    requesting_user: User = Depends(current_active_user),
+) -> Response:
+    """User-driven license re-attestation per handoff §10.
+
+    "I attest this license is active and in good standing." flips
+    `attested_active=True` + `attested_at=NOW()`, recomputes the
+    licensure's `status` (active if not expired, expired if past
+    `expiration_date`, pending otherwise), and re-runs
+    `recompute_clinician_claim` so the Claim-A denorm cache reflects
+    the new state. A `Verification` event of type `license_attested`
+    is appended.
+
+    Authz: the requesting user must own the parent Clinician (or be
+    admin). The licensure must belong to the URL-named clinician —
+    same defense-in-depth shape the framework's generic subentity
+    handlers use.
+    """
+    from datetime import date, datetime, timezone
+
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail="Clinician not found")
+    if not is_owner_or_admin(clinician, requesting_user):
+        raise ForbiddenError(detail="Cannot attest licenses for this clinician")
+
+    licensure = await clinician_repo.get_by_model_id(ClinicianLicensure, licensure_id)
+    if licensure is None or licensure.clinician_id != clinician_id:
+        # 404 (not 403) when the licensure doesn't belong to this
+        # clinician — same info-leak shape the framework's subresource
+        # handlers use.
+        raise NotFoundError(detail="Licensure not found for this clinician")
+
+    licensure.attested_active = True
+    licensure.attested_at = datetime.now(timezone.utc)
+    if licensure.expiration_date is None or licensure.expiration_date >= date.today():
+        licensure.status = "active"
+    else:
+        licensure.status = "expired"
+
+    await record_verification_event(
+        verification_repo=verification_repo,
+        audit_repo=audit_repo,
+        subject_type="clinician",
+        clinician_id=clinician.id,
+        event_type="license_attested",
+        status="verified",
+        evidence={
+            "licensure_id": str(licensure.id),
+            "license_type": licensure.license_type,
+            "issuing_state": licensure.issuing_state,
+        },
+        actor_id=requesting_user.id,
+    )
+
+    # Recompute the Claim-A cache. Attestation may flip
+    # `clinician_verified` to True (if the NPI is already matched and
+    # this was the missing active license) or keep it as-is.
+    recompute_clinician_claim(clinician)
+
+    await clinician_repo.session.commit()
     return refreshed_response()
