@@ -34,6 +34,7 @@ def test_base_context_anonymous():
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": False,
+        "can_read_full_feed": False,
     }
 
 
@@ -55,6 +56,7 @@ def test_base_context_regular_user():
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": False,
+        "can_read_full_feed": False,
     }
 
 
@@ -80,6 +82,25 @@ def test_base_context_claim_a_verified_user():
     ctx = base_context(user)
     assert ctx["claims"] == {"a": True, "b": []}
     assert ctx["any_claim_lapsed"] is False
+
+
+def test_base_context_can_read_full_feed_true_for_verified_clinician():
+    """The chrome scalar `can_read_full_feed` powers `home.html`'s
+    network-feed blur — pinned here so a regression in `base_context`
+    can't silently re-blur every authed user's feed."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="bob",
+        is_superuser=False,
+        is_verified=True,
+        clinicians=[
+            SimpleNamespace(
+                npi="1234567890", clinician_verified=True, ever_verified_at=None
+            )
+        ],
+        org_representations=[],
+    )
+    assert base_context(user)["can_read_full_feed"] is True
 
 
 def test_base_context_claim_b_coordinator():

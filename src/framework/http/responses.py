@@ -46,7 +46,7 @@ def base_context(user: Actor | None) -> dict:
     request. The import is lazy to keep this framework module from taking
     a hard `domain/` import.
     """
-    from src.domain.logic.capabilities import claim_state
+    from src.domain.logic.capabilities import can_read_full_feed, claim_state
 
     state = claim_state(user)
     return {
@@ -62,6 +62,11 @@ def base_context(user: Actor | None) -> dict:
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": bool(state.lapsed),
+        # `can_read_full_feed` is the chrome-level feed-teaser gate
+        # (handoff §7.1: full feed once verified, retained after lapse
+        # via `ever_verified_at`). Anonymous viewers always see the
+        # teaser (predicate returns False for `user=None`).
+        "can_read_full_feed": can_read_full_feed(user),
     }
 
 
