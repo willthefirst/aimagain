@@ -41,6 +41,7 @@ async def after_create_clinician_verification(
     verification_repo: VerificationRepository,
     clinician_repo: ClinicianRepository,
     verification_audit_repo: AuditRepository,
+    demo_outcome: str | None = None,
 ) -> None:
     """Run the NPI verification pipeline immediately after a clinician row
     is created. Produces one Verification row + audit row and writes through
@@ -50,23 +51,38 @@ async def after_create_clinician_verification(
     session expires `row`'s attributes, so a `refresh` follows to keep the
     object usable for the `mutate` context manager's after-snapshot (which
     runs synchronously via Pydantic's `model_validate`).
+
+    When `demo_outcome` is provided the caller has already verified the
+    clinician is in a demo org; NPPES/OIG is skipped and the selected
+    outcome is persisted directly.
     """
     import httpx
 
     from src.domain.logic.verifications.handlers import (
         HTTP_TIMEOUT_SECONDS,
+        run_clinician_demo_verification,
         run_clinician_verification,
     )
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
-        await run_clinician_verification(
+    if demo_outcome and demo_outcome in ("verified", "needs_review", "failed"):
+        await run_clinician_demo_verification(
             clinician_id=row.id,
+            demo_outcome=demo_outcome,  # type: ignore[arg-type]
             verification_repo=verification_repo,
             clinician_repo=clinician_repo,
             audit_repo=verification_audit_repo,
-            http=http,
             actor_id=requesting_user.id,
         )
+    else:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+            await run_clinician_verification(
+                clinician_id=row.id,
+                verification_repo=verification_repo,
+                clinician_repo=clinician_repo,
+                audit_repo=verification_audit_repo,
+                http=http,
+                actor_id=requesting_user.id,
+            )
     await clinician_repo.session.refresh(row)
 
 

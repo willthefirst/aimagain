@@ -84,6 +84,7 @@ async def profile_clinician_create(
     location_city: str | None = Form(default=None),
     location_state: str | None = Form(default=None),
     location_zip: str | None = Form(default=None),
+    demo_outcome: str | None = Form(default=None),
     requesting_user: User = Depends(current_active_user),
     clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
     organization_repo: OrganizationRepository = Depends(get_organization_repository),
@@ -95,6 +96,9 @@ async def profile_clinician_create(
     Fires NPI verification inline (same as the generic clinician
     create) then redirects back to /profile so the hub re-renders
     with the NPPES result already reflected in the setup flow.
+
+    `demo_outcome` is only honored when the requesting user is in a demo
+    org context — the handler ignores it for regular users.
     """
     await handle_clinician_create(
         first_name=first_name,
@@ -108,6 +112,7 @@ async def profile_clinician_create(
         organization_repo=organization_repo,
         verification_repo=verification_repo,
         audit_repo=audit_repo,
+        demo_outcome=demo_outcome,
     )
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
@@ -165,6 +170,7 @@ async def profile_clinician_identity_update(
     first_name: str | None = Form(default=None),
     last_name: str | None = Form(default=None),
     npi: str | None = Form(default=None),
+    demo_outcome: str | None = Form(default=None),
     requesting_user: User = Depends(current_active_user),
     clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
     verification_repo: VerificationRepository = Depends(get_verification_repository),
@@ -174,6 +180,9 @@ async def profile_clinician_identity_update(
     verification.  Presented as an inline form on /profile when the
     initial verification returned a mismatch — keeps the user on /profile
     rather than bouncing them to the full clinician-edit page.
+
+    `demo_outcome` is only honored when the requesting user is in a demo
+    org context.
     """
     await handle_clinician_identity_update(
         clinician_id=clinician_id,
@@ -184,6 +193,7 @@ async def profile_clinician_identity_update(
         clinician_repo=clinician_repo,
         verification_repo=verification_repo,
         audit_repo=audit_repo,
+        demo_outcome=demo_outcome,
     )
     return JSONResponse(
         status_code=status.HTTP_200_OK,

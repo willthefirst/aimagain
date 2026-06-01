@@ -50,6 +50,9 @@ class OrganizationCreate(WirePayload):
     # Blank HTML form input (`""`) is coerced to `None` at the
     # `WirePayload` layer — see `_coerce_blank_strings_on_nullable_scalars`.
     parent_org_id: uuid.UUID | None = None
+    # Admin-only: marks this org as a demo environment. See
+    # `Organization.is_demo` for the full contract.
+    is_demo: bool = False
 
 
 class OrganizationUpdate(PartialUpdate):
@@ -60,6 +63,7 @@ class OrganizationUpdate(PartialUpdate):
     name: StrippedText | None = None
     type: Literal[*ORGANIZATION_TYPES] | None = None
     parent_org_id: uuid.UUID | None = None
+    is_demo: bool | None = None
 
 
 # --- Admin verification-state axis ---------------------------------------

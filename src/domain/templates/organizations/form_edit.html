@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import entity_select_field, form_section, select_field, text_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, form_section, select_field, text_field, checkbox_field -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Organizations{% endblock %}
 {% block current_label %}{{ organization.name }}{% endblock %}
@@ -9,6 +9,11 @@
       {{ text_field("name", "Name", current=organization.name, maxlength=200) }}
       {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, current=organization.type) }}
     {% endcall %}
+    {% if current_user and current_user.is_superuser %}
+      {% call form_section("Demo") %}
+        {{ checkbox_field("is_demo", "Demo organization (bypasses real NPI verification)", current=organization.is_demo, required=false) }}
+      {% endcall %}
+    {% endif %}
     {% call form_section("Hierarchy") %}
       {# `root_org_id` is server-managed — see
        src/domain/models/organizations/README.md. The form exposes

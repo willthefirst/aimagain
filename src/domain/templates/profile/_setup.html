@@ -24,10 +24,58 @@
    Uses `form_with_errors` from `_shared/form_meta.html` so validation
    failures (e.g. invalid NPI format) re-render the form in-place via
    HTMX with per-field error copy.
+
+   `is_demo_context` (bool, from build_profile_context): when True the
+   user is associated with a demo org and NPI verification forms show a
+   "Simulate outcome" picker instead of calling real NPPES. The selected
+   value is posted as `demo_outcome` and the server bypasses NPPES.
 #}
 {%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/actions.html" import actions -%}
+{%- macro _demo_outcome_picker() -%}
+  {# Shown only in demo org context. Lets the user choose which
+     verification result to simulate instead of hitting real NPPES. #}
+  {% if is_demo_context %}
+    <fieldset style="border: 1px dashed var(--pico-muted-border-color);
+                     padding: 0.75rem;
+                     border-radius: var(--pico-border-radius)">
+      <legend style="color: var(--pico-muted-color);
+                     font-size: 0.85em;
+                     padding: 0 0.5rem">Demo: simulate verification outcome</legend>
+      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+        <label style="display: flex;
+                      align-items: center;
+                      gap: 0.4rem;
+                      font-weight: normal">
+          <input type="radio"
+                 name="demo_outcome"
+                 value="verified"
+                 checked
+                 style="margin: 0">
+          Verified
+        </label>
+        <label style="display: flex;
+                      align-items: center;
+                      gap: 0.4rem;
+                      font-weight: normal">
+          <input type="radio"
+                 name="demo_outcome"
+                 value="needs_review"
+                 style="margin: 0">
+          Needs review
+        </label>
+        <label style="display: flex;
+                      align-items: center;
+                      gap: 0.4rem;
+                      font-weight: normal">
+          <input type="radio" name="demo_outcome" value="failed" style="margin: 0;">
+          Failed
+        </label>
+      </div>
+    </fieldset>
+  {% endif %}
+{%- endmacro -%}
 <section>
   {# ------------------------------------------------------------------ #}
   {# Clinician identity                                                   #}
@@ -49,6 +97,7 @@
           {{ text_field("last_name", "Last name", required=false) }}
         </div>
         {{ text_field("npi", "NPI (Type-1)", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ _demo_outcome_picker() }}
         {{ actions("Start verification") }}
       {% endcall %}
     {% elif _clinician.npi_match_status == "matched" and not _active_licenses %}
@@ -89,6 +138,7 @@
           {{ text_field("last_name", "Last name", current=_clinician.last_name or "", required=false) }}
         </div>
         {{ text_field("npi", "NPI (Type-1)", current=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ _demo_outcome_picker() }}
         {{ actions("Retry verification") }}
       {% endcall %}
     {% elif _clinician.npi_match_status == "none" %}
@@ -99,6 +149,7 @@
           {{ text_field("last_name", "Last name", current=_clinician.last_name or "", required=false) }}
         </div>
         {{ text_field("npi", "NPI (Type-1)", current=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ _demo_outcome_picker() }}
         {{ actions("Start verification") }}
       {% endcall %}
     {% else %}

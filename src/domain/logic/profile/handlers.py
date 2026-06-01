@@ -63,6 +63,23 @@ def resolve_profile_mode(
     return MODE_MANAGE
 
 
+def _user_is_demo_context(user: User) -> bool:
+    """Return True if the user is associated with any demo organization.
+
+    Checks both org representations (Claim B links) and directly owned
+    organizations — both relationships are selectin-loaded on User, so
+    this is free after the initial user fetch.
+    """
+    for rep in getattr(user, "org_representations", None) or ():
+        org = getattr(rep, "org", None)
+        if org and getattr(org, "is_demo", False):
+            return True
+    for org in getattr(user, "organizations", None) or ():
+        if getattr(org, "is_demo", False):
+            return True
+    return False
+
+
 def build_profile_context(
     user: User,
     *,
@@ -77,12 +94,14 @@ def build_profile_context(
     """
     state = capabilities.claim_state(user)
     mode = resolve_profile_mode(user, intent=intent)
+    is_demo_context = _user_is_demo_context(user)
     logger.info(
-        "profile.hub: user=%s mode=%s claim_a=%s claim_b=%d",
+        "profile.hub: user=%s mode=%s claim_a=%s claim_b=%d demo=%s",
         user.id,
         mode,
         state.a,
         len(state.b),
+        is_demo_context,
     )
     return {
         "mode": mode,
@@ -90,6 +109,7 @@ def build_profile_context(
         "claim_state": state,
         "clinicians": list(getattr(user, "clinicians", None) or ()),
         "org_representations": list(getattr(user, "org_representations", None) or ()),
+        "is_demo_context": is_demo_context,
     }
 
 
@@ -106,6 +126,7 @@ async def handle_clinician_create(
     organization_repo: Any,
     verification_repo: Any,
     audit_repo: Any,
+    demo_outcome: str | None = None,
 ) -> Any:
     """Create a minimal clinician profile from the profile hub and run
     NPI verification inline.
@@ -114,6 +135,10 @@ async def handle_clinician_create(
     an org during onboarding. Location is optional — callers that omit
     it (the fast-path wizard) pass ``None`` for all three fields; users
     can fill location in later from "complete your profile".
+
+    `demo_outcome` is only honored when the requesting user is in a demo
+    org context (checked here via `_user_is_demo_context`). If passed by
+    a non-demo user it is ignored and NPPES runs normally.
     """
     from src.domain.logic.clinicians.handlers import (
         _assert_clinician_payload_org_ownership,
@@ -144,6 +169,7 @@ async def handle_clinician_create(
     )
     clinician = await clinician_repo.create(clinician)
 
+    effective_demo = demo_outcome if _user_is_demo_context(requesting_user) else None
     await after_create_clinician_verification(
         row=clinician,
         payload=payload,
@@ -151,6 +177,7 @@ async def handle_clinician_create(
         verification_repo=verification_repo,
         clinician_repo=clinician_repo,
         verification_audit_repo=audit_repo,
+        demo_outcome=effective_demo,
     )
     return clinician
 
@@ -165,11 +192,14 @@ async def handle_clinician_identity_update(
     clinician_repo: Any,
     verification_repo: Any,
     audit_repo: Any,
+    demo_outcome: str | None = None,
 ) -> Any:
     """Update a clinician's identity fields (name + NPI) and re-run NPI
     verification inline.  Used by the profile hub's inline retry form
     when the initial verification returned a mismatch — the user can
     correct their name or NPI without leaving /profile.
+
+    `demo_outcome` is only honored in demo org context.
     """
     from src.domain.logic.clinicians.handlers import after_create_clinician_verification
     from src.domain.models import Clinician
@@ -193,6 +223,7 @@ async def handle_clinician_identity_update(
     if fields:
         clinician = await clinician_repo.patch(clinician, **fields)
 
+    effective_demo = demo_outcome if _user_is_demo_context(requesting_user) else None
     await after_create_clinician_verification(
         row=clinician,
         payload=clinician,
@@ -200,6 +231,7 @@ async def handle_clinician_identity_update(
         verification_repo=verification_repo,
         clinician_repo=clinician_repo,
         verification_audit_repo=audit_repo,
+        demo_outcome=effective_demo,
     )
     return clinician
 
