@@ -1,9 +1,20 @@
-"""`mount_create` — `POST /<collection>`."""
+"""`mount_create` — `POST /<collection>`.
 
-from typing import Any, Awaitable, Callable
+Also owns `handle_create` and `make_create_handler` — the generic
+create handler and its factory, originally in `handlers.py`.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from uuid import UUID
 
 from fastapi import HTTPException, Request, status
+from pydantic import BaseModel
 
+from src.framework.actor import Actor
+from src.framework.audit.core import mutate
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.mounts._common import (
     call_handler_with,
     parent_path_param_pairs,
@@ -12,9 +23,14 @@ from src.framework.dispatch.mounts._common import (
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
+from src.framework.http.exceptions import NotFoundError
 from src.framework.http.form_rerender import form_rerender
 from src.framework.http.forms import parse_form_to_payload, validate_or_422
 from src.framework.http.responses import created_response
+from src.framework.persistence.base_repository import BaseRepository
+
+if TYPE_CHECKING:
+    from src.framework.dispatch.entity_spec import EntitySpec
 
 
 def mount_create(
@@ -183,7 +199,7 @@ async def _render_form_with_errors(
     swaps 2xx — non-HTMX clients and the JSON-422 contract are
     untouched (this branch is gated on `HX-Request: true`).
     """
-    from src.framework.dispatch.handlers import handle_get_new_form
+    from src.framework.dispatch.mounts.form import handle_get_new_form
 
     entity_spec = spec.entity_spec
     if entity_spec is None:
@@ -259,3 +275,159 @@ def _fragment_template_name(full_path: str) -> str:
     dirname, basename = os.path.split(full_path)
     name, ext = os.path.splitext(basename)
     return os.path.join(dirname, f"_{name}_fragment{ext}")
+
+
+async def handle_create(
+    spec: EntitySpec,
+    *,
+    payload: BaseModel,
+    repo: BaseRepository,
+    audit_repo: AuditRepository,
+    requesting_user: Actor,
+    parent_id: UUID | None = None,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_kwargs: dict[str, Any] | None = None,
+    after_create: Callable[..., Awaitable[None]] | None = None,
+    after_create_kwargs: dict[str, Any] | None = None,
+) -> Any:
+    """Generic create handler driven by `spec`.
+
+    `payload_authz` (if supplied) is invoked AFTER the parent row has
+    been loaded and `write_authz` has run on it (if applicable), and
+    BEFORE the payload is used to build the model. The callable is
+    expected to raise `ForbiddenError` / `NotFoundError` on rejection;
+    `payload_authz_kwargs` supplies any spec-declared typed repo kwargs.
+    See `EntitySpec.payload_authz_path` for the contract.
+
+    `after_create` (if supplied) is invoked AFTER the row has been
+    persisted (it has an id) and BEFORE the audit `after`-snapshot is
+    taken. Use it to mutate the row's server-controlled columns based
+    on the payload, OR to do side effects in the same transaction
+    (e.g. record a `Verification` event). The hook receives `row=`,
+    `payload=`, `requesting_user=`, and `**after_create_kwargs`. See
+    `EntitySpec.after_create_path` for the contract."""
+    if spec.audit is None:
+        raise ValueError(
+            f"handle_create: spec {spec.name!r} has no audit binding; "
+            "create operations must be audited."
+        )
+
+    if spec.parent is not None:
+        if parent_id is None:
+            raise ValueError(
+                f"handle_create: spec {spec.name!r} has parent "
+                f"{spec.parent.name!r} but no parent_id was supplied."
+            )
+        parent = await repo.get_by_model_id(spec.parent.model, parent_id)
+        if parent is None:
+            raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+        if spec.write_authz is not None:
+            spec.write_authz(parent, requesting_user, action=f"create this {spec.name}")
+        if payload_authz is not None:
+            await payload_authz(
+                payload=payload,
+                requesting_user=requesting_user,
+                **(payload_authz_kwargs or {}),
+            )
+        child = spec.model(**payload.model_dump())
+        created = await repo.add_child(parent, spec.url_collection, child)
+
+    elif spec.discriminator is not None:
+        if payload_authz is not None:
+            await payload_authz(
+                payload=payload,
+                requesting_user=requesting_user,
+                **(payload_authz_kwargs or {}),
+            )
+        kind = payload.kind
+        kind_spec = spec.discriminator[kind]
+        # Read detail fields off the serialized dump, not via
+        # ``getattr``, so wire-flat / schema-nested fields (e.g. the
+        # post-#451 ``location: Location`` value object on
+        # :class:`ReferralCreate`, which serializes back to flat
+        # ``location_city`` / ``location_state`` / ``location_zip`` keys
+        # via ``flatten_location_on_dump``) line up with the ORM
+        # model's flat columns enumerated in ``detail_fields``.
+        dump = payload.model_dump()
+        detail = kind_spec.detail_model(
+            **{f: dump[f] for f in kind_spec.detail_fields if f in dump}
+        )
+        parent_obj = spec.model(**{spec.discriminator.column: kind})
+        if spec.owner_attr is not None:
+            setattr(parent_obj, spec.owner_attr, requesting_user.id)
+        created = await repo.create_polymorphic(
+            parent_obj, detail, detail_relationship=kind_spec.detail_relationship
+        )
+
+    else:
+        if payload_authz is not None:
+            await payload_authz(
+                payload=payload,
+                requesting_user=requesting_user,
+                **(payload_authz_kwargs or {}),
+            )
+        # Inline-child collections (e.g. clinician's licensures /
+        # educations / certifications) come in on the payload alongside
+        # the parent's own fields. Exclude them from the parent
+        # constructor, persist the parent, then append each child via
+        # `repo.add_child` so the in-memory state stays coherent for
+        # the audit after-snapshot. Empty `spec.children` is the common
+        # case (most entities have no inline children) and the loop is
+        # a no-op.
+        inline_collections = tuple(c.url_collection for c in spec.children)
+        parent_fields = payload.model_dump(exclude=set(inline_collections))
+        instance = spec.model(**parent_fields)
+        if spec.owner_attr is not None:
+            setattr(instance, spec.owner_attr, requesting_user.id)
+        created = await repo.create(instance)
+        for child_spec in spec.children:
+            for item in getattr(payload, child_spec.url_collection, []) or []:
+                await repo.add_child(
+                    created,
+                    child_spec.url_collection,
+                    child_spec.model(**item.model_dump()),
+                )
+
+    async with mutate(
+        repo,
+        audit_repo,
+        actor=requesting_user,
+        target=created,
+        resource=spec.audit,
+        verb="create",
+    ):
+        # `after_create` runs inside the `mutate(...)` block — after
+        # persistence (so the row has an id) and before the audit
+        # `after`-snapshot is taken (so any row mutations the hook
+        # makes are reflected in the snapshot). Raises propagate; the
+        # context manager rolls back the transaction without writing
+        # the audit row.
+        if after_create is not None:
+            await after_create(
+                row=created,
+                payload=payload,
+                requesting_user=requesting_user,
+                **(after_create_kwargs or {}),
+            )
+    return created
+
+
+def make_create_handler(
+    spec: EntitySpec,
+    *,
+    payload_authz: Callable[..., Awaitable[None]] | None = None,
+    payload_authz_repos: tuple[tuple[str, type], ...] = (),
+    after_create: Callable[..., Awaitable[None]] | None = None,
+    after_create_repos: tuple[tuple[str, type], ...] = (),
+):
+    from src.framework.dispatch.handlers import _CREATE_SHAPE, _make_factory_handler
+
+    return _make_factory_handler(
+        spec,
+        _CREATE_SHAPE,
+        handle_create,
+        payload_authz=payload_authz,
+        payload_authz_repos=payload_authz_repos,
+        after_create=after_create,
+        after_create_repos=after_create_repos,
+    )
