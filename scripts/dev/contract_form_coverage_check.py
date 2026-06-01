@@ -81,6 +81,14 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
         "Empty-body endpoint that reads the user from the session and "
         "re-mints a verify token. Nothing to pin beyond the path."
     ),
+    "POST /org_representations": (
+        "The Profile Hub's `_add_claim.html` submits to the bespoke "
+        "create handler that dispatches on authority_method. Body shape "
+        "is pinned by `OrgRepresentationCreate` (Pydantic) and the "
+        "in-process handler tests in "
+        "`src/domain/logic/org_representations/test_handlers.py`. A Pact "
+        "pair would only re-verify what those tests already cover."
+    ),
 }
 
 

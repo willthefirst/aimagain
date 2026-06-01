@@ -1,0 +1,77 @@
+{# Re-verify mode — wireframe L7.
+
+   At least one of the user's claims has lapsed (a license expired, an
+   authority was revoked, an NPPES re-check failed). Per handoff §7,
+   capabilities gated on the lapsed claim pause; capabilities gated on
+   other claims keep working; the user's feed read-access is retained
+   via `ever_verified_at`.
+
+   The page header names the lapse + offers a one-tap Fix CTA — no dead
+   ends. The detail of WHICH claim has lapsed comes from
+   `claim_state.lapsed` (a tuple of reason codes); we render one card
+   per reason and a "still active" reassurance line for the unaffected
+   claim.
+
+   Phase-5 ships the dispatch + this template; the `claim_state.lapsed`
+   detection itself is populated by Phase-3's recompute helpers when
+   they detect a regression (currently stubbed empty in `claim_state`).
+   This template renders correctly the moment `lapsed` becomes
+   non-empty.
+#}
+<header>
+  <hgroup>
+    <h2>
+      <i class="icon-alert-triangle"></i> Action needed
+    </h2>
+    <p>
+      One of your verification claims has lapsed. The affected capabilities are paused until you re-attest; everything else keeps working.
+    </p>
+  </hgroup>
+</header>
+{% for reason in claim_state.lapsed %}
+  <article style="border-left: 4px solid var(--pico-color-yellow-600);">
+    <header>
+      {% if reason == "claim_a_lapsed" %}
+        {# title-case-ignore: "Claim A" is a user-facing label #}
+        <strong>Clinician identity (Claim A) lapsed</strong>
+        <p style="margin-bottom: 0;">
+          <small>Re-attest your license to resume posting referrals and openings.</small>
+        </p>
+      {% elif reason == "claim_b_lapsed" %}
+        {# title-case-ignore: "Claim B" is a user-facing label #}
+        <strong>Organization representation (Claim B) lapsed</strong>
+        <p style="margin-bottom: 0;">
+          <small>Re-verify your authority for the affected organization to resume posting on its behalf.</small>
+        </p>
+      {% else %}
+        <strong>{{ reason }}</strong>
+      {% endif %}
+    </header>
+    <a href="/profile" role="button">Fix</a>
+  </article>
+{% endfor %}
+{# Reassurance section — the unaffected claim(s) keep working. Per
+   wireframe L7 the lapsed-claim banner is paired with a "still
+   working" line so the user knows what's paused vs not. #}
+<section style="margin-top: 1rem;">
+  <header>
+    <strong>Still working</strong>
+  </header>
+  <ul>
+    {% if claim_state.a and "claim_a_lapsed" not in claim_state.lapsed %}
+      <li>
+        {# title-case-ignore: "Claim A" is a user-facing label #}
+        <i class="icon-check"></i> Clinician identity (Claim A) — verified
+      </li>
+    {% endif %}
+    {% if claim_state.b and "claim_b_lapsed" not in claim_state.lapsed %}
+      <li>
+        {# title-case-ignore: "Claim B" is a user-facing label #}
+        <i class="icon-check"></i> Organization representation (Claim B) — verified for {{ claim_state.b|length }} organization(s)
+      </li>
+    {% endif %}
+    <li>
+      <i class="icon-check"></i> Feed browsing — retained
+    </li>
+  </ul>
+</section>
