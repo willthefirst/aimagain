@@ -80,9 +80,11 @@ Also, before adding or moving a route, run `dev routes [prefix]` to see every ha
 
 Use `/plan` when a change touches multiple layers or introduces new resources/routes — the Explore + Plan overhead pays off when a wrong direction is expensive. Skip it for typo fixes, single-file refactors, README polish, and anything you can describe in one sentence.
 
+When you have a clear implementation path, start without asking "shall I proceed?" — just do it. Only pause for explicit confirmation before irreversible actions (data deletion, force pushes to main, production changes) or when a genuine decision requires user input. A "yes" should never be needed for a non-risky plan.
+
 ## Per-PR retrospective
 
-Before declaring a PR complete (after the final commit, before push), run a retro on the session and ship it as the final message — separately from the PR description. The user decides which entries become issues; this is how friction gets filed instead of re-discovered next session.
+The final message of every PR session **must** be the retro, delivered **unprompted** immediately after the last commit. Never wait to be asked. The user decides which entries become issues; this is how friction gets filed instead of re-discovered next session.
 
 Each entry should be issue-shaped:
 
@@ -98,3 +100,7 @@ Each entry should be issue-shaped:
 The two middle fields are sorting questions, not approval gates. Most entries will answer "no existing pattern applies" and "no, one-off" in ten words and move on. The *signal* is when the answer to the first is "an existing pattern applies and I didn't follow it" — that's the fork between filing a doc note and filing a structural-prevention issue. The second field forces an audit before generalizing, so retro entries don't imply current bugs that don't actually exist.
 
 Cover the single biggest time sink, any missing/misleading tool or doc, and anything that worked unexpectedly well (so it gets repeated).
+
+## After a PR merges
+
+Once `dev merge` confirms a PR landed, run `git pull` on main, then scan open issues (`gh issue list --state open --limit 10`) and propose the next highest-priority unassigned one. Do not wait for the user to ask "what's next?".
