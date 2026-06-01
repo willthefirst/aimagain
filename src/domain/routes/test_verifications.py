@@ -153,3 +153,176 @@ async def test_anon_gets_401_or_redirect(
     clinician_id = await _seed_clinician(db_test_session_manager)
     response = await test_client.post(f"/clinicians/{clinician_id}/verifications")
     assert response.status_code in {401, 403}
+
+
+# --- Inline NPI submit endpoints ----------------------------------------
+
+
+async def _seed_clinician_owned_by(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    owner_id: uuid.UUID,
+    *,
+    npi: str | None = None,
+) -> uuid.UUID:
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(owner_id=owner_id, npi=npi)
+            session.add(clinician)
+        return clinician.id
+
+
+async def test_clinician_npi_submit_owner_flips_to_pending(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner of a Clinician can submit an NPI; the column gets the
+    value, `npi_match_status='pending'`, and a `Verification` event of
+    type `npi_submitted` is appended."""
+    from src.domain.models import Clinician, Verification
+
+    clinician_id = await _seed_clinician_owned_by(
+        db_test_session_manager, logged_in_user.id
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/npi", json={"npi": "1234567890"}
+    )
+    assert response.status_code == 200
+    assert response.headers.get("HX-Refresh") == "true"
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Clinician, clinician_id)
+        assert loaded.npi == "1234567890"
+        assert loaded.npi_match_status == "pending"
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.clinician_id == clinician_id,
+                        Verification.event_type == "npi_submitted",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
+        assert events[0].evidence == {"npi": "1234567890"}
+
+
+async def test_clinician_npi_submit_non_owner_gets_403(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A non-owner non-admin user cannot submit an NPI for someone
+    else's Clinician."""
+    other_owner = create_test_user(username=f"owner-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other_owner)
+    clinician_id = await _seed_clinician_owned_by(
+        db_test_session_manager, other_owner.id
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/npi", json={"npi": "1234567890"}
+    )
+    assert response.status_code == 403
+
+
+async def test_clinician_npi_submit_404_for_missing(
+    authenticated_client: AsyncClient,
+):
+    bogus = uuid.uuid4()
+    response = await authenticated_client.post(
+        f"/clinicians/{bogus}/npi", json={"npi": "1234567890"}
+    )
+    assert response.status_code == 404
+
+
+async def test_clinician_npi_submit_422_for_malformed_npi(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Pydantic 422 fires before any DB read — keeps error messages
+    user-readable (the DB-level GLOB check would be a server-error
+    surface, not a form-rerender)."""
+    clinician_id = await _seed_clinician_owned_by(
+        db_test_session_manager, logged_in_user.id
+    )
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/npi", json={"npi": "12345"}  # 5 digits
+    )
+    assert response.status_code == 422
+
+
+async def test_clinician_npi_submit_blocks_in_flight_change(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Re-submitting a *different* NPI while the prior one is `pending`
+    is rejected — the worker would otherwise lose track. Same NPI
+    re-submit IS allowed (idempotent retry path)."""
+    from src.domain.models import Clinician
+
+    clinician_id = await _seed_clinician_owned_by(
+        db_test_session_manager, logged_in_user.id
+    )
+    # First submit lands in pending.
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/npi", json={"npi": "1234567890"}
+    )
+    assert response.status_code == 200
+
+    # Second submit with a different NPI while still pending → 400.
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/npi", json={"npi": "9876543210"}
+    )
+    assert response.status_code == 400
+
+    # Idempotent re-submit of the same value while pending IS allowed.
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/npi", json={"npi": "1234567890"}
+    )
+    assert response.status_code == 200
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Clinician, clinician_id)
+        assert loaded.npi == "1234567890"
+
+
+async def test_org_npi_submit_owner_flips_to_pending(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Mirror of clinician submit, for the Type-2 org NPI."""
+    from src.domain.models import Organization, Verification
+    from tests.helpers import make_organization_row
+
+    org = make_organization_row(owner_id=logged_in_user.id, name="Acme Health")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+
+    response = await authenticated_client.post(
+        f"/organizations/{org.id}/npi", json={"npi": "1234567890"}
+    )
+    assert response.status_code == 200
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Organization, org.id)
+        assert loaded.npi == "1234567890"
+        assert loaded.npi_match_status == "pending"
+        events = (
+            (
+                await session.execute(
+                    select(Verification).filter(
+                        Verification.org_id == org.id,
+                        Verification.event_type == "npi_submitted",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(events) == 1
