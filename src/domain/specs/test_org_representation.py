@@ -24,16 +24,31 @@ def test_auth_deps_authenticated_and_policy_owner_or_admin():
     assert ORG_REPRESENTATION_ENTITY.auth_policy is OWNER_OR_ADMIN
 
 
-def test_routes_update_delete_only_no_collection_views():
-    """API-only routes. `create=False` because the bespoke handler
-    `handle_create_org_representation` (with per-authority-method
-    dispatch) owns POST `/org_representations`; the framework's
-    generic create would land every row at `authority_status='pending'`
-    and miss the `authorized_official` auto-verify happy path."""
+def test_routes_crud_only_no_collection_views():
+    """API-only routes. Generic create is back (`create=True`) — the
+    spec uses `payload_authz_path` + `after_create_path` for the per-
+    `authority_method` dispatch (auto-verify, append Verification
+    event). List/detail/form views still belong to the Profile Hub."""
     r = ORG_REPRESENTATION_ENTITY.routes
-    assert r.create is False
-    assert (r.update, r.delete) == (True, True)
+    assert (r.create, r.update, r.delete) == (True, True, True)
     assert (r.list, r.detail, r.form_new, r.form_edit) == (False, False, False, False)
+
+
+def test_create_dispatch_hooks_wired():
+    """The two spec hooks together replace the bespoke create handler.
+    `payload_authz_path` validates per-method preconditions;
+    `after_create_path` mutates the just-persisted row + records the
+    Verification event for auto-verified paths. The dotted paths are
+    pinned so a refactor that moves the callables can't silently
+    drift."""
+    assert ORG_REPRESENTATION_ENTITY.payload_authz_path == (
+        "src.domain.logic.org_representations.handlers."
+        "validate_org_representation_payload"
+    )
+    assert ORG_REPRESENTATION_ENTITY.after_create_path == (
+        "src.domain.logic.org_representations.handlers."
+        "after_create_org_representation"
+    )
 
 
 def test_authority_state_axis_wired():
