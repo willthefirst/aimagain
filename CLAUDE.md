@@ -15,6 +15,20 @@ For any code change in `src/`, the change is **not done** until all four are tru
 
 If a relevant README or test file doesn't exist yet, **create it as part of the change**. Don't defer.
 
+## Working norms
+
+These govern how work gets done, not what to build.
+
+**Design tradeoffs in prose, not forms.** When exploring how to model something, write a tight prose explanation of 2–3 real options with tradeoffs and a recommendation, then ask one direct follow-up question. Do not reach for `AskUserQuestion` with multiple questions × multiple options.
+
+**Grep before proposing.** When a planning step involves "how should I structure X," search the repo for similar patterns first. Don't propose a new convention when an existing one is a `grep` away.
+
+**Multi-PR breakdown by default.** A change spanning layers should land as a sequence of small, independently-reviewable PRs. Don't scope a PR to "everything needed for feature X" when a sub-PR can ship and be reviewed first.
+
+**Re-anchor on CLAUDE.md after plan mode.** Long planning conversations push the opening system prompt out of attention. Before writing code after a plan session, reread this file.
+
+**Simplicity justification.** Before introducing a new abstraction, dependency, or architectural pattern, explicitly state: "This adds [X complexity]. The simpler alternative is [Y]. I'm choosing X because [reason]." If you cannot fill in a reason beyond future-proofing, choose Y.
+
 A Stop hook checks the diff at end-of-turn and surfaces a reminder when source files change without their README/test. The hook is a soft prompt, not a hard block — but ignoring it should be a deliberate decision (e.g. typo fix, log message tweak), not an oversight.
 
 A SessionStart hook prints the real current branch, dirty state, and stash list at session start — and warns loudly if you've landed on `main`/`master` in the shared working tree. Multi-agent sessions in this repo share one working directory; trust the hook's output over any harness-provided "current branch" line. A PreToolUse hook then enforces the rule: `Edit`/`Write`/`NotebookEdit` are refused on the main checkout when you're on `main`/`master`, so new work has to start on a worktree (`dev worktree add <slug>`). Feature branches on the main checkout are still allowed (for in-flight sessions); worktrees always are. See [`scripts/README.md`](scripts/README.md) for all three hooks.
