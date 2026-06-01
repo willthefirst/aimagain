@@ -24,53 +24,58 @@ from sqlalchemy.orm import declared_attr
 class LocationMixin:
     """``(city, state, zip)`` postal-address column group.
 
-    Mixed into :class:`~src.domain.models.clinicians.Clinician` and
-    :class:`~src.domain.models.posts.referral_detail.ReferralDetail`.
-    Both consumers want ``nullable=False`` on all three columns and a
-    ``location_state`` CHECK constraint against ``US_STATES``; the
-    constraint stays on the consuming table (CHECK names are table-
-    prefixed, see module docstring).
+    Mixed into ORM models that carry a location triple.
+    ``ReferralDetail`` keeps ``nullable=False`` (a referral is always
+    location-specific).  ``ClinicianAffiliation`` sets
+    ``_location_nullable = True`` so location can be deferred during
+    onboarding and filled in later.
 
     Each column is declared via :func:`declared_attr` so SQLAlchemy
     builds a fresh :class:`Column` per subclass (a bare ``Column(...)``
     on a mixin would be shared across every consumer and only attach to
     the first table that imports it).
 
-    The mixin also exposes a Python-side :attr:`location` property that
-    returns a ``{"city": ..., "state": ..., "zip": ...}`` dict view of
-    the three columns. The Read wire schema's nested ``location: Location``
-    field consumes this property via Pydantic's ``from_attributes=True``;
-    embedding schemas don't need to know about the underlying column
-    layout.
+    The mixin exposes a Python-side :attr:`location` property that
+    returns a ``{"city": ..., "state": ..., "zip": ...}`` dict when the
+    columns are populated, or ``None`` when all three are ``NULL``.  The
+    Read wire schema's nested ``location: Location | None`` field consumes
+    this via Pydantic's ``from_attributes=True``.
 
     The wire/audit-layer counterpart is
     :class:`src.domain.logic.value_objects.location.Location`.
     """
 
+    # Subclasses that allow NULL location (e.g. ClinicianAffiliation where
+    # location is optional during onboarding) set this to True.  The
+    # declared_attr methods read this at mapper-configuration time so
+    # SQLAlchemy emits the right column definition per table.
+    _location_nullable: bool = False
+
     @declared_attr
     def location_city(cls):
-        return Column(Text, nullable=False)
+        return Column(Text, nullable=getattr(cls, "_location_nullable", False))
 
     @declared_attr
     def location_state(cls):
-        return Column(Text, nullable=False)
+        return Column(Text, nullable=getattr(cls, "_location_nullable", False))
 
     @declared_attr
     def location_zip(cls):
-        return Column(Text, nullable=False)
+        return Column(Text, nullable=getattr(cls, "_location_nullable", False))
 
     @property
-    def location(self) -> dict[str, str]:
+    def location(self) -> dict[str, str | None] | None:
         """Python-side dict view of the ``(city, state, zip)`` columns.
 
-        Consumed by the Read wire schema (``location: Location`` field
-        with ``from_attributes=True``). The wire layer's
-        ``model_serializer`` flattens this back to top-level
-        ``location_<sub>`` keys on dump, so JSON/audit shape stays
-        unchanged from pre-#451.
+        Returns ``None`` when all three columns are ``NULL`` — this lets
+        the Read wire schema declare ``location: Location | None`` and
+        correctly represent clinicians whose location has not been filled
+        in yet.  When at least one column is non-NULL the full dict is
+        returned so ``Location`` validation succeeds.
         """
-        return {
-            "city": self.location_city,
-            "state": self.location_state,
-            "zip": self.location_zip,
-        }
+        city = self.location_city
+        state = self.location_state
+        zip_ = self.location_zip
+        if city is None and state is None and zip_ is None:
+            return None
+        return {"city": city, "state": state, "zip": zip_}
