@@ -1616,9 +1616,9 @@ async def test_list_paginates_when_over_per_page(
     """Page 1 shows up to `DEFAULT_PAGE_SIZE` rows and a Next link;
     page 2 shows the rest and a Prev link. Monkeypatches the page
     size down to keep the seed cheap — the framework's `handle_list`
-    reads the constant from `handlers.DEFAULT_PAGE_SIZE`, so that's
+    reads the constant from `mounts.list_.DEFAULT_PAGE_SIZE`, so that's
     where the patch lives."""
-    monkeypatch.setattr("src.framework.dispatch.handlers.DEFAULT_PAGE_SIZE", 2)
+    monkeypatch.setattr("src.framework.dispatch.mounts.list_.DEFAULT_PAGE_SIZE", 2)
     for _ in range(3):
         await _seed_clinician_for(db_test_session_manager, user_id=logged_in_user.id)
 
@@ -1654,7 +1654,7 @@ async def test_list_pagination_preserves_query_params(
     doesn't lose their filter when navigating. `base_query()` is
     filter-agnostic: anything in the URL except `page=` carries over,
     so any extra param works as the test signal."""
-    monkeypatch.setattr("src.framework.dispatch.handlers.DEFAULT_PAGE_SIZE", 1)
+    monkeypatch.setattr("src.framework.dispatch.mounts.list_.DEFAULT_PAGE_SIZE", 1)
     for _ in range(2):
         await _seed_clinician_for(db_test_session_manager, user_id=logged_in_user.id)
 

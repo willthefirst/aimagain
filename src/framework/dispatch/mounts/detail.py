@@ -1,13 +1,31 @@
-"""`mount_detail` — `GET /<collection>/{<id_param>}`."""
+"""`mount_detail` — `GET /<collection>/{<id_param>}`.
 
-from typing import Any, Awaitable, Callable
+Also owns `handle_detail` and `make_detail_handler` — the generic
+detail handler and its factory, originally in `handlers.py`.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from uuid import UUID
 
 from fastapi import Request
 
-from src.framework.dispatch.mounts._common import call_handler_with
+from src.framework.actor import Actor
+from src.framework.authz import is_admin
+from src.framework.dispatch.mounts._common import (
+    assert_kind_lock,
+    call_handler_with,
+)
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
+from src.framework.http.exceptions import NotFoundError
 from src.framework.http.responses import APIResponse
+from src.framework.persistence.base_repository import BaseRepository
+from src.framework.rendering.projections import project_view
+
+if TYPE_CHECKING:
+    from src.framework.dispatch.entity_spec import EntitySpec
 
 
 def mount_detail(
@@ -101,3 +119,100 @@ def mount_detail(
         router.get(f"/{alias_segment}")(alias_route_fn)
 
     router.get(f"/{{{id_param}}}")(route_fn)
+
+
+async def handle_detail(
+    spec: EntitySpec,
+    *,
+    request: Request,
+    target_id: UUID,
+    repo: BaseRepository,
+    requesting_user: Actor | None,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_kwargs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Generic detail handler driven by `spec`; merges spec-driven
+    context with the entity's `extras` callable (last-write-wins)."""
+    target = await repo.get_by_model_id(spec.model, target_id)
+    if target is None:
+        raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+    assert_kind_lock(spec, target)
+
+    from src.framework.rendering.route_urls import url_for_spec
+
+    context: dict[str, Any] = {
+        "request": request,
+        spec.name: target,
+        # Shared partials (e.g. `_shared/posts/_owner_actions.html`)
+        # read `entity_name` to build kind-aware URLs via
+        # `entity_url(entity_name, ...)`. Set on every detail render so
+        # included partials don't have to walk back through caller
+        # context.
+        "entity_name": spec.name,
+        "current_user": requesting_user,
+        # Detail templates' breadcrumb back-link to the collection
+        # used to set `resource_url` via a `{% set %}` line; inject
+        # here so child templates skip the boilerplate.
+        "resource_url": url_for_spec(spec),
+    }
+    if spec.can_write is not None:
+        context["can_edit"] = spec.can_write(target, requesting_user)
+
+    # Viewer-derived flags. `subject_attr` is the attribute on `target`
+    # whose value equals `requesting_user.id` when the viewer IS the
+    # subject — for `owner_attr=None` (users — the row IS the user), the
+    # rule reduces to `target.id == viewer.id`; for owned resources
+    # (clinician, post), it uses the owner FK. The uniform rule lets every
+    # entity inherit `is_self` / `can_admin_actions` without per-entity glue.
+    subject_attr = spec.owner_attr or "id"
+    is_self = (
+        requesting_user is not None
+        and getattr(target, subject_attr) == requesting_user.id
+    )
+    context["is_self"] = is_self
+    context["can_admin_actions"] = is_admin(requesting_user) and not is_self
+
+    if spec.private_field_predicate is not None:
+        context["can_view_private"] = bool(
+            spec.private_field_predicate(requesting_user, target)
+        )
+
+    if spec.public_fields:
+        context[f"target_{spec.name}"] = project_view(
+            target,
+            public_fields=spec.public_fields,
+            actor=requesting_user,
+            private_fields=spec.private_fields,
+            private_field_predicate=spec.private_field_predicate,
+        )
+
+    # Spec-declared constants — merged before extras so an extras
+    # callable can still override (last-write-wins, matching the
+    # framework's existing precedence rule).
+    if spec.static_context:
+        context.update(spec.static_context)
+
+    if extras is not None:
+        extras_kwargs = {
+            "target": target,
+            "request": request,
+            "requesting_user": requesting_user,
+        }
+        if extra_kwargs:
+            extras_kwargs.update(extra_kwargs)
+        context.update(await extras(**extras_kwargs))
+
+    return context
+
+
+def make_detail_handler(
+    spec: EntitySpec,
+    *,
+    extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    extra_repos: tuple[tuple[str, type], ...] = (),
+):
+    from src.framework.dispatch.handlers import _DETAIL_SHAPE, _make_factory_handler
+
+    return _make_factory_handler(
+        spec, _DETAIL_SHAPE, handle_detail, extras=extras, extra_repos=extra_repos
+    )
