@@ -529,6 +529,37 @@ class EntitySpec:
     payload_authz_path: str | None = None
     payload_authz_repos: tuple[tuple[str, type], ...] = ()
 
+    # `after_create_path` is a dotted import path to an async callable
+    # invoked by `handle_create` AFTER the new row has been persisted
+    # (it has an id) and BEFORE the audit `after`-snapshot is taken.
+    # Use it to dispatch on payload fields and mutate the row's
+    # server-controlled columns (the mutation flushes before the audit
+    # snapshot, so the snapshot reflects the final state) OR to do
+    # side effects in the same transaction (e.g. record a `Verification`
+    # event, send an invite).
+    #
+    # Contract of the callable:
+    #
+    #   async def hook(
+    #       *,
+    #       row: <model>,                   # the just-persisted row
+    #       payload: BaseModel,             # the validated create payload
+    #       requesting_user: User,
+    #       **typed_repos,                  # one kwarg per entry in after_create_repos
+    #   ) -> None:
+    #       ...
+    #
+    # Raises propagate; the framework's `mutate(...)` context manager
+    # rolls back the transaction. The hook is for the factory-built
+    # create path — declaring `after_create_path` alongside an explicit
+    # `handlers["create"]` is rejected at mount time (same precedent as
+    # `payload_authz_path`).
+    #
+    # `after_create_repos` declares typed-repo kwargs the callable
+    # receives. Mirrors `payload_authz_repos` exactly.
+    after_create_path: str | None = None
+    after_create_repos: tuple[tuple[str, type], ...] = ()
+
     # Static context bindings -------------------------------------------
     # Constant key→value pairs that `handle_detail` / `handle_list` merge
     # into the template context after the framework's auto-injected keys
@@ -910,6 +941,19 @@ class EntitySpec:
             raise ValueError(
                 f"EntitySpec({self.name!r}) declares payload_authz_repos but "
                 "no payload_authz_path — the typed-repo kwargs would have "
+                "no consumer."
+            )
+        # `after_create` only fires from `handle_create`; declaring the
+        # path without `routes.create=True` is dead config.
+        if self.after_create_path is not None and not self.routes.create:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares after_create_path but "
+                "routes.create is False — the hook would never run."
+            )
+        if self.after_create_repos and self.after_create_path is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares after_create_repos but "
+                "no after_create_path — the typed-repo kwargs would have "
                 "no consumer."
             )
         if self.read_schema is not None:

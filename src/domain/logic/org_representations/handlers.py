@@ -1,51 +1,59 @@
-"""Handlers for `OrgRepresentation` create + state-axis dispatch.
+"""Handlers for `OrgRepresentation` create dispatch + state-axis.
 
-Two bespoke handlers here:
+The create path uses the framework's generic factory plus two spec
+hooks:
 
-1. **`handle_create_org_representation`** — POST `/org_representations`.
-   Dispatches on `payload.authority_method` per handoff §6:
+1. **`validate_org_representation_payload`** — `payload_authz_path`.
+   Runs after `write_authz`, before model construction. Enforces the
+   per-`authority_method` preconditions:
 
    - ``authorized_official`` — NPPES Authorized-Official name-match.
-     Compares the org's cached `authorized_official_name` to the
-     requesting user's verified `Clinician` legal name; on match the
-     row lands at `authority_status='verified'` and a `Verification`
-     event of type `authority_proven` is recorded. No match → 400.
-   - ``rep_approval`` — invite-driven. `approved_by` must point at a
-     verified non-archived rep on the same org. Row lands at
-     `authority_status='pending'`; the approver flips it via the
-     `authority` state axis.
-   - ``domain_email`` — v1 stub: 400 "not yet enabled". The enum
-     value is shipped so the schema/UI stays coherent; full build-out
-     needs an `OrganizationDomain` table + email-at-domain
-     verification flow.
-   - ``admin_review`` — fallback. Row lands at `authority_status='pending'`.
+     The org's cached `authorized_official_name` is compared to the
+     requesting user's verified `Clinician` legal name; no match → 400.
+   - ``rep_approval`` — requires the requesting user to be an existing
+     verified rep of the org (admin bypass).
+   - ``domain_email`` — v1 stub: 400 "not yet enabled".
+   - ``admin_review`` — no precondition; passes through.
 
-2. **`handle_set_org_representation_authority`** — PUT
-   `/org_representations/{id}/authority`. Admin override (or
-   rep-approval approver, in a follow-up) flips `authority_status`.
+   Also enforces the cross-cutting "can't create for someone else"
+   rule.
 
-The generic `mount_entity` create handler is opted out
-(`routes.create=False` on the spec) so this bespoke create owns the
-post path. Update / delete continue to flow through the generic
-handlers.
+2. **`after_create_org_representation`** — `after_create_path`. Runs
+   after persistence, inside the framework's `mutate(...)` transaction
+   so its mutations land in the audit `after` snapshot. Per
+   `authority_method`:
+
+   - ``authorized_official`` / ``rep_approval`` → flip
+     `authority_status='verified'` (+ `approved_by` for rep_approval),
+     append a `Verification` event of type `authority_proven`.
+   - ``admin_review`` → leave at `pending` (default).
+
+The two-hook split keeps validation and side effects separate, and
+both run from the generic create path — no bespoke route handler
+needed.
+
+3. **`handle_set_org_representation_authority`** — PUT
+   `/org_representations/{id}/authority`. Admin override flips
+   `authority_status`. Unchanged.
 """
 
 import logging
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from src.domain.logic.org_representations.repository import (
     OrgRepresentationRepository,
 )
 from src.domain.logic.org_representations.schema import (
     OrgRepresentationAuthorityUpdate,
-    OrgRepresentationCreate,
 )
 from src.domain.logic.verifications.events import record_verification_event
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.logic.verifications.scoring import _name_similarity
 from src.domain.models import Organization, OrgRepresentation, User
 from src.domain.specs.org_representation import ORG_REPRESENTATION_ENTITY
-from src.framework.audit.core import record_audit, record_audit_for
+from src.framework.audit.core import record_audit
 from src.framework.audit.repository import AuditRepository
 from src.framework.http.exceptions import (
     BadRequestError,
@@ -55,18 +63,13 @@ from src.framework.http.exceptions import (
 
 logger = logging.getLogger(__name__)
 
-# Same threshold the clinician-side NPPES name match uses. Keeping a
-# module-local constant avoids reading through `scoring._NAME_MATCH_THRESHOLD`
-# (a private symbol) at the handler boundary; if the clinician threshold
-# changes we can re-anchor here.
+# Same threshold the clinician-side NPPES name match uses.
 _AO_NAME_MATCH_THRESHOLD = 0.80
 
 
 def _verified_clinician_full_name(user: User) -> str | None:
     """First-verified Clinician's `<first> <last>` form, or None if the
-    user has no `clinician_verified=True` row with both names. The
-    `authorized_official` path matches this against the org's cached
-    `authorized_official_name`."""
+    user has no `clinician_verified=True` row with both names."""
     for c in getattr(user, "clinicians", None) or ():
         if not getattr(c, "clinician_verified", False):
             continue
@@ -77,35 +80,27 @@ def _verified_clinician_full_name(user: User) -> str | None:
     return None
 
 
-async def handle_create_org_representation(
-    payload: OrgRepresentationCreate,
-    repo: OrgRepresentationRepository,
-    verification_repo: VerificationRepository,
-    audit_repo: AuditRepository,
+async def validate_org_representation_payload(
+    *,
+    payload: BaseModel,
     requesting_user: User,
-) -> OrgRepresentation:
-    """Create a new `OrgRepresentation` row. Authority-method dispatch
-    sets the initial `authority_status` + `approved_by`; the row is
-    persisted, audited, and (for the auto-verify happy path) a
-    `Verification` event is appended in the same transaction.
+    org_rep_repo: OrgRepresentationRepository,
+) -> None:
+    """`payload_authz_path` target — per-`authority_method` precondition
+    checks. Raises `ForbiddenError` / `BadRequestError` / `NotFoundError`
+    on rejection; returns `None` on success.
 
-    Authz: the requesting user must own the row they're creating
-    (`payload.user_id` == requesting_user.id) or be admin. The
-    target Organization must exist; the user must have appropriate
-    standing for the authority method.
+    Loads the target Organization here (not in `after_create`) so the
+    AO name-match runs before the row is persisted — fails fast.
     """
     if payload.user_id != requesting_user.id and not requesting_user.is_superuser:
         raise ForbiddenError(
             detail="Cannot create an org representation for another user"
         )
 
-    org = await repo.get_by_model_id(Organization, payload.org_id)
+    org = await org_rep_repo.get_by_model_id(Organization, payload.org_id)
     if org is None:
         raise NotFoundError(detail="Organization not found")
-
-    initial_status = "pending"
-    approved_by: UUID | None = None
-    verification_event: str | None = None
 
     if payload.authority_method == "authorized_official":
         if not org.authorized_official_name:
@@ -134,11 +129,8 @@ async def handle_create_org_representation(
                     "method (e.g. admin_review)."
                 )
             )
-        initial_status = "verified"
-        verification_event = "authority_proven"
 
     elif payload.authority_method == "domain_email":
-        # v1 stub — the enum value ships so the schema/UI stay coherent.
         raise BadRequestError(
             detail=(
                 "The domain_email authority path is not yet enabled. "
@@ -147,14 +139,7 @@ async def handle_create_org_representation(
         )
 
     elif payload.authority_method == "rep_approval":
-        # An existing verified rep approves the new one. The Profile Hub
-        # invite flow sets `approved_by` to the approver's user_id; the
-        # request must come FROM the approver (or admin) so an
-        # unauthorized user can't claim someone else's approval.
-        # `approved_by` is server-set here from `requesting_user.id`
-        # rather than read from the payload schema (which doesn't expose
-        # it) — the requesting user IS the approver in this flow.
-        approver_reps = await repo.list_verified_for_org(payload.org_id)
+        approver_reps = await org_rep_repo.list_verified_for_org(payload.org_id)
         if not any(r.user_id == requesting_user.id for r in approver_reps):
             if not requesting_user.is_superuser:
                 raise ForbiddenError(
@@ -164,39 +149,47 @@ async def handle_create_org_representation(
                         "new rep."
                     )
                 )
-        approved_by = requesting_user.id
-        # Approver-driven approvals land at `verified` directly — the
-        # approver IS the gate.
-        initial_status = "verified"
+
+    # `admin_review` passes through; the row will land at pending.
+
+
+async def after_create_org_representation(
+    *,
+    row: OrgRepresentation,
+    payload: BaseModel,
+    requesting_user: User,
+    verification_repo: VerificationRepository,
+    audit_repo_dep: AuditRepository,
+) -> None:
+    """`after_create_path` target — post-persist dispatch on
+    `payload.authority_method`. Mutates the row's `authority_status`
+    and (for `rep_approval`) `approved_by`; appends a `Verification`
+    event for the auto-verified paths.
+
+    Runs inside the framework's `mutate(...)` create transaction. Row
+    mutations here land in the audit `after` snapshot; the
+    `Verification` event lands in the same transaction so the audit +
+    verification rows commit atomically.
+
+    The hook DOES NOT re-run validation — that's
+    `validate_org_representation_payload`'s job. By the time we get
+    here, the payload is known-good.
+    """
+    if payload.authority_method == "authorized_official":
+        row.authority_status = "verified"
         verification_event = "authority_proven"
+    elif payload.authority_method == "rep_approval":
+        row.authority_status = "verified"
+        row.approved_by = requesting_user.id
+        verification_event = "authority_proven"
+    else:
+        # `admin_review` → leave at the default `pending`.
+        verification_event = None
 
-    elif payload.authority_method == "admin_review":
-        # Land at pending; admin closes the loop via the `authority`
-        # state axis.
-        initial_status = "pending"
-
-    new_row = OrgRepresentation(
-        user_id=payload.user_id,
-        org_id=payload.org_id,
-        role=payload.role,
-        authority_method=payload.authority_method,
-        authority_status=initial_status,
-        approved_by=approved_by,
-    )
-    new_row = await repo._persist_new(new_row)
-    await record_audit_for(
-        audit_repo,
-        resource=ORG_REPRESENTATION_ENTITY.audit,
-        verb="create",
-        actor_id=requesting_user.id,
-        target_id=new_row.id,
-        before=None,
-        after=ORG_REPRESENTATION_ENTITY.audit.snapshot(new_row),
-    )
     if verification_event is not None:
         await record_verification_event(
             verification_repo=verification_repo,
-            audit_repo=audit_repo,
+            audit_repo=audit_repo_dep,
             subject_type="organization",
             org_id=payload.org_id,
             event_type=verification_event,
@@ -207,16 +200,14 @@ async def handle_create_org_representation(
             },
             actor_id=requesting_user.id,
         )
-    await repo.session.commit()
     logger.info(
-        "org_representation.create: id=%s user=%s org=%s method=%s status=%s",
-        new_row.id,
+        "org_representation.after_create: id=%s user=%s org=%s method=%s status=%s",
+        row.id,
         payload.user_id,
         payload.org_id,
         payload.authority_method,
-        initial_status,
+        row.authority_status,
     )
-    return new_row
 
 
 async def handle_set_org_representation_authority(

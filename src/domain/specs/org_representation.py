@@ -12,17 +12,18 @@ the resource is User-owned, not Org-owned, so a `/orgs/{id}/reps`
 shape would be misleading). The `authority` state axis is the
 admin (or rep_approval-approver) override of `authority_status`.
 
-This Phase-1 spec lands the minimum routes the Profile Hub (Phase 5)
-needs: `create` for the goal-led setup flow, `update` for role
-changes, `delete` for hard-revoke admin paths. List/detail/form
-templates land alongside the Profile Hub partials in Phase 5; until
-then the spec opts out of `list` / `detail` / `form_new` / `form_edit`
-so no placeholder template is shipped.
+Creation uses the generic factory plus an `after_create` hook for the
+per-`authority_method` dispatch (auto-verify for `authorized_official`,
+record a `Verification` event, etc.) — see
+`src.domain.logic.org_representations.handlers.after_create_org_representation`.
+The hook runs inside the framework's `mutate(...)` create transaction so
+its mutations land in the audit `after` snapshot.
 """
 
 from typing import Final
 
 from src.domain.logic.org_representations.repository import (
+    OrgRepresentationRepository,
     get_org_representation_repository,
 )
 from src.domain.logic.org_representations.schema import (
@@ -33,8 +34,10 @@ from src.domain.logic.org_representations.schema import (
     OrgRepresentationRead,
     OrgRepresentationUpdate,
 )
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import OrgRepresentation
 from src.framework.audit.core import AuditAction
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -59,14 +62,40 @@ ORG_REPRESENTATION_ENTITY: Final[EntitySpec] = EntitySpec(
     update_adapter=OrgRepresentationUpdate,
     read_schema=OrgRepresentationRead,
     audit_snapshot=OrgRepresentationAuditSnapshot,
-    # Phase 1: API surface only. The Profile Hub (Phase 5) renders the
-    # list/detail/form views via its own per-mode partials — no generic
-    # collection page here yet, so we don't ship placeholder templates.
-    # `create=False` opts out of the framework's generic create so the
-    # bespoke `handle_create_org_representation` (which dispatches on
-    # `authority_method`) owns POST `/org_representations`. Update +
-    # delete still flow through the generic factories.
-    routes=RouteSet(update=True, delete=True),
+    # Generic CRUD through the factory; the per-authority_method
+    # dispatch happens in `after_create`. Update + delete are
+    # unchanged.
+    routes=RouteSet(create=True, update=True, delete=True),
+    # Precondition validation: AO name-match check, domain_email stub,
+    # rep_approval-approver check. Raises on rejection.
+    payload_authz_path=(
+        "src.domain.logic.org_representations.handlers."
+        "validate_org_representation_payload"
+    ),
+    payload_authz_repos=(
+        # `repo` is already a framework-reserved signature param on the
+        # create handler; declare under a distinct name and the hook
+        # consumes the same `OrgRepresentationRepository` instance via
+        # FastAPI's per-request injection.
+        ("org_rep_repo", OrgRepresentationRepository),
+    ),
+    # Post-persist dispatch: mutates the just-created row's
+    # `authority_status` + `approved_by` from `payload.authority_method`,
+    # and appends a `Verification` event for auto-verified paths
+    # (`authorized_official`, `rep_approval`). Lands inside the
+    # framework's create transaction so audit + verification rows
+    # commit atomically with the row itself.
+    after_create_path=(
+        "src.domain.logic.org_representations.handlers."
+        "after_create_org_representation"
+    ),
+    after_create_repos=(
+        ("verification_repo", VerificationRepository),
+        # `audit_repo` is reserved by the create-handler factory; bind
+        # under a distinct name so the hook receives its own injected
+        # instance.
+        ("audit_repo_dep", AuditRepository),
+    ),
     state_axes=(
         StateAxis(
             name="authority",

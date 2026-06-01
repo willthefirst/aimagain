@@ -136,6 +136,8 @@ async def handle_create(
     parent_id: UUID | None = None,
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_kwargs: dict[str, Any] | None = None,
+    after_create: Callable[..., Awaitable[None]] | None = None,
+    after_create_kwargs: dict[str, Any] | None = None,
 ) -> Any:
     """Generic create handler driven by `spec`.
 
@@ -144,7 +146,15 @@ async def handle_create(
     BEFORE the payload is used to build the model. The callable is
     expected to raise `ForbiddenError` / `NotFoundError` on rejection;
     `payload_authz_kwargs` supplies any spec-declared typed repo kwargs.
-    See `EntitySpec.payload_authz_path` for the contract."""
+    See `EntitySpec.payload_authz_path` for the contract.
+
+    `after_create` (if supplied) is invoked AFTER the row has been
+    persisted (it has an id) and BEFORE the audit `after`-snapshot is
+    taken. Use it to mutate the row's server-controlled columns based
+    on the payload, OR to do side effects in the same transaction
+    (e.g. record a `Verification` event). The hook receives `row=`,
+    `payload=`, `requesting_user=`, and `**after_create_kwargs`. See
+    `EntitySpec.after_create_path` for the contract."""
     if spec.audit is None:
         raise ValueError(
             f"handle_create: spec {spec.name!r} has no audit binding; "
@@ -235,7 +245,19 @@ async def handle_create(
         resource=spec.audit,
         verb="create",
     ):
-        pass
+        # `after_create` runs inside the `mutate(...)` block — after
+        # persistence (so the row has an id) and before the audit
+        # `after`-snapshot is taken (so any row mutations the hook
+        # makes are reflected in the snapshot). Raises propagate; the
+        # context manager rolls back the transaction without writing
+        # the audit row.
+        if after_create is not None:
+            await after_create(
+                row=created,
+                payload=payload,
+                requesting_user=requesting_user,
+                **(after_create_kwargs or {}),
+            )
     return created
 
 
@@ -375,6 +397,12 @@ class _FactoryShape:
     # for each declared typed repo, and forwards the resolved callable
     # plus the collected typed-repo dict to the underlying handler.
     payload_authz_call: bool = False
+    # Verbs that route through `after_create` (create only). Mirror of
+    # the `payload_authz_call` plumbing — `_make_factory_handler`
+    # accepts optional `after_create` + `after_create_repos`, synthesizes
+    # signature params for each declared typed repo, and forwards both
+    # to the underlying handler.
+    after_create_call: bool = False
 
 
 _DELETE_SHAPE = _FactoryShape(
@@ -389,6 +417,7 @@ _CREATE_SHAPE = _FactoryShape(
     include_parent_id=True,
     include_audit_repo=True,
     payload_authz_call=True,
+    after_create_call=True,
 )
 _UPDATE_SHAPE = _FactoryShape(
     name_template="_handle_update_{name}",
@@ -442,6 +471,8 @@ def _make_factory_handler(
     extra_repos: tuple[tuple[str, type], ...] = (),
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_repos: tuple[tuple[str, type], ...] = (),
+    after_create: Callable[..., Awaitable[None]] | None = None,
+    after_create_repos: tuple[tuple[str, type], ...] = (),
 ):
     """Build the wrapper the mount layer introspects and calls.
 
@@ -464,7 +495,10 @@ def _make_factory_handler(
         if shape.payload_authz_call
         else ()
     )
-    if shape.payload_authz_call and payload_authz_repo_names:
+    after_create_repo_names = (
+        tuple(name for name, _ in after_create_repos) if shape.after_create_call else ()
+    )
+    if shape.payload_authz_call or shape.after_create_call:
         reserved = {
             "payload",
             "repo",
@@ -474,13 +508,29 @@ def _make_factory_handler(
         }
         if parent_id_param is not None:
             reserved.add(parent_id_param)
-        clashes = [n for n in payload_authz_repo_names if n in reserved]
+        clashes = [
+            n
+            for n in (*payload_authz_repo_names, *after_create_repo_names)
+            if n in reserved
+        ]
         if clashes:
             raise ValueError(
-                f"_make_factory_handler({spec.name!r}): payload_authz_repos "
-                f"name(s) {clashes!r} collide with the factory-generated "
-                "signature params — pick distinct names."
+                f"_make_factory_handler({spec.name!r}): payload_authz_repos / "
+                f"after_create_repos name(s) {clashes!r} collide with the "
+                "factory-generated signature params — pick distinct names."
             )
+        # Names must also not collide with each other (a single
+        # `inspect.Parameter` per name).
+        seen: set[str] = set()
+        for n in (*payload_authz_repo_names, *after_create_repo_names):
+            if n in seen:
+                raise ValueError(
+                    f"_make_factory_handler({spec.name!r}): repo name "
+                    f"{n!r} declared in both payload_authz_repos and "
+                    "after_create_repos — synthesize one slot, share it via "
+                    "a single declaration."
+                )
+            seen.add(n)
     # `spec.filters` accepts raw `QueryParam` (legacy) or `Filter`
     # subclasses (URL + UI metadata). Both expose the URL shape via the
     # same `name` / `annotation` pair — `Filter` via `to_query_param()`.
@@ -529,6 +579,14 @@ def _make_factory_handler(
     if shape.payload_authz_call:
         for name, repo_type in payload_authz_repos:
             sig_params.append(_param(name, repo_type))
+    if shape.after_create_call:
+        # Skip names already added via `payload_authz_repos` — a spec
+        # can reuse the same repo for both hooks; one slot is enough.
+        existing = set(payload_authz_repo_names) if shape.payload_authz_call else set()
+        for name, repo_type in after_create_repos:
+            if name in existing:
+                continue
+            sig_params.append(_param(name, repo_type))
 
     async def _handler(**kwargs: Any) -> Any:
         call_kwargs: dict[str, Any] = {
@@ -561,6 +619,11 @@ def _make_factory_handler(
             call_kwargs["payload_authz_kwargs"] = {
                 n: kwargs[n] for n in payload_authz_repo_names
             }
+        if shape.after_create_call and after_create is not None:
+            call_kwargs["after_create"] = after_create
+            call_kwargs["after_create_kwargs"] = {
+                n: kwargs[n] for n in after_create_repo_names
+            }
         return await handler_fn(spec, **call_kwargs)
 
     _handler.__signature__ = inspect.Signature(parameters=sig_params)  # type: ignore[attr-defined]
@@ -578,6 +641,8 @@ def make_create_handler(
     *,
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_repos: tuple[tuple[str, type], ...] = (),
+    after_create: Callable[..., Awaitable[None]] | None = None,
+    after_create_repos: tuple[tuple[str, type], ...] = (),
 ):
     return _make_factory_handler(
         spec,
@@ -585,6 +650,8 @@ def make_create_handler(
         handle_create,
         payload_authz=payload_authz,
         payload_authz_repos=payload_authz_repos,
+        after_create=after_create,
+        after_create_repos=after_create_repos,
     )
 
 
