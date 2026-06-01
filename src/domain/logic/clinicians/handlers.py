@@ -167,7 +167,7 @@ async def handle_set_license_attestation(
     # narrow; this handler is the only caller that needs them.
     from datetime import date, datetime, timezone
 
-    from src.domain.logic.verifications.handlers import (
+    from src.domain.logic.verifications.events import (
         recompute_clinician_claim,
         record_verification_event,
     )
