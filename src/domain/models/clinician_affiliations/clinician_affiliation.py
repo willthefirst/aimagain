@@ -1,4 +1,5 @@
 from functools import partial
+from typing import ClassVar
 
 from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
@@ -14,6 +15,9 @@ _ck = partial(named_check_in, _TABLE)
 
 
 class ClinicianAffiliation(LocationMixin, BaseModel):
+    # Location is deferred during onboarding — users fill it in from the
+    # "complete your profile" section after NPI verification.
+    _location_nullable: ClassVar[bool] = True
     """The clinician's role at one organization.
 
     Holds the practice-role attributes that vary per (clinician × org):

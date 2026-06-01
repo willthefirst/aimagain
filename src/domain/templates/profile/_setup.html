@@ -2,26 +2,28 @@
    Renders a progressive step-by-step flow based on the user's
    clinicians' current state:
 
-   Step 0 — no clinician yet: minimal create form (name + NPI +
-     location). Posts to POST /profile/clinician, which fires NPI
-     verification inline and redirects back here.
+   Step 0 — no clinician yet: minimal fast-path form (name + NPI only;
+     location is deferred to "complete your profile"). Posts to
+     POST /profile/clinician, which fires NPI verification inline and
+     redirects back here.
 
    Step 1 — clinician exists, NPI matched but no active license:
      inline license + attestation form. Posts to
      POST /profile/clinician/{id}/license.
 
-   Step 2 — clinician exists, NPI mismatch: error copy + link to
-     the clinician edit page to correct the NPI.
+   Step 2 — clinician exists, NPI mismatch: inline name + NPI retry
+     form so the user can correct without leaving /profile. Posts to
+     POST /profile/clinician/{id}/identity.
 
-   Step 2b — clinician exists, NPI not yet submitted: prompt to edit
-     and add NPI.
+   Step 2b — clinician exists, NPI not yet submitted: inline NPI
+     submit form.
 
    Claim B ("Post on behalf of an organization") card stays visible
    per handoff §8.1 / wireframe L5 — always shown, never hidden.
 
    Uses `form_with_errors` from `_shared/form_meta.html` so validation
-   failures (e.g. invalid NPI, bad ZIP) re-render the form in-place
-   via HTMX with per-field error copy.
+   failures (e.g. invalid NPI format) re-render the form in-place via
+   HTMX with per-field error copy.
 #}
 {%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
@@ -40,18 +42,13 @@
     {%- set _clinician = clinicians[0] if clinicians else none -%}
     {%- set _active_licenses = (_clinician.licensures | selectattr('status', 'equalto', 'active') | list) if _clinician else [] -%}
     {% if not _clinician %}
-      {# Step 0: no clinician yet — minimal create form. #}
+      {# Step 0: no clinician yet — name + NPI only; location deferred. #}
       {% call form_with_errors(action="/profile/clinician", method="post") %}
         <div class="grid">
           {{ text_field("first_name", "First name", required=false) }}
           {{ text_field("last_name", "Last name", required=false) }}
         </div>
         {{ text_field("npi", "NPI (Type-1)", required=true, pattern="\\d{10}", maxlength=10) }}
-        <div class="grid">
-          {{ text_field('location_city', 'City') }}
-          {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
-          {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
-        </div>
         {{ actions("Start verification") }}
       {% endcall %}
     {% elif _clinician.npi_match_status == "matched" and not _active_licenses %}
@@ -76,7 +73,7 @@
         {{ actions("Add license") }}
       {% endcall %}
     {% elif _clinician.npi_match_status == "mismatch" %}
-      {# Step 2: NPI mismatch — guide user to correct it. #}
+      {# Step 2: NPI mismatch — inline retry form, no redirect away. #}
       <p style="color: var(--pico-color-orange-600);">
         <i class="icon-shield-alert"></i>
         <strong>NPI not matched</strong>
@@ -84,18 +81,26 @@
       </p>
       <p style="color: var(--pico-muted-color);">
         {# title-case-ignore #}
-        Check that your first name, last name, and NPI match your NPPES record exactly.
+        Correct your name or NPI below to match your NPPES record exactly, then retry.
       </p>
-      <a href="{{ entity_url('clinician', id=_clinician.id) }}/form"
-         role="button"
-         class="outline">Edit clinician profile</a>
+      {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/identity", method="post") %}
+        <div class="grid">
+          {{ text_field("first_name", "First name", value=_clinician.first_name or "", required=false) }}
+          {{ text_field("last_name", "Last name", value=_clinician.last_name or "", required=false) }}
+        </div>
+        {{ text_field("npi", "NPI (Type-1)", value=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ actions("Retry verification") }}
+      {% endcall %}
     {% elif _clinician.npi_match_status == "none" %}
-      {# NPI not submitted yet — prompt to add it. #}
-      <p style="color: var(--pico-muted-color);">
-        No NPI on file yet.
-        <a href="{{ entity_url('clinician', id=_clinician.id) }}/form">Add your NPI</a>
-        to start verification.
-      </p>
+      {# NPI not submitted yet — inline form to add it. #}
+      {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/identity", method="post") %}
+        <div class="grid">
+          {{ text_field("first_name", "First name", value=_clinician.first_name or "", required=false) }}
+          {{ text_field("last_name", "Last name", value=_clinician.last_name or "", required=false) }}
+        </div>
+        {{ text_field("npi", "NPI (Type-1)", value=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ actions("Start verification") }}
+      {% endcall %}
     {% else %}
       {# Pending / any other transient state. #}
       <p style="color: var(--pico-muted-color);">

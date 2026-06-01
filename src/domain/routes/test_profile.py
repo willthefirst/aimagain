@@ -103,6 +103,37 @@ async def test_post_profile_clinician_creates_and_redirects(
         assert clinician.org_id is not None
 
 
+async def test_post_profile_clinician_without_location(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """POST /profile/clinician works without location fields — the fast
+    path only needs name + NPI.  Location columns stay NULL on the
+    affiliation row and can be filled in later via the details endpoint."""
+    response = await authenticated_client.post(
+        "/profile/clinician",
+        data={
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.headers.get("HX-Redirect") == "/profile"
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Clinician).where(Clinician.owner_id == logged_in_user.id)
+        )
+        clinician = result.scalars().first()
+        assert clinician is not None
+        assert clinician.npi == "1234567890"
+        assert clinician.location_city is None
+        assert clinician.location_state is None
+
+
 async def test_post_profile_clinician_requires_authentication(
     test_client: AsyncClient,
 ):
@@ -163,6 +194,136 @@ async def test_post_profile_clinician_license_creates_attests_and_redirects(
         assert licensure is not None
         assert licensure.attested_active is True
         assert licensure.status == "active"
+
+
+async def test_post_profile_clinician_identity_update_retries_verification(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """POST /profile/clinician/{id}/identity updates name + NPI and
+    re-runs verification inline, returning HX-Redirect: /profile."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id,
+        npi="1111111111",
+        npi_match_status="mismatch",
+    )
+    clinician.clinician_verified = False
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+    clinician_id = clinician.id
+
+    response = await authenticated_client.post(
+        f"/profile/clinician/{clinician_id}/identity",
+        data={
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "9999999999",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers.get("HX-Redirect") == "/profile"
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Clinician).where(Clinician.id == clinician_id)
+        )
+        updated = result.scalars().first()
+        assert updated.npi == "9999999999"
+        assert updated.first_name == "Jane"
+
+
+async def test_post_profile_clinician_identity_update_rejects_wrong_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A user cannot update another user's clinician identity."""
+    from tests.helpers import create_test_user, make_clinician_with_org
+
+    other = create_test_user(username="other-identity")
+    clinician = make_clinician_with_org(owner_id=other.id, npi="2222222222")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(clinician)
+
+    response = await authenticated_client.post(
+        f"/profile/clinician/{clinician.id}/identity",
+        data={"first_name": "Evil", "last_name": "Hacker", "npi": "3333333333"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+
+
+async def test_post_profile_clinician_details_update_saves_location(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """POST /profile/clinician/{id}/details patches location fields and
+    returns HX-Redirect: /profile."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id,
+        npi="1234567890",
+        location_city=None,
+        location_state=None,
+        location_zip=None,
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+    clinician_id = clinician.id
+
+    response = await authenticated_client.post(
+        f"/profile/clinician/{clinician_id}/details",
+        data={
+            "location_city": "Portland",
+            "location_state": "OR",
+            "location_zip": "97201",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers.get("HX-Redirect") == "/profile"
+
+    async with db_test_session_manager() as session:
+        result = await session.execute(
+            select(Clinician).where(Clinician.id == clinician_id)
+        )
+        updated = result.scalars().first()
+        assert updated.location_city == "Portland"
+        assert updated.location_state == "OR"
+        assert updated.location_zip == "97201"
+
+
+async def test_post_profile_clinician_details_update_rejects_wrong_owner(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A user cannot update another user's clinician details."""
+    from tests.helpers import create_test_user, make_clinician_with_org
+
+    other = create_test_user(username="other-details")
+    clinician = make_clinician_with_org(owner_id=other.id, npi="5555555555")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+            session.add(clinician)
+
+    response = await authenticated_client.post(
+        f"/profile/clinician/{clinician.id}/details",
+        data={"location_city": "Evil", "location_state": "CA", "location_zip": "90210"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
 
 
 async def test_post_profile_clinician_license_requires_authentication(

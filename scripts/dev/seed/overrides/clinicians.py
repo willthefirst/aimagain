@@ -121,7 +121,14 @@ async def generate_affiliations(
         # Primary affiliation — deterministic ID keyed (clinician, 0).
         primary_id = deterministic_uuid("ClinicianAffiliation", i, 0)
         kwargs = _affiliation_kwargs(rng, aff_index)
-        kwargs["location_city"] = _city_for_state(rng, kwargs["location_state"])
+        # ~20% of affiliations have null location — exercises the deferred
+        # "complete your profile" path where location is filled in later.
+        if rng.bool(0.2):
+            kwargs["location_city"] = None
+            kwargs["location_state"] = None
+            kwargs["location_zip"] = None
+        else:
+            kwargs["location_city"] = _city_for_state(rng, kwargs["location_state"])
         primary = ClinicianAffiliation(
             id=primary_id,
             clinician_id=clinician.id,
