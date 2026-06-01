@@ -5,7 +5,7 @@
   {% block title %}Home{% endblock %}
   {% block content %}
     {# Three-branch home per handoff §8.2:
-       1. No claim → "Finish setting up" card + blurred teaser feed.
+       1. No claim → "Finish setting up" card + anonymized teaser feed.
        2. ≥1 claim → existing body (my posts + network feed).
        3. Any claim lapsed → yellow banner above the existing body
           naming the lapsed claim. The banner copy is owned by
@@ -71,22 +71,20 @@
         <a href="{{ entity_url('post') }}">Adjust filters</a>
           {# djlint:on #}
         </p>
-        {# When the user hasn't verified yet (no claim AND no
-           ever_verified_at), blur the network feed so the teaser
-           conveys "there's content here once you verify". Drives the
-           handoff-§7.1 feed-teaser rule via the same single-source
-           capability predicate, exposed as a `base_context()` scalar
-           so this template stays chrome-dumb. #}
+        {# Identifying info (poster name, practice, contact) is
+           anonymized server-side via `can_read_full_feed`. Show a
+           CTA so unverified users know verification unlocks the full
+           view. Verified users see nothing extra here. #}
         {% if not can_read_full_feed %}
-          <div id="feed-teaser-blur"
-               style="filter: blur(4px);
-                      user-select: none;
-                      pointer-events: none">
-            {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
-          </div>
-        {% else %}
-          {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
+          <p id="feed-verify-notice"
+             style="font-size: 0.875rem;
+                    color: var(--pico-muted-color);
+                    margin-bottom: 1rem">
+            Clinician names and contact details are hidden until you verify.
+            <a href="/profile">Complete verification →</a>
+          </p>
         {% endif %}
+        {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
       </section>
     {% endif %}
   {% endblock %}

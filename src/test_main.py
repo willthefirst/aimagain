@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient
 from selectolax.parser import HTMLParser
 
+from src.domain.models import Post
 from src.main import lifespan
 
 pytestmark = pytest.mark.asyncio
@@ -71,6 +72,67 @@ async def test_home_page_hides_post_buttons_without_claim_a(
     tree = HTMLParser(response.text)
     assert tree.css_first('a[href="/posts/form?kind=referral"]') is None
     assert "Finish setting up" in response.text
+
+
+async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
+    """The blur wrapper (`feed-teaser-blur`) is removed regardless of
+    verification state — anonymization is now server-side via `can_read_full_feed`,
+    not a CSS filter on the client."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    assert "feed-teaser-blur" not in response.text
+
+
+async def test_home_page_verify_notice_for_unverified_with_network_posts(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """When the viewer can't read the full feed and there are network posts,
+    the home page shows a CTA directing them to complete verification."""
+    from tests.helpers import create_test_user, make_referral_detail
+
+    author = create_test_user(username="net-poster")
+    post = Post(kind="referral", owner_id=author.id)
+    post.referral_detail = make_referral_detail()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    assert "feed-verify-notice" in response.text
+    assert "Complete verification" in response.text
+
+
+async def test_home_page_no_verify_notice_for_verified_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """A verified user (Claim A active) sees no verify-notice on /home."""
+    from tests.helpers import (
+        create_test_user,
+        make_clinician_with_org,
+        make_referral_detail,
+    )
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    author = create_test_user(username="net-poster-v")
+    post = Post(kind="referral", owner_id=author.id)
+    post.referral_detail = make_referral_detail()
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    assert "feed-verify-notice" not in response.text
 
 
 async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):

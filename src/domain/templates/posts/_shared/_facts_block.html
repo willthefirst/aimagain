@@ -47,7 +47,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 `DESIRED_TIME_SLOT_LABELS`, `REFERRAL_SERVICE_LABELS`,
 `TREATMENT_SETTINGS_LABELS`) are Jinja globals. #}
 {%- from "_shared/sections.html" import fact -%}
-{% macro facts_block(view, expanded=False) -%}
+{% macro facts_block(view, expanded=False, redacted=False) -%}
   <section class="entity-facts">
     <dl>
       {%- if view.services or view.settings %}
@@ -123,19 +123,19 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                     {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
                       {{ fact('age', 'Age', ages | join(", ") , icon='users') }}
                     {%- endif %}
-                    {%- if view.practice_link %}
+                    {%- if view.practice_link and not redacted %}
                       {%- call fact('practice', 'Practice') %}<a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>
                     {% endcall %}
                   {%- endif %}
-                  {%- if view.program_link %}
+                  {%- if view.program_link and not redacted %}
                     {%- call fact('program', 'Program') %}<a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>
                   {% endcall %}
                 {%- endif %}
-                {%- if view.organization_link %}
+                {%- if view.organization_link and not redacted %}
                   {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>
                 {% endcall %}
               {%- endif %}
-              {%- if view.full_address %}{{ fact('address', 'Address', view.full_address, icon='map-pin') }}{%- endif %}
+              {%- if view.full_address and not redacted %}{{ fact('address', 'Address', view.full_address, icon='map-pin') }}{%- endif %}
                 {%- if view.in_person is not none %}
                   {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person], icon='monitor') }}
                 {%- endif %}
