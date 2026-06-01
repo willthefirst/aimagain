@@ -12,18 +12,22 @@ from src.domain.logic.organizations.schema import (
     OrganizationCreate,
     OrganizationRead,
     OrganizationUpdate,
+    OrganizationVerificationAuditSnapshot,
+    OrganizationVerificationStateUpdate,
 )
 from src.domain.models import Organization
 from src.domain.models.enums import (
     ORGANIZATION_TYPES,
     ORGANIZATION_TYPES_LABELS,
 )
+from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
     Redirects,
     RouteSet,
+    StateAxis,
 )
 
 _organization_form_redirect = Redirects.to_edit_form("organizations", "organization_id")
@@ -75,4 +79,20 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
         "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
         "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,
     },
+    state_axes=(
+        # Admin override of `Organization.npi_match_status`. Mirror of
+        # the clinician-side axis (handler/semantics in
+        # `src.domain.logic.organizations.handlers.handle_set_org_verification_state`).
+        StateAxis(
+            name="verification",
+            body_schema=OrganizationVerificationStateUpdate,
+            action=AuditAction.SET_ORG_VERIFICATION_STATE,
+            handler_path=(
+                "src.domain.logic.organizations.handlers."
+                "handle_set_org_verification_state"
+            ),
+            audit_snapshot=OrganizationVerificationAuditSnapshot,
+            forbid_self=False,
+        ),
+    ),
 )

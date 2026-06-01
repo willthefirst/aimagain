@@ -443,7 +443,7 @@ CERTIFICATION_TYPES: Final[tuple[str, ...]] = CertificationType.values()
 CERTIFICATION_TYPES_LABELS: Final[dict[str, str]] = CertificationType.labels()
 
 
-# Outcome of a single nightly verification attempt. `verified` —
+# Outcome of a single NPPES verification attempt. `verified` —
 # all checks passed; `needs_review` — a soft mismatch worth a human look
 # (e.g. NPPES name similarity below threshold); `failed` — a hard
 # disqualifier (NPI not in NPPES, or an OIG/LEIE match). One row per

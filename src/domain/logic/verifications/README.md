@@ -14,8 +14,10 @@ Persistence + pure-function primitives for the clinician verification pipeline. 
 
 The pipeline orchestrators have two callers each:
 
-1. **`handle_create_clinician_verification` / `handle_create_org_verification`** in `handlers.py` (admin retrigger; `actor_id=requesting_user.id`).
-2. **`run_nightly_verification`** in [`../../../jobs/nightly_verification.py`](../../../jobs/nightly_verification.py) (daily APScheduler job; `actor_id=None`).
+1. **`submit_clinician_npi` / `submit_organization_npi`** in [`../../routes/verifications.py`](../../routes/verifications.py) (end-user NPI submission; the route runs the pipeline inline so the response carries the resolved state — see that file's docstring).
+2. **`handle_create_clinician_verification` / `handle_create_org_verification`** in `handlers.py` (admin retrigger; `actor_id=requesting_user.id`).
+
+There is no scheduled job — see [`../../../jobs/README.md`](../../../jobs/README.md) for the rationale (NPPES is fast enough to run inline; a worker buys polling and pending-state complexity in exchange for no real latency win).
 
 (`__init__.py` is intentionally empty — these are imported directly via `src.domain.logic.verifications.nppes`/`.oig`/`.scoring`/`.repository`/`.schema`/`.handlers`/`.events`.)
 
@@ -25,7 +27,7 @@ The orchestrator owns the database session and the `httpx.AsyncClient` — pure 
 
 ## Registry rate limits and reliability
 
-NPPES is a free public registry; no documented rate limit. The nightly job (#530) runs sequentially anyway, so we don't pace requests. The 10-second per-call timeout exists so a single hung lookup can't stall the whole batch.
+NPPES is a free public registry; no documented rate limit. With verification running inline on submit, there's no batch to pace — one NPI lookup per user-driven POST. The 10-second per-call timeout bounds the submit response time on a slow NPPES day.
 
 ## Exclusion-list refresh cadence
 
@@ -39,7 +41,7 @@ A missing CSV does not crash the pipeline — `oig_check` logs once at process s
 
 ## Audit ritual
 
-The orchestrator writes one `Verification` row plus one matching audit row in a single transaction (`record_audit_for(...)` + an explicit `session.commit()`). `actor_id=None` for nightly runs, `requesting_user.id` for the admin retrigger — see [System actor](../../../framework/audit/README.md#system-actor). The retrigger endpoint is `current_admin_user`-gated; non-superusers get 403.
+The orchestrator writes one `Verification` row plus one matching audit row in a single transaction (`record_audit_for(...)` + an explicit `session.commit()`). `actor_id=requesting_user.id` for both the inline submit and the admin retrigger — see [System actor](../../../framework/audit/README.md#system-actor). The retrigger endpoint is `current_admin_user`-gated; non-superusers get 403. (The pipeline still accepts `actor_id=None` for system-initiated runs; nothing in the codebase calls it that way today, but the `Optional` shape preserves that option.)
 
 ### Why `record_audit_for` + explicit commit (not `mutate`)
 

@@ -124,21 +124,33 @@ async def run_clinician_verification(
         after=VERIFICATION_RESOURCE.snapshot(verification),
     )
 
-    # Update the Claim-A denorm cache. Per handoff §10.1 the worker
-    # never auto-transitions to `mismatch` — a soft mismatch stays
-    # `pending` until an admin closes it via the `verification` state
-    # axis on Clinician (Phase 1 ships the column but not the axis
-    # handler yet; Phase 8's worker calls into this same code).
+    # Update the Claim-A denorm cache. Three outcomes map to two states
+    # the worker doesn't re-poll:
+    #
+    # - `verified`: NPPES name match cleared the threshold → `matched`.
+    # - `failed` / `needs_review` with NPI on file: NPPES gave a
+    #   definitive non-match (NPI not found, OIG hit, name mismatch).
+    #   Re-running NPPES against the same row won't change the answer,
+    #   so flip to `mismatch` and stop polling. The original §10.1
+    #   "never hard-fail without admin review" rule is preserved by the
+    #   `verification` state axis on Clinician — admin can flip back
+    #   to `pending` (to re-queue) or `matched` (to override) via
+    #   `PUT /clinicians/{id}/verification`.
+    # - `failed` with no NPI on file: nothing to lock in; stay at
+    #   `none` so the next submission re-enters the pipeline cleanly.
+    #
+    # The `npi_resolved` Verification row above already captures the
+    # NPPES result in the event log; a separate "cache transition"
+    # event would just duplicate that.
     if score.status == "verified":
         clinician.npi_match_status = "matched"
         clinician.npi_verified_at = _now()
-    elif score.status == "failed" and not clinician.npi:
-        # No NPI submitted yet — stay at 'none' rather than burning the
-        # column to a final-fail state the user can't recover from
-        # without admin intervention.
-        clinician.npi_match_status = "none"
-    # `needs_review` and "found but mismatch" stay `pending` until an
-    # admin closes the loop.
+    elif score.status in ("failed", "needs_review"):
+        if clinician.npi:
+            clinician.npi_match_status = "mismatch"
+        else:
+            clinician.npi_match_status = "none"
+
     recompute_clinician_claim(clinician)
 
     await verification_repo.session.commit()
@@ -258,15 +270,19 @@ async def run_org_verification(
         after=VERIFICATION_RESOURCE.snapshot(verification),
     )
 
-    # Update the org-side denorm cache. Same §10.1 rule as the Clinician
-    # side: `needs_review` stays `pending` rather than auto-flipping to
-    # `mismatch`.
+    # Update the org-side denorm cache. Mirror of the clinician-side
+    # rule: `failed`/`needs_review` with an NPI on file → `mismatch`
+    # (worker stops polling; admin flips via the `verification` state
+    # axis on Organization if needed).
     if status == "verified":
         org.npi_match_status = "matched"
         if nppes_result.authorized_official_name:
             org.authorized_official_name = nppes_result.authorized_official_name
-    elif status == "failed" and not org.npi:
-        org.npi_match_status = "none"
+    elif status in ("failed", "needs_review"):
+        if org.npi:
+            org.npi_match_status = "mismatch"
+        else:
+            org.npi_match_status = "none"
     recompute_org_claim(org)
 
     await verification_repo.session.commit()
