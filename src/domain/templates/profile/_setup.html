@@ -85,20 +85,20 @@
       </p>
       {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/identity", method="post") %}
         <div class="grid">
-          {{ text_field("first_name", "First name", value=_clinician.first_name or "", required=false) }}
-          {{ text_field("last_name", "Last name", value=_clinician.last_name or "", required=false) }}
+          {{ text_field("first_name", "First name", current=_clinician.first_name or "", required=false) }}
+          {{ text_field("last_name", "Last name", current=_clinician.last_name or "", required=false) }}
         </div>
-        {{ text_field("npi", "NPI (Type-1)", value=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ text_field("npi", "NPI (Type-1)", current=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
         {{ actions("Retry verification") }}
       {% endcall %}
     {% elif _clinician.npi_match_status == "none" %}
       {# NPI not submitted yet — inline form to add it. #}
       {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/identity", method="post") %}
         <div class="grid">
-          {{ text_field("first_name", "First name", value=_clinician.first_name or "", required=false) }}
-          {{ text_field("last_name", "Last name", value=_clinician.last_name or "", required=false) }}
+          {{ text_field("first_name", "First name", current=_clinician.first_name or "", required=false) }}
+          {{ text_field("last_name", "Last name", current=_clinician.last_name or "", required=false) }}
         </div>
-        {{ text_field("npi", "NPI (Type-1)", value=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
+        {{ text_field("npi", "NPI (Type-1)", current=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
         {{ actions("Start verification") }}
       {% endcall %}
     {% else %}
