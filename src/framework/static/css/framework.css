@@ -325,10 +325,10 @@ dd { margin: 0; }
      `.toolbar-actions` — a single cell wrapping the filter link
        (`.toolbar-filter-link`) and the action menu
        (`.toolbar-right`). Wrapping both in one cell is what
-       gives the toolbar atomic reflow: at ≥641px the heading
-       and actions share one row; at ≤640px the actions cell
-       drops below the heading as a single unit. The cluster
-       never splits mid-toolbar.
+       gives the toolbar atomic reflow: the heading and actions
+       share one row at all viewport widths — the heading cell
+       shrinks via `minmax(0, 1fr)` to accommodate the actions.
+       The cluster never splits mid-toolbar.
    Pages without actions or filter link render only the H1; the
    macro omits `.toolbar-actions` entirely so the grid's second
    column collapses. */
@@ -348,15 +348,10 @@ dd { margin: 0; }
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 .toolbar-filter-link { min-width: 0; }
 .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-/* Atomic stack on narrow viewports. The actions cell drops to
-   a second row in one move — the cluster doesn't split. */
-@media (max-width: 640px) {
-  .toolbar { grid-template-columns: 1fr; }
-  .toolbar-actions { justify-content: flex-start; flex-wrap: wrap; }
-}
 /* `<menu>` is HTML's native "list of commands" element — used
    by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
    and any in-row action cluster (e.g. the users-table Actions
