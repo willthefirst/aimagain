@@ -1,6 +1,7 @@
 from typing import Sequence
 from uuid import UUID
 
+import sqlalchemy as sa
 from sqlalchemy import select
 
 from src.domain.models import Clinician, ClinicianLicensure
@@ -50,8 +51,29 @@ class ClinicianRepository(BaseRepository):
     ) -> Sequence[Clinician]:
         """List directory entries newest first. Both filters are multi-select;
         when set, joins through `clinician_licensures` (SQL table) and distincts so a
-        clinician with multiple matching licensures appears once."""
-        stmt = select(Clinician)
+        clinician with multiple matching licensures appears once.
+
+        Per handoff §4.3 + §10.6, the directory only surfaces clinicians
+        with `clinician_verified=True` OR `ever_verified_at IS NOT NULL`:
+
+        * `clinician_verified=True` — actively verified Claim A.
+        * `ever_verified_at IS NOT NULL` — once-verified clinician
+          whose claim has lapsed (per §10.6 they "stay listed but hide
+          open posts" — listing them keeps the directory page useful,
+          their post visibility is gated separately by the capability
+          predicates).
+
+        Never-verified clinicians are filtered out so the directory
+        stays a curated index of verified providers — the chrome's
+        capability gates already prevent them from posting, and listing
+        them would surface noise.
+        """
+        stmt = select(Clinician).filter(
+            sa.or_(
+                Clinician.clinician_verified.is_(True),
+                Clinician.ever_verified_at.is_not(None),
+            )
+        )
         if license_type or issuing_state:
             stmt = stmt.join(
                 ClinicianLicensure,

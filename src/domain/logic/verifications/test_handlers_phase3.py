@@ -518,11 +518,16 @@ async def test_run_clinician_verification_writes_through_cache(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(owner)
+            # Seed unverified so the pipeline exercises the
+            # `False → True` transition. The helper defaults to
+            # verified, so override here.
             clinician = make_clinician_with_org(
                 owner_id=owner.id,
                 npi="1234567890",
                 first_name="Eva",
                 last_name="Stone",
+                clinician_verified=False,
+                npi_match_status="none",
             )
             session.add(clinician)
     clinician_id = clinician.id

@@ -346,6 +346,16 @@ async def test_delete_clinician_cascades_to_credentials(
 # --- list_clinicians -----------------------------------------------------------------------------------------------------
 
 
+def _verified(clinician):
+    """Per Phase-7 the directory filter only surfaces clinicians with
+    `clinician_verified=True` OR `ever_verified_at IS NOT NULL` (per
+    handoff §4.3 + §10.6). These tests pre-date that rule; flip the
+    flag here so they exercise the filter's success path."""
+    clinician.clinician_verified = True
+    clinician.npi_match_status = "matched"
+    return clinician
+
+
 async def test_list_clinicians_no_filters_returns_all(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
@@ -354,15 +364,66 @@ async def test_list_clinicians_no_filters_returns_all(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(make_clinician_with_org(owner_id=user_a.id))
+            session.add(_verified(make_clinician_with_org(owner_id=user_a.id)))
             session.add(
-                make_clinician_with_org(owner_id=user_b.id, practice_name="Other")
+                _verified(
+                    make_clinician_with_org(owner_id=user_b.id, practice_name="Other")
+                )
             )
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
         clinicians = await repo.list_clinicians()
         assert len(clinicians) == 2
+
+
+async def test_list_clinicians_filters_out_never_verified(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A clinician with `clinician_verified=False` AND
+    `ever_verified_at IS NULL` is filtered out of the directory per
+    handoff §4.3. The chrome's capability gate already prevents them
+    from posting; listing them would surface noise."""
+    user = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            # `make_clinician_with_org` defaults to verified; override
+            # explicitly to None-out the "other" clinician's claim.
+            session.add(make_clinician_with_org(owner_id=user.id))
+            other = make_clinician_with_org(
+                owner_id=user.id,
+                practice_name="Other",
+                clinician_verified=False,
+                npi_match_status="none",
+            )
+            session.add(other)
+
+    async with db_test_session_manager() as session:
+        repo = ClinicianRepository(session)
+        clinicians = await repo.list_clinicians()
+        assert len(clinicians) == 1
+
+
+async def test_list_clinicians_includes_once_verified_clinicians(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Per handoff §10.6 a clinician whose claim has lapsed stays
+    visible in the directory (their open posts are gated separately).
+    `ever_verified_at IS NOT NULL` is the retention signal."""
+    import datetime as _dt
+
+    user = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            lapsed = make_clinician_with_org(owner_id=user.id)
+            lapsed.clinician_verified = False
+            lapsed.ever_verified_at = _dt.datetime(2025, 6, 1)
+            session.add(lapsed)
+
+    async with db_test_session_manager() as session:
+        repo = ClinicianRepository(session)
+        clinicians = await repo.list_clinicians()
+        assert len(clinicians) == 1
 
 
 async def test_list_clinicians_filtered_by_license_type(
@@ -373,9 +434,9 @@ async def test_list_clinicians_filtered_by_license_type(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician_a = make_clinician_with_org(owner_id=user_a.id)
-            clinician_b = make_clinician_with_org(
-                owner_id=user_b.id, practice_name="Other"
+            clinician_a = _verified(make_clinician_with_org(owner_id=user_a.id))
+            clinician_b = _verified(
+                make_clinician_with_org(owner_id=user_b.id, practice_name="Other")
             )
             session.add_all([clinician_a, clinician_b])
             await session.flush()
@@ -409,9 +470,9 @@ async def test_list_clinicians_filtered_by_issuing_state(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician_a = make_clinician_with_org(owner_id=user_a.id)
-            clinician_b = make_clinician_with_org(
-                owner_id=user_b.id, practice_name="Other"
+            clinician_a = _verified(make_clinician_with_org(owner_id=user_a.id))
+            clinician_b = _verified(
+                make_clinician_with_org(owner_id=user_b.id, practice_name="Other")
             )
             session.add_all([clinician_a, clinician_b])
             await session.flush()
@@ -447,12 +508,12 @@ async def test_list_clinicians_combined_filter_is_anded(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician_a = make_clinician_with_org(owner_id=user_a.id)
-            clinician_b = make_clinician_with_org(
-                owner_id=user_b.id, practice_name="Two"
+            clinician_a = _verified(make_clinician_with_org(owner_id=user_a.id))
+            clinician_b = _verified(
+                make_clinician_with_org(owner_id=user_b.id, practice_name="Two")
             )
-            clinician_c = make_clinician_with_org(
-                owner_id=user_c.id, practice_name="Three"
+            clinician_c = _verified(
+                make_clinician_with_org(owner_id=user_c.id, practice_name="Three")
             )
             session.add_all([clinician_a, clinician_b, clinician_c])
             await session.flush()
@@ -529,7 +590,7 @@ async def test_list_clinicians_distinct_when_multiple_licensures_match(
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician_row = make_clinician_with_org(owner_id=user.id)
+            clinician_row = _verified(make_clinician_with_org(owner_id=user.id))
             session.add(clinician_row)
             await session.flush()
             session.add(
