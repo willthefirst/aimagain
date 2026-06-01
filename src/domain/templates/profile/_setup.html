@@ -1,54 +1,132 @@
-{# Setup mode — first-run goal picker per wireframe L1.
+{# Setup mode — guided onboarding for users with no verified claims.
+   Renders a progressive step-by-step flow based on the user's
+   clinicians' current state:
 
-   Renders two cards (Claim A / Claim B). In Phase-5-skeleton these are
-   informational + a link to the existing user-detail page where NPI /
-   license / org-representation rows can be created via the framework's
-   generic CRUD. The follow-up PR introduces inline POST endpoints
-   (`POST /clinicians/{id}/npi`, `POST /organizations/{id}/npi`) that
-   land the row, flip `npi_match_status='pending'`, and swap the card
-   into a "Verifying…" pill via HTMX.
+   Step 0 — no clinician yet: minimal create form (name + NPI +
+     location). Posts to POST /profile/clinician, which fires NPI
+     verification inline and redirects back here.
 
-   Per handoff §8.1 / wireframe L5: when a user only wants Claim B,
-   the Claim A card stays visible but in a disabled / "not needed"
-   state — never hidden. The card IS the affordance; inputs simply
-   aren't there until the user opts in.
+   Step 1 — clinician exists, NPI matched but no active license:
+     inline license + attestation form. Posts to
+     POST /profile/clinician/{id}/license.
+
+   Step 2 — clinician exists, NPI mismatch: error copy + link to
+     the clinician edit page to correct the NPI.
+
+   Step 2b — clinician exists, NPI not yet submitted: prompt to edit
+     and add NPI.
+
+   Claim B ("Post on behalf of an organization") card stays visible
+   per handoff §8.1 / wireframe L5 — always shown, never hidden.
+
+   Uses `form_with_errors` from `_shared/form_meta.html` so validation
+   failures (e.g. invalid NPI, bad ZIP) re-render the form in-place
+   via HTMX with per-field error copy.
 #}
+{%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
+{%- from "_shared/actions.html" import actions -%}
 <section>
-  <p>
-    <strong>What do you want to do on Bedlam Connect?</strong>
-  </p>
+  {# ------------------------------------------------------------------ #}
+  {# Clinician identity                                                   #}
+  {# ------------------------------------------------------------------ #}
   <article id="claim-a-card">
     <header>
-      <strong>Refer &amp; take clients as a clinician</strong>
-      <small style="display: block; color: var(--pico-muted-color);">Claim A — verify your individual NPI and license</small>
+      <strong>Add a clinician profile</strong>
+      <small style="display: block; color: var(--pico-muted-color);">
+        Verify your individual NPI and license to post referrals or openings
+      </small>
     </header>
-    <p>To list clinicians under your account and post referrals or openings, add a verified clinician profile.</p>
-    {% if clinicians %}
-      <p>
-        <small>You have {{ clinicians|length }} clinician profile(s) on file.
-          <a href="{{ entity_url('user', id='me') }}">Manage</a></small>
+    {%- set _clinician = clinicians[0] if clinicians else none -%}
+    {%- set _active_licenses = (_clinician.licensures | selectattr('status', 'equalto', 'active') | list) if _clinician else [] -%}
+    {% if not _clinician %}
+      {# Step 0: no clinician yet — minimal create form. #}
+      {% call form_with_errors(action="/profile/clinician", method="post") %}
+        <div class="grid">
+          {{ text_field("first_name", "First name", required=false) }}
+          {{ text_field("last_name", "Last name", required=false) }}
+        </div>
+        {{ text_field("npi", "NPI (Type-1)", required=true, pattern="\\d{10}", maxlength=10) }}
+        <div class="grid">
+          {{ text_field('location_city', 'City') }}
+          {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
+          {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
+        </div>
+        {{ actions("Start verification") }}
+      {% endcall %}
+    {% elif _clinician.npi_match_status == "matched" and not _active_licenses %}
+      {# Step 1: NPI matched — add license and attest in one step. #}
+      <p style="color: var(--pico-color-green-600);">
+        <i class="icon-shield-check"></i>
+        {# title-case-ignore #}
+        <strong>Matched in NPPES</strong>
+        {% if _clinician.first_name or _clinician.last_name %}
+          — resolves to {{ _clinician.first_name or "" }} {{ _clinician.last_name or "" }}
+        {% endif %}
+      </p>
+      <p>Now add your license:</p>
+      {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/license", method="post") %}
+        {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
+        <div class="grid">
+          {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
+          {{ text_field('license_number', 'License number') }}
+        </div>
+        {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
+        {{ checkbox_field("_attest_confirm", "I attest this license is active and in good standing.", required=true) }}
+        {{ actions("Add license") }}
+      {% endcall %}
+    {% elif _clinician.npi_match_status == "mismatch" %}
+      {# Step 2: NPI mismatch — guide user to correct it. #}
+      <p style="color: var(--pico-color-orange-600);">
+        <i class="icon-shield-alert"></i>
+        <strong>NPI not matched</strong>
+        {% if _clinician.npi %}— NPI {{ _clinician.npi }} did not resolve to your name in NPPES.{% endif %}
+      </p>
+      <p style="color: var(--pico-muted-color);">
+        {# title-case-ignore #}
+        Check that your first name, last name, and NPI match your NPPES record exactly.
+      </p>
+      <a href="{{ entity_url('clinician', id=_clinician.id) }}/form"
+         role="button"
+         class="outline">Edit clinician profile</a>
+    {% elif _clinician.npi_match_status == "none" %}
+      {# NPI not submitted yet — prompt to add it. #}
+      <p style="color: var(--pico-muted-color);">
+        No NPI on file yet.
+        <a href="{{ entity_url('clinician', id=_clinician.id) }}/form">Add your NPI</a>
+        to start verification.
       </p>
     {% else %}
-      <a href="{{ entity_url('user', id='me') }}"
-         role="button"
-         class="outline">+ Add a clinician profile</a>
+      {# Pending / any other transient state. #}
+      <p style="color: var(--pico-muted-color);">
+        <i class="icon-loader"></i> Verification in progress…
+        <a href="{{ entity_url('clinician', id=_clinician.id) }}/form">View clinician</a>
+      </p>
     {% endif %}
   </article>
+  {# ------------------------------------------------------------------ #}
+  {# Organization representation                                          #}
+  {# ------------------------------------------------------------------ #}
   <article id="claim-b-card">
     <header>
       <strong>Post on behalf of an organization</strong>
-      <small style="display: block; color: var(--pico-muted-color);">
-        Claim B — represent an organization with a Type-2 NPI
-      </small>
+      <small style="display: block; color: var(--pico-muted-color);">Represent an organization with a Type-2 NPI</small>
     </header>
-    <p>To post program intakes or org-attributed referrals, become a verified representative of an organization.</p>
+    <p>
+      To post program intakes or org-attributed referrals, become a verified
+      representative of an organization.
+    </p>
     {% if org_representations %}
       <p>
         <small>You have {{ org_representations|length }} representation(s) on file.</small>
       </p>
     {% else %}
       <p style="color: var(--pico-muted-color);">
-        <small>Coordinator path — coming soon. The org's NPI is verified once; you prove you're authorized to speak for it via Authorized-Official match, domain email, or admin review.</small>
+        <small>
+          The org's NPI is verified once; you prove you're authorized to speak
+          for it via Authorized-Official match, domain email, or admin review.
+          Coming soon.
+        </small>
       </p>
     {% endif %}
   </article>

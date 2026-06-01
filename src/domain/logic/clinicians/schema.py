@@ -267,8 +267,8 @@ class ClinicianCreate(FlatLocationSchema, WirePayload):
     first_name: StrippedOptionalText = None
     last_name: StrippedOptionalText = None
     location: Location
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
     # Insurance posture. `in_network_carriers` is the set the practice
     # accepts in-network (empty = no in-network); `accepts_out_of_network`
     # is independent and defaults `True` (most practices accept OON;
