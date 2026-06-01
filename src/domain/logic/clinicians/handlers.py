@@ -33,6 +33,43 @@ from src.framework.rendering.templating import set_viewer
 logger = logging.getLogger(__name__)
 
 
+async def after_create_clinician_verification(
+    *,
+    row: Clinician,
+    payload: BaseModel,
+    requesting_user: User,
+    verification_repo: VerificationRepository,
+    clinician_repo: ClinicianRepository,
+    verification_audit_repo: AuditRepository,
+) -> None:
+    """Run the NPI verification pipeline immediately after a clinician row
+    is created. Produces one Verification row + audit row and writes through
+    the Claim-A denorm cache, all within the same request transaction.
+
+    `run_clinician_verification` commits internally. After that commit the
+    session expires `row`'s attributes, so a `refresh` follows to keep the
+    object usable for the `mutate` context manager's after-snapshot (which
+    runs synchronously via Pydantic's `model_validate`).
+    """
+    import httpx
+
+    from src.domain.logic.verifications.handlers import (
+        HTTP_TIMEOUT_SECONDS,
+        run_clinician_verification,
+    )
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+        await run_clinician_verification(
+            clinician_id=row.id,
+            verification_repo=verification_repo,
+            clinician_repo=clinician_repo,
+            audit_repo=verification_audit_repo,
+            http=http,
+            actor_id=requesting_user.id,
+        )
+    await clinician_repo.session.refresh(row)
+
+
 async def _assert_clinician_payload_org_ownership(
     *,
     payload: BaseModel,

@@ -855,3 +855,186 @@ async def test_set_clinician_verification_state_404_for_missing(
                 audit_repo=AuditRepository(session),
                 requesting_user=admin,
             )
+
+
+# --- after_create_clinician_verification (post-create hook) ---------------
+
+
+async def test_after_create_clinician_verification_creates_verification_row(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Happy path: the hook produces one Verification row for the just-
+    created clinician and updates the Claim-A denorm cache.
+
+    `nppes_lookup` is patched so no real HTTP call is made; the OIG module
+    is pointed at the fixture CSV so it loads correctly.
+    """
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from src.domain.logic.clinicians.handlers import after_create_clinician_verification
+    from src.domain.logic.verifications import oig as oig_module
+    from src.domain.logic.verifications.nppes import NppesResult
+
+    leie_fixture = (
+        Path(__file__).parent.parent / "verifications" / "test_data" / "leie_sample.csv"
+    )
+    oig_module._reset_cache_for_tests()
+
+    import os
+
+    old_path = os.environ.get("LEIE_CSV_PATH")
+    os.environ["LEIE_CSV_PATH"] = str(leie_fixture)
+    try:
+        user = await _seed_user(db_test_session_manager)
+        org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
+
+        nppes_match = NppesResult(
+            found=True, first_name="Jane", last_name="Smith", raw={}
+        )
+
+        async with db_test_session_manager() as session:
+            repo = ClinicianRepository(session)
+            audit_repo = AuditRepository(session)
+            verification_repo = VerificationRepository(session)
+
+            clinician = Clinician(
+                owner_id=user.id,
+                org_id=org_id,
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+                first_name="Jane",
+                last_name="Smith",
+                npi="9999999999",
+            )
+            created = await repo.create(clinician)
+
+            with patch(
+                "src.domain.logic.verifications.handlers.nppes_lookup",
+                new=AsyncMock(return_value=nppes_match),
+            ):
+                await after_create_clinician_verification(
+                    row=created,
+                    payload=_clinician_create_payload(org_id=org_id),
+                    requesting_user=user,
+                    verification_repo=verification_repo,
+                    clinician_repo=repo,
+                    verification_audit_repo=audit_repo,
+                )
+
+        async with db_test_session_manager() as session:
+            from src.domain.models import Verification
+
+            rows = (
+                (
+                    await session.execute(
+                        select(Verification).filter(
+                            Verification.clinician_id == created.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(rows) == 1
+            assert rows[0].status == "verified"
+            assert rows[0].event_type == "npi_resolved"
+
+            loaded = await session.get(Clinician, created.id)
+            assert loaded.npi_match_status == "matched"
+    finally:
+        if old_path is None:
+            os.environ.pop("LEIE_CSV_PATH", None)
+        else:
+            os.environ["LEIE_CSV_PATH"] = old_path
+        oig_module._reset_cache_for_tests()
+
+
+async def test_after_create_clinician_verification_no_npi_records_skipped(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A clinician without an NPI still gets a Verification row (status=failed,
+    nppes_skipped flag) and npi_match_status stays 'none'. nppes_lookup is never called.
+    """
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from src.domain.logic.clinicians.handlers import after_create_clinician_verification
+    from src.domain.logic.verifications import oig as oig_module
+
+    leie_fixture = (
+        Path(__file__).parent.parent / "verifications" / "test_data" / "leie_sample.csv"
+    )
+    oig_module._reset_cache_for_tests()
+
+    import os
+
+    old_path = os.environ.get("LEIE_CSV_PATH")
+    os.environ["LEIE_CSV_PATH"] = str(leie_fixture)
+    try:
+        user = await _seed_user(db_test_session_manager)
+        org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
+
+        async with db_test_session_manager() as session:
+            repo = ClinicianRepository(session)
+            audit_repo = AuditRepository(session)
+            verification_repo = VerificationRepository(session)
+
+            clinician = Clinician(
+                owner_id=user.id,
+                org_id=org_id,
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+                npi=None,
+            )
+            created = await repo.create(clinician)
+
+            nppes_stub = AsyncMock(
+                side_effect=AssertionError("nppes_lookup called unexpectedly")
+            )
+            with patch(
+                "src.domain.logic.verifications.handlers.nppes_lookup",
+                new=nppes_stub,
+            ):
+                await after_create_clinician_verification(
+                    row=created,
+                    payload=_clinician_create_payload(org_id=org_id),
+                    requesting_user=user,
+                    verification_repo=verification_repo,
+                    clinician_repo=repo,
+                    verification_audit_repo=audit_repo,
+                )
+            nppes_stub.assert_not_called()
+
+        async with db_test_session_manager() as session:
+            from src.domain.models import Verification
+
+            rows = (
+                (
+                    await session.execute(
+                        select(Verification).filter(
+                            Verification.clinician_id == created.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(rows) == 1
+            assert rows[0].status == "failed"
+            assert "nppes_skipped" in rows[0].flags
+
+            loaded = await session.get(Clinician, created.id)
+            assert loaded.npi_match_status == "none"
+    finally:
+        if old_path is None:
+            os.environ.pop("LEIE_CSV_PATH", None)
+        else:
+            os.environ["LEIE_CSV_PATH"] = old_path
+        oig_module._reset_cache_for_tests()
