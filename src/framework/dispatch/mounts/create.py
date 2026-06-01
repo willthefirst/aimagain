@@ -420,7 +420,10 @@ def make_create_handler(
     after_create: Callable[..., Awaitable[None]] | None = None,
     after_create_repos: tuple[tuple[str, type], ...] = (),
 ):
-    from src.framework.dispatch.handlers import _CREATE_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _CREATE_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(
         spec,

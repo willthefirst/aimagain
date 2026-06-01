@@ -1,25 +1,10 @@
-"""Generic dispatch handlers driven by EntitySpec.
+"""Shared factory infrastructure for the per-verb ``make_*_handler`` functions.
 
-Handler logic has moved to the corresponding per-verb mount files:
-
-  - ``handle_delete`` / ``make_delete_handler``  →  mounts/delete.py
-  - ``handle_create`` / ``make_create_handler``  →  mounts/create.py
-  - ``handle_update`` / ``make_update_handler``  →  mounts/update.py
-  - ``handle_get_edit_form`` / ``make_edit_form_handler``  →  mounts/form.py
-  - ``handle_get_new_form`` / ``make_new_form_handler``  →  mounts/form.py
-  - ``handle_detail`` / ``make_detail_handler``  →  mounts/detail.py
-  - ``handle_list`` / ``make_list_handler``  →  mounts/list_.py
-
-This module retains the shared factory infrastructure
-(``_FactoryShape``, ``_*_SHAPE`` constants, ``_param``,
-``_make_factory_handler``) that the per-verb ``make_*_handler``
-functions import lazily, and re-exports every public symbol so
-existing callers keep working without changes.
-
-The re-export shim will be deleted in a follow-up once all direct
-callers of ``handle_*`` (``src/domain/logic/users/test_handlers.py``
-and ``src/domain/logic/clinicians/test_handlers.py``) are updated to
-import from the individual mount files.
+Each verb module (``create.py``, ``delete.py``, etc.) imports
+``_FactoryShape``, the pre-built shape constants, ``_param``, and
+``_make_factory_handler`` from here. Keeping this in the ``mounts``
+package eliminates the old inward dependency on
+``src.framework.dispatch.handlers``.
 """
 
 import inspect
@@ -32,7 +17,6 @@ from pydantic import BaseModel
 
 from src.framework.actor import Actor
 from src.framework.audit.repository import AuditRepository
-from src.framework.dispatch.entity_spec import EntitySpec
 from src.framework.dispatch.filters import Filter
 from src.framework.dispatch.pagination import (  # noqa: F401
     DEFAULT_PAGE_SIZE,
@@ -43,11 +27,6 @@ from src.framework.dispatch.pagination import (  # noqa: F401
     parse_page,
 )
 from src.framework.persistence.base_repository import BaseRepository
-
-# ---------------------------------------------------------------------------
-# Shared factory infrastructure
-# (kept here; per-verb make_*_handler functions import these lazily)
-# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,7 +119,7 @@ def _param(name: str, annotation: Any) -> inspect.Parameter:
 
 
 def _make_factory_handler(
-    spec: EntitySpec,
+    spec: Any,  # EntitySpec — typed as Any to avoid a cross-package import cycle
     shape: _FactoryShape,
     handler_fn: Callable[..., Awaitable[Any]],
     *,
@@ -307,50 +286,3 @@ def _make_factory_handler(
     _handler.__name__ = shape.name_template.format(name=spec.name)
     _handler.__qualname__ = _handler.__name__
     return _handler
-
-
-# ---------------------------------------------------------------------------
-# Re-exports — public symbols now live in the per-verb mount files.
-# Import lazily to keep the module loadable before the mount package
-# has fully initialized (the per-verb files import back from here for
-# the factory infrastructure above).
-# ---------------------------------------------------------------------------
-
-
-def _lazy_imports():
-    from src.framework.dispatch.mounts.create import handle_create, make_create_handler
-    from src.framework.dispatch.mounts.delete import handle_delete, make_delete_handler
-    from src.framework.dispatch.mounts.detail import handle_detail, make_detail_handler
-    from src.framework.dispatch.mounts.form import (
-        handle_get_edit_form,
-        handle_get_new_form,
-        make_edit_form_handler,
-        make_new_form_handler,
-    )
-    from src.framework.dispatch.mounts.list_ import handle_list, make_list_handler
-    from src.framework.dispatch.mounts.update import handle_update, make_update_handler
-
-    return {
-        "handle_delete": handle_delete,
-        "make_delete_handler": make_delete_handler,
-        "handle_create": handle_create,
-        "make_create_handler": make_create_handler,
-        "handle_update": handle_update,
-        "make_update_handler": make_update_handler,
-        "handle_get_edit_form": handle_get_edit_form,
-        "make_edit_form_handler": make_edit_form_handler,
-        "handle_get_new_form": handle_get_new_form,
-        "make_new_form_handler": make_new_form_handler,
-        "handle_detail": handle_detail,
-        "make_detail_handler": make_detail_handler,
-        "handle_list": handle_list,
-        "make_list_handler": make_list_handler,
-    }
-
-
-def __getattr__(name: str) -> Any:
-    """Lazy re-export: resolve public handler symbols on first access."""
-    symbols = _lazy_imports()
-    if name in symbols:
-        return symbols[name]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
