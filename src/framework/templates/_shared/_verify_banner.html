@@ -1,16 +1,38 @@
-{# Nag banner — "verify your email" reminder shown on every page
-   when the authed user is `is_verified=False`. Reads
-   `current_user_is_verified` from `base_context()` (defaults True for
-   anonymous + missing-attr stubs so the banner is silent unless
-   explicitly opted-in).
+{# Claim-aware chrome banner.
 
-   Re-send is a one-click HTMX POST to `/auth/resend-verify` (custom
-   page route, not fastapi-users' `/auth/request-verify-token`).
-   The custom route reads the user from the session so the email
-   doesn't have to live in the HTML. Response is the
-   `_verify_banner_sent.html` partial which swaps the banner in
-   place via `hx-swap="outerHTML"`. #}
-{%- if is_authenticated and not current_user_is_verified -%}
+   Generalized from the original email-only "verify your email" nag
+   per handoff §8.3 (the two-claim verification rollout). Reads
+   `base_context()` scalars (`is_authenticated`,
+   `current_user_is_verified`, `any_claim_lapsed`, `claims`) and picks
+   the most-urgent message — mutually exclusive sub-cases, first match
+   wins.
+
+   Sub-cases (in priority order):
+   1. **Email unverified** — the original email-confirm nag. Highest
+      priority because every other claim transitively requires email
+      verification.
+   2. **Action needed — claim lapsed** — at least one held claim has
+      regressed (a license expired, an authority was revoked, etc.).
+      Capabilities gated on the lapsed claim are paused but feed
+      read-access is retained via `ever_verified_at`.
+   3. **No claim — finish setup** — the user has no verified claims at
+      all. CTA into `/profile` (setup mode).
+
+   The HTMX swap target stays `#verify-banner` so the existing
+   resend-verification flow (`_verify_banner_sent.html` swaps the banner
+   in place after the user clicks "Resend") keeps working unchanged.
+
+   Notes on hiding the banner:
+   * On `/profile` itself we keep the banner silent so the page's own
+     content owns the "finish setup" / "fix the lapsed claim" copy —
+     showing both would be redundant (and the page is already where
+     the CTA would land).
+#}
+{%- if not is_authenticated -%}
+  {# Anonymous visitors see nothing — the banner is opt-in for authed users only. #}
+{%- elif request.url.path == "/profile" -%}
+  {# Suppressed on the profile page itself; see notes above. #}
+{%- elif not current_user_is_verified -%}
   <aside role="status" id="verify-banner">
     <strong>Verify your email.</strong>
     Check your inbox for a link to confirm your account.
@@ -21,5 +43,19 @@
           hx-swap="outerHTML">
       <button type="submit" class="secondary">Resend verification email</button>
     </form>
+  </aside>
+{%- elif any_claim_lapsed -%}
+  <aside role="status" id="verify-banner">
+    <strong>Action needed.</strong>
+    One of your verification claims has lapsed — some capabilities are paused until you re-attest.
+    {# title-case-ignore: "Profile" is the page label, kept capitalized #}
+    <a href="/profile" role="button" class="secondary">Fix on Profile</a>
+  </aside>
+{%- elif not claims.a and not claims.b -%}
+  <aside role="status" id="verify-banner">
+    <strong>Finish setting up.</strong>
+    Add a verified clinician profile or represent an organization to start posting.
+    {# title-case-ignore: "Profile" is the page label, kept capitalized #}
+    <a href="/profile" role="button" class="secondary">Open Profile</a>
   </aside>
 {%- endif -%}

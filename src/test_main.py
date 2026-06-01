@@ -34,14 +34,43 @@ async def test_home_page_requires_auth(test_client: AsyncClient):
     assert "/auth/login" in response.headers["location"]
 
 
-async def test_home_page_shows_post_buttons(authenticated_client: AsyncClient):
+async def test_home_page_shows_post_buttons_when_claim_a_verified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
     """The home page renders kind-specific CTAs linking to the unified
-    `/posts/form` URL with the appropriate `?kind=` query parameter."""
+    `/posts/form` URL when the user holds Claim A. Per Phase-6
+    rollout the CTAs are gated on `claims.a` from `base_context()` —
+    same predicate the route's `write_authz` consults — so the visible
+    button and the server-side block can't disagree."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
     assert tree.css_first('a[href="/posts/form?kind=clinician_opening"]') is not None
+
+
+async def test_home_page_hides_post_buttons_without_claim_a(
+    authenticated_client: AsyncClient,
+):
+    """An unverified user (the default dev fixture) sees no post CTAs
+    on /home — they're shown the no-claim "Finish setting up" card
+    instead."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first('a[href="/posts/form?kind=referral"]') is None
+    assert "Finish setting up" in response.text
 
 
 async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):

@@ -4,14 +4,45 @@
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
   {% block content %}
-    <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
-      <a href="{{ entity_form_url("post") }}?kind=referral"
-         role="button"
-         class="outline">+ Post a referral</a>
-      <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
-         role="button"
-         class="outline">+ Post an opening</a>
-    </section>
+    {# Three-branch home per handoff §8.2:
+       1. No claim → "Finish setting up" card + blurred teaser feed.
+       2. ≥1 claim → existing body (my posts + network feed).
+       3. Any claim lapsed → yellow banner above the existing body
+          naming the lapsed claim. The banner copy is owned by
+          `_verify_banner.html` (claim-aware) above the chrome — the
+          per-page repeat here would be redundant. #}
+    {% set _no_claim = not claims.a and not claims.b %}
+    {% if _no_claim %}
+      <article id="finish-setup-card">
+        <header>
+          <strong>Finish setting up</strong>
+          <small style="display: block; color: var(--pico-muted-color);">
+            Tell us what you want to do on Bedlam Connect — we'll only ask for what that needs.
+          </small>
+        </header>
+        <p>
+          {# title-case-ignore: "Claim A" / "Claim B" are user-facing labels for the two-claim model #}
+          Add a verified clinician profile (Claim A) to post referrals or openings as yourself, and/or become a verified representative of an organization (Claim B) to post program intakes on its behalf.
+        </p>
+        {# title-case-ignore: "Profile" is the page label, kept capitalized #}
+        <a href="/profile" role="button">Open Profile</a>
+      </article>
+    {% else %}
+      {# Post CTAs gated on Claim A. The chrome's `claims.a` scalar
+         from `base_context()` is the single source of truth — same
+         predicate the route's `write_authz` consults, so the visible
+         button and the server-side block can't disagree. #}
+      {% if claims.a %}
+        <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <a href="{{ entity_form_url("post") }}?kind=referral"
+             role="button"
+             class="outline">+ Post a referral</a>
+          <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+             role="button"
+             class="outline">+ Post an opening</a>
+        </section>
+      {% endif %}
+    {% endif %}
     {% if my_posts %}
       <section>
         <header style="display: flex;
@@ -40,7 +71,22 @@
         <a href="{{ entity_url('post') }}">Adjust filters</a>
           {# djlint:on #}
         </p>
-        {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
+        {# When the user hasn't verified yet (no claim AND no
+           ever_verified_at), blur the network feed so the teaser
+           conveys "there's content here once you verify". Drives the
+           handoff-§7.1 feed-teaser rule via the same single-source
+           capability predicate, exposed as a `base_context()` scalar
+           so this template stays chrome-dumb. #}
+        {% if not can_read_full_feed %}
+          <div id="feed-teaser-blur"
+               style="filter: blur(4px);
+                      user-select: none;
+                      pointer-events: none">
+            {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
+          </div>
+        {% else %}
+          {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
+        {% endif %}
       </section>
     {% endif %}
   {% endblock %}
