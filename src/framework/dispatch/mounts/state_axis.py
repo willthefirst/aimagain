@@ -14,6 +14,8 @@ from pydantic import TypeAdapter
 
 from src.framework.dispatch.mounts._common import (
     call_handler_with,
+    parent_path_param_pairs,
+    path_segments_under_router,
     resolve_handler,
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
@@ -59,6 +61,17 @@ def mount_state_axis(
     reason or a verified-by id. Single-field bodies still pay one
     declaration to keep the surface uniform.
 
+    **Parent-owned subentities** (``spec.parent is not None``) mount at
+    ``/<parent_id_param>/<collection>/<id_param>/<axis_name>`` relative
+    to the parent's router prefix — same convention the rest of the
+    sub-resource mounts (`mount_create` / `mount_update` /
+    `mount_delete`) follow. The handler receives every parent id-param
+    as a kwarg alongside ``spec.id_param``. License attestation
+    (``LICENSURE_ENTITY`` under ``CLINICIAN_ENTITY``) is the canonical
+    consumer: the axis mounts at
+    ``PUT /clinicians/{clinician_id}/licensures/{licensure_id}/attestation``
+    and the handler receives both ``clinician_id`` and ``licensure_id``.
+
     Response is ``200 OK`` with body = ``response_to_dict(updated)`` (if
     set, else ``{}``) and ``HX-Refresh: true``. The projection is
     per-mount because each axis surfaces a different field
@@ -70,14 +83,18 @@ def mount_state_axis(
         raise ValueError(
             f"mount_state_axis requires {spec.collection!r} to set write_user_dep."
         )
-    if spec.parent is not None:
-        raise NotImplementedError(
-            "mount_state_axis with spec.parent is not supported yet."
-        )
 
     id_param = spec.id_param
     body_adapter = TypeAdapter(body_schema)
-    path = f"/{{{id_param}}}/{axis_name}"
+    parent_id_names = tuple(p[0] for p in parent_path_param_pairs(spec))
+    if spec.parent is None:
+        path = f"/{{{id_param}}}/{axis_name}"
+    else:
+        # `path_segments_under_router(spec, with_id=True)` returns the
+        # `/<parent_id>/<collection>/<id_param>` prefix relative to the
+        # router (which is rooted at the topmost ancestor's collection,
+        # e.g. `/clinicians`). Append the axis name on the end.
+        path = f"{path_segments_under_router(spec, with_id=True)}/{axis_name}"
 
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
@@ -93,7 +110,7 @@ def mount_state_axis(
             user_dep=spec.write_user_dep,
             body_adapter=body_adapter,
             body_format="json",
-            path_param_names=(id_param,),
+            path_param_names=(*parent_id_names, id_param),
         ),
         response_builder=response_builder,
     )

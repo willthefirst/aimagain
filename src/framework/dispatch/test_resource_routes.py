@@ -1047,6 +1047,109 @@ def test_mount_state_axis_requires_write_user_dep():
         )
 
 
+def test_mount_state_axis_parent_owned_path_includes_parent_id():
+    """A child ResourceSpec with `parent=` mounts the state-axis path
+    under the parent's id-param. Handler receives both ids by their
+    declared kwarg name. Mirrors the subresource-CRUD mounts."""
+    captured: dict = {}
+
+    async def handler(
+        parent_id: UUID,
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        captured["parent_id"] = parent_id
+        captured["widget_id"] = widget_id
+        captured["state"] = payload.state
+        return SimpleNamespace(id=widget_id)
+
+    parent_spec = ResourceSpec(
+        collection="parents",
+        id_param="parent_id",
+        repo_dep=lambda: SimpleNamespace(name="parent_repo"),
+    )
+    child_spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        parent=parent_spec,
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
+    )
+
+    app = FastAPI()
+    router = APIRouter(prefix=f"/{parent_spec.collection}")
+    _override_audit(app)
+    mount_state_axis(
+        router,
+        child_spec,
+        handler=handler,
+        axis_name="toggle",
+        body_schema=_AxisBody,
+    )
+    app.include_router(router)
+
+    parent_id = uuid4()
+    widget_id = uuid4()
+    resp = TestClient(app).put(
+        f"/parents/{parent_id}/widgets/{widget_id}/toggle",
+        json={"state": "on"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["HX-Refresh"] == "true"
+    assert captured["parent_id"] == parent_id
+    assert captured["widget_id"] == widget_id
+    assert captured["state"] == "on"
+
+
+def test_mount_state_axis_parent_owned_404_when_no_parent_match():
+    """The framework's path includes `{parent_id}` so a request to the
+    wrong path entirely (no parent id) 404s. (Parent-existence + child-
+    belongs-to-parent checks are still the handler's responsibility, same
+    as the other subresource mounts.)"""
+
+    async def handler(
+        parent_id: UUID,
+        widget_id: UUID,
+        payload: _AxisBody,
+        repo: UserRepository,
+        audit_repo: AuditRepository,
+        requesting_user: User,
+    ):
+        return SimpleNamespace(id=widget_id)
+
+    parent_spec = ResourceSpec(
+        collection="parents",
+        id_param="parent_id",
+        repo_dep=lambda: SimpleNamespace(name="parent_repo"),
+    )
+    child_spec = ResourceSpec(
+        collection="widgets",
+        id_param="widget_id",
+        parent=parent_spec,
+        repo_dep=lambda: SimpleNamespace(name="repo"),
+        write_user_dep=lambda: SimpleNamespace(id=uuid4(), is_superuser=True),
+    )
+
+    app = FastAPI()
+    router = APIRouter(prefix=f"/{parent_spec.collection}")
+    _override_audit(app)
+    mount_state_axis(
+        router,
+        child_spec,
+        handler=handler,
+        axis_name="toggle",
+        body_schema=_AxisBody,
+    )
+    app.include_router(router)
+
+    # Sub-resource path without the parent prefix → 404.
+    resp = TestClient(app).put(f"/widgets/{uuid4()}/toggle", json={"state": "on"})
+    assert resp.status_code == 404
+
+
 def test_mount_state_axis_no_response_to_dict_returns_empty_body():
     """Without `response_to_dict`, the body is `{}` — handler still runs
     and the HX-Refresh header still fires."""
