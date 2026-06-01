@@ -38,7 +38,7 @@ from sqlalchemy import func, select
 from scripts.dev.seed import seed_all
 from scripts.dev.seed.check_registry import CHECK_VALUES
 from src.domain.models import (
-    Affiliation,
+    ClinicianAffiliation,
     Organization,
     metadata,
 )
@@ -103,7 +103,7 @@ async def test_seed_all_smoke(seeded_db):
     """The shared module seed populated the expected major tables."""
     assert await _count_table("organizations") >= 10
     assert await _count_table("clinicians") >= 100
-    assert await _count_table("affiliations") >= 100
+    assert await _count_table("clinician_affiliations") >= 100
 
 
 async def test_idempotent_rerun(seeded_db):
@@ -202,11 +202,11 @@ async def test_organization_hierarchy_present(seeded_db):
 
 async def test_multi_affiliation_clinician_present(seeded_db):
     """At least one clinician has 2+ affiliations — exercises the
-    `Clinician.affiliations` 1:N edge."""
+    `Clinician.clinician_affiliations` 1:N edge."""
     async with async_test_sessionmaker() as session:
         subq = (
-            select(Affiliation.clinician_id, func.count().label("n"))
-            .group_by(Affiliation.clinician_id)
+            select(ClinicianAffiliation.clinician_id, func.count().label("n"))
+            .group_by(ClinicianAffiliation.clinician_id)
             .subquery()
         )
         result = await session.execute(

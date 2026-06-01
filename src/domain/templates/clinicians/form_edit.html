@@ -54,7 +54,7 @@
   <section>
     {# Affiliations — clinician's practice-role rows. #}
     <h2>Affiliations</h2>
-    {% call(aff) credential_list(clinician.affiliations, "No affiliations yet.") %}
+    {% call(aff) credential_list(clinician.clinician_affiliations, "No affiliations yet.") %}
       {%- set meta_parts = [
             aff.location_city,
             aff.location_state,
@@ -68,11 +68,11 @@
             ] -%}
       {{ credential_row(aff.org.name,
             meta_parts,
-            delete_url=entity_url('clinician', id=clinician.id) ~ "/affiliations/" ~ aff.id|string,
+            delete_url=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string,
       delete_confirm="Remove this affiliation?",
       ) }}
     {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/affiliations", "Add affiliation", "Add affiliation") %}
+    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations", "Add affiliation", "Add affiliation") %}
       <label for="aff_org_id">
         Organization
         <select id="aff_org_id" name="org_id" required>

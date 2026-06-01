@@ -92,7 +92,7 @@ class SeedPool:
     they produce via `add` so downstream generators can FK to them.
 
     Also threads `state_by_index` so the location_state chosen for an
-    Affiliation gets reused when generating that row's `location_zip`
+    ClinicianAffiliation gets reused when generating that row's `location_zip`
     (the ZIP prefix is state-dependent).
     """
 

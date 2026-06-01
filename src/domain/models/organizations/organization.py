@@ -24,7 +24,7 @@ class Organization(BaseModel):
     """First-class directory entity for clinics, group practices, health
     systems, and solo-practice shells. ``Organization.name`` is the
     source of truth for the practice's display name; every Clinician
-    is linked to one or more Orgs via Affiliation and templates
+    is linked to one or more Orgs via ClinicianAffiliation and templates
     read ``clinician.org.name`` directly.
 
     Hierarchy is modeled as a self-referential tree via ``parent_org_id``
@@ -95,8 +95,8 @@ class Organization(BaseModel):
     )
     # FK-side ``RESTRICT`` on Programs — deleting an Org with attached
     # Programs fails loudly rather than silently orphaning. The Org →
-    # Clinician path is Org → Affiliation (#635 PR B);
-    # callers that want "clinicians at this org" navigate `org.affiliations`
+    # Clinician path is Org → ClinicianAffiliation (#635 PR B);
+    # callers that want "clinicians at this org" navigate `org.clinician_affiliations`
     # and read `affiliation.clinician`. ORM relationships are read-only
     # from the Org side.
     programs = relationship("Program", back_populates="organization")

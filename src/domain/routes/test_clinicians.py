@@ -387,14 +387,14 @@ async def test_get_clinician_detail_renders_stacked_affiliation_cards(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /clinicians/{id}` renders one stacked card per Affiliation
+    """`GET /clinicians/{id}` renders one stacked card per ClinicianAffiliation
     after #642 PR 2. Seed a Clinician with two affiliations (the one
     `Clinician.__init__` builds from the create payload + a second one
     appended) and assert both org names render and both
     `[data-testid="affiliation-card"]` blocks appear, in the order
-    `clinician.affiliations` returns (oldest first by `created_at`).
+    `clinician.clinician_affiliations` returns (oldest first by `created_at`).
     """
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
@@ -404,7 +404,7 @@ async def test_get_clinician_detail_renders_stacked_affiliation_cards(
         location_state="NY",
         location_zip="11201",
     )
-    # Append a second Affiliation at a different Org.
+    # Append a second ClinicianAffiliation at a different Org.
     second_org_id = await _seed_org(
         db_test_session_manager,
         owner_id=logged_in_user.id,
@@ -414,7 +414,7 @@ async def test_get_clinician_detail_renders_stacked_affiliation_cards(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                Affiliation(
+                ClinicianAffiliation(
                     clinician_id=clinician_id,
                     org_id=second_org_id,
                     location_city="Queens",
@@ -566,7 +566,7 @@ async def test_list_clinicians_row_shows_all_affiliations(
     and Location cells. The Insurance cell unions in-network carriers
     across affiliations — pin one carrier per side and assert both
     show up."""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
@@ -586,7 +586,7 @@ async def test_list_clinicians_row_shows_all_affiliations(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                Affiliation(
+                ClinicianAffiliation(
                     clinician_id=clinician_id,
                     org_id=second_org_id,
                     location_city="Queens",
@@ -645,7 +645,7 @@ async def test_list_clinicians_row_dedupes_identical_locations(
     when a clinician holds two affiliations at different Orgs in the
     same city. Org chips intentionally don't dedupe (each Org is its
     own link)."""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
@@ -664,7 +664,7 @@ async def test_list_clinicians_row_dedupes_identical_locations(
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(
-                Affiliation(
+                ClinicianAffiliation(
                     clinician_id=clinician_id,
                     org_id=second_org_id,
                     location_city="Brooklyn",
@@ -1144,7 +1144,7 @@ async def test_patch_licensure_returns_404_for_mismatched_clinician(
     assert response.status_code == 404
 
 
-# --- Affiliation sub-resource CRUD (#642 PR 1) --------------------------
+# --- ClinicianAffiliation sub-resource CRUD (#642 PR 1) --------------------------
 
 
 async def test_post_affiliation_creates_additional_row(
@@ -1152,11 +1152,11 @@ async def test_post_affiliation_creates_additional_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`POST /clinicians/{id}/affiliations` adds a new Affiliation to
+    """`POST /clinicians/{id}/clinician_affiliations` adds a new ClinicianAffiliation to
     the Clinician. The framework's generic create handler succeeds for
     every row past the first one (which `Clinician.__init__` already
     built from the wire payload)."""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
@@ -1168,7 +1168,7 @@ async def test_post_affiliation_creates_additional_row(
     )
 
     response = await authenticated_client.post(
-        f"/clinicians/{clinician_id}/affiliations",
+        f"/clinicians/{clinician_id}/clinician_affiliations",
         data={
             "org_id": str(second_org_id),
             "location_city": "Queens",
@@ -1187,7 +1187,9 @@ async def test_post_affiliation_creates_additional_row(
         rows = (
             (
                 await session.execute(
-                    select(Affiliation).where(Affiliation.clinician_id == clinician_id)
+                    select(ClinicianAffiliation).where(
+                        ClinicianAffiliation.clinician_id == clinician_id
+                    )
                 )
             )
             .scalars()
@@ -1206,24 +1208,26 @@ async def test_patch_affiliation_updates_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`PATCH /clinicians/{id}/affiliations/{aff_id}` partially updates
+    """`PATCH /clinicians/{id}/clinician_affiliations/{aff_id}` partially updates
     the row. Pinned because the framework's update handler resolves the
-    affiliation through the new `AffiliationRepository`."""
+    affiliation through the new `ClinicianAffiliationRepository`."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
-    # The Clinician's `__init__` already built one Affiliation — patch it.
+    # The Clinician's `__init__` already built one ClinicianAffiliation — patch it.
     async with db_test_session_manager() as session:
-        from src.domain.models import Affiliation
+        from src.domain.models import ClinicianAffiliation
 
         aff_id = (
             await session.execute(
-                select(Affiliation.id).where(Affiliation.clinician_id == clinician_id)
+                select(ClinicianAffiliation.id).where(
+                    ClinicianAffiliation.clinician_id == clinician_id
+                )
             )
         ).scalar_one()
 
     response = await authenticated_client.patch(
-        f"/clinicians/{clinician_id}/affiliations/{aff_id}",
+        f"/clinicians/{clinician_id}/clinician_affiliations/{aff_id}",
         data={"sliding_scale": "true", "cost": "$999/session"},
     )
 
@@ -1238,11 +1242,11 @@ async def test_delete_affiliation_removes_row(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`DELETE /clinicians/{id}/affiliations/{aff_id}` removes the row.
+    """`DELETE /clinicians/{id}/clinician_affiliations/{aff_id}` removes the row.
     The Clinician can be left with zero Affiliations — readers fall
     back to `None` via the property proxies. (PR 3's Clinician-row
     rollup is the user-facing fix for empty-affiliations Clinicians.)"""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
@@ -1250,12 +1254,14 @@ async def test_delete_affiliation_removes_row(
     async with db_test_session_manager() as session:
         aff_id = (
             await session.execute(
-                select(Affiliation.id).where(Affiliation.clinician_id == clinician_id)
+                select(ClinicianAffiliation.id).where(
+                    ClinicianAffiliation.clinician_id == clinician_id
+                )
             )
         ).scalar_one()
 
     response = await authenticated_client.delete(
-        f"/clinicians/{clinician_id}/affiliations/{aff_id}"
+        f"/clinicians/{clinician_id}/clinician_affiliations/{aff_id}"
     )
 
     assert response.status_code in (200, 204)
@@ -1263,7 +1269,9 @@ async def test_delete_affiliation_removes_row(
         remaining = (
             (
                 await session.execute(
-                    select(Affiliation).where(Affiliation.clinician_id == clinician_id)
+                    select(ClinicianAffiliation).where(
+                        ClinicianAffiliation.clinician_id == clinician_id
+                    )
                 )
             )
             .scalars()
@@ -1279,9 +1287,9 @@ async def test_delete_affiliation_returns_404_for_mismatched_clinician(
 ):
     """An affiliation_id that belongs to a different clinician must 404 —
     the framework's URL-vs-row consistency check (configured via
-    `child_parent_match_attr="clinician_id"` on `AFFILIATION_ENTITY`)
+    `child_parent_match_attr="clinician_id"` on `CLINICIAN_AFFILIATION_ENTITY`)
     blocks cross-clinician deletes."""
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     my_clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
@@ -1292,14 +1300,14 @@ async def test_delete_affiliation_returns_404_for_mismatched_clinician(
     async with db_test_session_manager() as session:
         other_aff_id = (
             await session.execute(
-                select(Affiliation.id).where(
-                    Affiliation.clinician_id == other_clinician_id
+                select(ClinicianAffiliation.id).where(
+                    ClinicianAffiliation.clinician_id == other_clinician_id
                 )
             )
         ).scalar_one()
 
     response = await authenticated_client.delete(
-        f"/clinicians/{my_clinician_id}/affiliations/{other_aff_id}"
+        f"/clinicians/{my_clinician_id}/clinician_affiliations/{other_aff_id}"
     )
     assert response.status_code == 404
 
@@ -1309,9 +1317,9 @@ async def test_owner_edit_form_renders_affiliations_section(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The clinician edit page surfaces every Affiliation row in a
+    """The clinician edit page surfaces every ClinicianAffiliation row in a
     dedicated "Affiliations" section with inline add and per-row
-    delete — #642 PR 1's UI. The Clinician's initial Affiliation
+    delete — #642 PR 1's UI. The Clinician's initial ClinicianAffiliation
     (built by `Clinician.__init__` from the create payload) appears
     prefilled."""
     clinician_id = await _seed_clinician_for(
@@ -1325,9 +1333,9 @@ async def test_owner_edit_form_renders_affiliations_section(
     headings = [h.text(strip=True) for h in tree.css("h2")]
     assert "Affiliations" in headings
 
-    # The inline add form posts to /clinicians/{id}/affiliations.
+    # The inline add form posts to /clinicians/{id}/clinician_affiliations.
     add_form = tree.css_first(
-        f'form[hx-post="/clinicians/{clinician_id}/affiliations"]'
+        f'form[hx-post="/clinicians/{clinician_id}/clinician_affiliations"]'
     )
     assert add_form is not None
     assert add_form.css_first('select[name="org_id"]') is not None
@@ -1335,16 +1343,18 @@ async def test_owner_edit_form_renders_affiliations_section(
 
     # The existing primary affiliation renders as a row with a
     # delete button pointing at its own URL.
-    from src.domain.models import Affiliation
+    from src.domain.models import ClinicianAffiliation
 
     async with db_test_session_manager() as session:
         aff_id = (
             await session.execute(
-                select(Affiliation.id).where(Affiliation.clinician_id == clinician_id)
+                select(ClinicianAffiliation.id).where(
+                    ClinicianAffiliation.clinician_id == clinician_id
+                )
             )
         ).scalar_one()
     delete_button = tree.css_first(
-        f'button[hx-delete="/clinicians/{clinician_id}/affiliations/{aff_id}"]'
+        f'button[hx-delete="/clinicians/{clinician_id}/clinician_affiliations/{aff_id}"]'
     )
     assert delete_button is not None
 

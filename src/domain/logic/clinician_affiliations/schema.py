@@ -1,10 +1,10 @@
-"""Wire schemas for the `Affiliation` sub-resource of `Clinician`.
+"""Wire schemas for the `ClinicianAffiliation` sub-resource of `Clinician`.
 
-A `Clinician` may hold multiple `Affiliation` rows after #642 PR 1 (the
+A `Clinician` may hold multiple `ClinicianAffiliation` rows after #642 PR 1 (the
 UNIQUE on `affiliations.provider_id` was dropped in `7c3c296c9429`).
 The clinician edit page surfaces them as an inline list — same UX
 pattern as licensures — so each row CRUDs through its own URLs under
-``/clinicians/{clinician_id}/affiliations/{affiliation_id}``.
+``/clinicians/{clinician_id}/clinician_affiliations/{affiliation_id}``.
 
 The fields mirror the per-role attributes on `ClinicianCreate` /
 `ClinicianUpdate` (`src/domain/logic/clinicians/schema.py`) — both
@@ -13,7 +13,7 @@ schemas land at the same SQLAlchemy table — except that there is no
 are person-level, FK to `clinicians.id` after #635 PR A; they don't
 belong to an affiliation row).
 
-Audit snapshots are byte-identical to :class:`AffiliationRead`; the
+Audit snapshots are byte-identical to :class:`ClinicianAffiliationRead`; the
 `EntitySpec` defaults `audit_snapshot` to `read_schema` so this module
 declares no separate snapshot class.
 """
@@ -46,8 +46,8 @@ InNetworkCarriersField = Annotated[
 ]
 
 
-class AffiliationRead(FlatLocationSchema, ReadProjection):
-    """Read shape for one Affiliation row — what the framework's
+class ClinicianAffiliationRead(FlatLocationSchema, ReadProjection):
+    """Read shape for one ClinicianAffiliation row — what the framework's
     create/update routes return and what the audit snapshot mirrors.
 
     The `(city, state, zip)` triple arrives flat from ORM attributes
@@ -70,8 +70,8 @@ class AffiliationRead(FlatLocationSchema, ReadProjection):
     cost: str | None = None
 
 
-class AffiliationCreate(FlatLocationSchema, WirePayload):
-    """Create payload for a new Affiliation row.
+class ClinicianAffiliationCreate(FlatLocationSchema, WirePayload):
+    """Create payload for a new ClinicianAffiliation row.
 
     `clinician_id` is bound from the URL by the framework's sub-resource
     create handler — not accepted on the wire. Only the per-role fields
@@ -88,8 +88,8 @@ class AffiliationCreate(FlatLocationSchema, WirePayload):
     cost: StrippedOptionalText = None
 
 
-class AffiliationUpdate(FlatLocationSchema, PartialUpdate):
-    """Partial update of an Affiliation's per-role fields."""
+class ClinicianAffiliationUpdate(FlatLocationSchema, PartialUpdate):
+    """Partial update of an ClinicianAffiliation's per-role fields."""
 
     org_id: uuid.UUID | None = None
     location: LocationPartial | None = None

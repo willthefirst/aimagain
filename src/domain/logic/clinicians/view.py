@@ -16,12 +16,12 @@ from src.framework.rendering.address import full_address
 
 
 def _role_attr(clinician, attr, default=None):
-    """Source a per-role attribute from `clinician.primary_affiliation`.
+    """Source a per-role attribute from `clinician.primary_clinician_affiliation`.
 
     Falls through to the attribute on the clinician directly for test stubs
     that set fields on a `SimpleNamespace` without wiring an affiliation.
     """
-    affiliation = getattr(clinician, "primary_affiliation", None)
+    affiliation = getattr(clinician, "primary_clinician_affiliation", None)
     if affiliation is not None:
         return getattr(affiliation, attr, default)
     return getattr(clinician, attr, default)
@@ -50,7 +50,7 @@ def _insurance_summary(clinician) -> str:
       - ``"Self-pay only"``  (no carriers, no OON anywhere)
 
     Falls back to the legacy single-record path (``_role_attr``) when
-    ``clinician.affiliations`` is empty/absent — covers ``SimpleNamespace``
+    ``clinician.clinician_affiliations`` is empty/absent — covers ``SimpleNamespace``
     test stubs that don't wire the 1:N relationship.
 
     Display-label lookup
@@ -62,7 +62,7 @@ def _insurance_summary(clinician) -> str:
     """
     from src.domain.models.enums import INSURANCE_CARRIER_LABELS
 
-    affiliations = list(getattr(clinician, "affiliations", None) or [])
+    affiliations = list(getattr(clinician, "clinician_affiliations", None) or [])
     if affiliations:
         carriers: list[str] = []
         seen: set[str] = set()
@@ -101,7 +101,7 @@ def _insurance_summary(clinician) -> str:
 
 def _affiliation_insurance_summary(affiliation) -> str:
     """Same shape as :func:`_insurance_summary` but sourced directly
-    from an ``Affiliation`` (not a ``Clinician``). The detail page's
+    from an ``ClinicianAffiliation`` (not a ``Clinician``). The detail page's
     stacked-sections layout (#642 PR 2) renders one insurance line per
     affiliation, so we need a per-affiliation summarizer alongside the
     per-clinician one the directory listing still uses."""
@@ -121,7 +121,7 @@ def _affiliation_insurance_summary(affiliation) -> str:
 
 
 def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
-    """Normalize a single ``Affiliation`` into the per-role dict shape
+    """Normalize a single ``ClinicianAffiliation`` into the per-role dict shape
     one stacked-section card on the clinician detail page reads from
     (#642 PR 2).
 
@@ -207,7 +207,7 @@ def clinician_card_view(clinician) -> dict[str, Any]:
             collections (the template iterates them via the existing
             ``credential_row`` partial; no shape change).
         affiliations: list of per-affiliation dicts (one per row in
-            ``clinician.affiliations``) shaped by
+            ``clinician.clinician_affiliations``) shaped by
             :func:`affiliation_card_view`. The detail page renders one
             stacked card per entry.
     """
@@ -215,7 +215,7 @@ def clinician_card_view(clinician) -> dict[str, Any]:
 
     org = getattr(clinician, "org", None)
     org_id = _role_attr(clinician, "org_id")
-    affiliations = list(getattr(clinician, "affiliations", None) or [])
+    affiliations = list(getattr(clinician, "clinician_affiliations", None) or [])
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
         "practice_url": (f"/organizations/{org_id}" if org_id is not None else None),
@@ -239,7 +239,7 @@ def clinician_card_view(clinician) -> dict[str, Any]:
         "licensures": list(getattr(clinician, "licensures", None) or []),
         "educations": list(getattr(clinician, "educations", None) or []),
         "certifications": list(getattr(clinician, "certifications", None) or []),
-        "affiliations": [
+        "clinician_affiliations": [
             affiliation_card_view(aff, getattr(aff, "org", None))
             for aff in affiliations
         ],

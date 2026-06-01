@@ -52,7 +52,7 @@ scripts/dev/seed/
     ├── __init__.py     # OVERRIDES registry + @register decorator
     ├── users.py        # fastapi-users password hashing
     ├── organizations.py # parent/child hierarchy
-    ├── clinicians.py   # Clinician + Affiliation
+    ├── clinicians.py   # Clinician + ClinicianAffiliation
     ├── credentials.py  # 1-3 per clinician fan-out
     ├── posts.py        # kind discriminator + matching detail
     ├── verifications.py # one per selected clinician

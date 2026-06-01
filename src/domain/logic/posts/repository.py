@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import and_, or_, select
 
 from src.domain.models import (
-    Affiliation,
+    ClinicianAffiliation,
     IntakeDetail,
     OpeningDetail,
     Post,
@@ -22,7 +22,7 @@ class PostRepository(BaseRepository):
     body means most predicates ``OR`` across two paths — the
     seeking side reads from ``ReferralDetail``, the offering
     side from ``OpeningDetail`` (and its linked
-    ``Affiliation``). Each post has a row in at most one of the two
+    ``ClinicianAffiliation``). Each post has a row in at most one of the two
     detail tables, so the ``OR`` coalesces the two paths into a
     single "matches" boolean without duplicating rows.
 
@@ -35,7 +35,7 @@ class PostRepository(BaseRepository):
       ``username``.
     * ``state`` (Choice, multi) — ``location_state`` ``IN`` across
       ``ReferralDetail`` (seeking) and the offering side's
-      linked ``Affiliation``.
+      linked ``ClinicianAffiliation``.
     * ``city`` (Text) — ILIKE substring across the same two location
       paths as ``state``.
     * ``age_group`` (Choice, multi) — JSON-array contains check on
@@ -47,11 +47,11 @@ class PostRepository(BaseRepository):
     * ``language`` (Choice, multi) — same JSON contains pattern
       against both detail tables' ``languages``.
     * ``geography`` (Text) — ILIKE across city, state, and zip on both
-      ``ReferralDetail`` (its own location) and ``Affiliation``
+      ``ReferralDetail`` (its own location) and ``ClinicianAffiliation``
       (opening/intake's linked practice location).
     * ``include_telehealth`` (Flag) — when present, expands the
       ``geography`` filter to also include openings where the linked
-      Affiliation has ``virtual_sessions='yes'`` in CA.
+      ClinicianAffiliation has ``virtual_sessions='yes'`` in CA.
     * ``level_of_care`` (Choice, multi) — ``settings`` JSON-array
       contains check across ``OpeningDetail`` and ``IntakeDetail``
       (``ReferralDetail`` has no settings field and is excluded when
@@ -60,7 +60,7 @@ class PostRepository(BaseRepository):
       check across all three detail tables.
     * ``insurance`` (Choice, multi) — ``insurance_carrier`` exact match
       on ``ReferralDetail`` OR ``in_network_carriers`` JSON-contains on
-      linked ``Affiliation``.
+      linked ``ClinicianAffiliation``.
 
     Empty / absent filter values short-circuit (no WHERE clause), so
     URL params that aren't set carry no SQL cost. AND-combined across
@@ -123,8 +123,8 @@ class PostRepository(BaseRepository):
             )
         if needs_clinician_join:
             stmt = stmt.outerjoin(
-                Affiliation,
-                Affiliation.clinician_id == OpeningDetail.clinician_id,
+                ClinicianAffiliation,
+                ClinicianAffiliation.clinician_id == OpeningDetail.clinician_id,
             )
         if needs_intake_join:
             stmt = stmt.outerjoin(
@@ -154,7 +154,7 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(
                 or_(
                     ReferralDetail.location_state.in_(state),
-                    Affiliation.location_state.in_(state),
+                    ClinicianAffiliation.location_state.in_(state),
                 )
             )
         if city:
@@ -162,7 +162,7 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(
                 or_(
                     ReferralDetail.location_city.ilike(needle),
-                    Affiliation.location_city.ilike(needle),
+                    ClinicianAffiliation.location_city.ilike(needle),
                 )
             )
         if age_group:
@@ -176,15 +176,15 @@ class PostRepository(BaseRepository):
                 ReferralDetail.location_city.ilike(needle),
                 ReferralDetail.location_state.ilike(needle),
                 ReferralDetail.location_zip.ilike(needle),
-                Affiliation.location_city.ilike(needle),
-                Affiliation.location_state.ilike(needle),
-                Affiliation.location_zip.ilike(needle),
+                ClinicianAffiliation.location_city.ilike(needle),
+                ClinicianAffiliation.location_state.ilike(needle),
+                ClinicianAffiliation.location_zip.ilike(needle),
             ]
             if include_telehealth:
                 geo_clauses.append(
                     and_(
-                        Affiliation.virtual_sessions == "yes",
-                        Affiliation.location_state == "CA",
+                        ClinicianAffiliation.virtual_sessions == "yes",
+                        ClinicianAffiliation.location_state == "CA",
                     )
                 )
             stmt = stmt.filter(or_(*geo_clauses))
@@ -213,7 +213,7 @@ class PostRepository(BaseRepository):
                 clauses.append(
                     or_(
                         ReferralDetail.insurance_carrier == v,
-                        Affiliation.in_network_carriers.like(token),
+                        ClinicianAffiliation.in_network_carriers.like(token),
                     )
                 )
             stmt = stmt.filter(or_(*clauses))
