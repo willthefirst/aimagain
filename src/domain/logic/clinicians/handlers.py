@@ -17,6 +17,7 @@ from src.domain.models import (
     Organization,
     User,
 )
+from src.framework.audit.repository import AuditRepository
 from src.framework.authz import assert_fk_ownership, list_visible_to
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
@@ -133,3 +134,98 @@ async def handle_list_user_clinicians(
         "current_user": requesting_user,
         "pager": Pager(page=page, base_query=base_query(request)),
     }
+
+
+async def handle_set_license_attestation(
+    clinician_id: UUID,
+    licensure_id: UUID,
+    payload: BaseModel,
+    repo: ClinicianRepository,
+    verification_repo: VerificationRepository,
+    audit_repo: AuditRepository,
+    requesting_user: User,
+):
+    """State-axis handler for `PUT /clinicians/{clinician_id}/licensures/{licensure_id}/attestation`.
+
+    "I attest this license is active and in good standing." Flips
+    `attested_active=True` + `attested_at=NOW()`, recomputes the
+    licensure's `status` from `expiration_date` + the attestation, and
+    re-runs `recompute_clinician_claim` so the Claim-A denorm cache
+    reflects the new state. A `Verification` event of type
+    `license_attested` is appended.
+
+    Authz: the requesting user must own the parent Clinician (or be
+    admin). The licensure must belong to the URL-named clinician —
+    same defense-in-depth shape the framework's generic subentity
+    handlers use.
+
+    This is the canonical consumer of `mount_state_axis` with
+    `spec.parent is not None`; the path / authz / response-shape rules
+    all flow from the framework's existing state-axis machinery.
+    """
+    # Imports kept local to keep the module's top-level import surface
+    # narrow; this handler is the only caller that needs them.
+    from datetime import date, datetime, timezone
+
+    from src.domain.logic.verifications.handlers import (
+        recompute_clinician_claim,
+        record_verification_event,
+    )
+    from src.domain.models import ClinicianLicensure
+    from src.domain.specs.clinician_licensure import LICENSURE_ENTITY
+    from src.framework.audit.core import record_audit
+    from src.framework.authz import is_owner_or_admin
+
+    clinician = await repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail="Clinician not found")
+    if not is_owner_or_admin(clinician, requesting_user):
+        raise ForbiddenError(detail="Cannot attest licenses for this clinician")
+
+    licensure = await repo.get_by_model_id(ClinicianLicensure, licensure_id)
+    if licensure is None or licensure.clinician_id != clinician_id:
+        raise NotFoundError(detail="Licensure not found for this clinician")
+
+    axis = LICENSURE_ENTITY.state_axis("attestation")
+    before = axis.audit_snapshot_fn(licensure)
+
+    licensure.attested_active = True
+    licensure.attested_at = datetime.now(timezone.utc)
+    if licensure.expiration_date is None or licensure.expiration_date >= date.today():
+        licensure.status = "active"
+    else:
+        licensure.status = "expired"
+
+    # Two audit surfaces here: an audit row for the licensure-level
+    # mutation (carrying `SET_LICENSE_ATTESTATION`) and a
+    # `Verification` event row in the verification cluster (carrying
+    # `event_type='license_attested'`). The audit row is what the
+    # framework's discipline guard looks for; the Verification event
+    # is the event-log entry the recompute helpers and the lapse
+    # detection read.
+    await record_audit(
+        audit_repo,
+        actor_id=requesting_user.id,
+        resource_type=LICENSURE_ENTITY.audit.type,
+        resource_id=licensure.id,
+        action=axis.action,
+        before=before,
+        after=axis.audit_snapshot_fn(licensure),
+    )
+    await record_verification_event(
+        verification_repo=verification_repo,
+        audit_repo=audit_repo,
+        subject_type="clinician",
+        clinician_id=clinician.id,
+        event_type="license_attested",
+        status="verified",
+        evidence={
+            "licensure_id": str(licensure.id),
+            "license_type": licensure.license_type,
+            "issuing_state": licensure.issuing_state,
+        },
+        actor_id=requesting_user.id,
+    )
+    recompute_clinician_claim(clinician)
+    await repo.session.commit()
+    return licensure
