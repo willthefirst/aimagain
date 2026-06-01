@@ -44,11 +44,11 @@ from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
-    Redirects,
     RouteSet,
     Templates,
 )
 from src.framework.dispatch.filters import ChoiceFilter, FlagFilter, TextFilter
+from src.framework.dispatch.redirects import Redirects
 
 POST_AUDITED_RESOURCE: Final = make_audited_resource(
     "post",

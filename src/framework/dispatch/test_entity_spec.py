@@ -22,11 +22,11 @@ from src.framework.dispatch.entity_spec import (
     EdgeAudit,
     EntitySpec,
     M2NRelation,
-    Redirects,
     RouteSet,
     StateAxis,
     Templates,
 )
+from src.framework.dispatch.redirects import Redirects
 
 
 class _DummyBody(BaseModel):

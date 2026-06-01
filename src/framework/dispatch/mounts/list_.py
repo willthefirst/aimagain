@@ -290,7 +290,10 @@ def make_list_handler(
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_repos: tuple[tuple[str, type], ...] = (),
 ):
-    from src.framework.dispatch.handlers import _LIST_SHAPE, _make_factory_handler
+    from src.framework.dispatch.mounts._factory import (
+        _LIST_SHAPE,
+        _make_factory_handler,
+    )
 
     return _make_factory_handler(
         spec, _LIST_SHAPE, handle_list, extras=extras, extra_repos=extra_repos

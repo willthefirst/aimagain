@@ -42,12 +42,12 @@ from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
-    Redirects,
     RouteSet,
     StateAxis,
     Templates,
 )
 from src.framework.dispatch.filters import ChoiceFilter
+from src.framework.dispatch.redirects import Redirects
 
 # After create or update, redirect to the edit form so the user can
 # keep editing the parent + its credentials. The same callable is reused
