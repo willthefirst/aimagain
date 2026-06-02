@@ -1666,3 +1666,115 @@ async def test_list_pagination_preserves_query_params(
     href = next_link.attributes.get("href", "")
     assert "ignored_param=foo" in href
     assert "page=2" in href
+
+
+# --- Ownership-list subresources (openings / referrals) ------------------
+
+
+async def _add_post_for(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    detail,
+    detail_relationship: str,
+):
+    """Persist a Post + per-kind detail row owned by `owner_id`."""
+    from src.domain.models import Post
+    from src.framework.persistence.base_repository import BaseRepository
+
+    kind_map = {
+        "opening_detail": "clinician_opening",
+        "referral_detail": "referral",
+    }
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            post = Post(kind=kind_map[detail_relationship], owner_id=owner_id)
+            repo = BaseRepository(session)
+            await repo.create_polymorphic(
+                post, detail, detail_relationship=detail_relationship
+            )
+
+
+async def test_get_clinician_openings_empty_state(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /clinicians/{id}/openings` renders the empty state when the
+    clinician has posted no openings."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}/openings")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#clinician-openings-list") is None
+    empty = tree.css_first(".post-feed-empty")
+    assert empty is not None
+    assert "No openings posted" in empty.text()
+
+
+async def test_get_clinician_openings_lists_only_this_clinician(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The list scopes to the path clinician: a second clinician's
+    opening does not bleed into the first clinician's list."""
+    from tests.helpers import make_opening_detail
+
+    mine = await _seed_clinician_for(db_test_session_manager, user_id=logged_in_user.id)
+    other = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    await _add_post_for(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        detail=make_opening_detail(clinician_id=mine),
+        detail_relationship="opening_detail",
+    )
+    await _add_post_for(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        detail=make_opening_detail(clinician_id=other),
+        detail_relationship="opening_detail",
+    )
+
+    response = await authenticated_client.get(f"/clinicians/{mine}/openings")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert len(tree.css("#clinician-openings-list .post-feed-row")) == 1
+
+
+async def test_get_clinician_referrals_lists_attributed(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /clinicians/{id}/referrals` lists referrals attributed to the
+    clinician via `referring_clinician_id`."""
+    from tests.helpers import make_referral_detail
+
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    await _add_post_for(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        detail=make_referral_detail(referring_clinician_id=clinician_id),
+        detail_relationship="referral_detail",
+    )
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}/referrals")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert len(tree.css("#clinician-referrals-list .post-feed-row")) == 1
+
+
+async def test_get_clinician_openings_404_for_missing_clinician(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """A nonexistent clinician id 404s rather than rendering an empty list."""
+    response = await authenticated_client.get(f"/clinicians/{uuid.uuid4()}/openings")
+    assert response.status_code == 404

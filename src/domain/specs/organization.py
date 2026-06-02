@@ -15,6 +15,7 @@ from src.domain.logic.organizations.schema import (
     OrganizationVerificationAuditSnapshot,
     OrganizationVerificationStateUpdate,
 )
+from src.domain.logic.posts.repository import get_post_repository
 from src.domain.models import Organization
 from src.domain.models.enums import (
     ORGANIZATION_TYPES,
@@ -25,12 +26,21 @@ from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
+    RelatedListSubresource,
     RouteSet,
     StateAxis,
 )
+from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.redirects import Redirects
 
 _organization_form_redirect = Redirects.to_edit_form("organizations", "organization_id")
+
+# Owner-scoped read projection over `/posts` (RESOURCE_GRAMMAR pattern
+# #5): the program-intakes whose Program belongs to this org. Renders
+# `Post` rows, so the child spec points at the post repo.
+_org_intakes_child = ResourceSpec(
+    collection="intakes", id_param="post_id", repo_dep=get_post_repository
+)
 
 
 ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
@@ -93,6 +103,13 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
             ),
             audit_snapshot=OrganizationVerificationAuditSnapshot,
             forbid_self=False,
+        ),
+    ),
+    subresources=(
+        RelatedListSubresource(
+            child_spec=_org_intakes_child,
+            template="organizations/intakes_list.html",
+            handler_path="src.domain.logic.posts.handlers.handle_list_org_intakes",
         ),
     ),
 )

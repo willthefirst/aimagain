@@ -133,6 +133,16 @@ GET /users/{id}/clinicians             list clinician directory entries owned by
 GET /users/me/clinicians               ⇒ same handler with owner_id=session.user_id
 ```
 
+The child the list projects over need not be a row the owner FK-owns directly. The post-family projections scope the polymorphic `/posts` collection down to one owner by joining through the per-kind detail table's FK:
+
+```
+GET /clinicians/{id}/openings          Posts(kind=clinician_opening) whose OpeningDetail.clinician_id = id
+GET /clinicians/{id}/referrals         Posts(kind=referral) whose ReferralDetail.referring_clinician_id = id
+GET /organizations/{id}/intakes        Posts(kind=program_intake) joined Program where Program.org_id = id
+```
+
+The inner join to the detail table inherently restricts to the matching kind (a Post has a row in exactly one detail table), so the projection never needs a `Post.kind` literal. The list mounts via `RelatedListSubresource` with a hand-rolled `ResourceSpec` whose `collection` names the URL segment (`openings`/`referrals`/`intakes`) and whose `repo_dep` is the **post** repo; auth follows the owner spec (`OWNER_OR_ADMIN` on clinician/org). The repo methods live in `posts/repository.py` and the handlers in `posts/handlers.py`.
+
 Don't use this for *all* child relationships — only when "list everything owned by X" is a real consumer view. If consumers only ever want a single child by id (e.g. `/users/{id}/avatar`), use a state-axis or single-value subresource instead.
 
 ### Bonus: hard DELETE
