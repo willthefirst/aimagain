@@ -94,3 +94,14 @@ class ReferralDetail(LocationMixin, Base):
         foreign_keys=[referring_clinician_id],
         lazy="selectin",
     )
+
+    # Context: the specific `ClinicianAffiliation` the referring clinician
+    # is acting under. Mirrors `OpeningDetail.clinician_affiliation_id` —
+    # a clinician with several org affiliations refers under one. Nullable
+    # (null = no context set), `SET NULL` on affiliation delete.
+    clinician_affiliation_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("clinician_affiliations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    clinician_affiliation = relationship("ClinicianAffiliation", lazy="selectin")
