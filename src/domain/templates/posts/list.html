@@ -6,9 +6,16 @@
 {% block resource_label %}Posts{% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading="Posts") %}
-    <li>
-      <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
-    </li>
+    {# Create CTA is gated on a posting-capable claim — Claim A (verified
+       clinician) OR any verified Claim B (org rep). Same universe the
+       per-kind server gates accept (`capabilities.can_post_*` self path
+       OR the org-rep path), so the visible button can't invite a 403.
+       `claims.{a,b}` come from `base_context()` → `claim_state(user)`. #}
+    {% if claims.a or claims.b %}
+      <li>
+        <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
+      </li>
+    {% endif %}
   {% endcall %}
 {% endblock %}
 {% block actions %}{% endblock %}
