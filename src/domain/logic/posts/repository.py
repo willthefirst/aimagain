@@ -8,6 +8,7 @@ from src.domain.models import (
     IntakeDetail,
     OpeningDetail,
     Post,
+    Program,
     ReferralDetail,
     User,
 )
@@ -224,6 +225,47 @@ class PostRepository(BaseRepository):
             stmt = stmt.filter(Post.owner_id != exclude_owner_id)
 
         stmt = stmt.order_by(Post.created_at.desc())
+        return await self._list(stmt, offset=offset, limit=limit)
+
+    # Owner-scoped read projections (RESOURCE_GRAMMAR pattern #5). Each
+    # is the same supertype rows narrowed to one owner; the inner join to
+    # a detail table already restricts to the matching kind (a post has a
+    # row in exactly one detail table), so no `Post.kind` literal is
+    # needed here.
+    async def list_clinician_openings(
+        self, clinician_id, *, offset: int = 0, limit: int | None = None
+    ) -> Sequence[Post]:
+        stmt = (
+            select(Post)
+            .join(OpeningDetail, OpeningDetail.post_id == Post.id)
+            .filter(OpeningDetail.clinician_id == clinician_id)
+            .order_by(Post.created_at.desc())
+        )
+        return await self._list(stmt, offset=offset, limit=limit)
+
+    async def list_clinician_referrals(
+        self, clinician_id, *, offset: int = 0, limit: int | None = None
+    ) -> Sequence[Post]:
+        # Scoped by the referral's designated referring clinician — the
+        # same FK the post-create authz treats as referral ownership.
+        stmt = (
+            select(Post)
+            .join(ReferralDetail, ReferralDetail.post_id == Post.id)
+            .filter(ReferralDetail.referring_clinician_id == clinician_id)
+            .order_by(Post.created_at.desc())
+        )
+        return await self._list(stmt, offset=offset, limit=limit)
+
+    async def list_org_intakes(
+        self, org_id, *, offset: int = 0, limit: int | None = None
+    ) -> Sequence[Post]:
+        stmt = (
+            select(Post)
+            .join(IntakeDetail, IntakeDetail.post_id == Post.id)
+            .join(Program, Program.id == IntakeDetail.program_id)
+            .filter(Program.org_id == org_id)
+            .order_by(Post.created_at.desc())
+        )
         return await self._list(stmt, offset=offset, limit=limit)
 
     # The single `/posts` URL family lists every kind through

@@ -498,3 +498,96 @@ async def test_delete_removes_org(
     async with db_test_session_manager() as session:
         loaded = await session.get(Organization, new_id)
         assert loaded is None
+
+
+# --- Ownership-list subresource (intakes) --------------------------------
+
+
+async def _seed_org_for(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    name: str = "Intake Org",
+) -> uuid.UUID:
+    org = make_organization_row(owner_id=owner_id, name=name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+    return org.id
+
+
+async def _seed_program_intake(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    org_id: uuid.UUID,
+):
+    """Persist a Program under `org_id` plus a Post(program_intake) whose
+    IntakeDetail points at it."""
+    from src.domain.models import Post
+    from src.framework.persistence.base_repository import BaseRepository
+    from tests.helpers import make_intake_detail, make_program
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            program = make_program(owner_id=owner_id, org_id=org_id)
+            session.add(program)
+        async with session.begin():
+            post = Post(kind="program_intake", owner_id=owner_id)
+            repo = BaseRepository(session)
+            await repo.create_polymorphic(
+                post,
+                make_intake_detail(program_id=program.id),
+                detail_relationship="intake_detail",
+            )
+
+
+async def test_get_org_intakes_empty_state(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /organizations/{id}/intakes` renders the empty state when the
+    org's programs have no intakes posted."""
+    org_id = await _seed_org_for(db_test_session_manager, owner_id=logged_in_user.id)
+    response = await authenticated_client.get(f"/organizations/{org_id}/intakes")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#org-intakes-list") is None
+    empty = tree.css_first(".post-feed-empty")
+    assert empty is not None
+    assert "No program intakes posted" in empty.text()
+
+
+async def test_get_org_intakes_lists_only_this_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The list scopes via Program.org_id: another org's intake does not
+    bleed into this org's list."""
+    mine = await _seed_org_for(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Mine"
+    )
+    other = await _seed_org_for(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Other"
+    )
+    await _seed_program_intake(
+        db_test_session_manager, owner_id=logged_in_user.id, org_id=mine
+    )
+    await _seed_program_intake(
+        db_test_session_manager, owner_id=logged_in_user.id, org_id=other
+    )
+
+    response = await authenticated_client.get(f"/organizations/{mine}/intakes")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert len(tree.css("#org-intakes-list .post-feed-row")) == 1
+
+
+async def test_get_org_intakes_404_for_missing_org(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.get(f"/organizations/{uuid.uuid4()}/intakes")
+    assert response.status_code == 404

@@ -1,0 +1,20 @@
+{% extends "views/list.html" %}
+{%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_item_list.html" import item_list -%}
+{# Owner-scoped projection over /posts — intakes whose Program belongs to
+   this org. #}
+{% block resource_label %}{% endblock %}
+{% block breadcrumb %}
+  {{ breadcrumb([
+    ("Organizations", entity_url('organization') ),
+  (organization.name, entity_url('organization', id=organization.id)),
+  ("Intakes", none),
+  ]) }}
+{% endblock %}
+{% block content %}
+  {%- set _empty %}{{ post_feed_empty("No program intakes posted for this organization yet.") }}{%- endset %}
+    {{ item_list(posts, post_feed_row, "org-intakes-list", "post-feed-list",
+        empty=_empty,
+        pager=pager) }}
+  {% endblock %}

@@ -29,6 +29,7 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
+from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Clinician
 from src.domain.models.enums import (
@@ -46,12 +47,25 @@ from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
+    RelatedListSubresource,
     RouteSet,
     StateAxis,
     Templates,
 )
 from src.framework.dispatch.filters import ChoiceFilter
+from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.redirects import Redirects
+
+# Owner-scoped read projections over `/posts` (RESOURCE_GRAMMAR pattern
+# #5): a clinician's openings and the referrals attributed to them. Both
+# render `Post` rows, so the child spec points at the post repo; only
+# `collection` / `id_param` / `repo_dep` are read by `mount_related_list`.
+_clinician_openings_child = ResourceSpec(
+    collection="openings", id_param="post_id", repo_dep=get_post_repository
+)
+_clinician_referrals_child = ResourceSpec(
+    collection="referrals", id_param="post_id", repo_dep=get_post_repository
+)
 
 # After create or update, redirect to the edit form so the user can
 # keep editing the parent + its credentials. The same callable is reused
@@ -172,6 +186,22 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
             ),
             audit_snapshot=ClinicianVerificationAuditSnapshot,
             forbid_self=False,
+        ),
+    ),
+    subresources=(
+        RelatedListSubresource(
+            child_spec=_clinician_openings_child,
+            template="clinicians/openings_list.html",
+            handler_path=(
+                "src.domain.logic.posts.handlers.handle_list_clinician_openings"
+            ),
+        ),
+        RelatedListSubresource(
+            child_spec=_clinician_referrals_child,
+            template="clinicians/referrals_list.html",
+            handler_path=(
+                "src.domain.logic.posts.handlers.handle_list_clinician_referrals"
+            ),
         ),
     ),
 )

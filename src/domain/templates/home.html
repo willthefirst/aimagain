@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{%- from "posts/_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
+{%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
