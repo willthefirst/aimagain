@@ -17,6 +17,7 @@ for the full polymorphic-face contract.
 from typing import Final
 
 from src.domain.logic.clinicians.repository import ClinicianRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.posts.schema import (
     post_audit_snapshot,
@@ -153,16 +154,17 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         form_edit="posts/form_edit.html",
     ),
     update_redirect=Redirects.to_detail("posts", "post_id"),
-    # Per-kind FK-ownership check + Claim-A capability gate. The
-    # dispatcher reads `payload.kind` and validates the kind-specific FK
-    # fields (clinician_opening's `clinician_id`, program_intake's
-    # `program_id`) against the requesting user's ownership, then
-    # enforces the matching claim gate from the two-claim verification
-    # model. See `_assert_post_payload_authz` for the full contract.
+    # Two authority paths on create (see `_assert_post_payload_authz`):
+    # the **self** path (own the per-kind FK row + hold the matching
+    # claim) or the **org-rep** path (be a verified rep of the org the
+    # listing's `clinician_affiliation_id` points at). The org lookup for
+    # the rep path needs `organization_repo`; the self path needs the
+    # clinician/program repos for the FK-ownership check.
     payload_authz_path="src.domain.logic.posts.handlers._assert_post_payload_authz",
     payload_authz_repos=(
         ("clinician_repo", ClinicianRepository),
         ("program_repo", ProgramRepository),
+        ("organization_repo", OrganizationRepository),
     ),
     discriminator=POST_KINDS,
     # Whole-supertype: no `discriminator_value` or `discriminator_values`.
