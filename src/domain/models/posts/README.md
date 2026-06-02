@@ -10,6 +10,10 @@ This subdirectory holds the SQLAlchemy models for the `posts` table and its per-
 - `opening_detail.py` — `OpeningDetail`, the detail row for `kind='clinician_opening'`. Same shape as `ReferralDetail` but tracks the clinician-availability form; adds the `settings` JSON multi-select. `services` and `settings` are required-min-1 on the wire (vs. optional/absent on Client Referral). Table name stays `opening_details` from before the kind rename (migration `9e1f7b3c4a2d`) — pure rename noise to drop it.
 - `intake_detail.py` — `IntakeDetail`, the detail row for `kind='program_intake'` (#541). Same per-announcement field set as `OpeningDetail` but points at a `Program` via `program_id` instead of a `Clinician` — the referrer is choosing an *intake door* (the Program) and trusting the owning Org to assign a clinician internally. Table name stays `intake_details` for the same reason as `opening_details`.
 
+### Listing context (`clinician_affiliation_id`)
+
+The two clinician-authored detail kinds (`OpeningDetail`, `ReferralDetail`) carry a nullable `clinician_affiliation_id` FK → `clinician_affiliations.id` (`ON DELETE SET NULL`): a clinician who affiliates with several orgs (`clinician_affiliations` is 1:N off `clinicians`) declares *which* affiliation a given opening/referral is offered under. It's nullable because the column post-dates existing rows and because not every listing has a context set. `IntakeDetail` has no such column — its context is the `Program`'s owning org, reachable via `program_id`. Migration `c4d5e6f7a8b9` added the columns and backfilled each existing row to its clinician's primary (earliest-`created_at`) affiliation, matching `Clinician.primary_clinician_affiliation`.
+
 ## Kind name history (audit-log readers)
 
 Audit-log rows persist the kind value that was current when the row was written. Two renames happened in `posts.kind`:

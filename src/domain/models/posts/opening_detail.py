@@ -50,3 +50,16 @@ class OpeningDetail(Base):
     description = Column(Text, nullable=True)
     referral_instructions = Column(Text, nullable=True)
     website = Column(Text, nullable=True)
+
+    # Context: the specific `ClinicianAffiliation` this opening is offered
+    # under. A clinician who affiliates with several orgs posts an opening
+    # under one of them; this FK names which. Nullable — null means "no
+    # context set" (the state of every row before this column existed and
+    # of rows created before a picker populates it). `SET NULL` on delete
+    # so removing an affiliation nulls the context rather than blocking.
+    clinician_affiliation_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("clinician_affiliations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    clinician_affiliation = relationship("ClinicianAffiliation", lazy="selectin")

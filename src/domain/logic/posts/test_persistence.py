@@ -480,6 +480,108 @@ async def test_delete_post_cascades_opening_detail(
         assert detail_row is None
 
 
+# --- Listing context (clinician_affiliation_id) -------------------------
+
+
+async def test_opening_persists_clinician_affiliation_context(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`OpeningDetail.clinician_affiliation_id` round-trips — the FK to the
+    affiliation the opening is offered under. The clinician factory builds
+    a primary affiliation; we pin the opening to it."""
+    owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
+    affiliation_id = clinician.primary_clinician_affiliation.id
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        created = await _create_post(
+            repo,
+            Post(kind="clinician_opening", owner_id=owner.id),
+            make_opening_detail(
+                clinician_id=clinician.id, clinician_affiliation_id=affiliation_id
+            ),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(OpeningDetail).filter(OpeningDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert detail_row.clinician_affiliation_id == affiliation_id
+
+
+async def test_opening_affiliation_context_defaults_null(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Omitting the context FK persists NULL — additive nullable column
+    must not break a row that doesn't supply it."""
+    owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        created = await _create_post(
+            repo,
+            Post(kind="clinician_opening", owner_id=owner.id),
+            make_opening_detail(clinician_id=clinician.id),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(OpeningDetail).filter(OpeningDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert detail_row.clinician_affiliation_id is None
+
+
+async def test_referral_persists_clinician_affiliation_context(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`ReferralDetail.clinician_affiliation_id` round-trips — the FK to the
+    affiliation the referring clinician is acting under."""
+    owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
+    affiliation_id = clinician.primary_clinician_affiliation.id
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        created = await _create_post(
+            repo,
+            Post(kind="referral", owner_id=owner.id),
+            make_referral_detail(
+                description="placement",
+                referring_clinician_id=clinician.id,
+                clinician_affiliation_id=affiliation_id,
+            ),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        detail_row = (
+            (
+                await session.execute(
+                    select(ReferralDetail).filter(ReferralDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert detail_row.clinician_affiliation_id == affiliation_id
+
+
 # --- Program availability kind ------------------------------------------
 
 
