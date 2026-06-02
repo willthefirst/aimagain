@@ -363,7 +363,7 @@ def test_audit_snapshot_for_referral_post():
     post = SimpleNamespace(
         kind="referral",
         owner_id=owner_id,
-        referral_detail=SimpleNamespace(**detail_attrs),
+        referral_detail=SimpleNamespace(**detail_attrs, clinician_affiliation_id=None),
     )
     snap = post_audit_snapshot(post)
     assert snap["kind"] == "referral"
@@ -657,7 +657,7 @@ def test_audit_snapshot_for_opening_post():
         kind="clinician_opening",
         owner_id=owner_id,
         referral_detail=None,
-        opening_detail=SimpleNamespace(**detail_attrs),
+        opening_detail=SimpleNamespace(**detail_attrs, clinician_affiliation_id=None),
     )
     snap = post_audit_snapshot(post)
     assert snap["kind"] == "clinician_opening"
