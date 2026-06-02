@@ -29,6 +29,7 @@ from src.domain.logic.posts.view import (
     post_row_summary,
     referral_headline,
 )
+from src.domain.logic.profile.view import onboarding_readiness
 from src.domain.models import enums
 from src.framework.rendering.form_fields import register_choice_labels
 from src.framework.rendering.templating import register_template_globals
@@ -119,6 +120,12 @@ register_template_globals(
     # `clinicians/detail.html` reads from — see its docstring in
     # `src.domain.logic.clinicians.view`.
     clinician_card_view=clinician_card_view,
+    # `onboarding_readiness(user)` is the compact capability-accurate
+    # readiness summary the "Getting started" checklist reads — see its
+    # docstring in `src.domain.logic.profile.view`. Reuses the same
+    # `capabilities` predicates the post gate uses, so the checklist
+    # can't invite a user into an action the server would 403.
+    onboarding_readiness=onboarding_readiness,
     # `capabilities` is the single-source-of-truth predicate module
     # (`src.domain.logic.capabilities`) registered as a Jinja namespace
     # so templates can write
