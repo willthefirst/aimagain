@@ -63,6 +63,17 @@ async def generate_posts(
     clinicians: list[Clinician] = pool.all("clinicians")
     programs: list[Program] = pool.all("programs")
 
+    # Clinician → primary affiliation id. The generic `build_row` would
+    # resolve the listing's `clinician_affiliation_id` FK to a *random*
+    # affiliation; under the picker-derives-clinician model that must
+    # instead be one of the listing clinician's own affiliations. First
+    # affiliation seen per clinician is its primary (generate_affiliations
+    # appends primary before any secondary), matching
+    # `Clinician.primary_clinician_affiliation`.
+    primary_aff_by_clinician: dict = {}
+    for aff in pool.all("clinician_affiliations"):
+        primary_aff_by_clinician.setdefault(aff.clinician_id, aff.id)
+
     out: list[Post] = []
 
     # --- Referral posts ---
@@ -73,6 +84,12 @@ async def generate_posts(
         detail = build_row(ReferralDetail, i, rng, pool)
         # FK + description: generic builder can't infer either.
         detail.post_id = post_id
+        # Referring clinician + its context affiliation, kept coherent:
+        # the affiliation must belong to the referring clinician (the
+        # picker-derives-clinician invariant).
+        ref_clin = clinicians[i % len(clinicians)]
+        detail.referring_clinician_id = ref_clin.id
+        detail.clinician_affiliation_id = primary_aff_by_clinician.get(ref_clin.id)
         detail.subject = None if rng.bool(0.2) else referral_subject(rng, i)
         detail.description = render_referral_description(rng, i)
         # Sidecar PK isn't an FK-pool target; just give it a stable
@@ -90,7 +107,10 @@ async def generate_posts(
         _shift_created_at(post, days_ago=i % 180)
         detail = build_row(OpeningDetail, i, rng, pool)
         detail.post_id = post_id
-        detail.clinician_id = clinicians[i % len(clinicians)].id
+        opening_clin = clinicians[i % len(clinicians)]
+        detail.clinician_id = opening_clin.id
+        # Context affiliation must belong to this opening's clinician.
+        detail.clinician_affiliation_id = primary_aff_by_clinician.get(opening_clin.id)
         detail.subject = None if rng.bool(0.2) else opening_subject(rng, i)
         # `description` is nullable — populate most rows for narrative,
         # leave a slice NULL so the empty-state card renders too.

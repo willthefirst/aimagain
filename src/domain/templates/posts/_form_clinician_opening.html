@@ -51,18 +51,19 @@ Field order:
     {# Practice picker. A Clinician may carry multiple Affiliations
      (clinician × org practice-role rows); the dropdown labels each
      option by the affiliation's org name so a clinician who works at
-     two practices sees both options. Each option's value is the
-     clinician id; the label comes from the affiliation's org. Uses
-     `composite_select_field` because the label is sourced from a
-     nested `affiliations` loop, not a flat attribute on the clinician
-     — mirrors `_form_referral.html`'s referring_clinician_id picker. #}
+     two practices sees both. Each option's value is the *affiliation*
+     id — the server derives the opening's `clinician_id` from it
+     (`_resolve_affiliation_context`), so a two-affiliation clinician's
+     options no longer collapse onto one value. Uses
+     `composite_select_field` because the label is sourced from a nested
+     `affiliations` loop — mirrors `_form_referral.html`'s picker. #}
     {%- set _practices = namespace(opts=[]) -%}
     {%- for c in current_user.clinicians -%}
       {%- for aff in c.clinician_affiliations -%}
-        {%- set _practices.opts = _practices.opts + [(c.id, aff.org.name)] -%}
+        {%- set _practices.opts = _practices.opts + [(aff.id, aff.org.name)] -%}
       {%- endfor -%}
     {%- endfor -%}
-    {{ composite_select_field("clinician_id", "Which practice?", _practices.opts, current=d.clinician_id if d else None, default_first=true) }}
+    {{ composite_select_field("clinician_affiliation_id", "Which practice?", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
     {# About: free-text core fields — description / referral / website. #}
     {% call form_section("About") %}
       {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
