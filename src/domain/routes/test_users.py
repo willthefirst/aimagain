@@ -509,14 +509,16 @@ async def test_detail_shows_inline_create_clinician_for_self(
     assert action.attributes.get("href") == "/clinicians/form"
 
 
-async def test_users_me_shows_onboarding_create_clinician_cta_when_no_profile(
+async def test_users_me_onboarding_points_at_identity_when_unverified(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /users/me` for a user with no clinician profile shows a
-    'Create your clinician profile' CTA in the onboarding checklist.
-    The checklist is self-only — other users' profiles (/users/{id})
-    are unaffected."""
+    """`GET /users/me` for an email-verified user who holds no
+    posting-capable claim (no Verified Clinician, no verified org rep)
+    shows the capability-accurate "Verify your identity to start posting"
+    CTA pointing at `/profile` — never an invitation to "Post an opening"
+    that the post gate would 403. The checklist is self-only; other
+    users' profiles (/users/{id}) are unaffected."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -530,14 +532,18 @@ async def test_users_me_shows_onboarding_create_clinician_cta_when_no_profile(
     assert (
         "Getting started" in headings
     ), "/users/me is missing the 'Getting started' onboarding card"
-    # The create-clinician CTA must link to the clinician form.
-    cta = tree.css_first(
-        "section.entity-card a[href='/clinicians/form'][role='button']"
-    )
+    # `onboarding_readiness.next_href` for an email-verified, claimless
+    # user is "/profile" with the identity-verification label. The
+    # "Post an opening" CTA must NOT render — the user can't post yet.
+    cta = tree.css_first("section.entity-card a[href='/profile'][role='button']")
+    assert cta is not None, "onboarding card is missing the 'Verify your identity' CTA"
+    assert "Verify your identity to start posting" in cta.text()
     assert (
-        cta is not None
-    ), "onboarding card is missing 'Create your clinician profile' CTA"
-    assert "Create your clinician profile" in cta.text()
+        tree.css_first(
+            "section.entity-card a[href='/posts/form?kind=clinician_opening']"
+        )
+        is None
+    ), "claimless user must not be offered the 'Post an opening' CTA"
 
 
 async def test_users_me_onboarding_post_opening_cta_when_has_clinician(

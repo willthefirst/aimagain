@@ -76,30 +76,49 @@
     </section>
   {% endif %}
   {# Onboarding checklist — visible only to the user viewing their own
-   profile. Shows status-based CTAs: create a clinician profile first,
-   then post an opening. Other users' profiles (/users/{id}) are
-   unchanged — they keep the Clinicians card below without this section. #}
+   profile. Driven by `onboarding_readiness(current_user)` so the CTAs
+   track the same capability gate the post route enforces: the
+   "Post an opening" button only appears once `can_post` is true, and
+   until then the checklist points at the single next verification step
+   (`next_href`) instead of inviting a 403. Other users' profiles
+   (/users/{id}) are unchanged — they keep the Clinicians card below
+   without this section. #}
   {% if is_self %}
+    {% set readiness = onboarding_readiness(current_user) %}
     <section class="entity-card">
       <header class="entity-header">
         <strong>Getting started</strong>
       </header>
       <ul>
         <li>
-          {% if clinicians %}
-            &#10003; <a href="{{ entity_url('clinician', id=clinicians[0].id) }}">Your clinician profile</a>
+          {% if readiness.email_verified %}
+            &#10003;
           {% else %}
-            <a href="{{ entity_form_url('clinician') }}" role="button">Create your clinician profile</a>
+            &#9744;
           {% endif %}
+          Verify your email
+        </li>
+        <li>
+          {% if readiness.can_post %}
+            &#10003;
+          {% else %}
+            &#9744;
+          {% endif %}
+          Verify your identity (clinician NPI or organization)
         </li>
         {% if clinicians %}
           <li>
-            <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
-               role="button"
-               class="outline">Post an opening</a>
+            &#10003; <a href="{{ entity_url('clinician', id=clinicians[0].id) }}">Your clinician profile</a>
           </li>
         {% endif %}
       </ul>
+      {% if readiness.can_post %}
+        <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+           role="button"
+           class="outline">Post an opening</a>
+      {% elif readiness.next_href %}
+        <a href="{{ readiness.next_href }}" role="button">{{ readiness.next_label }}</a>
+      {% endif %}
     </section>
   {% endif %}
   <section class="entity-card">
