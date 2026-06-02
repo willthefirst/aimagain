@@ -126,8 +126,8 @@
             <strong>Insurance &amp; payment</strong>
           </summary>
           {% call form_with_errors(action="/profile/clinician/" ~ _c.id|string ~ "/details", method="post") %}
-            {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network insurance", checked=_c.accepts_out_of_network) }}
-            {{ checkbox_field("sliding_scale", "Sliding scale available", checked=_c.sliding_scale) }}
+            {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network insurance", current=_c.accepts_out_of_network) }}
+            {{ checkbox_field("sliding_scale", "Sliding scale available", current=_c.sliding_scale) }}
             {{ text_field("cost", "Session cost (optional)", current=_c.cost or "", required=false) }}
             {{ actions("Save payment info") }}
           {% endcall %}
