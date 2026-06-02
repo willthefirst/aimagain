@@ -550,6 +550,46 @@ async def test_list_hides_verify_notice_for_verified(
     assert "posts-verify-notice" not in response.text
 
 
+# --- Toolbar Create CTA gate (posting-capable claim) -------------------------
+
+
+async def test_list_hides_create_cta_for_claimless_user(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """The `/posts` toolbar 'Create' button is hidden for a user holding
+    no posting-capable claim — clicking it would only land on a server
+    403 / degraded form. Matches the per-kind post gate's universe."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert (
+        tree.css_first("a[href='/posts/form'][role='button']") is None
+    ), "claimless user must not be offered the toolbar Create CTA"
+
+
+async def test_list_shows_create_cta_for_claim_a_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A Claim-A (verified clinician) user sees the toolbar 'Create' CTA —
+    the server post gate would let them through."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert (
+        tree.css_first("a[href='/posts/form'][role='button']") is not None
+    ), "Claim-A user should be offered the toolbar Create CTA"
+
+
 async def test_detail_hides_email_and_shows_cta_for_unverified(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
