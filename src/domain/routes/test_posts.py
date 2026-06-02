@@ -463,9 +463,12 @@ async def test_create_form_shown_when_clinician_profile_exists(
     assert "Create your clinician profile" not in response.text
 
 
+# Both clinician-authored kinds now expose a single practice picker named
+# `clinician_affiliation_id` (one option per affiliation); the server
+# derives the clinician FK from the chosen affiliation.
 _CLINICIAN_FIELD = {
-    "referral": "referring_clinician_id",
-    "clinician_opening": "clinician_id",
+    "referral": "clinician_affiliation_id",
+    "clinician_opening": "clinician_affiliation_id",
 }
 
 
@@ -476,14 +479,15 @@ async def test_create_form_preselects_first_clinician(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """The clinician picker on new-post forms defaults to the user's first
-    clinician — no placeholder '-- ' option is rendered."""
+    """The practice picker on new-post forms defaults to the user's first
+    affiliation — no placeholder '-- ' option is rendered."""
     clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, practice_name="First Practice"
     )
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(clinician)
+    affiliation_id = clinician.clinician_affiliations[0].id
 
     response = await authenticated_client.get(f"/posts/form?kind={kind}")
     assert response.status_code == 200
@@ -494,7 +498,7 @@ async def test_create_form_preselects_first_clinician(
     assert select is not None, f"no <select name={field_name!r}> in response"
 
     options = select.css("option")
-    assert options, "clinician select rendered no options"
+    assert options, "practice select rendered no options"
 
     # No disabled placeholder.
     assert not any(
@@ -507,10 +511,10 @@ async def test_create_form_preselects_first_clinician(
     # key presence — not a non-None value — is the correct sentinel.
     assert (
         "selected" in options[0].attributes
-    ), "first clinician option should carry the 'selected' attribute"
-    assert str(clinician.id) in (
+    ), "first affiliation option should carry the 'selected' attribute"
+    assert str(affiliation_id) in (
         options[0].attributes.get("value") or ""
-    ), "selected option value should be the first clinician's id"
+    ), "selected option value should be the first affiliation's id"
 
 
 # --- Anonymization gate (can_read_full_feed) ---------------------------------

@@ -59,6 +59,12 @@ def create_test_user(
 # hit the DB. Real round-trip tests pass an actual Clinician's id.
 _STUB_REFERRING_CLINICIAN_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
+# Stub clinician_affiliation_id — the field the form practice-picker
+# submits and from which the server derives the listing's clinician FK.
+# Required on the wire Create for both clinician-authored kinds. Schema
+# tests use the stub; route/persistence tests pass a real affiliation id.
+_STUB_CLINICIAN_AFFILIATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
+
 # ORM factory defaults: FK fields must be None (nullable columns).
 # SQLAlchemy's UUID column type calls .hex on the value — plain strings blow up.
 _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
@@ -84,9 +90,13 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
 
 # Wire-payload defaults: FK fields as stub string UUIDs for Pydantic validation.
 # Tests that actually persist must override with a real DB-resident ID.
+# `clinician_affiliation_id` is the required picker field; `referring_clinician_id`
+# is now optional on the wire (server-derived from the affiliation) but kept
+# here as a stub so schema round-trip tests still exercise it.
 _REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
     **_REFERRAL_ORM_DEFAULTS,
     "referring_clinician_id": str(_STUB_REFERRING_CLINICIAN_ID),
+    "clinician_affiliation_id": str(_STUB_CLINICIAN_AFFILIATION_ID),
 }
 
 _OPENING_DEFAULTS: dict[str, Any] = {
@@ -133,6 +143,7 @@ def opening_payload(**overrides: Any) -> dict[str, Any]:
     return {
         "kind": "clinician_opening",
         "clinician_id": str(_STUB_CLINICIAN_ID),
+        "clinician_affiliation_id": str(_STUB_CLINICIAN_AFFILIATION_ID),
         **_OPENING_DEFAULTS,
         **overrides,
     }

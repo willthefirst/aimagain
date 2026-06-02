@@ -104,7 +104,10 @@ def test_post_create_referral_rejects_empty_description():
         "age_groups",
         "description",
         "network_preference",
-        "referring_clinician_id",
+        # The picker submits this; `referring_clinician_id` is now
+        # server-derived from it, so the affiliation id is the required
+        # wire field, not the clinician id.
+        "clinician_affiliation_id",
     ],
 )
 def test_post_create_referral_requires_all_required_fields(missing_field):
@@ -363,7 +366,7 @@ def test_audit_snapshot_for_referral_post():
     post = SimpleNamespace(
         kind="referral",
         owner_id=owner_id,
-        referral_detail=SimpleNamespace(**detail_attrs, clinician_affiliation_id=None),
+        referral_detail=SimpleNamespace(**detail_attrs),
     )
     snap = post_audit_snapshot(post)
     assert snap["kind"] == "referral"
@@ -536,7 +539,9 @@ def test_post_update_opening_accepts_age_groups_only():
 @pytest.mark.parametrize(
     "missing_field",
     [
-        "clinician_id",
+        # The picker submits this; `clinician_id` is now server-derived
+        # from it, so the affiliation id is the required wire field.
+        "clinician_affiliation_id",
         "age_groups",
     ],
 )
@@ -657,7 +662,7 @@ def test_audit_snapshot_for_opening_post():
         kind="clinician_opening",
         owner_id=owner_id,
         referral_detail=None,
-        opening_detail=SimpleNamespace(**detail_attrs, clinician_affiliation_id=None),
+        opening_detail=SimpleNamespace(**detail_attrs),
     )
     snap = post_audit_snapshot(post)
     assert snap["kind"] == "clinician_opening"

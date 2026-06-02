@@ -28,7 +28,13 @@ from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.posts.repository import PostRepository
 from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.models import Clinician, Organization, Program, User
+from src.domain.models import (
+    Clinician,
+    ClinicianAffiliation,
+    Organization,
+    Program,
+    User,
+)
 from src.framework.authz import assert_fk_ownership
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
@@ -77,7 +83,15 @@ async def _assert_post_payload_authz(
 
     Superusers bypass the capability check the same way they bypass
     ownership — admins act on any row.
+
+    Before ownership runs, ``_resolve_affiliation_context`` derives the
+    listing's clinician FK from the picker-submitted
+    ``clinician_affiliation_id`` (clinician-authored kinds only). The
+    ownership check then validates that *resolved* clinician, so a
+    picker pointing at an affiliation whose clinician the user doesn't
+    own is rejected here.
     """
+    await _resolve_affiliation_context(payload=payload, clinician_repo=clinician_repo)
     await _assert_post_payload_target_ownership(
         payload=payload,
         requesting_user=requesting_user,
@@ -85,6 +99,43 @@ async def _assert_post_payload_authz(
         program_repo=program_repo,
     )
     _assert_post_payload_capability(payload, requesting_user)
+
+
+async def _resolve_affiliation_context(
+    *, payload: BaseModel, clinician_repo: ClinicianRepository
+) -> None:
+    """Derive the listing's clinician FK from the picker's affiliation.
+
+    The opening / referral create+edit forms expose a single practice
+    picker whose options are the acting user's ``ClinicianAffiliation``
+    rows (one per clinician×org). The picker submits
+    ``clinician_affiliation_id``; the listing's persisted clinician FK
+    (``clinician_id`` for openings, ``referring_clinician_id`` for
+    referrals) is *derived* from that affiliation's ``clinician_id`` so
+    the two can never disagree — and so a clinician affiliated with two
+    orgs no longer collapses both options onto the same value.
+
+    Sets the derived FK on ``payload`` in place (Pydantic v2 marks it in
+    ``model_fields_set``, so ``model_dump(exclude_unset=True)`` carries
+    it into the update path too). Runs before the ownership check, which
+    then validates the resolved clinician.
+
+    No-op when the payload carries no ``clinician_affiliation_id`` — a
+    ``program_intake`` payload (no such field) or a referral/opening
+    PATCH that leaves context unchanged. 404 when the id doesn't resolve.
+    """
+    aff_id = getattr(payload, "clinician_affiliation_id", None)
+    if aff_id is None:
+        return
+    affiliation = await clinician_repo.get_by_model_id(ClinicianAffiliation, aff_id)
+    if affiliation is None:
+        raise NotFoundError(detail=f"Clinician affiliation {aff_id} not found")
+    derived_attr = (
+        "referring_clinician_id"
+        if getattr(payload, "kind", None) == "referral"
+        else "clinician_id"
+    )
+    setattr(payload, derived_attr, affiliation.clinician_id)
 
 
 def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -> None:
