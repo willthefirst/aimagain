@@ -178,17 +178,14 @@ def test_archived_org_rep_stays_in_setup():
 # ---------------------------------------------------------------------------
 
 
-def test_clinician_create_handler_uses_practice_name():
+async def test_clinician_create_handler_uses_practice_name():
     """_assert_clinician_payload_org_ownership should use practice_name over
     first+last when it is provided, so the auto-org gets the right display name."""
+    from types import SimpleNamespace
+
     from src.domain.logic.clinicians.handlers import (
         _assert_clinician_payload_org_ownership,
     )
-
-    class _MockOrg:
-        def __init__(self, **kwargs):
-            self.__dict__.update(kwargs)
-            self.id = uuid4()
 
     class _MockRepo:
         last_created = None
@@ -200,9 +197,6 @@ def test_clinician_create_handler_uses_practice_name():
 
         async def get_by_model_id(self, *a, **kw):
             return None
-
-    import asyncio
-    from types import SimpleNamespace
 
     user = SimpleNamespace(
         id=uuid4(), username="alice", is_superuser=False, is_verified=True
@@ -216,20 +210,17 @@ def test_clinician_create_handler_uses_practice_name():
         org_id = None
 
     repo = _MockRepo()
-    result = asyncio.run(
-        _assert_clinician_payload_org_ownership(
-            payload=_Payload(),
-            requesting_user=user,
-            organization_repo=repo,
-        )
+    result = await _assert_clinician_payload_org_ownership(
+        payload=_Payload(),
+        requesting_user=user,
+        organization_repo=repo,
     )
     assert result is not None
     assert _MockRepo.last_created.name == "Single Thread Psychiatry"
 
 
-def test_clinician_create_handler_falls_back_to_name():
+async def test_clinician_create_handler_falls_back_to_name():
     """When practice_name is absent, the org name falls back to first+last."""
-    import asyncio
     from types import SimpleNamespace
 
     from src.domain.logic.clinicians.handlers import (
@@ -255,11 +246,9 @@ def test_clinician_create_handler_falls_back_to_name():
         last_name = "Reeves"
         org_id = None
 
-    asyncio.run(
-        _assert_clinician_payload_org_ownership(
-            payload=_Payload(),
-            requesting_user=user,
-            organization_repo=_MockRepo(),
-        )
+    await _assert_clinician_payload_org_ownership(
+        payload=_Payload(),
+        requesting_user=user,
+        organization_repo=_MockRepo(),
     )
     assert _MockRepo.last_created.name == "Katie Reeves"
