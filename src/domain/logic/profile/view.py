@@ -2,13 +2,18 @@
 
 `onboarding_readiness(user)` collapses the two-claim verification model
 into one capability-accurate summary of "what does this user still need
-to do before they can post." It exists so any onboarding surface — the
-"Getting started" checklist on `/users/me`, the chrome nudge — reads the
-*same* readiness from the *same* predicates the server-side post gate
-uses (`capabilities.*`). That's the whole point of the capabilities
-module: the visible affordance and the gate can't disagree, so a
-checklist must never invite a user to "Post an opening" when
-`can_post_opening` would 403 them.
+to do before they can post." It exists so any surface that *reports*
+verification status — the read-only Verification card on `/users/me` —
+reads the *same* readiness from the *same* predicates the server-side
+post gate uses (`capabilities.*`). That's the whole point of the
+capabilities module: a status signpost can't disagree with the gate.
+
+The single place a user *acts* on verification is the `/profile` hub
+(handoff §8.1 — "onboarding IS the hub in setup mode; no separate
+wizard"); `/users/me` reports state and links into the hub, it does not
+re-host the onboarding wizard. So this projection drives a status line,
+not an action checklist — `next_href` is a deep-link *into the hub*, not
+a substitute for it.
 
 This is a pure projection (no I/O): it reads already-loaded relationships
 off `user` via the `capabilities` predicates and returns a frozen view
