@@ -17,15 +17,29 @@ acceptable while the kind set is small.
 """
 
 import logging
+from typing import Any
+from uuid import UUID
 
+from fastapi import Request
 from pydantic import BaseModel
 
 from src.domain.logic import capabilities
 from src.domain.logic.clinicians.repository import ClinicianRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
+from src.domain.logic.posts.repository import PostRepository
 from src.domain.logic.programs.repository import ProgramRepository
-from src.domain.models import Clinician, Program, User
+from src.domain.models import Clinician, Organization, Program, User
 from src.framework.authz import assert_fk_ownership
-from src.framework.http.exceptions import ForbiddenError
+from src.framework.dispatch.pagination import (
+    DEFAULT_PAGE_SIZE,
+    Pager,
+    base_query,
+    offset_for,
+    paginate,
+    parse_page,
+)
+from src.framework.http.exceptions import ForbiddenError, NotFoundError
+from src.framework.rendering.templating import set_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -151,3 +165,107 @@ async def _assert_post_payload_target_ownership(
             child_noun="post",
         )
         return
+
+
+# ── Owner-scoped read projections (RESOURCE_GRAMMAR pattern #5) ──────────
+#
+# `/clinicians/{id}/openings`, `/clinicians/{id}/referrals`, and
+# `/organizations/{id}/intakes` are filtered views over the same `/posts`
+# supertype — no new ownership, no schema change. Each handler is the
+# target of a `RelatedListSubresource.handler_path` on the parent entity
+# spec; the mount injects `repo` (the *post* repo, since the rows are
+# posts), the parent id under the parent's `id_param`, `requesting_user`,
+# and any extra typed repo the handler declares.
+
+
+async def handle_list_clinician_openings(
+    request: Request,
+    clinician_id: UUID,
+    repo: PostRepository,
+    clinician_repo: ClinicianRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail=f"Clinician {clinician_id} not found")
+    return await _post_owner_list_context(
+        request=request,
+        owner=clinician,
+        owner_key="clinician",
+        rows_coro=repo.list_clinician_openings,
+        owner_id=clinician_id,
+        requesting_user=requesting_user,
+    )
+
+
+async def handle_list_clinician_referrals(
+    request: Request,
+    clinician_id: UUID,
+    repo: PostRepository,
+    clinician_repo: ClinicianRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail=f"Clinician {clinician_id} not found")
+    return await _post_owner_list_context(
+        request=request,
+        owner=clinician,
+        owner_key="clinician",
+        rows_coro=repo.list_clinician_referrals,
+        owner_id=clinician_id,
+        requesting_user=requesting_user,
+    )
+
+
+async def handle_list_org_intakes(
+    request: Request,
+    organization_id: UUID,
+    repo: PostRepository,
+    organization_repo: OrganizationRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    org = await organization_repo.get_by_model_id(Organization, organization_id)
+    if org is None:
+        raise NotFoundError(detail=f"Organization {organization_id} not found")
+    return await _post_owner_list_context(
+        request=request,
+        owner=org,
+        owner_key="organization",
+        rows_coro=repo.list_org_intakes,
+        owner_id=organization_id,
+        requesting_user=requesting_user,
+    )
+
+
+async def _post_owner_list_context(
+    *,
+    request: Request,
+    owner: Any,
+    owner_key: str,
+    rows_coro,
+    owner_id: UUID,
+    requesting_user: User,
+) -> dict[str, Any]:
+    """Shared paginate-and-project body for the three owner-scoped post
+    lists. `owner_key` names the owner in the template context
+    ("clinician" / "organization"); `rows_coro` is the bound repo method
+    that returns the owner's posts."""
+    page_number = parse_page(request)
+    per_page = DEFAULT_PAGE_SIZE
+    rows_plus_one = await rows_coro(
+        owner_id,
+        offset=offset_for(page_number, per_page),
+        limit=per_page + 1,
+    )
+    posts, page = paginate(rows_plus_one, page=page_number, per_page=per_page)
+    set_viewer(requesting_user)
+    return {
+        "request": request,
+        owner_key: owner,
+        "posts": posts,
+        "is_self": getattr(owner, "owner_id", None) == requesting_user.id,
+        "can_read_full_feed": capabilities.can_read_full_feed(requesting_user),
+        "current_user": requesting_user,
+        "pager": Pager(page=page, base_query=base_query(request)),
+    }
