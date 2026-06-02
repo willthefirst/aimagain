@@ -25,8 +25,8 @@ async def test_profile_hub_renders_setup_for_new_user(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     # Setup mode's distinctive copy from `_setup.html`.
-    assert "Add a clinician profile" in response.text
-    assert "Post on behalf of an organization" in response.text
+    assert "Verify your NPI" in response.text
+    assert "Register an organization" in response.text
 
 
 async def test_profile_hub_requires_authentication(test_client: AsyncClient):

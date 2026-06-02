@@ -118,12 +118,14 @@ async def handle_clinician_create(
     first_name: str | None,
     last_name: str | None,
     npi: str | None,
+    practice_name: str | None = None,
     location_city: str | None,
     location_state: str | None,
     location_zip: str | None,
     requesting_user: User,
     clinician_repo: Any,
     organization_repo: Any,
+    org_rep_repo: Any,
     verification_repo: Any,
     audit_repo: Any,
     demo_outcome: str | None = None,
@@ -132,36 +134,51 @@ async def handle_clinician_create(
     NPI verification inline.
 
     Hardcodes ``solo_practice=True`` so the user doesn't need to pick
-    an org during onboarding. Location is optional — callers that omit
-    it (the fast-path wizard) pass ``None`` for all three fields; users
-    can fill location in later from "complete your profile".
+    an org during onboarding. Also auto-creates an ``OrgRepresentation``
+    so the user has owner authority over their solo-practice org from day
+    one (Claim B pending org NPI verification).
+
+    `practice_name` names the auto-org; falls back to "first last" then
+    username when absent. Location is optional — callers pass ``None``
+    for all three fields and users fill it in later from "complete your
+    profile".
 
     `demo_outcome` is only honored when the requesting user is in a demo
-    org context (checked here via `_user_is_demo_context`). If passed by
-    a non-demo user it is ignored and NPPES runs normally.
+    org context.
     """
     from src.domain.logic.clinicians.handlers import (
         _assert_clinician_payload_org_ownership,
         after_create_clinician_verification,
     )
     from src.domain.logic.clinicians.schema import ClinicianCreate
-    from src.domain.models import Clinician
+    from src.domain.models import Clinician, OrgRepresentation
 
     payload = ClinicianCreate(
         first_name=first_name,
         last_name=last_name,
         npi=npi,
+        practice_name=practice_name,
         solo_practice=True,
         location_city=location_city,
         location_state=location_state,
         location_zip=location_zip,
     )
 
-    await _assert_clinician_payload_org_ownership(
+    auto_org = await _assert_clinician_payload_org_ownership(
         payload=payload,
         requesting_user=requesting_user,
         organization_repo=organization_repo,
     )
+
+    if auto_org is not None:
+        auto_rep = OrgRepresentation(
+            user_id=requesting_user.id,
+            org_id=auto_org.id,
+            role="owner",
+            authority_method="admin_review",
+            authority_status="verified",
+        )
+        await org_rep_repo.create(auto_rep)
 
     clinician = Clinician(
         owner_id=requesting_user.id,
@@ -180,6 +197,65 @@ async def handle_clinician_create(
         demo_outcome=effective_demo,
     )
     return clinician
+
+
+async def handle_org_create(
+    *,
+    org_name: str,
+    org_type: str,
+    org_npi: str | None,
+    requesting_user: User,
+    organization_repo: Any,
+    org_rep_repo: Any,
+    verification_repo: Any,
+    audit_repo: Any,
+) -> Any:
+    """Create an org + auto-grant owner OrgRepresentation for non-clinician
+    onboarding (and any user who wants to register a named practice).
+
+    The user becomes the org owner with ``authority_status='verified'``
+    immediately — no external proof required because they are creating the
+    org themselves.  ``org_verified`` stays ``False`` until an org-side NPI
+    verification passes; if ``org_npi`` is supplied the NPPES lookup runs
+    inline exactly as it does for clinician NPI verification.
+    """
+    import httpx
+
+    from src.domain.logic.verifications.handlers import (
+        HTTP_TIMEOUT_SECONDS,
+        run_org_verification,
+    )
+    from src.domain.models import Organization, OrgRepresentation
+
+    org = Organization(
+        name=org_name,
+        type=org_type,
+        owner_id=requesting_user.id,
+        npi=org_npi or None,
+    )
+    created_org = await organization_repo.create(org)
+
+    auto_rep = OrgRepresentation(
+        user_id=requesting_user.id,
+        org_id=created_org.id,
+        role="owner",
+        authority_method="admin_review",
+        authority_status="verified",
+    )
+    await org_rep_repo.create(auto_rep)
+
+    if org_npi:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+            await run_org_verification(
+                org_id=created_org.id,
+                verification_repo=verification_repo,
+                org_repo=organization_repo,
+                audit_repo=audit_repo,
+                http=http,
+                actor_id=requesting_user.id,
+            )
+
+    return created_org
 
 
 async def handle_clinician_identity_update(

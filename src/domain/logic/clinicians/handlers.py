@@ -91,26 +91,31 @@ async def _assert_clinician_payload_org_ownership(
     payload: BaseModel,
     requesting_user: User,
     organization_repo: OrganizationRepository,
-) -> None:
+) -> Organization | None:
     """Payload authz for clinician create/update.
 
     Solo-practice path: when ``payload.solo_practice`` is True,
-    auto-create a solo-practice Organization and patch ``payload.org_id``.
-    Normal path: delegate to the framework's FK-ownership guard.
+    auto-create a solo-practice Organization, patch ``payload.org_id``,
+    and return the created org so the caller can wire up an OrgRepresentation.
+    Normal path: delegate to the framework's FK-ownership guard, return None.
     """
     if getattr(payload, "solo_practice", False):
-        first = (getattr(payload, "first_name", None) or "").strip()
-        last = (getattr(payload, "last_name", None) or "").strip()
-        name_parts = [p for p in (first, last) if p]
-        org_name = " ".join(name_parts) if name_parts else requesting_user.username
+        practice_name = (getattr(payload, "practice_name", None) or "").strip()
+        if not practice_name:
+            first = (getattr(payload, "first_name", None) or "").strip()
+            last = (getattr(payload, "last_name", None) or "").strip()
+            name_parts = [p for p in (first, last) if p]
+            practice_name = (
+                " ".join(name_parts) if name_parts else requesting_user.username
+            )
         auto_org = Organization(
-            name=org_name,
+            name=practice_name,
             type="solo_practice",
             owner_id=requesting_user.id,
         )
         created_org = await organization_repo.create(auto_org)
         payload.org_id = created_org.id
-        return
+        return created_org
     await assert_fk_ownership(
         payload=payload,
         attr="org_id",
@@ -120,6 +125,7 @@ async def _assert_clinician_payload_org_ownership(
         parent_noun="Organization",
         child_noun="Clinician",
     )
+    return None
 
 
 async def clinician_form_extras(

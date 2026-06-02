@@ -33,6 +33,10 @@ from src.domain.logic.clinicians.repository import (
     ClinicianRepository,
     get_clinician_repository,
 )
+from src.domain.logic.org_representations.repository import (
+    OrgRepresentationRepository,
+    get_org_representation_repository,
+)
 from src.domain.logic.organizations.repository import (
     OrganizationRepository,
     get_organization_repository,
@@ -43,6 +47,7 @@ from src.domain.logic.profile.handlers import (
     handle_clinician_details_update,
     handle_clinician_identity_update,
     handle_clinician_license_create,
+    handle_org_create,
 )
 from src.domain.logic.verifications.repository import (
     VerificationRepository,
@@ -81,6 +86,7 @@ async def profile_clinician_create(
     first_name: str | None = Form(default=None),
     last_name: str | None = Form(default=None),
     npi: str | None = Form(default=None),
+    practice_name: str | None = Form(default=None),
     location_city: str | None = Form(default=None),
     location_state: str | None = Form(default=None),
     location_zip: str | None = Form(default=None),
@@ -88,31 +94,80 @@ async def profile_clinician_create(
     requesting_user: User = Depends(current_active_user),
     clinician_repo: ClinicianRepository = Depends(get_clinician_repository),
     organization_repo: OrganizationRepository = Depends(get_organization_repository),
+    org_rep_repo: OrgRepresentationRepository = Depends(
+        get_org_representation_repository
+    ),
     verification_repo: VerificationRepository = Depends(get_verification_repository),
     audit_repo: AuditRepository = Depends(get_audit_repository),
 ) -> Any:
     """Create a minimal clinician profile from the onboarding hub.
 
-    Fires NPI verification inline (same as the generic clinician
-    create) then redirects back to /profile so the hub re-renders
-    with the NPPES result already reflected in the setup flow.
+    Fires NPI verification inline then redirects back to /profile so the
+    hub re-renders with the NPPES result already reflected in the setup
+    flow. Also auto-creates an OrgRepresentation for the solo-practice org
+    so the user has owner authority over their practice immediately.
 
-    `demo_outcome` is only honored when the requesting user is in a demo
-    org context — the handler ignores it for regular users.
+    `practice_name` names the auto-created org (falls back to "first last"
+    then username). `demo_outcome` is only honored in demo org context.
     """
     await handle_clinician_create(
         first_name=first_name,
         last_name=last_name,
         npi=npi,
+        practice_name=practice_name,
         location_city=location_city,
         location_state=location_state,
         location_zip=location_zip,
         requesting_user=requesting_user,
         clinician_repo=clinician_repo,
         organization_repo=organization_repo,
+        org_rep_repo=org_rep_repo,
         verification_repo=verification_repo,
         audit_repo=audit_repo,
         demo_outcome=demo_outcome,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={},
+        headers={"HX-Redirect": "/profile"},
+    )
+
+
+@profile_pages_router.post("/profile/org", name="profile:org_create")
+async def profile_org_create(
+    org_name: str = Form(...),
+    org_type: str = Form(...),
+    org_npi: str | None = Form(default=None),
+    requesting_user: User = Depends(current_active_user),
+    organization_repo: OrganizationRepository = Depends(get_organization_repository),
+    org_rep_repo: OrgRepresentationRepository = Depends(
+        get_org_representation_repository
+    ),
+    verification_repo: VerificationRepository = Depends(get_verification_repository),
+    audit_repo: AuditRepository = Depends(get_audit_repository),
+) -> Any:
+    """Register an organization and auto-grant the submitting user owner
+    authority over it.
+
+    For non-clinician org reps this is the primary onboarding path — they
+    skip the NPI / license steps and land here directly. Clinicians can
+    also use this to register a named practice separate from their
+    solo-practice auto-org (e.g. after joining a group practice).
+
+    If ``org_npi`` is provided the org NPPES verification runs inline,
+    exactly as clinician NPI verification does. ``org_verified`` stays
+    ``False`` if no NPI is given; the user can add one later from the
+    manage view.
+    """
+    await handle_org_create(
+        org_name=org_name,
+        org_type=org_type,
+        org_npi=org_npi or None,
+        requesting_user=requesting_user,
+        organization_repo=organization_repo,
+        org_rep_repo=org_rep_repo,
+        verification_repo=verification_repo,
+        audit_repo=audit_repo,
     )
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
