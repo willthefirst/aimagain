@@ -16,6 +16,8 @@ The two clinician-authored detail kinds (`OpeningDetail`, `ReferralDetail`) carr
 
 On the create/edit forms this column is the **only** clinician selector the user touches: the practice picker submits `clinician_affiliation_id`, and the listing's clinician FK (`referring_clinician_id` for referrals, `clinician_id` for openings) is *derived* from that affiliation server-side — so the two can never disagree, and a clinician affiliated with two orgs no longer collapses both options onto one value. The derivation runs in `_resolve_affiliation_context` ([`../../logic/posts/handlers.py`](../../logic/posts/handlers.py)) before the FK-ownership check, which then validates the resolved clinician.
 
+Because the affiliation *is* the clinician↔org link, it also carries the **org-rep authority chain** on create: `_assert_post_payload_authz` authorizes a referral/opening either via the **self** path (own the resolved clinician + hold Claim A) or the **org-rep** path (be a verified `OrgRepresentation` — Claim B — for the affiliation's org, per `capabilities.org_rep_verified`). The org-rep path lets a group-practice coordinator post under an affiliated clinician they don't own without holding Claim A. It's wired on **create only**: editing a post one doesn't own is still gated by the object-level owner-or-admin `write_authz` that runs before the payload hook on PATCH (expanding that to the org-rep chain needs an async object-level policy — a separate change).
+
 ## Kind name history (audit-log readers)
 
 Audit-log rows persist the kind value that was current when the row was written. Two renames happened in `posts.kind`:
