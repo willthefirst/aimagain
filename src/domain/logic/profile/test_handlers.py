@@ -216,7 +216,7 @@ def test_clinician_create_handler_uses_practice_name():
         org_id = None
 
     repo = _MockRepo()
-    result = asyncio.get_event_loop().run_until_complete(
+    result = asyncio.run(
         _assert_clinician_payload_org_ownership(
             payload=_Payload(),
             requesting_user=user,
@@ -255,7 +255,7 @@ def test_clinician_create_handler_falls_back_to_name():
         last_name = "Reeves"
         org_id = None
 
-    asyncio.get_event_loop().run_until_complete(
+    asyncio.run(
         _assert_clinician_payload_org_ownership(
             payload=_Payload(),
             requesting_user=user,
