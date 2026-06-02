@@ -14,6 +14,8 @@ This subdirectory holds the SQLAlchemy models for the `posts` table and its per-
 
 The two clinician-authored detail kinds (`OpeningDetail`, `ReferralDetail`) carry a nullable `clinician_affiliation_id` FK → `clinician_affiliations.id` (`ON DELETE SET NULL`): a clinician who affiliates with several orgs (`clinician_affiliations` is 1:N off `clinicians`) declares *which* affiliation a given opening/referral is offered under. It's nullable because the column post-dates existing rows and because not every listing has a context set. `IntakeDetail` has no such column — its context is the `Program`'s owning org, reachable via `program_id`. Migration `c4d5e6f7a8b9` added the columns and backfilled each existing row to its clinician's primary (earliest-`created_at`) affiliation, matching `Clinician.primary_clinician_affiliation`.
 
+On the create/edit forms this column is the **only** clinician selector the user touches: the practice picker submits `clinician_affiliation_id`, and the listing's clinician FK (`referring_clinician_id` for referrals, `clinician_id` for openings) is *derived* from that affiliation server-side — so the two can never disagree, and a clinician affiliated with two orgs no longer collapses both options onto one value. The derivation runs in `_resolve_affiliation_context` ([`../../logic/posts/handlers.py`](../../logic/posts/handlers.py)) before the FK-ownership check, which then validates the resolved clinician.
+
 ## Kind name history (audit-log readers)
 
 Audit-log rows persist the kind value that was current when the row was written. Two renames happened in `posts.kind`:

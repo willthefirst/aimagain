@@ -220,6 +220,10 @@ class ReferralRead(_PostReadBase):
     # Nullable on the read side — rows created before this field existed
     # will have None here.
     referring_clinician_id: uuid.UUID | None = None
+    # Context affiliation this referral was offered under. Nullable —
+    # rows predating the column (and rows whose affiliation was later
+    # deleted, `SET NULL`) read as None.
+    clinician_affiliation_id: uuid.UUID | None = None
 
     # Flat-on-dump: keep ``location_city`` / ``location_state`` /
     # ``location_zip`` at the top level of JSON responses. The parent's
@@ -240,6 +244,9 @@ class ClinicianOpeningRead(_PostReadBase):
     # FK; templates dereference via
     # `post.opening_detail.clinician.<field>`.
     clinician_id: uuid.UUID
+    # Context affiliation this opening is offered under. Nullable — see
+    # `ReferralRead.clinician_affiliation_id`.
+    clinician_affiliation_id: uuid.UUID | None = None
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     services: ServicesField = []
@@ -327,11 +334,19 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # decision.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # Context: which ClinicianAffiliation the referring clinician acts
+    # under. This is what the form's practice picker submits (one option
+    # per affiliation). Required on new referrals. The server resolves
+    # `referring_clinician_id` from this affiliation in
+    # `_assert_post_payload_authz` — see `referring_clinician_id` below.
+    clinician_affiliation_id: uuid.UUID
     # FK to the Clinician the submitting user designates as referrer.
-    # Required on new referrals; the ownership check in
-    # `_assert_post_payload_target_ownership` verifies the user owns
-    # the clinician before persisting.
-    referring_clinician_id: uuid.UUID
+    # NOT a form input — the picker submits `clinician_affiliation_id`
+    # and the server derives this from `affiliation.clinician_id`
+    # (`_assert_post_payload_authz`), then re-checks ownership of the
+    # resolved clinician. Optional/None on the wire; any client-sent
+    # value is overwritten by the resolved one.
+    referring_clinician_id: uuid.UUID | None = None
 
 
 class ClinicianOpeningCreate(WirePayload):
@@ -345,11 +360,18 @@ class ClinicianOpeningCreate(WirePayload):
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
-    # FK to one of the requesting user's Clinician profiles. The form
-    # restricts the dropdown to clinicians owned by the user; the route
-    # handler also verifies ownership at write time so a wire-level
-    # attacker can't reference another user's clinician.
-    clinician_id: uuid.UUID
+    # Context: which ClinicianAffiliation this opening is offered under.
+    # This is what the form's practice picker submits (one option per
+    # affiliation). Required on new openings. The server resolves
+    # `clinician_id` from `affiliation.clinician_id` in
+    # `_assert_post_payload_authz`.
+    clinician_affiliation_id: uuid.UUID
+    # FK to the Clinician whose practice this announcement describes. NOT
+    # a form input — the picker submits `clinician_affiliation_id` and
+    # the server derives this from `affiliation.clinician_id`
+    # (`_assert_post_payload_authz`), then re-checks ownership. Optional/
+    # None on the wire; any client-sent value is overwritten.
+    clinician_id: uuid.UUID | None = None
     desired_times: DesiredTimesField = []
     # Free-text companion to `desired_times` for cohort dates / fixed
     # program hours. Single-line input; not a textarea.
@@ -452,8 +474,14 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # repo's "None means leave unchanged" semantic for optional fields).
     network_preference: Literal[*NETWORK_PREFERENCES] | None = None
     insurance_carrier: OptionalInsuranceCarrier = None
-    # `None` = leave unchanged. Ownership re-checked on update — a PATCH
-    # that repoints to a clinician the user doesn't own is 403.
+    # `None` = leave unchanged. The form picker submits this; the server
+    # re-derives `referring_clinician_id` from it (and re-checks
+    # ownership of the resolved clinician) in `_assert_post_payload_authz`.
+    clinician_affiliation_id: uuid.UUID | None = None
+    # `None` = leave unchanged. Server-derived from
+    # `clinician_affiliation_id` when the picker changes context;
+    # ownership re-checked on update — repointing to a clinician the user
+    # doesn't own is 403.
     referring_clinician_id: uuid.UUID | None = None
 
 
@@ -465,8 +493,13 @@ class ClinicianOpeningUpdate(PartialUpdate):
     description: TextareaOptional = None
     referral_instructions: TextareaOptional = None
     website: UrlOptional = None
+    # `None` = leave unchanged. The form picker submits this; the server
+    # re-derives `clinician_id` from it (and re-checks ownership of the
+    # resolved clinician) in `_assert_post_payload_authz`.
+    clinician_affiliation_id: uuid.UUID | None = None
     # FK to a Clinician profile owned by the requesting user. `None` =
-    # leave unchanged. The route handler verifies ownership on update.
+    # leave unchanged. Server-derived from `clinician_affiliation_id`
+    # when the picker changes context; ownership verified on update.
     clinician_id: uuid.UUID | None = None
     desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
@@ -549,6 +582,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
     referring_clinician_id: uuid.UUID | None = None
+    clinician_affiliation_id: uuid.UUID | None = None
 
     # Flat-on-dump — see :class:`ReferralRead`.
     @model_serializer(mode="wrap")
@@ -565,6 +599,7 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     # Audit row records the FK, not the dereferenced practice fields —
     # standard pattern for relational audit snapshots.
     clinician_id: uuid.UUID
+    clinician_affiliation_id: uuid.UUID | None = None
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     services: ServicesField = []
