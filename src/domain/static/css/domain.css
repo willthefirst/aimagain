@@ -187,3 +187,51 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   .posts-filter-sidebar { flex: unset; width: 100%; }
   .posts-filter-form { display: none; }
 }
+
+/* ── Profile step cards ───────────────────────────────────────
+   Each verification requirement on /profile renders as a step card.
+   Status badges surface completion state; border-left accents mark
+   cards that need action. All state is expressed via classes — no
+   inline styles on the profile templates. */
+.step-card > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.step-card > header > a {
+  font-size: 0.875rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.step-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+}
+.step-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.1rem;
+}
+.step-status--complete { color: var(--pico-color-green-600); }
+.step-status--action   { color: var(--pico-color-orange-600); }
+.step-status--error    { color: var(--pico-color-red-600); }
+.step-status--pending  { color: var(--pico-muted-color); }
+.step-card--action { border-left: 3px solid var(--pico-color-orange-400); }
+.step-card--error  { border-left: 3px solid var(--pico-color-red-400); }
+.step-summary-list { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+.step-cta-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.step-banner--warn {
+  color: var(--pico-color-yellow-600);
+  background: var(--pico-color-yellow-100);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  margin-bottom: var(--pico-spacing);
+}

@@ -247,6 +247,10 @@ class ClinicianCreate(FlatLocationSchema, WirePayload):
     # patches `org_id` before persisting the Clinician (#699). Excluded
     # from model_dump() so the field never leaks into the ORM constructor.
     solo_practice: bool = Field(default=False, exclude=True)
+    # Display name for the auto-created solo-practice org. Falls back to
+    # "first last" (then username) when absent. Excluded from model_dump()
+    # — used only by the org-creation step, never written to Clinician.
+    practice_name: StrippedOptionalText = Field(default=None, exclude=True)
     # Required when `solo_practice=False`; the handler fills it in for
     # the solo path. The `@model_validator` below enforces the invariant.
     org_id: uuid.UUID | None = None
