@@ -137,3 +137,129 @@ def test_build_profile_context_exposes_mode_and_lists():
     assert ctx["org_representations"] == user.org_representations
     assert ctx["claim_state"].a is True
     assert len(ctx["claim_state"].b) == 1
+
+
+# ---------------------------------------------------------------------------
+# Non-clinician org-rep onboarding path
+# ---------------------------------------------------------------------------
+
+
+def test_non_clinician_org_rep_only_exits_setup():
+    """A user with a verified OrgRepresentation but no clinician exits setup
+    into manage mode — the two-claim model allows Claim B without Claim A."""
+    user = _user(org_representations=[_rep(authority_status="verified")])
+    assert resolve_profile_mode(user) == MODE_MANAGE
+
+
+def test_pending_org_rep_stays_in_setup():
+    """An OrgRepresentation that is still `pending` does not contribute to
+    `claim_state.b`, so the user stays in setup mode."""
+    user = _user(org_representations=[_rep(authority_status="pending")])
+    assert resolve_profile_mode(user) == MODE_SETUP
+
+
+def test_archived_org_rep_stays_in_setup():
+    """An archived OrgRepresentation (revoked) is excluded from the active rep
+    set, so the user falls back to setup mode if they have no other claims."""
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    archived_rep = SimpleNamespace(
+        org_id=uuid4(),
+        authority_status="verified",
+        archived_at=datetime.now(),
+    )
+    user = _user(org_representations=[archived_rep])
+    assert resolve_profile_mode(user) == MODE_SETUP
+
+
+# ---------------------------------------------------------------------------
+# _assert_clinician_payload_org_ownership return value
+# ---------------------------------------------------------------------------
+
+
+def test_clinician_create_handler_uses_practice_name():
+    """_assert_clinician_payload_org_ownership should use practice_name over
+    first+last when it is provided, so the auto-org gets the right display name."""
+    from src.domain.logic.clinicians.handlers import (
+        _assert_clinician_payload_org_ownership,
+    )
+
+    class _MockOrg:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+            self.id = uuid4()
+
+    class _MockRepo:
+        last_created = None
+
+        async def create(self, obj):
+            self.__class__.last_created = obj
+            obj.id = uuid4()
+            return obj
+
+        async def get_by_model_id(self, *a, **kw):
+            return None
+
+    import asyncio
+    from types import SimpleNamespace
+
+    user = SimpleNamespace(
+        id=uuid4(), username="alice", is_superuser=False, is_verified=True
+    )
+
+    class _Payload:
+        solo_practice = True
+        practice_name = "Single Thread Psychiatry"
+        first_name = "Katie"
+        last_name = "Reeves"
+        org_id = None
+
+    repo = _MockRepo()
+    result = asyncio.run(
+        _assert_clinician_payload_org_ownership(
+            payload=_Payload(),
+            requesting_user=user,
+            organization_repo=repo,
+        )
+    )
+    assert result is not None
+    assert _MockRepo.last_created.name == "Single Thread Psychiatry"
+
+
+def test_clinician_create_handler_falls_back_to_name():
+    """When practice_name is absent, the org name falls back to first+last."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from src.domain.logic.clinicians.handlers import (
+        _assert_clinician_payload_org_ownership,
+    )
+
+    class _MockRepo:
+        last_created = None
+
+        async def create(self, obj):
+            self.__class__.last_created = obj
+            obj.id = uuid4()
+            return obj
+
+    user = SimpleNamespace(
+        id=uuid4(), username="alice", is_superuser=False, is_verified=True
+    )
+
+    class _Payload:
+        solo_practice = True
+        practice_name = None
+        first_name = "Katie"
+        last_name = "Reeves"
+        org_id = None
+
+    asyncio.run(
+        _assert_clinician_payload_org_ownership(
+            payload=_Payload(),
+            requesting_user=user,
+            organization_repo=_MockRepo(),
+        )
+    )
+    assert _MockRepo.last_created.name == "Katie Reeves"

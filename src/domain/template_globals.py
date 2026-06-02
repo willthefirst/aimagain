@@ -73,13 +73,23 @@ register_template_globals(
     GENDER_LABELS=enums.GENDER_LABELS,
     INSURANCE_POSTURES=enums.INSURANCE_POSTURES,
     INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
+    # Org types exposed as a Jinja global so the profile-hub setup template
+    # (and any other bespoke template that isn't rendered via an EntitySpec)
+    # can render the org-type select without per-route context injection.
+    ORGANIZATION_TYPES=enums.ORGANIZATION_TYPES,
+    ORGANIZATION_TYPES_LABELS=enums.ORGANIZATION_TYPES_LABELS,
+    # LICENSE_TYPES and EDUCATION/CERTIFICATION equivalents are exposed here
+    # as globals so bespoke templates (like the profile hub's license step)
+    # can reference them without relying on CLINICIAN_ENTITY.static_context,
+    # which only runs through the framework's generic entity handlers.
+    LICENSE_TYPES=enums.LICENSE_TYPES,
+    LICENSE_TYPES_LABELS=enums.LICENSE_TYPES_LABELS,
     # `LICENSE_TYPES`, `EDUCATION_TYPES`, `CERTIFICATION_TYPES` and
-    # their `_LABELS` are clinician-only — they flow into the context
-    # via `CLINICIAN_ENTITY.static_context` (merged by `handle_detail` /
-    # `handle_list` / `handle_get_edit_form`) so the spec is the single
-    # binding site. `register_choice_labels(...)` for those tuples
-    # stays below (the form-rendering macro looks up labels by tuple
-    # identity, not by Jinja global).
+    # their `_LABELS` also flow into the context via
+    # `CLINICIAN_ENTITY.static_context` (merged by `handle_detail` /
+    # `handle_list` / `handle_get_edit_form`) so the spec remains the
+    # single binding site for generic entity pages. `register_choice_labels`
+    # below covers the form-field macro label lookup for both paths.
     #
     # Polymorphic posts have no single create-schema (the top-level
     # adapter is a discriminated union); the per-kind route handler
@@ -135,6 +145,7 @@ register_choice_labels(enums.REFERRAL_SERVICES, enums.REFERRAL_SERVICE_LABELS)
 register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
 register_choice_labels(enums.TREATMENT_MODALITIES, enums.TREATMENT_MODALITY_LABELS)
 register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
+register_choice_labels(enums.ORGANIZATION_TYPES, enums.ORGANIZATION_TYPES_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)
