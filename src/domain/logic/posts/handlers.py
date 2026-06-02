@@ -66,14 +66,29 @@ async def _assert_post_payload_authz(
     requesting_user: User,
     clinician_repo: ClinicianRepository,
     program_repo: ProgramRepository,
+    organization_repo: OrganizationRepository,
 ) -> None:
-    """`POST_ENTITY.payload_authz_path` target — runs the two
-    payload-time authorization checks in order:
+    """`POST_ENTITY.payload_authz_path` target — authorizes a post
+    create payload via one of two authority paths.
 
-    1. **Ownership** — the per-kind FK on the payload must point at a
-       row the requesting user owns. (Existing rule.)
-    2. **Capability** — the submitter must hold the claim that gates
-       this post-kind:
+    First ``_resolve_affiliation_context`` derives the listing's
+    clinician FK from the picker-submitted ``clinician_affiliation_id``
+    (clinician-authored kinds only) and returns the resolved
+    affiliation. Authority then resolves as:
+
+    1. **Org-rep (Claim B) path** — if the payload carries an
+       affiliation and the requesting user is a *verified org rep*
+       (`capabilities.org_rep_verified`) for that affiliation's org,
+       the write is authorized. This lets a group-practice coordinator
+       post a referral/opening under an affiliated clinician they don't
+       *own*, without holding Claim A themselves — the org-rep authority
+       chain (`OrgRepresentation` → org → affiliation → clinician).
+
+    2. **Self (owner + Claim A) path** — otherwise the per-kind FK on
+       the payload must point at a row the requesting user owns
+       (:func:`_assert_post_payload_target_ownership`) AND the user must
+       hold the claim that gates this post-kind
+       (:func:`_assert_post_payload_capability`):
 
        - ``referral`` / ``clinician_opening`` → Claim A
          (`capabilities.clinician_verified(user)`).
@@ -81,17 +96,28 @@ async def _assert_post_payload_authz(
          (deferred — the org lookup lands when the Profile Hub PR
          (Phase 5) wires the program-intake create flow end-to-end).
 
-    Superusers bypass the capability check the same way they bypass
-    ownership — admins act on any row.
+    Superusers fall through to the self path, where both the ownership
+    and capability checks bypass for admins — so an admin still writes
+    any row. ``program_intake`` carries no affiliation, so it always
+    takes the self path (its org authority is the Program's owning org,
+    handled there).
 
-    Before ownership runs, ``_resolve_affiliation_context`` derives the
-    listing's clinician FK from the picker-submitted
-    ``clinician_affiliation_id`` (clinician-authored kinds only). The
-    ownership check then validates that *resolved* clinician, so a
-    picker pointing at an affiliation whose clinician the user doesn't
-    own is rejected here.
+    **Create-only.** The org-rep path is wired on create
+    (`mount_create` runs only ``payload_authz`` on the not-yet-existing
+    post). Editing a post one doesn't own is still gated by the
+    object-level ``write_authz`` (owner-or-admin) that runs before this
+    hook on PATCH — expanding *that* to the org-rep chain needs an async
+    object-level policy and is a separate change.
     """
-    await _resolve_affiliation_context(payload=payload, clinician_repo=clinician_repo)
+    affiliation = await _resolve_affiliation_context(
+        payload=payload, clinician_repo=clinician_repo
+    )
+    if affiliation is not None and await _is_verified_org_rep_for_affiliation(
+        affiliation=affiliation,
+        requesting_user=requesting_user,
+        organization_repo=organization_repo,
+    ):
+        return
     await _assert_post_payload_target_ownership(
         payload=payload,
         requesting_user=requesting_user,
@@ -101,9 +127,31 @@ async def _assert_post_payload_authz(
     _assert_post_payload_capability(payload, requesting_user)
 
 
+async def _is_verified_org_rep_for_affiliation(
+    *,
+    affiliation: ClinicianAffiliation,
+    requesting_user: User,
+    organization_repo: OrganizationRepository,
+) -> bool:
+    """True iff ``requesting_user`` holds verified Claim B for the org
+    the affiliation points at.
+
+    The affiliation *is* the clinician↔org link, so resolving its
+    ``org_id`` and checking `capabilities.org_rep_verified(user, org)`
+    fully captures the org-rep authority chain — the
+    "clinician affiliated to org" leg of `can_post_org_referral` is
+    tautological when the affiliation is the source of truth. Returns
+    False (rather than raising) on any miss so the caller falls through
+    to the self/owner authority path."""
+    org = await organization_repo.get_by_model_id(Organization, affiliation.org_id)
+    if org is None:
+        return False
+    return capabilities.org_rep_verified(requesting_user, org)
+
+
 async def _resolve_affiliation_context(
     *, payload: BaseModel, clinician_repo: ClinicianRepository
-) -> None:
+) -> ClinicianAffiliation | None:
     """Derive the listing's clinician FK from the picker's affiliation.
 
     The opening / referral create+edit forms expose a single practice
@@ -120,13 +168,15 @@ async def _resolve_affiliation_context(
     it into the update path too). Runs before the ownership check, which
     then validates the resolved clinician.
 
-    No-op when the payload carries no ``clinician_affiliation_id`` — a
-    ``program_intake`` payload (no such field) or a referral/opening
-    PATCH that leaves context unchanged. 404 when the id doesn't resolve.
+    Returns the loaded ``ClinicianAffiliation`` (so the caller can reach
+    its ``org_id`` for the org-rep authority path), or ``None`` when the
+    payload carries no ``clinician_affiliation_id`` — a ``program_intake``
+    payload (no such field) or a referral/opening PATCH that leaves
+    context unchanged. 404 when the id doesn't resolve.
     """
     aff_id = getattr(payload, "clinician_affiliation_id", None)
     if aff_id is None:
-        return
+        return None
     affiliation = await clinician_repo.get_by_model_id(ClinicianAffiliation, aff_id)
     if affiliation is None:
         raise NotFoundError(detail=f"Clinician affiliation {aff_id} not found")
@@ -136,6 +186,7 @@ async def _resolve_affiliation_context(
         else "clinician_id"
     )
     setattr(payload, derived_attr, affiliation.clinician_id)
+    return affiliation
 
 
 def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -> None:
