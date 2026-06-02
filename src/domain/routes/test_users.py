@@ -509,54 +509,49 @@ async def test_detail_shows_inline_create_clinician_for_self(
     assert action.attributes.get("href") == "/clinicians/form"
 
 
-async def test_users_me_onboarding_points_at_identity_when_unverified(
+async def test_users_me_verification_card_signposts_hub_when_unverified(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """`GET /users/me` for an email-verified user who holds no
-    posting-capable claim (no Verified Clinician, no verified org rep)
-    shows the capability-accurate "Verify your identity to start posting"
-    CTA pointing at `/profile` — never an invitation to "Post an opening"
-    that the post gate would 403. The checklist is self-only; other
-    users' profiles (/users/{id}) are unaffected."""
+    posting-capable claim shows the read-only Verification card whose
+    only CTA links into the `/profile` hub — never a "Post an opening"
+    or "Create clinician" action, which live in the hub (handoff §8.1).
+    The card is self-only; other users' profiles are unaffected."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # The onboarding "Getting started" card must be present. Detail-page
-    # cards are `<section class="entity-card">` (article is reserved for
-    # list items); list-item cards inside still use `article` (no overlap).
     headings = [
         el.text(strip=True)
         for el in tree.css("section.entity-card header.entity-header strong")
     ]
     assert (
-        "Getting started" in headings
-    ), "/users/me is missing the 'Getting started' onboarding card"
-    # `onboarding_readiness.next_href` for an email-verified, claimless
-    # user is "/profile" with the identity-verification label. The
-    # "Post an opening" CTA must NOT render — the user can't post yet.
+        "Verification" in headings
+    ), "/users/me is missing the 'Verification' status card"
+    # The card's sole CTA signposts the hub; it carries no in-page
+    # onboarding action (no Post CTA, and the only clinician-form link on
+    # the page is the separate Clinicians-card footer, not this card).
     cta = tree.css_first("section.entity-card a[href='/profile'][role='button']")
-    assert cta is not None, "onboarding card is missing the 'Verify your identity' CTA"
-    assert "Verify your identity to start posting" in cta.text()
+    assert cta is not None, "Verification card is missing its '/profile' hub CTA"
+    assert "Set up and verify your practice" in cta.text()
     assert (
         tree.css_first(
             "section.entity-card a[href='/posts/form?kind=clinician_opening']"
         )
         is None
-    ), "claimless user must not be offered the 'Post an opening' CTA"
+    ), "Verification card must not host a 'Post an opening' action"
 
 
-async def test_users_me_onboarding_post_opening_cta_when_has_clinician(
+async def test_users_me_verification_card_manage_cta_when_can_post(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /users/me` for a user with a clinician profile renders the
-    'Post an opening' CTA pointing at `/posts/form?kind=clinician_opening`.
-    Regression for the bug where the template called
-    `entity_form_url('opening')` after the opening entity was consolidated
-    into `/posts` — the ValueError crashed the page for any user who had
-    already created a clinician profile."""
+    """`GET /users/me` for a user who can post (verified clinician) shows
+    the Verification card with a "Manage your practice" CTA into the hub
+    — not a "Post an opening" action, which lives on the hub / posts list.
+    Regression guard: the card must render without crashing for a user
+    who already has a clinician profile."""
     clinician = make_clinician_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -565,22 +560,21 @@ async def test_users_me_onboarding_post_opening_cta_when_has_clinician(
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200, response.text
     tree = HTMLParser(response.text)
-    cta = tree.css_first(
-        "section.entity-card a[href='/posts/form?kind=clinician_opening'][role='button']"
-    )
+    cta = tree.css_first("section.entity-card a[href='/profile'][role='button']")
+    assert cta is not None, "Verification card is missing its '/profile' hub CTA"
+    assert "Manage your practice and verification" in cta.text()
     assert (
-        cta is not None
-    ), "onboarding card is missing 'Post an opening' CTA after having a clinician"
-    assert "Post an opening" in cta.text()
+        tree.css_first("section.entity-card a[href*='/posts/form']") is None
+    ), "Verification card must not host a 'Post an opening' action"
 
 
-async def test_users_me_onboarding_not_shown_for_other_users(
+async def test_users_me_verification_card_not_shown_for_other_users(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The 'Getting started' onboarding card must NOT appear on
-    other users' profile pages — it is self-only."""
+    """The 'Verification' status card must NOT appear on other users'
+    profile pages — it is self-only."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -594,8 +588,8 @@ async def test_users_me_onboarding_not_shown_for_other_users(
         for el in tree.css("section.entity-card header.entity-header strong")
     ]
     assert (
-        "Getting started" not in headings
-    ), "onboarding card unexpectedly shown on another user's profile"
+        "Verification" not in headings
+    ), "Verification card unexpectedly shown on another user's profile"
 
 
 async def test_detail_omits_inline_create_clinician_for_other_user(

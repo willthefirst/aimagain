@@ -75,50 +75,35 @@
       </footer>
     </section>
   {% endif %}
-  {# Onboarding checklist — visible only to the user viewing their own
-   profile. Driven by `onboarding_readiness(current_user)` so the CTAs
-   track the same capability gate the post route enforces: the
-   "Post an opening" button only appears once `can_post` is true, and
-   until then the checklist points at the single next verification step
-   (`next_href`) instead of inviting a 403. Other users' profiles
-   (/users/{id}) are unchanged — they keep the Clinicians card below
-   without this section. #}
+  {# Verification status — self-only, read-only. This is a *status
+   signpost*, not an onboarding wizard: the single place to verify and
+   manage claims is the /profile hub (handoff §8.1 — "onboarding IS the
+   hub in setup mode; no separate wizard"). This card reports where the
+   user stands (email + identity) and links into the hub to act; it
+   deliberately carries no "Post an opening" / "Create clinician" action
+   CTAs, which would re-create the duplicate onboarding surface the hub
+   is meant to own. Status reads from `onboarding_readiness`, the same
+   capability-accurate projection the post gate uses. Other users'
+   profiles (/users/{id}) omit this section entirely. #}
   {% if is_self %}
     {% set readiness = onboarding_readiness(current_user) %}
     <section class="entity-card">
       <header class="entity-header">
-        <strong>Getting started</strong>
+        <strong>Verification</strong>
       </header>
-      <ul>
-        <li>
-          {% if readiness.email_verified %}
-            &#10003;
-          {% else %}
-            &#9744;
-          {% endif %}
-          Verify your email
-        </li>
-        <li>
-          {% if readiness.can_post %}
-            &#10003;
-          {% else %}
-            &#9744;
-          {% endif %}
-          Verify your identity (clinician NPI or organization)
-        </li>
-        {% if clinicians %}
-          <li>
-            &#10003; <a href="{{ entity_url('clinician', id=clinicians[0].id) }}">Your clinician profile</a>
-          </li>
+      <section class="entity-facts">
+        <dl>
+          {{ fact('verify-email', 'Email', 'Verified' if readiness.email_verified else 'Not verified') }}
+          {{ fact('verify-identity', 'Identity', 'Verified' if readiness.can_post else 'Not verified') }}
+        </dl>
+      </section>
+      <footer class="entity-footer">
+        {% if readiness.can_post %}
+          <a href="/profile" role="button" class="outline">Manage your practice and verification</a>
+        {% else %}
+          <a href="{{ readiness.next_href or '/profile' }}" role="button">Set up and verify your practice</a>
         {% endif %}
-      </ul>
-      {% if readiness.can_post %}
-        <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
-           role="button"
-           class="outline">Post an opening</a>
-      {% elif readiness.next_href %}
-        <a href="{{ readiness.next_href }}" role="button">{{ readiness.next_label }}</a>
-      {% endif %}
+      </footer>
     </section>
   {% endif %}
   <section class="entity-card">
