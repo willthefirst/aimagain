@@ -107,7 +107,9 @@ async def test_profile_identity_step_started_clinician_ignores_path_hint(
     response = await authenticated_client.get("/profile/identity?path=org")
     assert response.status_code == 200
     assert "Verify your NPI" in response.text
-    assert "I represent an organization" not in response.text
+    # The org registration form should not appear; the path switcher picker
+    # still shows "I represent an organization" as a non-selected link option.
+    assert "Register an organization" not in response.text
 
 
 async def test_profile_step_unknown_key_returns_404(

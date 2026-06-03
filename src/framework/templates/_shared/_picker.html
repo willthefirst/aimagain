@@ -5,19 +5,33 @@ macro anywhere a multi-option entry point needs to funnel the user to a
 kind- or type-specific sub-form before showing fields.
 
 Each option is a dict with keys:
-  href:        URL to navigate to on click
+  href:        URL to navigate to on click (ignored when selected=true)
   heading:     short label (e.g. "Solo practice")
   description: one-line tagline
+  selected:    (optional bool) when true, renders as a non-link selected
+               card (.picker-option--selected) with a checkmark — use
+               this to show which path is currently active.
 #}
 {%- macro picker(options) -%}
   <div class="picker">
     {%- for opt in options %}
-      <a href="{{ opt.href }}" class="picker-option">
-        <hgroup>
-          <h2>{{ opt.heading }}</h2>
-          <p>{{ opt.description }}</p>
-        </hgroup>
-      </a>
+      {%- if opt.selected %}
+        <div class="picker-option picker-option--selected">
+          <hgroup>
+            <h2>
+              <i class="icon-check"></i> {{ opt.heading }}
+            </h2>
+            <p>{{ opt.description }}</p>
+          </hgroup>
+        </div>
+      {%- else %}
+        <a href="{{ opt.href }}" class="picker-option">
+          <hgroup>
+            <h2>{{ opt.heading }}</h2>
+            <p>{{ opt.description }}</p>
+          </hgroup>
+        </a>
+      {%- endif %}
     {%- endfor %}
   </div>
 {%- endmacro %}
