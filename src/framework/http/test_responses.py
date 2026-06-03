@@ -36,6 +36,10 @@ def test_base_context_anonymous():
         "any_claim_lapsed": False,
         "can_read_full_feed": False,
         "can_post": False,
+        # Anonymous viewers never see the incomplete-profile banner; the
+        # checklist is only computed for an authed user.
+        "onboarding_incomplete": False,
+        "onboarding_next_href": "/profile",
     }
 
 
@@ -59,6 +63,10 @@ def test_base_context_regular_user():
         "any_claim_lapsed": False,
         "can_read_full_feed": False,
         "can_post": False,
+        # Email verified but no claim → identity step incomplete, so the
+        # banner shows and points at the claim-A focus deep-link.
+        "onboarding_incomplete": True,
+        "onboarding_next_href": "/profile?focus=claim_a",
     }
 
 
@@ -165,6 +173,41 @@ def test_base_context_can_post_false_for_claim_b_only():
     ctx = base_context(user)
     assert ctx["can_post"] is False
     assert ctx["claims"]["b"] == [org_id]
+
+
+def test_base_context_onboarding_complete_silences_banner():
+    """A verified clinician has cleared the spine, so `onboarding_incomplete`
+    is False and the global banner stays silent."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="alice",
+        is_superuser=False,
+        is_verified=True,
+        clinicians=[
+            SimpleNamespace(
+                npi="1234567890", clinician_verified=True, ever_verified_at=None
+            )
+        ],
+        org_representations=[],
+    )
+    ctx = base_context(user)
+    assert ctx["onboarding_incomplete"] is False
+
+
+def test_base_context_unverified_email_points_banner_at_email():
+    """An unverified-email user's first incomplete step is email, so the
+    banner deep-links to the email focus."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="alice",
+        is_superuser=False,
+        is_verified=False,
+        clinicians=[],
+        org_representations=[],
+    )
+    ctx = base_context(user)
+    assert ctx["onboarding_incomplete"] is True
+    assert ctx["onboarding_next_href"] == "/profile?focus=email"
 
 
 def test_base_context_unverified_user_surfaces_for_nag_banner():

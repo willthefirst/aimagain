@@ -178,6 +178,22 @@
         {# Anonymous visitors get only the brand link. #}
       </nav>
     </header>
+    {# Single global incomplete-profile banner. One chrome signal that
+       reads `onboarding_incomplete` from `base_context` — itself the
+       `onboarding_checklist` registry projection — so it can't disagree
+       with the itemized steps on `/profile`. Explains *why* content is
+       gated and links to the next actionable step (a `/profile?focus=…`
+       deep-link). Suppressed on `/profile` itself, where the full
+       checklist is already on screen — a banner there would just point
+       at the page you're on. #}
+    {% if is_authenticated and onboarding_incomplete and not _on_profile %}
+      <aside role="status" id="onboarding-banner" class="container">
+        <strong>Finish setting up your profile.</strong>
+        Clinician names and contact details stay hidden, and you can't post,
+        until you verify.
+        <a href="{{ onboarding_next_href }}">Continue setup →</a>
+      </aside>
+    {% endif %}
     <main class="container">
       {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
          `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
