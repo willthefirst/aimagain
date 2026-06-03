@@ -51,13 +51,15 @@ async def test_profile_email_verify_hidden_for_verified_user(
     assert tree.css_first("#verify-banner") is None
 
 
-async def test_profile_email_verify_shown_for_unverified_user(
+async def test_profile_email_row_links_to_step_for_unverified_user(
     authenticated_client: AsyncClient,
     db_test_session_manager,
     logged_in_user,
 ):
-    """An unverified user sees the email-verify section on `/profile`
-    with a resend button."""
+    """For an unverified user the `/profile` table of contents shows the
+    email row as an incomplete link to the `/profile/email` step page —
+    no inline resend on the hub. The resend control lives on the step page
+    (asserted by the step-page test below)."""
     from sqlalchemy import select
 
     from src.domain.models import User
@@ -72,21 +74,55 @@ async def test_profile_email_verify_shown_for_unverified_user(
     response = await authenticated_client.get("/profile")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("#verify-banner") is not None
+    # The hub is a pure index now — no embedded resend form.
+    assert tree.css_first("#verify-banner") is None
+    # The email row is incomplete and links out to its step subroute.
+    email_row = tree.css_first('#onboarding-checklist [data-step="email"]')
+    assert email_row is not None
+    link = email_row.css_first("a.onboarding-progress-link")
+    assert link is not None
+    assert link.attributes.get("href") == "/profile/email"
+
+
+async def test_profile_email_step_page_hosts_resend_for_unverified_user(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """The `/profile/email` step page hosts the resend control with the
+    `#verify-banner` swap target. The resend stays a passive outline button
+    so it doesn't shout."""
+    from sqlalchemy import select
+
+    from src.domain.models import User
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            fresh_user = (
+                await session.execute(select(User).where(User.id == logged_in_user.id))
+            ).scalar_one()
+            fresh_user.is_verified = False
+
+    response = await authenticated_client.get("/profile/email")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
     assert "Verify your email" in response.text
     assert "Resend verification email" in response.text
-    # The resend is a passive secondary action — it must render as an inline
-    # outline button so it doesn't outshout the persona chooser below it.
     resend = tree.css_first("#verify-banner button[type=submit]")
     assert resend is not None
     classes = resend.attributes.get("class", "")
     assert "outline" in classes
     assert "verify-resend" in classes
-    # The resend is embedded *inside* the email spine row, not a standalone
-    # aside above it — the row owns its own action (no duplicate email block).
-    email_row = tree.css_first('#onboarding-checklist [data-step="email"]')
-    assert email_row is not None
-    assert email_row.css_first("#verify-banner") is not None
+
+
+async def test_profile_email_step_redirects_to_hub_when_verified(
+    authenticated_client: AsyncClient,
+):
+    """A verified user has nothing to do on `/profile/email`, so it
+    redirects back to the hub table of contents."""
+    response = await authenticated_client.get("/profile/email", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/profile"
 
 
 async def test_home_shows_empty_my_posts_section_when_no_active_posts(

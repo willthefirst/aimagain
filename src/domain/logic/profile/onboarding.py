@@ -11,9 +11,11 @@ things every onboarding surface needs to render and act on it:
   vocab stays the single home for "where do I go to fix this."
 - `title` / `hint` — the checklist row label and the "what to do next"
   copy shown while the step is incomplete.
-- `embed` — a presentation hint: `True` means a surface *may* render the
-  satisfying form inline (the `/profile` orchestrator does this);
-  `False` means link out. Advisory, not a routing decision.
+
+Each step is satisfied at its own subroute (`/profile/<key>`, derived
+from `reason` via `action_href`); the `/profile` hub is a table of
+contents that links to them. Steps always link out — there is no
+inline-embed hint.
 
 Why a registry and not just `onboarding_readiness`: this is the backbone
 the migration builds on (see RESOURCE_GRAMMAR.md and the profile-hub
@@ -64,15 +66,15 @@ class OnboardingStep:
     hint: str
     reason: str
     predicate: Callable[[Any], bool]
-    embed: bool
 
     def is_complete(self, user: Any) -> bool:
         return self.predicate(user)
 
     @property
     def action_href(self) -> str:
-        """Deep-link into `/profile` that satisfies this step. Derived from
-        `reason` so the URL vocab lives in `capabilities._FIX_URLS` only."""
+        """The step's subroute (`/profile/<key>`) where it gets satisfied.
+        Derived from `reason` so the URL vocab lives in capabilities only;
+        the `/profile` table of contents links each row here."""
         return capabilities.fix_url_for(self.reason)
 
 
@@ -85,7 +87,6 @@ ONBOARDING_STEPS: tuple[OnboardingStep, ...] = (
         hint="Confirm your email address to activate your account.",
         reason=capabilities.REASON_EMAIL_UNVERIFIED,
         predicate=capabilities.email_verified,
-        embed=False,
     ),
     OnboardingStep(
         key="identity",
@@ -93,7 +94,6 @@ ONBOARDING_STEPS: tuple[OnboardingStep, ...] = (
         hint="Verify your clinician identity or your organization to start posting.",
         reason=capabilities.REASON_CLAIM_A_UNVERIFIED,
         predicate=_identity_verified,
-        embed=True,
     ),
 )
 

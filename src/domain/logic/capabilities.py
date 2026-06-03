@@ -52,7 +52,11 @@ class ReasonMeta:
       place of a withheld field ("Add a verified clinician profile to
       unlock this.").
     - `fix_label`: CTA link text ("Complete clinician setup").
-    - `fix_url`: deep-link into the relevant `/profile` section.
+    - `fix_url`: deep-link to where the reason gets fixed. The two
+      onboarding-floor reasons (email, claim A) point at their dedicated
+      step subroute (`/profile/email`, `/profile/identity`); the additive
+      and lapsed reasons point at the hub root (`/profile`), which
+      mode-dispatches them (add-a-claim / re-verify / manage).
 
     Templates read this via the `capabilities.reason_meta(reason)` Jinja
     global so a given reason reads identically on every surface — the
@@ -69,27 +73,27 @@ _REASON_META = {
     REASON_EMAIL_UNVERIFIED: ReasonMeta(
         unlock="Verify your email to unlock this.",
         fix_label="Verify email",
-        fix_url="/profile?focus=email",
+        fix_url="/profile/email",
     ),
     REASON_CLAIM_A_UNVERIFIED: ReasonMeta(
         unlock="Add a verified clinician profile to unlock this.",
         fix_label="Complete clinician setup",
-        fix_url="/profile?focus=claim_a",
+        fix_url="/profile/identity",
     ),
     REASON_CLAIM_A_LAPSED: ReasonMeta(
         unlock="Re-attest your license to resume this.",
         fix_label="Re-verify license",
-        fix_url="/profile?focus=claim_a",
+        fix_url="/profile",
     ),
     REASON_CLAIM_B_UNVERIFIED: ReasonMeta(
         unlock="Become a verified organization representative to unlock this.",
         fix_label="Complete organization setup",
-        fix_url="/profile?focus=claim_b",
+        fix_url="/profile",
     ),
     REASON_AFFILIATION_MISSING: ReasonMeta(
         unlock="Add a clinician affiliation to unlock this.",
         fix_label="Manage affiliations",
-        fix_url="/profile?focus=claim_b",
+        fix_url="/profile",
     ),
 }
 

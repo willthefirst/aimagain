@@ -48,8 +48,8 @@ class OnboardingReadiness:
     - `can_read_full_feed` — full (un-teased) feed access.
     - `next_label` / `next_href` — the single next verification step, or
       ``None`` when nothing remains (the user can post). Hrefs come from
-      `capabilities.fix_url_for` / `/profile` so the deep-link vocab
-      stays in one place.
+      `capabilities.fix_url_for` (the step subroutes) so the deep-link
+      vocab stays in one place.
     """
 
     email_verified: bool
@@ -83,7 +83,7 @@ def onboarding_readiness(user: Any) -> OnboardingReadiness:
         next_href = capabilities.fix_url_for(capabilities.REASON_EMAIL_UNVERIFIED)
     elif not can_post:
         next_label = "Verify your identity to start posting"
-        next_href = "/profile"
+        next_href = capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED)
     else:
         next_label = None
         next_href = None

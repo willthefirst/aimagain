@@ -17,60 +17,74 @@ from src.domain.models import Clinician, ClinicianLicensure, User
 pytestmark = pytest.mark.asyncio
 
 
-async def test_profile_hub_renders_persona_chooser_for_new_user(
+async def test_profile_hub_links_identity_row_to_step_subroute(
     authenticated_client: AsyncClient,
 ):
-    """A fresh dev user (no clinician, no org representation) and no
-    `?path=` hint lands in setup mode showing the persona chooser — not
-    either onboarding sub-flow yet."""
+    """A fresh dev user (no clinician, no org representation) lands on the
+    `/profile` table of contents. The hub is a pure index now: the identity
+    row is an incomplete link to the `/profile/identity` step subroute, not
+    an embedded persona chooser."""
     response = await authenticated_client.get("/profile")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    # The hub is a TOC — the persona chooser has moved to the step page.
+    assert "I&#39;m a clinician" not in response.text
+    assert "Verify your NPI" not in response.text
+    identity_row = HTMLParser(response.text).css_first(
+        '#onboarding-checklist [data-step="identity"]'
+    )
+    assert identity_row is not None
+    assert identity_row.css_first(".picker") is None
+    link = identity_row.css_first("a.onboarding-progress-link")
+    assert link is not None
+    assert link.attributes.get("href") == "/profile/identity"
+
+
+async def test_profile_identity_step_renders_persona_chooser_for_new_user(
+    authenticated_client: AsyncClient,
+):
+    """A fresh dev user with no `?path=` hint sees the persona chooser on
+    the `/profile/identity` step page — not either onboarding sub-flow yet."""
+    response = await authenticated_client.get("/profile/identity")
+    assert response.status_code == 200
     # The two persona cards from the chooser branch of `_setup.html`.
     # Jinja HTML-escapes the apostrophe, so match the rendered form.
     assert "I&#39;m a clinician" in response.text
     assert "I represent an organization" in response.text
     assert "?path=clinician" in response.text
     assert "?path=org" in response.text
-    # The setup flow is embedded *inside* the identity spine row, not a
-    # separate section below the checklist — the row owns its own action.
-    identity_row = HTMLParser(response.text).css_first(
-        '#onboarding-checklist [data-step="identity"]'
-    )
-    assert identity_row is not None
-    assert identity_row.css_first(".picker") is not None
     # The chooser renders as the shared picker card grid — each option is a
     # bordered `.picker-option` card, not a bare underlined link. This is the
-    # primary action on the setup page, so it must read as a card.
+    # primary action on the step page, so it must read as a card.
     assert 'class="picker"' in response.text
     assert 'class="picker-option"' in response.text
     # Neither sub-flow's form is shown until a persona is picked.
     assert "Verify your NPI" not in response.text
 
 
-async def test_profile_hub_clinician_path_shows_npi_flow(
+async def test_profile_identity_step_clinician_path_shows_npi_flow(
     authenticated_client: AsyncClient,
 ):
-    """`/profile?path=clinician` renders the clinician onboarding flow —
-    NPI verification — and not the org-registration form."""
-    response = await authenticated_client.get("/profile?path=clinician")
+    """`/profile/identity?path=clinician` renders the clinician onboarding
+    flow — NPI verification — and not the org-registration form."""
+    response = await authenticated_client.get("/profile/identity?path=clinician")
     assert response.status_code == 200
     assert "Verify your NPI" in response.text
     assert "Register an organization" not in response.text
 
 
-async def test_profile_hub_org_path_shows_org_flow(
+async def test_profile_identity_step_org_path_shows_org_flow(
     authenticated_client: AsyncClient,
 ):
-    """`/profile?path=org` renders the org-registration flow and not the
-    clinician NPI form."""
-    response = await authenticated_client.get("/profile?path=org")
+    """`/profile/identity?path=org` renders the org-registration flow and
+    not the clinician NPI form."""
+    response = await authenticated_client.get("/profile/identity?path=org")
     assert response.status_code == 200
     assert "Register an organization" in response.text
     assert "Verify your NPI" not in response.text
 
 
-async def test_profile_hub_started_clinician_ignores_path_hint(
+async def test_profile_identity_step_started_clinician_ignores_path_hint(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -90,10 +104,19 @@ async def test_profile_hub_started_clinician_ignores_path_hint(
         async with session.begin():
             session.add(clinician)
 
-    response = await authenticated_client.get("/profile?path=org")
+    response = await authenticated_client.get("/profile/identity?path=org")
     assert response.status_code == 200
     assert "Verify your NPI" in response.text
     assert "I represent an organization" not in response.text
+
+
+async def test_profile_step_unknown_key_returns_404(
+    authenticated_client: AsyncClient,
+):
+    """`/profile/<unknown>` is not a registered onboarding step, so the
+    step handler 404s rather than rendering an empty page."""
+    response = await authenticated_client.get("/profile/not-a-step")
+    assert response.status_code == 404
 
 
 async def test_profile_hub_requires_authentication(test_client: AsyncClient):
@@ -144,7 +167,8 @@ async def test_post_profile_clinician_creates_and_redirects(
     logged_in_user: User,
 ):
     """POST /profile/clinician creates a minimal clinician + fires NPI
-    verification inline, then returns HX-Redirect: /profile."""
+    verification inline, then returns HX-Redirect: /profile/identity so the
+    identity step re-renders with the NPPES result."""
     response = await authenticated_client.post(
         "/profile/clinician",
         data={
@@ -158,7 +182,7 @@ async def test_post_profile_clinician_creates_and_redirects(
     )
 
     assert response.status_code == 201
-    assert response.headers.get("HX-Redirect") == "/profile"
+    assert response.headers.get("HX-Redirect") == "/profile/identity"
 
     async with db_test_session_manager() as session:
         result = await session.execute(
@@ -188,7 +212,7 @@ async def test_post_profile_clinician_without_location(
     )
 
     assert response.status_code == 201
-    assert response.headers.get("HX-Redirect") == "/profile"
+    assert response.headers.get("HX-Redirect") == "/profile/identity"
 
     async with db_test_session_manager() as session:
         result = await session.execute(
@@ -226,7 +250,7 @@ async def test_post_profile_clinician_license_creates_attests_and_redirects(
     logged_in_user: User,
 ):
     """POST /profile/clinician/{id}/license creates a licensure, attests
-    it active in one step, and returns HX-Redirect: /profile."""
+    it active in one step, and returns HX-Redirect: /profile/identity."""
     from tests.helpers import make_clinician_with_org
 
     clinician = make_clinician_with_org(
@@ -249,7 +273,7 @@ async def test_post_profile_clinician_license_creates_attests_and_redirects(
     )
 
     assert response.status_code == 201
-    assert response.headers.get("HX-Redirect") == "/profile"
+    assert response.headers.get("HX-Redirect") == "/profile/identity"
 
     async with db_test_session_manager() as session:
         result = await session.execute(
@@ -269,7 +293,7 @@ async def test_post_profile_clinician_identity_update_retries_verification(
     logged_in_user: User,
 ):
     """POST /profile/clinician/{id}/identity updates name + NPI and
-    re-runs verification inline, returning HX-Redirect: /profile."""
+    re-runs verification inline, returning HX-Redirect: /profile/identity."""
     from tests.helpers import make_clinician_with_org
 
     clinician = make_clinician_with_org(
@@ -293,7 +317,7 @@ async def test_post_profile_clinician_identity_update_retries_verification(
     )
 
     assert response.status_code == 200
-    assert response.headers.get("HX-Redirect") == "/profile"
+    assert response.headers.get("HX-Redirect") == "/profile/identity"
 
     async with db_test_session_manager() as session:
         result = await session.execute(
