@@ -5,7 +5,7 @@
     <h1>Profile</h1>
     <p style="color: var(--pico-muted-color); margin-top: -0.25rem;">
       {% if mode == "setup" %}
-        Verify your identity to post and see full referral details.
+        Complete these steps to start posting and see full referral details.
       {% elif mode == "manage" %}
         Manage your verification claims and profile.
       {% elif mode == "add-a-claim" %}
@@ -15,36 +15,20 @@
       {% endif %}
     </p>
   </header>
-  {# Registry-driven progress overview — the unified "what's done / what
-     remains" strip, read from the `onboarding_checklist` projection. Sits
-     above the email aside and the mode partials so the user sees the whole
-     spine at a glance before acting on any one step. #}
+  {# Registry-driven setup spine. In setup mode this *is* the page: each
+     incomplete step row embeds its own action — the email row carries the
+     resend control (with the `#verify-banner` swap target), the identity
+     row embeds `_setup.html`. So there is no standalone email aside or
+     separate setup section here; see `_checklist.html`. The spine is
+     suppressed once onboarding is complete (manage mode). #}
   {% include "profile/_checklist.html" %}
-  {# Email verification step. Shown above the claim-setup content so the
-     user knows to check their inbox before completing any other step.
-     Uses the same HTMX target (`#verify-banner`) and swap partial as
-     the old global banner so `POST /auth/resend-verify` keeps working. #}
-  {%- if not current_user_is_verified -%}
-    <aside role="status" id="verify-banner" style="margin-bottom: 1rem;">
-      <strong>Verify your email.</strong>
-      Check your inbox for a link to confirm your account.
-      <form method="post"
-            action="/auth/resend-verify"
-            hx-post="/auth/resend-verify"
-            hx-target="#verify-banner"
-            hx-swap="outerHTML">
-        <button type="submit" class="outline secondary verify-resend">Resend verification email</button>
-      </form>
-    </aside>
-  {%- endif -%}
-  {# Mode dispatch. All four modes have dedicated partials:
-     * `_setup.html`     — wireframe L1, no-claim goal picker.
+  {# Mode dispatch for the post-onboarding modes. Setup-mode content lives
+     inside the spine above (the identity row), so it is not dispatched
+     here:
      * `_manage.html`    — wireframe L4, ≥1 claim verified.
      * `_add_claim.html` — wireframe L6, additive unlock framing.
      * `_reverify.html`  — wireframe L7, lapsed-claim Fix CTA. #}
-  {% if mode == "setup" %}
-    {% include "profile/_setup.html" %}
-  {% elif mode == "manage" %}
+  {% if mode == "manage" %}
     {% include "profile/_manage.html" %}
   {% elif mode == "add-a-claim" %}
     {% include "profile/_add_claim.html" %}

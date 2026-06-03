@@ -82,6 +82,11 @@ async def test_profile_email_verify_shown_for_unverified_user(
     classes = resend.attributes.get("class", "")
     assert "outline" in classes
     assert "verify-resend" in classes
+    # The resend is embedded *inside* the email spine row, not a standalone
+    # aside above it — the row owns its own action (no duplicate email block).
+    email_row = tree.css_first('#onboarding-checklist [data-step="email"]')
+    assert email_row is not None
+    assert email_row.css_first("#verify-banner") is not None
 
 
 async def test_home_shows_empty_my_posts_section_when_no_active_posts(

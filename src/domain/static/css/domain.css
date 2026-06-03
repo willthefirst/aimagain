@@ -245,20 +245,28 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   margin-bottom: var(--pico-spacing);
 }
 
-/* ── Onboarding progress overview ─────────────────────────────
-   Registry-driven setup-progress strip at the top of /profile
-   (profile/_checklist.html). One row per onboarding step; the mark
-   and the muted/strong treatment express completion. All state via
-   classes — no inline styles on the template. */
+/* ── Onboarding setup spine ───────────────────────────────────
+   Registry-driven spine at the top of /profile (profile/_checklist.html).
+   One row per onboarding step. Each row is a vertical stack: a `head`
+   (mark · title/hint · optional Done tag) over an optional embedded
+   `action` — the incomplete row that owns it carries its satisfying
+   control inline (email → resend, identity → the setup flow). The mark
+   and muted/strong treatment express completion. All state via classes —
+   no inline styles on the template. */
 .onboarding-progress {
   list-style: none;
   margin: 0 0 var(--pico-spacing);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 .onboarding-progress-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.onboarding-progress-head {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
@@ -275,6 +283,9 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  color: var(--pico-color-green-600);
 }
-.onboarding-progress-item.is-complete .onboarding-progress-status { color: var(--pico-color-green-600); }
-.onboarding-progress-item.is-pending .onboarding-progress-status { color: var(--pico-color-orange-600); }
+/* The embedded action sits under the row head, indented past the mark so
+   it lines up with the step title. */
+.onboarding-progress-action { margin-left: 1.6rem; }
+.onboarding-progress-action > form { margin-bottom: 0; }
