@@ -137,6 +137,20 @@ def test_build_profile_context_exposes_mode_and_lists():
     assert ctx["org_representations"] == user.org_representations
     assert ctx["claim_state"].a is True
     assert len(ctx["claim_state"].b) == 1
+    # A verified user has cleared the spine — the progress overview reads
+    # complete (and `_checklist.html` therefore renders nothing).
+    assert ctx["checklist"].complete is True
+
+
+def test_build_profile_context_checklist_marks_remaining_steps():
+    """A no-claim user's checklist surfaces the email-complete /
+    identity-pending split the `/profile` progress strip renders."""
+    user = _user(is_verified=True, clinicians=[], org_representations=[])
+    checklist = build_profile_context(user)["checklist"]
+    by_key = {s.step.key: s.complete for s in checklist.statuses}
+    assert by_key == {"email": True, "identity": False}
+    assert checklist.incomplete is True
+    assert checklist.next_step.key == "identity"
 
 
 # ---------------------------------------------------------------------------

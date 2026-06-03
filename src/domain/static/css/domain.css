@@ -235,3 +235,37 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   border-radius: 4px;
   margin-bottom: var(--pico-spacing);
 }
+
+/* ── Onboarding progress overview ─────────────────────────────
+   Registry-driven setup-progress strip at the top of /profile
+   (profile/_checklist.html). One row per onboarding step; the mark
+   and the muted/strong treatment express completion. All state via
+   classes — no inline styles on the template. */
+.onboarding-progress {
+  list-style: none;
+  margin: 0 0 var(--pico-spacing);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.onboarding-progress-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.onboarding-progress-mark { flex-shrink: 0; line-height: 1.4; }
+.onboarding-progress-item.is-complete .onboarding-progress-mark { color: var(--pico-color-green-600); }
+.onboarding-progress-item.is-pending .onboarding-progress-mark { color: var(--pico-color-orange-600); }
+.onboarding-progress-body { display: flex; flex-direction: column; gap: 0.1rem; flex: 1; min-width: 0; }
+.onboarding-progress-body small { color: var(--pico-muted-color); }
+.onboarding-progress-item.is-complete .onboarding-progress-body strong { color: var(--pico-muted-color); }
+.onboarding-progress-status {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.onboarding-progress-item.is-complete .onboarding-progress-status { color: var(--pico-color-green-600); }
+.onboarding-progress-item.is-pending .onboarding-progress-status { color: var(--pico-color-orange-600); }

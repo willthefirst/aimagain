@@ -1,0 +1,33 @@
+{# Registry-driven setup-progress overview.
+
+   Renders the `checklist` (an `OnboardingChecklist` from
+   `build_profile_context` → `onboarding_checklist(user)`) as a single
+   completed/remaining strip covering the whole verification spine
+   (email → identity). It ties together the email step — whose actionable
+   resend lives in the `#verify-banner` aside below — and the identity
+   step — whose detailed forms live in the mode partials — into one
+   "where am I" view, the unified progress the hub otherwise lacked.
+
+   Reads the same `capabilities` predicates as the post gate and the
+   global `#onboarding-banner`, so the three can't disagree. Only shown
+   while onboarding is incomplete; a fully-verified user (manage mode)
+   has nothing left to track. #}
+{% if checklist.incomplete %}
+  <section id="onboarding-checklist" aria-label="Setup progress">
+    <ol class="onboarding-progress">
+      {% for status in checklist.statuses %}
+        <li class="onboarding-progress-item {{ 'is-complete' if status.complete else 'is-pending' }}"
+            data-step="{{ status.step.key }}">
+          <span class="onboarding-progress-mark" aria-hidden="true">
+            <i class="icon-{{ 'circle-check' if status.complete else 'circle' }}"></i>
+          </span>
+          <span class="onboarding-progress-body">
+            <strong>{{ status.step.title }}</strong>
+            <small>{{ 'Done' if status.complete else status.step.hint }}</small>
+          </span>
+          <span class="onboarding-progress-status">{{ 'Done' if status.complete else 'To do' }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+{% endif %}
