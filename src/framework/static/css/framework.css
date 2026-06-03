@@ -585,3 +585,42 @@ body {
   color: var(--pico-muted-color);
   font-style: italic;
 }
+/* Picker rendered by `_shared/_picker.html`. A "choose your path" card
+   grid that funnels the user to a kind- or type-specific sub-form. Each
+   option is a bordered card so the chooser reads as the primary action on
+   entry-point pages; only the heading reads as a link, the description is
+   muted body text (Pico would otherwise underline the whole anchor). */
+.picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: var(--pico-spacing);
+}
+.picker-option {
+  display: block;
+  padding: 1rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.picker-option:hover,
+.picker-option:focus-visible {
+  border-color: var(--pico-primary);
+  background: var(--pico-card-sectioning-background-color);
+}
+.picker-option hgroup {
+  margin-bottom: 0;
+}
+.picker-option h2 {
+  margin-bottom: 0.25rem;
+  font-size: 1.05rem;
+  color: var(--pico-primary);
+}
+.picker-option p {
+  margin-bottom: 0;
+  color: var(--pico-muted-color);
+  font-size: 0.9rem;
+}

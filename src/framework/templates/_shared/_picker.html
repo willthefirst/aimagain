@@ -10,12 +10,14 @@ Each option is a dict with keys:
   description: one-line tagline
 #}
 {%- macro picker(options) -%}
-  {%- for opt in options %}
-    <a href="{{ opt.href }}">
-      <hgroup>
-        <h2>{{ opt.heading }}</h2>
-        <p>{{ opt.description }}</p>
-      </hgroup>
-    </a>
-  {%- endfor %}
+  <div class="picker">
+    {%- for opt in options %}
+      <a href="{{ opt.href }}" class="picker-option">
+        <hgroup>
+          <h2>{{ opt.heading }}</h2>
+          <p>{{ opt.description }}</p>
+        </hgroup>
+      </a>
+    {%- endfor %}
+  </div>
 {%- endmacro %}
