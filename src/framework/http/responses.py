@@ -45,6 +45,12 @@ def base_context(user: Actor | None) -> dict:
     so the single-source-of-truth predicate set computes them once per
     request. The import is lazy to keep this framework module from taking
     a hard `domain/` import.
+
+    `can_post` is the chrome-level "show a Create Post CTA" gate. It equals
+    Claim A only — deliberately narrower than the server's `_assert_post_payload_authz`,
+    which also accepts verified org reps (Claim B). Org-rep posting has no
+    chrome entry point by design; templates gate on `can_post` so they all
+    use the same definition instead of re-deriving `claims.a`.
     """
     from src.domain.logic.capabilities import can_read_full_feed, claim_state
 
@@ -59,6 +65,7 @@ def base_context(user: Actor | None) -> dict:
             True if user is None else bool(getattr(user, "is_verified", True))
         ),
         "claims": {"a": state.a, "b": list(state.b)},
+        "can_post": state.a,
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": bool(state.lapsed),

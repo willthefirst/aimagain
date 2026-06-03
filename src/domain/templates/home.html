@@ -28,11 +28,12 @@
         <a href="/profile" role="button">Open Profile</a>
       </article>
     {% else %}
-      {# Post CTAs gated on Claim A. The chrome's `claims.a` scalar
-         from `base_context()` is the single source of truth — same
-         predicate the route's `write_authz` consults, so the visible
-         button and the server-side block can't disagree. #}
-      {% if claims.a %}
+      {# Post CTAs gate on `can_post` (Claim A only). The server's
+         `_assert_post_payload_authz` also accepts verified org reps
+         (Claim B), but the chrome deliberately omits that path — org
+         reps have no chrome CTA by design. `can_post` is derived once
+         in `base_context()` — don't re-derive from raw `claims.*`. #}
+      {% if can_post %}
         <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
           <a href="{{ entity_form_url("post") }}?kind=referral"
              role="button"
