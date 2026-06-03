@@ -16,17 +16,71 @@ from src.domain.models import Clinician, ClinicianLicensure, User
 pytestmark = pytest.mark.asyncio
 
 
-async def test_profile_hub_renders_setup_for_new_user(
+async def test_profile_hub_renders_persona_chooser_for_new_user(
     authenticated_client: AsyncClient,
 ):
-    """A fresh dev user (no clinician, no org representation) lands in
-    setup mode — the minimal clinician create form."""
+    """A fresh dev user (no clinician, no org representation) and no
+    `?path=` hint lands in setup mode showing the persona chooser — not
+    either onboarding sub-flow yet."""
     response = await authenticated_client.get("/profile")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
-    # Setup mode's distinctive copy from `_setup.html`.
+    # The two persona cards from the chooser branch of `_setup.html`.
+    # Jinja HTML-escapes the apostrophe, so match the rendered form.
+    assert "I&#39;m a clinician" in response.text
+    assert "I represent an organization" in response.text
+    assert "?path=clinician" in response.text
+    assert "?path=org" in response.text
+    # Neither sub-flow's form is shown until a persona is picked.
+    assert "Verify your NPI" not in response.text
+
+
+async def test_profile_hub_clinician_path_shows_npi_flow(
+    authenticated_client: AsyncClient,
+):
+    """`/profile?path=clinician` renders the clinician onboarding flow —
+    NPI verification — and not the org-registration form."""
+    response = await authenticated_client.get("/profile?path=clinician")
+    assert response.status_code == 200
     assert "Verify your NPI" in response.text
+    assert "Register an organization" not in response.text
+
+
+async def test_profile_hub_org_path_shows_org_flow(
+    authenticated_client: AsyncClient,
+):
+    """`/profile?path=org` renders the org-registration flow and not the
+    clinician NPI form."""
+    response = await authenticated_client.get("/profile?path=org")
+    assert response.status_code == 200
     assert "Register an organization" in response.text
+    assert "Verify your NPI" not in response.text
+
+
+async def test_profile_hub_started_clinician_ignores_path_hint(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A user who already created a clinician resumes the clinician flow
+    even with `?path=org` — the started path wins over the hint, so they
+    aren't bounced back to the chooser or the wrong sub-flow."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id,
+        npi="1234567890",
+        npi_match_status="pending",
+    )
+    clinician.clinician_verified = False
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/profile?path=org")
+    assert response.status_code == 200
+    assert "Verify your NPI" in response.text
+    assert "I represent an organization" not in response.text
 
 
 async def test_profile_hub_requires_authentication(test_client: AsyncClient):
