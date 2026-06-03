@@ -31,6 +31,43 @@ MODE_REVERIFY = "re-verify"
 
 PROFILE_MODES = (MODE_SETUP, MODE_MANAGE, MODE_ADD_CLAIM, MODE_REVERIFY)
 
+SETUP_PATH_CLINICIAN = "clinician"
+SETUP_PATH_ORG = "org"
+
+SETUP_PATHS = (SETUP_PATH_CLINICIAN, SETUP_PATH_ORG)
+
+
+def resolve_setup_path(
+    user: User,
+    *,
+    path_hint: str | None = None,
+) -> str | None:
+    """Pick which setup sub-flow `_setup.html` renders, or `None` for the
+    persona chooser.
+
+    Setup mode serves two personas — a solo/group clinician (Claim A) and
+    an organization representative (Claim B) — whose minimal onboarding
+    fields differ. Rather than stack both as one funnel, the hub shows a
+    two-card persona chooser first; the choice rides in the `?path=` query
+    param (`clinician` / `org`).
+
+    Once the user has acted, the path is implied by what they created and
+    the `?path=` hint is ignored — a clinician record means the clinician
+    flow (``POST /profile/clinician`` also auto-creates the solo-practice
+    org rep, so we key off the clinician, not the rep), and an org rep with
+    no clinician means the org flow. A fresh user with no started claim and
+    no hint gets `None` → the chooser.
+
+    An out-of-range hint is treated as absent.
+    """
+    if getattr(user, "clinicians", None):
+        return SETUP_PATH_CLINICIAN
+    if getattr(user, "org_representations", None):
+        return SETUP_PATH_ORG
+    if path_hint in SETUP_PATHS:
+        return path_hint
+    return None
+
 
 def resolve_profile_mode(
     user: User,
@@ -85,6 +122,7 @@ def build_profile_context(
     user: User,
     *,
     intent: str | None = None,
+    path_hint: str | None = None,
 ) -> dict[str, Any]:
     """Compose the template context for `profile/hub.html`.
 
@@ -116,6 +154,7 @@ def build_profile_context(
         "clinicians": list(getattr(user, "clinicians", None) or ()),
         "org_representations": list(getattr(user, "org_representations", None) or ()),
         "is_demo_context": is_demo_context,
+        "setup_path": resolve_setup_path(user, path_hint=path_hint),
     }
 
 
