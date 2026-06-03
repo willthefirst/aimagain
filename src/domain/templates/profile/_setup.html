@@ -75,18 +75,30 @@
     <p>How will you use Bedlam Connect? Pick the option that fits — you can add the other later.</p>
     {{ picker([
       {
-        "href": "/profile?path=clinician",
+        "href": "/profile/identity?path=clinician",
         "heading": "I'm a clinician",
         "description": "A solo or group practitioner — verify your NPI and license."
       },
       {
-        "href": "/profile?path=org",
+        "href": "/profile/identity?path=org",
         "heading": "I represent an organization",
         "description": "Register your practice, clinic, or facility to post program intakes and on behalf of its clinicians."
       }
     ]) }}
   {% elif setup_path == "clinician" %}
     {# ── Clinician path: verify NPI, then attest a license ──────────── #}
+    {{ picker([
+      {
+        "selected": true,
+        "heading": "I'm a clinician",
+        "description": "A solo or group practitioner — verify your NPI and license."
+      },
+      {
+        "href": "/profile/identity?path=org",
+        "heading": "I represent an organization",
+        "description": "Register your practice, clinic, or facility to post program intakes."
+      }
+    ]) }}
     <article class="step-card{% if not _npi_ok %} step-card--action{% endif %}"
              id="claim-a-card">
       <header>
@@ -179,13 +191,20 @@
         {% endcall %}
       </article>
     {% endif %}
-    <p style="margin-top: 0.75rem;
-              font-size: 0.9em;
-              color: var(--pico-muted-color)">
-      Representing an organization instead? <a href="/profile?path=org">Register your organization.</a>
-    </p>
   {% elif setup_path == "org" %}
     {# ── Org path: register the organization + its Type-2 NPI ───────── #}
+    {{ picker([
+      {
+        "href": "/profile/identity?path=clinician",
+        "heading": "I'm a clinician",
+        "description": "A solo or group practitioner — verify your NPI and license."
+      },
+      {
+        "selected": true,
+        "heading": "I represent an organization",
+        "description": "Register your practice, clinic, or facility to post program intakes."
+      }
+    ]) }}
     <article class="step-card{% if not org_representations %} step-card--action{% endif %}"
              id="claim-b-card">
       <header>
@@ -226,10 +245,5 @@
         {% endcall %}
       {% endif %}
     </article>
-    <p style="margin-top: 0.75rem;
-              font-size: 0.9em;
-              color: var(--pico-muted-color)">
-      Also a practicing clinician? <a href="/profile?path=clinician">Add your Type-1 NPI</a> to enable clinician posting too.
-    </p>
   {% endif %}
 </section>
