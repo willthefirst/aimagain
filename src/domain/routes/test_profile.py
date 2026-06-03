@@ -8,6 +8,7 @@ to use it without holding Claim A).
 
 import pytest
 from httpx import AsyncClient
+from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -31,6 +32,13 @@ async def test_profile_hub_renders_persona_chooser_for_new_user(
     assert "I represent an organization" in response.text
     assert "?path=clinician" in response.text
     assert "?path=org" in response.text
+    # The setup flow is embedded *inside* the identity spine row, not a
+    # separate section below the checklist — the row owns its own action.
+    identity_row = HTMLParser(response.text).css_first(
+        '#onboarding-checklist [data-step="identity"]'
+    )
+    assert identity_row is not None
+    assert identity_row.css_first(".picker") is not None
     # The chooser renders as the shared picker card grid — each option is a
     # bordered `.picker-option` card, not a bare underlined link. This is the
     # primary action on the setup page, so it must read as a card.
