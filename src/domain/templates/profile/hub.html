@@ -15,6 +15,11 @@
       {% endif %}
     </p>
   </header>
+  {# Registry-driven progress overview — the unified "what's done / what
+     remains" strip, read from the `onboarding_checklist` projection. Sits
+     above the email aside and the mode partials so the user sees the whole
+     spine at a glance before acting on any one step. #}
+  {% include "profile/_checklist.html" %}
   {# Email verification step. Shown above the claim-setup content so the
      user knows to check their inbox before completing any other step.
      Uses the same HTMX target (`#verify-banner`) and swap partial as
