@@ -1,0 +1,40 @@
+{# Consistent "you can't do/see this yet" affordances, driven by the
+   closed `capabilities.REASON_*` vocab. Two treatments, picked by the
+   *type* of thing being gated:
+
+   - `locked_action(reason, label)` — for write affordances (buttons,
+     create links). Renders the control DISABLED and visible, with the
+     reason + fix link beneath. The user sees the action exists and what
+     unlocks it. Safe to render: the server re-checks authz on submit
+     (e.g. `_assert_post_payload_authz`), so a disabled control leaks no
+     data.
+
+   - `locked_field(reason, label)` — for withheld DATA values (practice
+     name, description, full address). Renders a placeholder that names
+     the field in place of its value. The caller passes the field's NAME,
+     never its value — so this macro CANNOT leak the data. Withholding the
+     real value is the VIEW layer's job (null it server-side); this macro
+     only renders the gap and the path to unlock it.
+
+   Copy + fix link both come from `capabilities.reason_meta(reason)` so a
+   given reason reads identically everywhere. `capabilities` is a Jinja
+   global (registered in `src/domain/template_globals.py`), so these
+   macros need no `with context` on import. Add or change reason copy in
+`src/domain/logic/capabilities.py` — never inline here. #}
+{% macro locked_action(reason, label) -%}
+  {%- set meta = capabilities.reason_meta(reason) -%}
+  <div class="locked-action">
+    <button type="button" class="outline" disabled aria-disabled="true">{{ label }}</button>
+    <small class="locked-reason">
+      <i class="icon-lock" aria-hidden="true"></i>{{ meta.unlock }}
+      <a href="{{ meta.fix_url }}">{{ meta.fix_label }} →</a>
+    </small>
+  </div>
+{%- endmacro %}
+{% macro locked_field(reason, label) -%}
+  {%- set meta = capabilities.reason_meta(reason) -%}
+  <span class="locked-field" title="{{ meta.unlock }}">
+    <i class="icon-lock" aria-hidden="true"></i>{{ label }} hidden —
+    <a href="{{ meta.fix_url }}">{{ meta.fix_label }} →</a>
+  </span>
+{%- endmacro %}
