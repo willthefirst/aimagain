@@ -53,6 +53,13 @@ async def test_component_gallery_returns_html(test_client: AsyncClient):
     assert "text/html" in response.headers["content-type"]
 
 
+async def test_component_gallery_documents_picker(test_client: AsyncClient):
+    """The gallery renders the shared `picker()` macro so the
+    choose-your-path card grid can be iterated in isolation."""
+    response = await test_client.get("/dev/components")
+    assert 'id="picker"' in response.text
+
+
 async def test_component_gallery_404s_when_not_development(
     test_client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
