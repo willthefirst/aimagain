@@ -118,9 +118,16 @@ async def test_form_new_picker_responds_200(
     logged_in_user,
 ):
     """`/posts/form` (no `?kind=`) renders the kind-picker page so the
-    user can pick which kind to create."""
+    user can pick which kind to create. Rendered via the shared
+    `_picker.html` macro — one card per kind, each deep-linking to
+    `?kind=<value>`."""
     response = await authenticated_client.get("/posts/form")
     assert response.status_code == 200
+    body = response.text
+    for heading in ("Referral", "Clinician", "Organization"):
+        assert f"<h2>{heading}</h2>" in body
+    for kind in ("referral", "clinician_opening", "program_intake"):
+        assert f"?kind={kind}" in body
 
 
 @pytest.mark.parametrize("kind", ["referral", "clinician_opening", "program_intake"])

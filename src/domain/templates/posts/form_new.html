@@ -12,24 +12,18 @@ better. The H1 on the kind-specific form page still funnels through
 "Create program intake".
 #}
 {% extends "views/form_new.html" %}
+{%- from "_shared/_picker.html" import picker -%}
 {% block resource_label %}Posts{% endblock %}
 {% block form_content %}
-  <a href="{{ entity_form_url("post") }}?kind=referral">
-    <hgroup>
-      <h2>Referral</h2>
-      <p>A client you're looking to place with another clinician.</p>
-    </hgroup>
-  </a>
-  <a href="{{ entity_form_url("post") }}?kind=clinician_opening">
-    <hgroup>
-      <h2>Clinician</h2>
-      <p>An individual clinician with availability on their caseload.</p>
-    </hgroup>
-  </a>
-  <a href="{{ entity_form_url("post") }}?kind=program_intake">
-    <hgroup>
-      <h2>Organization</h2>
-      <p>An organization's program announcing open intake slots.</p>
-    </hgroup>
-  </a>
+  {{ picker([
+    {"href": entity_form_url("post") + "?kind=referral",
+  "heading": "Referral",
+  "description": "A client you're looking to place with another clinician."},
+  {"href": entity_form_url("post") + "?kind=clinician_opening",
+  "heading": "Clinician",
+  "description": "An individual clinician with availability on their caseload."},
+  {"href": entity_form_url("post") + "?kind=program_intake",
+  "heading": "Organization",
+  "description": "An organization's program announcing open intake slots."},
+  ]) }}
 {% endblock %}
