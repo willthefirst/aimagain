@@ -66,13 +66,19 @@ async def profile_hub(
     request: Request,
     requesting_user: User = Depends(current_active_user),
     intent: str | None = None,
+    path: str | None = None,
 ) -> Any:
     """Render the profile hub. `intent=add_claim` (set by the
     "Add a capability" CTA) lands the user in `add-a-claim` mode when
     they already hold at least one claim; otherwise mode is derived
     purely from the claim state.
+
+    `path=clinician|org` (set by the setup-mode persona chooser) selects
+    which onboarding sub-flow the setup partial renders for a fresh user;
+    it is ignored once the user has started a claim (the started path is
+    implied by what they created). See `resolve_setup_path`.
     """
-    context = build_profile_context(requesting_user, intent=intent)
+    context = build_profile_context(requesting_user, intent=intent, path_hint=path)
     return APIResponse.html_response(
         "profile/hub.html",
         context,
