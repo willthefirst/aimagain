@@ -18,6 +18,7 @@ from typing import Any
 from uuid import UUID
 
 from src.domain.logic import capabilities
+from src.domain.logic.profile.onboarding import onboarding_checklist
 from src.domain.models import User
 
 logger = logging.getLogger(__name__)
@@ -88,9 +89,13 @@ def build_profile_context(
     """Compose the template context for `profile/hub.html`.
 
     Exposes the resolved mode + a snapshot of the `ClaimState` shape
-    the partials read. The chrome scalars (`is_authenticated`,
-    `claims`, `any_claim_lapsed`, etc.) are added by `base_context` at
-    render time — this context only carries the hub-specific extras.
+    the partials read, plus the `onboarding_checklist` projection that
+    drives the registry-driven progress overview (`_checklist.html`).
+    The checklist reads the same `capabilities` predicates as the post
+    gate and the global banner, so the three can't disagree. The chrome
+    scalars (`is_authenticated`, `claims`, `any_claim_lapsed`, etc.) are
+    added by `base_context` at render time — this context only carries
+    the hub-specific extras.
     """
     state = capabilities.claim_state(user)
     mode = resolve_profile_mode(user, intent=intent)
@@ -107,6 +112,7 @@ def build_profile_context(
         "mode": mode,
         "profile_modes": PROFILE_MODES,
         "claim_state": state,
+        "checklist": onboarding_checklist(user),
         "clinicians": list(getattr(user, "clinicians", None) or ()),
         "org_representations": list(getattr(user, "org_representations", None) or ()),
         "is_demo_context": is_demo_context,

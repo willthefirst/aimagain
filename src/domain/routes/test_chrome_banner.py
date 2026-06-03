@@ -144,3 +144,41 @@ async def test_onboarding_banner_hidden_once_claim_verified(
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     assert HTMLParser(response.text).css_first("#onboarding-banner") is None
+
+
+async def test_profile_checklist_shows_remaining_steps_for_incomplete_user(
+    authenticated_client: AsyncClient,
+):
+    """The registry-driven progress overview on `/profile` lists the spine
+    steps with their done/remaining state. A fresh dev user has email done
+    and identity pending."""
+    response = await authenticated_client.get("/profile")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    checklist = tree.css_first("#onboarding-checklist")
+    assert checklist is not None
+    email_row = checklist.css_first('[data-step="email"]')
+    identity_row = checklist.css_first('[data-step="identity"]')
+    assert "is-complete" in email_row.attributes["class"]
+    assert "is-pending" in identity_row.attributes["class"]
+
+
+async def test_profile_checklist_hidden_when_onboarding_complete(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """A verified clinician has nothing left to track, so the progress
+    overview is omitted (manage mode)."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/profile")
+    assert response.status_code == 200
+    assert HTMLParser(response.text).css_first("#onboarding-checklist") is None
