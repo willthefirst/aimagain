@@ -562,3 +562,26 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
 }
+/* Locked affordances rendered by `_shared/_locked.html`. A gated *action*
+   stays visible but disabled, stacked above a muted unlock line; a gated
+   *field* renders a muted italic placeholder where the withheld value
+   would be. Both carry an `icon-lock` glyph and a deep-link to the fix.
+   See the macro header for the action-vs-field contract. */
+.locked-action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.locked-action button[disabled] {
+  width: auto;
+  margin: 0;
+  cursor: not-allowed;
+}
+.locked-reason {
+  color: var(--pico-muted-color);
+  font-size: 0.875rem;
+}
+.locked-field {
+  color: var(--pico-muted-color);
+  font-style: italic;
+}

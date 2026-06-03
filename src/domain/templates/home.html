@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/_locked.html" import locked_action -%}
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
   {% block content %}
@@ -28,21 +29,26 @@
         <a href="/profile" role="button">Open Profile</a>
       </article>
     {% else %}
-      {# Post CTAs gate on `can_post` (Claim A only). The server's
-         `_assert_post_payload_authz` also accepts verified org reps
-         (Claim B), but the chrome deliberately omits that path — org
-         reps have no chrome CTA by design. `can_post` is derived once
-         in `base_context()` — don't re-derive from raw `claims.*`. #}
-      {% if can_post %}
-        <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
+      {# Post CTAs gate on `can_post` (Claim A only). A Claim-B-only org
+         rep can't post as themselves, but rather than hide the actions we
+         render them DISABLED with the unlock path (`locked_action`), so
+         the user sees the capability exists and how to reach it. The
+         server's `_assert_post_payload_authz` is the real gate; a disabled
+         button leaks nothing. `can_post` is derived once in
+         `base_context()` — don't re-derive from raw `claims.*`. #}
+      <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        {% if can_post %}
           <a href="{{ entity_form_url('post') }}?kind=referral"
              role="button"
              class="outline">+ Post a referral</a>
           <a href="{{ entity_form_url('post') }}?kind=clinician_opening"
              role="button"
              class="outline">+ Post an opening</a>
-        </section>
-      {% endif %}
+        {% else %}
+          {{ locked_action(capabilities.REASON_CLAIM_A_UNVERIFIED, "+ Post a referral") }}
+          {{ locked_action(capabilities.REASON_CLAIM_A_UNVERIFIED, "+ Post an opening") }}
+        {% endif %}
+      </section>
     {% endif %}
     {% if can_post %}
       <section>
