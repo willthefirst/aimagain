@@ -18,6 +18,7 @@ it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/_picker.html" import picker -%}
 {% extends "base.html" %}
 {% block head %}
   <style>
@@ -179,6 +180,9 @@ it's dev-only chrome that should never ship to production. #}
               <li>
                 <span class="gallery-nav-subgroup">Forms</span>
                 <ul>
+                  <li>
+                    <a href="#picker">Picker</a>
+                  </li>
                   <li>
                     <a href="#checkboxes">Checkboxes</a>
                   </li>
@@ -469,6 +473,29 @@ it's dev-only chrome that should never ship to production. #}
       {# ═══════════════════════════════════════════════════════════ #}
       {# FRAMEWORK: FORMS                                             #}
       {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="picker">
+        <h2>Picker</h2>
+        <p>
+          <small>Rendered via <code>_shared/_picker.html</code> → <code>picker()</code> macro. A "choose your path" card grid that funnels the user to a kind- or type-specific sub-form before showing fields. Used by <code>/posts/form</code> and <code>/organizations/form</code>.</small>
+        </p>
+        {{ picker([
+          {
+            "href": "#picker",
+            "heading": "Solo practice",
+            "description": "Just you — a single clinician running their own practice."
+          },
+          {
+            "href": "#picker",
+            "heading": "Group practice",
+            "description": "Multiple clinicians under one roof or brand."
+          },
+          {
+            "href": "#picker",
+            "heading": "Other",
+            "description": "Doesn't fit the above."
+          }
+        ]) }}
+      </section>
       <section class="gallery-section" id="checkboxes">
         <h2>Search checkboxes</h2>
         <p>
