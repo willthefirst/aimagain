@@ -35,6 +35,7 @@ def test_base_context_anonymous():
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": False,
         "can_read_full_feed": False,
+        "can_post": False,
     }
 
 
@@ -57,6 +58,7 @@ def test_base_context_regular_user():
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": False,
         "can_read_full_feed": False,
+        "can_post": False,
     }
 
 
@@ -123,6 +125,45 @@ def test_base_context_claim_b_coordinator():
     )
     ctx = base_context(user)
     assert ctx["claims"]["a"] is False
+    assert ctx["claims"]["b"] == [org_id]
+
+
+def test_base_context_can_post_true_for_claim_a():
+    """`can_post` is True when Claim A is held — Claim A users see the chrome post CTA."""
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="alice",
+        is_superuser=False,
+        is_verified=True,
+        clinicians=[
+            SimpleNamespace(
+                npi="1234567890", clinician_verified=True, ever_verified_at=None
+            )
+        ],
+        org_representations=[],
+    )
+    assert base_context(user)["can_post"] is True
+
+
+def test_base_context_can_post_false_for_claim_b_only():
+    """`can_post` is False when only Claim B is held — org reps have no chrome post CTA.
+    The server (`_assert_post_payload_authz`) still authorizes them; the chrome
+    is deliberately narrower."""
+    org_id = uuid.uuid4()
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        username="dana",
+        is_superuser=False,
+        is_verified=True,
+        clinicians=[],
+        org_representations=[
+            SimpleNamespace(
+                org_id=org_id, authority_status="verified", archived_at=None
+            )
+        ],
+    )
+    ctx = base_context(user)
+    assert ctx["can_post"] is False
     assert ctx["claims"]["b"] == [org_id]
 
 

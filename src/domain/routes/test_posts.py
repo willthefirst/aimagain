@@ -28,11 +28,13 @@ from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Clinician, Organization, Post, Program
+from src.domain.models.org_representations.org_representation import OrgRepresentation
 from tests.helpers import (
     create_test_user,
     make_clinician_with_org,
     make_intake_detail,
     make_opening_detail,
+    make_organization_row,
     make_program,
     make_referral_detail,
     opening_payload,
@@ -588,6 +590,38 @@ async def test_list_shows_create_cta_for_claim_a_user(
     assert (
         tree.css_first("a[href='/posts/form'][role='button']") is not None
     ), "Claim-A user should be offered the toolbar Create CTA"
+
+
+async def test_list_hides_create_cta_for_claim_b_only_org_rep(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A Claim-B-only org rep (verified org representative, no Claim A) must NOT
+    see the `/posts` toolbar Create CTA.
+
+    The server's `_assert_post_payload_authz` still authorises org reps to post;
+    the chrome is deliberately narrower. This test pins that invariant so nobody
+    accidentally widens the gate back to `claims.a or claims.b`."""
+    org = make_organization_row(owner_id=logged_in_user.id)
+    rep = OrgRepresentation(
+        user_id=logged_in_user.id,
+        org_id=org.id,
+        role="coordinator",
+        authority_method="admin_review",
+        authority_status="verified",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+            session.add(rep)
+
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert (
+        tree.css_first("a[href='/posts/form'][role='button']") is None
+    ), "Claim-B-only org rep must not be offered the toolbar Create CTA"
 
 
 async def test_detail_hides_email_and_shows_cta_for_unverified(

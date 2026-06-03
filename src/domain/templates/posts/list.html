@@ -6,12 +6,14 @@
 {% block resource_label %}Posts{% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading="Posts") %}
-    {# Create CTA is gated on a posting-capable claim — Claim A (verified
-       clinician) OR any verified Claim B (org rep). Same universe the
-       per-kind server gates accept (`capabilities.can_post_*` self path
-       OR the org-rep path), so the visible button can't invite a 403.
-       `claims.{a,b}` come from `base_context()` → `claim_state(user)`. #}
-    {% if claims.a or claims.b %}
+    {# Create CTA gates on `can_post` (Claim A only) — narrower than the
+       server's `_assert_post_payload_authz`, which also accepts verified
+       org reps (Claim B). The org-rep posting path (#1128) has no chrome
+       entry point by design; it's reachable by direct URL or a future
+       org-context surface. Do not widen this back to `claims.b` without
+       also adding a scoped org-context CTA for reps.
+       `can_post` is derived once in `base_context()` — don't re-derive here. #}
+    {% if can_post %}
       <li>
         <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
       </li>
