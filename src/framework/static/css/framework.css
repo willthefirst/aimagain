@@ -624,3 +624,11 @@ body {
   color: var(--pico-muted-color);
   font-size: 0.9rem;
 }
+.picker-option--selected {
+  border-color: var(--pico-primary);
+  background: var(--pico-card-sectioning-background-color);
+  cursor: default;
+}
+.picker-option--selected h2 {
+  color: var(--pico-primary);
+}
