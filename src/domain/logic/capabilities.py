@@ -33,21 +33,73 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
-# Reason codes used by `_locked.html` partials and `fix_url_for(...)`.
-# Closed vocab: any new reason must be added here and mapped below.
+# Reason codes used by the `_shared/_locked.html` macros and
+# `fix_url_for(...)`. Closed vocab: any new reason must be added here and
+# given a `ReasonMeta` entry in `_REASON_META` below.
 REASON_EMAIL_UNVERIFIED = "email_unverified"
 REASON_CLAIM_A_UNVERIFIED = "claim_a_unverified"
 REASON_CLAIM_B_UNVERIFIED = "claim_b_unverified"
 REASON_CLAIM_A_LAPSED = "claim_a_lapsed"
 REASON_AFFILIATION_MISSING = "affiliation_missing"
 
-_FIX_URLS = {
-    REASON_EMAIL_UNVERIFIED: "/profile?focus=email",
-    REASON_CLAIM_A_UNVERIFIED: "/profile?focus=claim_a",
-    REASON_CLAIM_A_LAPSED: "/profile?focus=claim_a",
-    REASON_CLAIM_B_UNVERIFIED: "/profile?focus=claim_b",
-    REASON_AFFILIATION_MISSING: "/profile?focus=claim_b",
+
+@dataclass(frozen=True)
+class ReasonMeta:
+    """The human-facing half of a gating reason: everything a locked
+    affordance needs to render, in one place.
+
+    - `unlock`: imperative sentence shown under a disabled action or in
+      place of a withheld field ("Add a verified clinician profile to
+      unlock this.").
+    - `fix_label`: CTA link text ("Complete clinician setup").
+    - `fix_url`: deep-link into the relevant `/profile` section.
+
+    Templates read this via the `capabilities.reason_meta(reason)` Jinja
+    global so a given reason reads identically on every surface — the
+    copy lives here, never inline in a template. Adding a reason without
+    a `ReasonMeta` entry falls back to the generic hub pointer.
+    """
+
+    unlock: str
+    fix_label: str
+    fix_url: str
+
+
+_REASON_META = {
+    REASON_EMAIL_UNVERIFIED: ReasonMeta(
+        unlock="Verify your email to unlock this.",
+        fix_label="Verify email",
+        fix_url="/profile?focus=email",
+    ),
+    REASON_CLAIM_A_UNVERIFIED: ReasonMeta(
+        unlock="Add a verified clinician profile to unlock this.",
+        fix_label="Complete clinician setup",
+        fix_url="/profile?focus=claim_a",
+    ),
+    REASON_CLAIM_A_LAPSED: ReasonMeta(
+        unlock="Re-attest your license to resume this.",
+        fix_label="Re-verify license",
+        fix_url="/profile?focus=claim_a",
+    ),
+    REASON_CLAIM_B_UNVERIFIED: ReasonMeta(
+        unlock="Become a verified organization representative to unlock this.",
+        fix_label="Complete organization setup",
+        fix_url="/profile?focus=claim_b",
+    ),
+    REASON_AFFILIATION_MISSING: ReasonMeta(
+        unlock="Add a clinician affiliation to unlock this.",
+        fix_label="Manage affiliations",
+        fix_url="/profile?focus=claim_b",
+    ),
 }
+
+# Unknown reasons land here: a generic nudge into the hub root. Keeps a
+# caller that passes an unmapped code from rendering an empty affordance.
+_FALLBACK_META = ReasonMeta(
+    unlock="Finish setting up your profile to unlock this.",
+    fix_label="Open profile",
+    fix_url="/profile",
+)
 
 
 @dataclass(frozen=True)
@@ -218,8 +270,20 @@ def claim_state(user: Any) -> ClaimState:
     )
 
 
+def reason_meta(reason: str) -> ReasonMeta:
+    """Resolve a `REASON_*` code to its human-facing copy + fix link.
+
+    Single source for the text a locked affordance shows. Templates call
+    this as a Jinja global (`capabilities.reason_meta(reason)`); routes /
+    banners that only need the URL call `fix_url_for` (a thin accessor over
+    this). Unknown reasons return `_FALLBACK_META` so a stray code renders
+    a sane nudge rather than blank chrome."""
+    return _REASON_META.get(reason, _FALLBACK_META)
+
+
 def fix_url_for(reason: str) -> str:
-    """Deep-link a "blocked action" partial into the relevant section of
-    `/profile`. The closed reason vocab keeps the partial / route / banner
-    from drifting. Unknown reasons fall back to the hub root."""
-    return _FIX_URLS.get(reason, "/profile")
+    """Deep-link a gated affordance into the relevant section of `/profile`.
+    Thin accessor over `reason_meta(reason).fix_url`, kept as a named
+    function because routes/banners reference the URL without the rest of
+    the metadata. Unknown reasons fall back to the hub root."""
+    return reason_meta(reason).fix_url

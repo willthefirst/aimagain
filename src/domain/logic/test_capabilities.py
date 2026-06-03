@@ -488,18 +488,56 @@ def test_fix_url_for_unknown_reason_falls_back_to_hub_root():
     assert capabilities.fix_url_for("totally-not-a-reason") == "/profile"
 
 
-def test_fix_url_table_covers_every_reason_constant():
-    """Guardrail: every REASON_* constant must have a fix URL mapping —
-    otherwise an unknown-reason fallback masks the missing entry."""
-    declared_reasons = {
+def _declared_reasons() -> set[str]:
+    reasons = {
         value
         for name, value in vars(capabilities).items()
         if name.startswith("REASON_") and isinstance(value, str)
     }
-    assert declared_reasons, "no REASON_* constants found"
-    for reason in declared_reasons:
+    assert reasons, "no REASON_* constants found"
+    return reasons
+
+
+def test_fix_url_table_covers_every_reason_constant():
+    """Guardrail: every REASON_* constant must have a `_REASON_META` entry —
+    otherwise an unknown-reason fallback masks the missing entry."""
+    for reason in _declared_reasons():
         url = capabilities.fix_url_for(reason)
-        assert url != "/profile", f"REASON {reason!r} has no entry in _FIX_URLS"
+        assert url != "/profile", f"REASON {reason!r} has no entry in _REASON_META"
+
+
+# ---------- reason_meta ---------------------------------------------------
+
+
+def test_reason_meta_known_reason_carries_full_copy():
+    """A known reason resolves to non-empty unlock copy, a fix label, and
+    the same deep-link `fix_url_for` returns — one source for both."""
+    meta = capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED)
+    assert meta.unlock
+    assert meta.fix_label
+    assert meta.fix_url == "/profile?focus=claim_a"
+    assert meta.fix_url == capabilities.fix_url_for(
+        capabilities.REASON_CLAIM_A_UNVERIFIED
+    )
+
+
+def test_reason_meta_unknown_reason_falls_back():
+    """An unmapped code returns the generic hub pointer, never raises —
+    a stray reason renders a sane nudge rather than blank chrome."""
+    meta = capabilities.reason_meta("totally-not-a-reason")
+    assert meta.fix_url == "/profile"
+    assert meta.unlock
+    assert meta.fix_label
+
+
+def test_reason_meta_covers_every_reason_constant_with_nonempty_copy():
+    """Guardrail mirroring the fix-URL one, for the human copy: every
+    REASON_* must resolve to non-empty unlock + fix_label text so no
+    surface renders an empty locked affordance."""
+    for reason in _declared_reasons():
+        meta = capabilities.reason_meta(reason)
+        assert meta.unlock, f"REASON {reason!r} has empty unlock copy"
+        assert meta.fix_label, f"REASON {reason!r} has empty fix_label"
 
 
 # ---------- UUID type sanity for claim_state.b ----------------------------

@@ -124,6 +124,62 @@ async def test_home_renders_post_ctas_when_claim_a_verified(
     assert "+ Post an opening" in response.text
 
 
+async def test_home_shows_locked_post_actions_for_claim_b_only_org_rep(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """A Claim-B-only org rep (verified org representative, no Claim A)
+    can't post as themselves, but the chrome no longer hides the actions —
+    it renders them DISABLED with the unlock path (`locked_action` →
+    `_shared/_locked.html`). Pins: the buttons render disabled (not as
+    active create links), and the unlock copy comes from
+    `capabilities.reason_meta`, not inline text."""
+    from src.domain.logic import capabilities
+    from src.domain.models.org_representations.org_representation import (
+        OrgRepresentation,
+    )
+    from tests.helpers import make_organization_row
+
+    org = make_organization_row(owner_id=logged_in_user.id)
+    rep = OrgRepresentation(
+        user_id=logged_in_user.id,
+        org_id=org.id,
+        role="coordinator",
+        authority_method="admin_review",
+        authority_status="verified",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+            session.add(rep)
+
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    # Claim-B-only → has a claim, so NOT the no-claim finish-setup card.
+    assert "Finish setting up" not in response.text
+
+    # Both post actions render as DISABLED buttons, not active create links.
+    disabled_labels = {
+        b.text(strip=True)
+        for b in tree.css("button[disabled]")
+        if b.text(strip=True).startswith("+ Post")
+    }
+    assert "+ Post a referral" in disabled_labels
+    assert "+ Post an opening" in disabled_labels
+    assert (
+        tree.css_first("a[href*='kind=referral']") is None
+    ), "Claim-B-only rep must not get an active post-create link"
+
+    # Unlock copy is the single-source string, not inline-authored here.
+    assert (
+        capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED).unlock
+        in response.text
+    )
+
+
 async def test_onboarding_banner_shown_off_profile_for_incomplete_user(
     authenticated_client: AsyncClient,
 ):
