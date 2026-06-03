@@ -64,9 +64,9 @@ def test_base_context_regular_user():
         "can_read_full_feed": False,
         "can_post": False,
         # Email verified but no claim → identity step incomplete, so the
-        # banner shows and points at the claim-A focus deep-link.
+        # banner shows and deep-links to the identity step subroute.
         "onboarding_incomplete": True,
-        "onboarding_next_href": "/profile?focus=claim_a",
+        "onboarding_next_href": "/profile/identity",
     }
 
 
@@ -207,7 +207,7 @@ def test_base_context_unverified_email_points_banner_at_email():
     )
     ctx = base_context(user)
     assert ctx["onboarding_incomplete"] is True
-    assert ctx["onboarding_next_href"] == "/profile?focus=email"
+    assert ctx["onboarding_next_href"] == "/profile/email"
 
 
 def test_base_context_unverified_user_surfaces_for_nag_banner():

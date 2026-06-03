@@ -245,32 +245,39 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   margin-bottom: var(--pico-spacing);
 }
 
-/* ── Onboarding setup spine ───────────────────────────────────
-   Registry-driven spine at the top of /profile (profile/_checklist.html).
-   One row per onboarding step. Each row is a vertical stack: a `head`
-   (mark · title/hint · optional Done tag) over an optional embedded
-   `action` — the incomplete row that owns it carries its satisfying
-   control inline (email → resend, identity → the setup flow). The mark
-   and muted/strong treatment express completion. All state via classes —
-   no inline styles on the template. */
+/* ── Onboarding setup table of contents ───────────────────────
+   Registry-driven step index at the top of /profile
+   (profile/_checklist.html). One row per onboarding step: mark ·
+   title/hint · trailing Done tag (complete) or chevron (incomplete).
+   An incomplete row is a single link to the step's subroute; a complete
+   row is static. The mark and muted/strong treatment express completion.
+   All state via classes — no inline styles on the template. */
 .onboarding-progress {
   list-style: none;
   margin: 0 0 var(--pico-spacing);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-.onboarding-progress-item {
-  display: flex;
-  flex-direction: column;
   gap: 0.5rem;
 }
-.onboarding-progress-head {
+/* The row content — a static span (complete) or an anchor (incomplete) —
+   lays the mark · body · trailing affordance out in a line. */
+.onboarding-progress-item,
+.onboarding-progress-link {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
 }
+/* The whole incomplete row is clickable; keep it reading as a row, not a
+   default underlined link. */
+.onboarding-progress-link {
+  text-decoration: none;
+  color: inherit;
+  padding: 0.5rem 0.6rem;
+  margin: -0.5rem -0.6rem;
+  border-radius: var(--pico-border-radius);
+}
+.onboarding-progress-link:hover { background: var(--pico-secondary-background); }
 .onboarding-progress-mark { flex-shrink: 0; line-height: 1.4; }
 .onboarding-progress-item.is-complete .onboarding-progress-mark { color: var(--pico-color-green-600); }
 .onboarding-progress-item.is-pending .onboarding-progress-mark { color: var(--pico-color-orange-600); }
@@ -285,7 +292,8 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   text-transform: uppercase;
   color: var(--pico-color-green-600);
 }
-/* The embedded action sits under the row head, indented past the mark so
-   it lines up with the step title. */
-.onboarding-progress-action { margin-left: 1.6rem; }
-.onboarding-progress-action > form { margin-bottom: 0; }
+.onboarding-progress-go { flex-shrink: 0; line-height: 1.4; color: var(--pico-muted-color); }
+
+/* ── Onboarding step page (profile/step.html) ─────────────────── */
+.onboarding-step-back { margin-bottom: 0.5rem; font-size: 0.9em; }
+.onboarding-step-action > form { margin-bottom: 0; }

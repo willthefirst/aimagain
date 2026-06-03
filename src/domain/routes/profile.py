@@ -5,14 +5,24 @@ The hub is one component with four modes — setup / manage / add-a-claim
 wizard). Mode is a pure function of the requesting user's claim state;
 see `src.domain.logic.profile.handlers.resolve_profile_mode`.
 
-In addition to the hub GET, this router owns two onboarding POST
-endpoints that stay on `/profile` after completion (rather than
-redirecting to entity-specific pages):
+In setup mode the hub is a **table of contents**: it lists the
+onboarding steps (from the `ONBOARDING_STEPS` registry) and links each
+to its own subroute, where the satisfying form lives:
+
+- ``GET /profile/{step}`` — one registry-driven handler renders the step
+  named by `{step}` (e.g. `/profile/email`, `/profile/identity`). A step
+  that's already complete redirects back to the hub, so a form submit
+  (which bounces back to its step) lands on the table of contents once
+  the step is done.
+
+The onboarding POST endpoints redirect back to the relevant step page
+(not the hub) so a multi-stage step — identity is NPI then license —
+flows on one page:
 
 - ``POST /profile/clinician`` — create a minimal clinician + run NPI
-  verification inline, then return to the hub.
+  verification inline, then return to ``/profile/identity``.
 - ``POST /profile/clinician/{clinician_id}/license`` — create a
-  licensure and attest it in one step, then return to the hub.
+  licensure and attest it in one step, then return to ``/profile/identity``.
 
 The hub is intentionally **not** mounted as a generic EntitySpec: it's
 not a CRUD resource (no id in the URL, no list/detail surface), and
@@ -25,8 +35,8 @@ routes").
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from src.auth_config import current_active_user
 from src.domain.logic.clinicians.repository import (
@@ -49,6 +59,7 @@ from src.domain.logic.profile.handlers import (
     handle_clinician_license_create,
     handle_org_create,
 )
+from src.domain.logic.profile.onboarding import ONBOARDING_STEPS
 from src.domain.logic.verifications.repository import (
     VerificationRepository,
     get_verification_repository,
@@ -87,6 +98,41 @@ async def profile_hub(
     )
 
 
+@profile_pages_router.get("/profile/{step}", name="profile:step")
+async def profile_step(
+    step: str,
+    request: Request,
+    requesting_user: User = Depends(current_active_user),
+    path: str | None = None,
+) -> Any:
+    """Render one onboarding step's action page — the subroute the
+    `/profile` table of contents links to.
+
+    `step` is a key in the `ONBOARDING_STEPS` registry (404 otherwise);
+    the page hosts the form that satisfies that step (email → resend,
+    identity → the guided setup flow). `path=clinician|org` is forwarded
+    to the identity setup flow exactly as on the hub.
+
+    A step that's already complete has nothing to act on, so it redirects
+    to the hub. That's also what returns the user to the table of contents
+    once they finish a step whose POST bounced them back here.
+    """
+    onboarding_step = next((s for s in ONBOARDING_STEPS if s.key == step), None)
+    if onboarding_step is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    context = build_profile_context(requesting_user, path_hint=path)
+    step_status = next(s for s in context["checklist"].statuses if s.step.key == step)
+    if step_status.complete:
+        return RedirectResponse("/profile", status_code=status.HTTP_303_SEE_OTHER)
+    context["step"] = onboarding_step
+    return APIResponse.html_response(
+        "profile/step.html",
+        context,
+        request,
+        current_user=requesting_user,
+    )
+
+
 @profile_pages_router.post("/profile/clinician", name="profile:clinician_create")
 async def profile_clinician_create(
     first_name: str | None = Form(default=None),
@@ -108,9 +154,10 @@ async def profile_clinician_create(
 ) -> Any:
     """Create a minimal clinician profile from the onboarding hub.
 
-    Fires NPI verification inline then redirects back to /profile so the
-    hub re-renders with the NPPES result already reflected in the setup
-    flow. Also auto-creates an OrgRepresentation for the solo-practice org
+    Fires NPI verification inline then redirects back to /profile/identity
+    so the identity step re-renders with the NPPES result reflected (and,
+    once the step is fully verified, on to the hub table of contents).
+    Also auto-creates an OrgRepresentation for the solo-practice org
     so the user has owner authority over their practice immediately.
 
     `practice_name` names the auto-created org (falls back to "first last"
@@ -135,7 +182,7 @@ async def profile_clinician_create(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={},
-        headers={"HX-Redirect": "/profile"},
+        headers={"HX-Redirect": "/profile/identity"},
     )
 
 
@@ -178,7 +225,7 @@ async def profile_org_create(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={},
-        headers={"HX-Redirect": "/profile"},
+        headers={"HX-Redirect": "/profile/identity"},
     )
 
 
@@ -201,8 +248,8 @@ async def profile_clinician_license_create(
 
     Combining create + attest removes the two-step dance (add license,
     then separately attest) by requiring the user to check an attestation
-    checkbox on the same form. Returns to /profile so the hub shows the
-    updated Claim A state.
+    checkbox on the same form. Returns to /profile/identity, which redirects
+    on to the hub once the identity step is fully satisfied.
     """
     await handle_clinician_license_create(
         clinician_id=clinician_id,
@@ -218,7 +265,7 @@ async def profile_clinician_license_create(
     return JSONResponse(
         status_code=status.HTTP_201_CREATED,
         content={},
-        headers={"HX-Redirect": "/profile"},
+        headers={"HX-Redirect": "/profile/identity"},
     )
 
 
@@ -238,9 +285,9 @@ async def profile_clinician_identity_update(
     audit_repo: AuditRepository = Depends(get_audit_repository),
 ) -> Any:
     """Update a clinician's name + NPI and immediately re-run NPI
-    verification.  Presented as an inline form on /profile when the
-    initial verification returned a mismatch — keeps the user on /profile
-    rather than bouncing them to the full clinician-edit page.
+    verification.  Presented as a form on the /profile/identity step when
+    the initial verification returned a mismatch — keeps the user on the
+    identity step rather than bouncing them to the full clinician-edit page.
 
     `demo_outcome` is only honored when the requesting user is in a demo
     org context.
@@ -259,7 +306,7 @@ async def profile_clinician_identity_update(
     return JSONResponse(
         status_code=status.HTTP_200_OK,
         content={},
-        headers={"HX-Redirect": "/profile"},
+        headers={"HX-Redirect": "/profile/identity"},
     )
 
 

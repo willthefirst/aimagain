@@ -45,7 +45,7 @@ def test_unverified_email_blocks_everything_and_points_at_email():
     assert r.claim_a_verified is False
     assert r.can_post is False
     assert r.next_label == "Verify your email"
-    assert r.next_href == "/profile?focus=email"
+    assert r.next_href == "/profile/email"
 
 
 def test_email_verified_no_claim_points_at_identity():
@@ -53,7 +53,7 @@ def test_email_verified_no_claim_points_at_identity():
     assert r.email_verified is True
     assert r.can_post is False
     assert r.next_label == "Verify your identity to start posting"
-    assert r.next_href == "/profile"
+    assert r.next_href == "/profile/identity"
 
 
 def test_claim_a_unlocks_posting_and_clears_next_step():
@@ -76,8 +76,9 @@ def test_claim_b_alone_unlocks_posting():
 def test_lapsed_clinician_retains_feed_but_cannot_post():
     """Once-verified (ever_verified_at set) but not currently verified:
     full-feed read is retained, but posting is not — the projection
-    surfaces the identity next-step again."""
+    surfaces the identity next-step again (the `/profile/identity` subroute,
+    where the re-verification flow lives)."""
     r = onboarding_readiness(_user(claim_a=False, ever_verified=True))
     assert r.can_read_full_feed is True
     assert r.can_post is False
-    assert r.next_href == "/profile"
+    assert r.next_href == "/profile/identity"

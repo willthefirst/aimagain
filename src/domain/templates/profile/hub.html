@@ -15,16 +15,16 @@
       {% endif %}
     </p>
   </header>
-  {# Registry-driven setup spine. In setup mode this *is* the page: each
-     incomplete step row embeds its own action — the email row carries the
-     resend control (with the `#verify-banner` swap target), the identity
-     row embeds `_setup.html`. So there is no standalone email aside or
-     separate setup section here; see `_checklist.html`. The spine is
-     suppressed once onboarding is complete (manage mode). #}
+  {# Registry-driven setup table of contents. In setup mode this *is* the
+     page: it lists the onboarding steps and links each incomplete one to
+     its own subroute (`/profile/email`, `/profile/identity`), where the
+     satisfying form lives. So no form is embedded here; see
+     `_checklist.html`. The list is suppressed once onboarding is complete
+     (manage mode). #}
   {% include "profile/_checklist.html" %}
   {# Mode dispatch for the post-onboarding modes. Setup-mode content lives
-     inside the spine above (the identity row), so it is not dispatched
-     here:
+     on the step subroutes linked from the table of contents above, so it
+     is not dispatched here:
      * `_manage.html`    — wireframe L4, ≥1 claim verified.
      * `_add_claim.html` — wireframe L6, additive unlock framing.
      * `_reverify.html`  — wireframe L7, lapsed-claim Fix CTA. #}

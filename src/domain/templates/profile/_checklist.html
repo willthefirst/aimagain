@@ -1,21 +1,13 @@
-{# Registry-driven setup spine — one row per onboarding step, each row
-   owning its own action inline.
+{# Registry-driven setup table of contents — one row per onboarding step.
 
    Renders the `checklist` (an `OnboardingChecklist` from
-   `build_profile_context` → `onboarding_checklist(user)`) as the
-   verification spine (email → identity). Each incomplete row *embeds the
-   action that satisfies it* rather than pointing at a separate block
-   elsewhere on the page — the email row carries the resend control, the
-   identity row carries the full setup flow (`_setup.html`). This is what
-   the registry's `OnboardingStep.embed` hint is for, and it's why the hub
-   no longer renders a standalone email aside or a separate setup section:
-   the spine is the page in setup mode.
-
-   Per-key dispatch (email → resend, identity → `_setup.html`) is
-   unavoidable because the satisfying action is inherently step-specific;
-   the registry can't hold Jinja markup. The identity embed is gated on
-   `mode == "setup"` so re-verify/add-claim modes — which can also leave
-   identity incomplete — keep their own mode partials below instead.
+   `build_profile_context` → `onboarding_checklist(user)`) as a list of
+   steps (email → identity). Each *incomplete* row links to the step's own
+   subroute (`/profile/<key>`, via `OnboardingStep.action_href`), where the
+   satisfying form lives (`profile/step.html`). Complete rows show a Done
+   tag and don't link — there's nothing left to do there. So this is a
+   pure index: the actions themselves live on the step subroutes, not
+   inline here.
 
    Reads the same `capabilities` predicates as the post gate and the
    global `#onboarding-banner`, so the three can't disagree. Only shown
@@ -27,36 +19,28 @@
       {% for status in checklist.statuses %}
         <li class="onboarding-progress-item {{ 'is-complete' if status.complete else 'is-pending' }}"
             data-step="{{ status.step.key }}">
-          <div class="onboarding-progress-head">
+          {%- if status.complete -%}
             <span class="onboarding-progress-mark" aria-hidden="true">
-              <i class="icon-{{ 'circle-check' if status.complete else 'circle' }}"></i>
+              <i class="icon-circle-check"></i>
             </span>
             <span class="onboarding-progress-body">
               <strong>{{ status.step.title }}</strong>
-              <small>{{ 'Done' if status.complete else status.step.hint }}</small>
+              <small>Done</small>
             </span>
-            {% if status.complete %}<span class="onboarding-progress-status">Done</span>{% endif %}
-          </div>
-          {# Embedded action — only on the incomplete row that owns it. The
-             status tag is dropped here on purpose: the action below makes
-             "to do" self-evident, so the tag would just be inert chrome. #}
-          {%- if not status.complete -%}
-            {%- if status.step.key == "email" -%}
-              {# The resend form keeps the `#verify-banner` id + swap target
-                 the old aside used, so `POST /auth/resend-verify` still
-                 swaps its confirmation partial in place. #}
-              <div id="verify-banner" class="onboarding-progress-action">
-                <form method="post"
-                      action="/auth/resend-verify"
-                      hx-post="/auth/resend-verify"
-                      hx-target="#verify-banner"
-                      hx-swap="outerHTML">
-                  <button type="submit" class="outline secondary verify-resend">Resend verification email</button>
-                </form>
-              </div>
-            {%- elif status.step.embed and mode == "setup" -%}
-              <div class="onboarding-progress-action">{% include "profile/_setup.html" %}</div>
-            {%- endif -%}
+            <span class="onboarding-progress-status">Done</span>
+          {%- else -%}
+            <a class="onboarding-progress-link" href="{{ status.step.action_href }}">
+              <span class="onboarding-progress-mark" aria-hidden="true">
+                <i class="icon-circle"></i>
+              </span>
+              <span class="onboarding-progress-body">
+                <strong>{{ status.step.title }}</strong>
+                <small>{{ status.step.hint }}</small>
+              </span>
+              <span class="onboarding-progress-go" aria-hidden="true">
+                <i class="icon-chevron-right"></i>
+              </span>
+            </a>
           {%- endif -%}
         </li>
       {% endfor %}
