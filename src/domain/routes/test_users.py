@@ -515,8 +515,10 @@ async def test_users_me_verification_card_signposts_hub_when_unverified(
 ):
     """`GET /users/me` for an email-verified user who holds no
     posting-capable claim shows the read-only Verification card whose
-    only CTA links into the `/profile` hub — never a "Post an opening"
-    or "Create clinician" action, which live in the hub (handoff §8.1).
+    only CTA deep-links into the `/profile` hub's next step — never a
+    "Post an opening" or "Create clinician" action, which live in the hub
+    (handoff §8.1). The deep-link follows `onboarding_readiness.next_href`,
+    which for this user is the `/profile/identity` step subroute.
     The card is self-only; other users' profiles are unaffected."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
@@ -528,11 +530,13 @@ async def test_users_me_verification_card_signposts_hub_when_unverified(
     assert (
         "Verification" in headings
     ), "/users/me is missing the 'Verification' status card"
-    # The card's sole CTA signposts the hub; it carries no in-page
-    # onboarding action (no Post CTA, and the only clinician-form link on
-    # the page is the separate Clinicians-card footer, not this card).
-    cta = tree.css_first("section.entity-card a[href='/profile'][role='button']")
-    assert cta is not None, "Verification card is missing its '/profile' hub CTA"
+    # The card's sole CTA signposts the hub's next step; it carries no
+    # in-page onboarding action (no Post CTA, and the only clinician-form
+    # link on the page is the separate Clinicians-card footer, not this card).
+    cta = tree.css_first(
+        "section.entity-card a[href='/profile/identity'][role='button']"
+    )
+    assert cta is not None, "Verification card is missing its hub deep-link CTA"
     assert "Set up and verify your practice" in cta.text()
     assert (
         tree.css_first(

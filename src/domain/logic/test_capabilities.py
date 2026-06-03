@@ -461,26 +461,24 @@ def test_claim_state_b_set_is_frozenset():
 # ---------- fix_url_for ---------------------------------------------------
 
 
-def test_fix_url_for_known_reasons_routes_to_profile_focus():
+def test_fix_url_for_onboarding_reasons_route_to_step_subroutes():
+    # The two onboarding-floor reasons deep-link to their dedicated step
+    # subroute; the additive / lapsed reasons land on the hub, which
+    # mode-dispatches them.
     assert (
         capabilities.fix_url_for(capabilities.REASON_EMAIL_UNVERIFIED)
-        == "/profile?focus=email"
+        == "/profile/email"
     )
     assert (
         capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED)
-        == "/profile?focus=claim_a"
+        == "/profile/identity"
+    )
+    assert capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED) == "/profile"
+    assert (
+        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED) == "/profile"
     )
     assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED)
-        == "/profile?focus=claim_a"
-    )
-    assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED)
-        == "/profile?focus=claim_b"
-    )
-    assert (
-        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING)
-        == "/profile?focus=claim_b"
+        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING) == "/profile"
     )
 
 
@@ -500,10 +498,13 @@ def _declared_reasons() -> set[str]:
 
 def test_fix_url_table_covers_every_reason_constant():
     """Guardrail: every REASON_* constant must have a `_REASON_META` entry —
-    otherwise an unknown-reason fallback masks the missing entry."""
+    otherwise the unknown-reason fallback silently masks the missing entry.
+    Checked by registry membership, not URL value, since legitimate entries
+    (lapsed / additive reasons) may themselves point at the hub root."""
     for reason in _declared_reasons():
-        url = capabilities.fix_url_for(reason)
-        assert url != "/profile", f"REASON {reason!r} has no entry in _REASON_META"
+        assert (
+            reason in capabilities._REASON_META
+        ), f"REASON {reason!r} has no entry in _REASON_META"
 
 
 # ---------- reason_meta ---------------------------------------------------
@@ -515,7 +516,7 @@ def test_reason_meta_known_reason_carries_full_copy():
     meta = capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED)
     assert meta.unlock
     assert meta.fix_label
-    assert meta.fix_url == "/profile?focus=claim_a"
+    assert meta.fix_url == "/profile/identity"
     assert meta.fix_url == capabilities.fix_url_for(
         capabilities.REASON_CLAIM_A_UNVERIFIED
     )
