@@ -77,6 +77,29 @@ async def test_profile_email_verify_shown_for_unverified_user(
     assert "Resend verification email" in response.text
 
 
+async def test_home_shows_empty_my_posts_section_when_no_active_posts(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """A verified clinician with no posts sees the 'My active posts' section
+    with an empty state message and a create CTA — not a hidden section."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    assert "My active posts" in response.text
+    assert "You have no active posts." in response.text
+    assert "Create a post" in response.text
+
+
 async def test_home_renders_post_ctas_when_claim_a_verified(
     authenticated_client: AsyncClient,
     db_test_session_manager,

@@ -35,16 +35,16 @@
          in `base_context()` — don't re-derive from raw `claims.*`. #}
       {% if can_post %}
         <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <a href="{{ entity_form_url("post") }}?kind=referral"
+          <a href="{{ entity_form_url('post') }}?kind=referral"
              role="button"
              class="outline">+ Post a referral</a>
-          <a href="{{ entity_form_url("post") }}?kind=clinician_opening"
+          <a href="{{ entity_form_url('post') }}?kind=clinician_opening"
              role="button"
              class="outline">+ Post an opening</a>
         </section>
       {% endif %}
     {% endif %}
-    {% if my_posts %}
+    {% if can_post %}
       <section>
         <header style="display: flex;
                        justify-content: space-between;
@@ -52,7 +52,12 @@
           <h2>My active posts</h2>
           <a href="{{ entity_url('post') }}">See all</a>
         </header>
-        {{ item_list(my_posts, _no_poster_row, "my-posts-list", "post-feed-list") }}
+        {% if my_posts %}
+          {{ item_list(my_posts, _no_poster_row, "my-posts-list", "post-feed-list") }}
+        {% else %}
+          <p style="color: var(--pico-muted-color)">You have no active posts.</p>
+          <a href="{{ entity_form_url('post') }}" role="button" class="outline">Create a post</a>
+        {% endif %}
       </section>
     {% endif %}
     {% if network_posts %}
