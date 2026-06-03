@@ -75,6 +75,13 @@ async def test_profile_email_verify_shown_for_unverified_user(
     assert tree.css_first("#verify-banner") is not None
     assert "Verify your email" in response.text
     assert "Resend verification email" in response.text
+    # The resend is a passive secondary action — it must render as an inline
+    # outline button so it doesn't outshout the persona chooser below it.
+    resend = tree.css_first("#verify-banner button[type=submit]")
+    assert resend is not None
+    classes = resend.attributes.get("class", "")
+    assert "outline" in classes
+    assert "verify-resend" in classes
 
 
 async def test_home_shows_empty_my_posts_section_when_no_active_posts(

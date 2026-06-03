@@ -31,6 +31,11 @@ async def test_profile_hub_renders_persona_chooser_for_new_user(
     assert "I represent an organization" in response.text
     assert "?path=clinician" in response.text
     assert "?path=org" in response.text
+    # The chooser renders as the shared picker card grid — each option is a
+    # bordered `.picker-option` card, not a bare underlined link. This is the
+    # primary action on the setup page, so it must read as a card.
+    assert 'class="picker"' in response.text
+    assert 'class="picker-option"' in response.text
     # Neither sub-flow's form is shown until a persona is picked.
     assert "Verify your NPI" not in response.text
 
