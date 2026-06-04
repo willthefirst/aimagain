@@ -40,6 +40,7 @@ REASON_EMAIL_UNVERIFIED = "email_unverified"
 REASON_CLAIM_A_UNVERIFIED = "claim_a_unverified"
 REASON_CLAIM_B_UNVERIFIED = "claim_b_unverified"
 REASON_CLAIM_A_LAPSED = "claim_a_lapsed"
+REASON_CLAIM_B_LAPSED = "claim_b_lapsed"
 REASON_AFFILIATION_MISSING = "affiliation_missing"
 # Read-side gate (not a write affordance): the viewer hasn't cleared
 # verification, so contact/identity details on a post detail are withheld
@@ -53,9 +54,12 @@ class ReasonMeta:
     """The human-facing half of a gating reason: everything a locked
     affordance needs to render, in one place.
 
-    - `unlock`: imperative sentence shown under a disabled action or in
-      place of a withheld field ("Add a verified clinician profile to
-      unlock this.").
+    - `title`: short claim/section name ("Clinician identity"). Used where
+      the affordance carries its own heading — e.g. the re-verify card's
+      `<strong>` — so the template doesn't re-derive a per-reason title.
+    - `unlock`: imperative sentence shown under a disabled action, in place
+      of a withheld field, or as the re-verify card's body ("Add a verified
+      clinician profile to unlock this.").
     - `fix_label`: CTA link text ("Complete clinician setup").
     - `fix_url`: deep-link to where the reason gets fixed. The two
       onboarding-floor reasons (email, claim A) point at their dedicated
@@ -69,6 +73,7 @@ class ReasonMeta:
     a `ReasonMeta` entry falls back to the generic hub pointer.
     """
 
+    title: str
     unlock: str
     fix_label: str
     fix_url: str
@@ -76,31 +81,43 @@ class ReasonMeta:
 
 _REASON_META = {
     REASON_EMAIL_UNVERIFIED: ReasonMeta(
+        title="Email verification",
         unlock="Verify your email to unlock this.",
         fix_label="Verify email",
         fix_url="/profile/email",
     ),
     REASON_CLAIM_A_UNVERIFIED: ReasonMeta(
+        title="Clinician identity",
         unlock="Add a verified clinician profile to unlock this.",
         fix_label="Complete clinician setup",
         fix_url="/profile/identity",
     ),
     REASON_CLAIM_A_LAPSED: ReasonMeta(
+        title="Clinician identity",
         unlock="Re-attest your license to resume this.",
         fix_label="Re-verify license",
         fix_url="/profile",
     ),
     REASON_CLAIM_B_UNVERIFIED: ReasonMeta(
+        title="Organization representation",
         unlock="Become a verified organization representative to unlock this.",
         fix_label="Complete organization setup",
         fix_url="/profile",
     ),
+    REASON_CLAIM_B_LAPSED: ReasonMeta(
+        title="Organization representation",
+        unlock="Re-verify your authority to resume this.",
+        fix_label="Re-verify authority",
+        fix_url="/profile",
+    ),
     REASON_AFFILIATION_MISSING: ReasonMeta(
+        title="Clinician affiliation",
         unlock="Add a clinician affiliation to unlock this.",
         fix_label="Manage affiliations",
         fix_url="/profile",
     ),
     REASON_VIEW_UNVERIFIED: ReasonMeta(
+        title="Contact details",
         unlock="Verify your account to see contact details.",
         fix_label="Complete verification",
         fix_url="/profile",
@@ -110,6 +127,7 @@ _REASON_META = {
 # Unknown reasons land here: a generic nudge into the hub root. Keeps a
 # caller that passes an unmapped code from rendering an empty affordance.
 _FALLBACK_META = ReasonMeta(
+    title="Profile",
     unlock="Finish setting up your profile to unlock this.",
     fix_label="Open profile",
     fix_url="/profile",

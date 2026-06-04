@@ -14,25 +14,21 @@
     </p>
   </hgroup>
 </header>
+{# Each lapsed card is fully driven by `capabilities.reason_meta(reason)`
+   — title, body copy, and the Fix CTA's target + label all come from the
+   single source in `capabilities.py`, keyed by the same `REASON_*` codes
+   `claim_state.lapsed` carries. No per-reason copy is authored here. #}
 {% for reason in claim_state.lapsed %}
+  {%- set meta = capabilities.reason_meta(reason) %}
   <article class="step-card step-card--error">
     <header>
       <div class="step-card-meta">
         <span class="step-status step-status--error"><i class="icon-shield-x"></i> Lapsed</span>
-        {% if reason == "claim_a_lapsed" %}
-          {# title-case-ignore: "Claim A" is a user-facing label #}
-          <strong>Clinician identity</strong>
-          <small>Re-attest your license to resume posting referrals and openings</small>
-        {% elif reason == "claim_b_lapsed" %}
-          {# title-case-ignore: "Claim B" is a user-facing label #}
-          <strong>Organization representation</strong>
-          <small>Re-verify your authority for the affected organization to resume posting on its behalf</small>
-        {% else %}
-          <strong>{{ reason }}</strong>
-        {% endif %}
+        <strong>{{ meta.title }}</strong>
+        <small>{{ meta.unlock }}</small>
       </div>
     </header>
-    <a href="/profile" role="button">Fix now</a>
+    <a href="{{ meta.fix_url }}" role="button">{{ meta.fix_label }}</a>
   </article>
 {% endfor %}
 <article class="step-card">
@@ -43,8 +39,10 @@
     </div>
   </header>
   <ul class="step-summary-list">
-    {% if claim_state.a and "claim_a_lapsed" not in claim_state.lapsed %}<li>Clinician identity — verified</li>{% endif %}
-    {% if claim_state.b and "claim_b_lapsed" not in claim_state.lapsed %}
+    {% if claim_state.a and capabilities.REASON_CLAIM_A_LAPSED not in claim_state.lapsed %}
+      <li>Clinician identity — verified</li>
+    {% endif %}
+    {% if claim_state.b and capabilities.REASON_CLAIM_B_LAPSED not in claim_state.lapsed %}
       <li>Organization representation — {{ claim_state.b|length }} organization(s)</li>
     {% endif %}
     <li>Feed browsing — retained</li>
