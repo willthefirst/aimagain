@@ -103,3 +103,21 @@ def test_locked_field_unknown_reason_falls_back_not_raises() -> None:
     link = HTMLParser(html).css_first(".locked-field a")
     assert link is not None
     assert link.attributes.get("href") == "/profile"
+
+
+def test_locked_field_without_label_reads_just_hidden() -> None:
+    """Inside an already-labeled row (a `<dl>` `<dt>` names the field) the
+    placeholder omits the name and reads "Hidden — …" — no redundant
+    "<field> hidden". The fix link still renders."""
+    env = _make_env()
+    template = (
+        '{%- from "_shared/_locked.html" import locked_field -%}'
+        "{{ locked_field(capabilities.REASON_VIEW_UNVERIFIED) }}"
+    )
+    html = env.from_string(template).render()
+    placeholder = HTMLParser(html).css_first(".locked-field")
+    assert placeholder is not None
+    text = placeholder.text(strip=True)
+    assert text.startswith("Hidden"), text
+    assert "hidden" not in text.replace("Hidden", "", 1).lower(), text
+    assert placeholder.css_first("a") is not None

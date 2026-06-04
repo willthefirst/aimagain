@@ -522,6 +522,16 @@ def test_reason_meta_known_reason_carries_full_copy():
     )
 
 
+def test_reason_meta_view_unverified_is_the_read_side_gate():
+    """The redaction reason (withheld post-detail contact/identity rows)
+    carries verification-oriented copy and points at the hub root, where
+    the viewer can complete any verification path."""
+    meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
+    assert "Complete verification" == meta.fix_label
+    assert meta.fix_url == "/profile"
+    assert meta.unlock
+
+
 def test_reason_meta_unknown_reason_falls_back():
     """An unmapped code returns the generic hub pointer, never raises —
     a stray reason renders a sane nudge rather than blank chrome."""
