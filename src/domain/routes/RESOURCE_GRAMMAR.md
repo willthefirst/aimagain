@@ -101,6 +101,22 @@ A form page MAY host multiple `<form>` HTML tags posting to different action end
 
 **Templates MUST reference parent-resource and form-page URLs through `entity_url` / `entity_form_url`** (Jinja globals registered by [`src/framework/rendering/route_urls.py`](../../framework/rendering/route_urls.py)). Hardcoded paths like `href="/organizations/form"` are forbidden by [`scripts/dev/template_route_check.py`](../../../scripts/dev/template_route_check.py) — the helpers read the URL from the entity registry, so a `url_collection` rename or a grammar shape change is a one-place edit. Subresource URLs (state axes, field clusters) pass through `entity_url(name, id=..., subresource="...")`; multi-segment nested URLs concatenate the leaf path onto a helper call.
 
+#### Read xor form — what each `GET` renders
+
+The URL grammar above says which pages exist; this says what each `GET` *shows*. One rule governs it:
+
+- **A `GET` is *either* a read view (`/<resource>`, `/<resource>/{id}`) *or* a form (`/<resource>/form`, `/<resource>/{id}/form`).** A read view never embeds a create/edit form; a form page never doubles as a listing. (The fix that motivated writing this down: `/profile/identity` used to be a read URL hosting the create forms — it's now a read-only dispatching picker, see below.)
+- **An empty collection read view is a *designed* empty-state**, not a blank page: its primary affordance routes to `/<resource>/form`.
+
+#### Pickers — two species, one component
+
+When a create entry point is multi-option, `GET /<resource>/form` renders a **picker** — a read-only grid of cards (the shared [`_picker.html`](../../framework/templates/_shared/_picker.html) macro, each card a `{href, heading, description}`) — instead of a form. There are two species; they differ *only* in where the hrefs point:
+
+- **Discriminator / type picker** — options stay *within* the resource, selecting a variant of its own create form via a query param: `/posts/form?kind=referral`, `/organizations/form?type=clinic`. Bare `/<resource>/form` shows the picker; the query param shows the chosen variant's form. Use `kind` for a persisted polymorphic subtype (distinct detail tables — the `DiscriminatorRegistry` pattern); `type` for a plain enum column.
+- **Dispatching picker** — options point *out* to **other** resources' create forms: `/profile/identity` → `/clinicians/form` and `/organizations/form`. The picker page is itself a pure read view (a derived gate that owns no row — KYC posture here); the canonical forms it links to own all the create work (NPI verification, owner-grant, etc.).
+
+A resource with a **single** create form (no subtypes, no variant) needs no picker and no selector query param: `/<resource>/form` *is* that form. Don't add a `?kind=`/`?type=` selector to a single-form resource. Reference implementations: `/posts/form` (discriminator picker), `/profile/identity` (dispatching picker), `/clinicians/form` + `/organizations/form` (single-form).
+
 ### 4. revisions
 
 When edits to a `published` resource must not be destructive (audit, review, autosave):
@@ -114,6 +130,11 @@ POST  /<resource>/{id}/revisions/{rev_id}/publication  apply revision to live
 Only meaningful for lifecycle-adopting resources. Add lazily.
 
 ### 5. ownership lists
+
+**Nesting encodes belonging, never auth.** A nested URL `/<owner>/{id}/<children>` asserts "these children belong to this owner" — it says nothing about who may view them (visibility is the auth layer's job, applied independently). So:
+
+- A child that **must** belong to exactly one owner is nestable (a post belongs to one author; an opening to one clinician). Nest it *and* keep the top-level collection — both are legitimate, distinct views (see below).
+- A **many-to-many** relationship stays top-level (un-nested): "under which parent?" is ambiguous when a thing belongs to several. Express it with a join resource instead (e.g. the User↔Organization link is `OrgRepresentation`, not a nested `/users/{id}/organizations` create).
 
 When one resource owns a 1:N relationship to another (a user owns clinician directory entries, an organization owns members), the owner-scoped list belongs on the **owner's** URL space, not the child's:
 
