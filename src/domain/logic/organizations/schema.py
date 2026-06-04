@@ -20,6 +20,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel
 
+from src.domain.logic.clinicians.schema import NpiText
 from src.domain.models.enums import ORGANIZATION_TYPES
 from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
@@ -47,6 +48,11 @@ class OrganizationCreate(WirePayload):
 
     name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
     type: Literal[*ORGANIZATION_TYPES]
+    # The org's Type-2 NPI (optional). When present, `POST /organizations`
+    # runs the Claim-B NPPES verification inline (see
+    # `after_create_organization_owner_grant`); blank/absent leaves
+    # `org_verified=False`, addable later from the manage view.
+    npi: NpiText = None
     # Blank HTML form input (`""`) is coerced to `None` at the
     # `WirePayload` layer — see `_coerce_blank_strings_on_nullable_scalars`.
     parent_org_id: uuid.UUID | None = None

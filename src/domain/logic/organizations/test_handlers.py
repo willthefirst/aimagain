@@ -112,6 +112,98 @@ async def test_form_extras_edit_path_excludes_self(
         assert sibling_id in ids
 
 
+# --- after_create_organization_owner_grant -------------------------------
+
+
+class _RepRepo:
+    """Captures the OrgRepresentation passed to `create`."""
+
+    def __init__(self):
+        self.created = None
+
+    async def create(self, obj):
+        self.created = obj
+        obj.id = uuid.uuid4()
+        return obj
+
+
+async def test_org_after_create_grants_owner_rep_without_npi(monkeypatch):
+    """No NPI: the creator gets an immediately-verified owner rep and the
+    NPPES verification is skipped."""
+    from types import SimpleNamespace
+
+    from src.domain.logic.organizations import handlers as org_handlers
+
+    called = {"verify": False}
+
+    async def _fake_verify(**_):
+        called["verify"] = True
+
+    monkeypatch.setattr(
+        "src.domain.logic.verifications.handlers.run_org_verification", _fake_verify
+    )
+
+    user = SimpleNamespace(id=uuid.uuid4())
+    row = SimpleNamespace(id=uuid.uuid4(), npi=None)
+    rep_repo = _RepRepo()
+
+    await org_handlers.after_create_organization_owner_grant(
+        row=row,
+        requesting_user=user,
+        org_rep_repo=rep_repo,
+        verification_repo=None,
+        organization_repo=None,
+        verification_audit_repo=None,
+    )
+
+    assert rep_repo.created is not None
+    assert rep_repo.created.user_id == user.id
+    assert rep_repo.created.org_id == row.id
+    assert rep_repo.created.role == "owner"
+    assert rep_repo.created.authority_method == "admin_review"
+    assert rep_repo.created.authority_status == "verified"
+    assert called["verify"] is False
+
+
+async def test_org_after_create_runs_npi_verification_when_npi_present(monkeypatch):
+    """With an NPI: still grants the owner rep, and runs the NPPES
+    verification inline for the new org as the creating actor."""
+    from types import SimpleNamespace
+
+    from src.domain.logic.organizations import handlers as org_handlers
+
+    captured = {}
+
+    async def _fake_verify(*, org_id, actor_id, **_):
+        captured["org_id"] = org_id
+        captured["actor_id"] = actor_id
+
+    monkeypatch.setattr(
+        "src.domain.logic.verifications.handlers.run_org_verification", _fake_verify
+    )
+
+    user = SimpleNamespace(id=uuid.uuid4())
+    row = SimpleNamespace(id=uuid.uuid4(), npi="1234567890")
+    rep_repo = _RepRepo()
+
+    async def _refresh(*_a, **_kw): ...
+
+    org_repo = SimpleNamespace(session=SimpleNamespace(refresh=_refresh))
+
+    await org_handlers.after_create_organization_owner_grant(
+        row=row,
+        requesting_user=user,
+        org_rep_repo=rep_repo,
+        verification_repo=None,
+        organization_repo=org_repo,
+        verification_audit_repo=None,
+    )
+
+    assert rep_repo.created is not None
+    assert captured["org_id"] == row.id
+    assert captured["actor_id"] == user.id
+
+
 # --- Admin verification-state axis ---------------------------------------
 
 

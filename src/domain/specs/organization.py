@@ -4,6 +4,9 @@ practices, health systems, and solo-practice shells.
 
 from typing import Final
 
+from src.domain.logic.org_representations.repository import (
+    OrgRepresentationRepository,
+)
 from src.domain.logic.organizations.repository import (
     OrganizationRepository,
     get_organization_repository,
@@ -16,12 +19,14 @@ from src.domain.logic.organizations.schema import (
     OrganizationVerificationStateUpdate,
 )
 from src.domain.logic.posts.repository import get_post_repository
+from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Organization
 from src.domain.models.enums import (
     ORGANIZATION_TYPES,
     ORGANIZATION_TYPES_LABELS,
 )
 from src.framework.audit.core import AuditAction
+from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -83,6 +88,22 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
         "src.domain.logic.organizations.handlers.organization_form_extras"
     ),
     form_extras_repos=(("organization_repo", OrganizationRepository),),
+    # After the org row is persisted: grant the creator an owner
+    # OrgRepresentation, and (when an NPI was supplied) run the Claim-B
+    # NPPES verification inline. `verification_audit_repo` is the
+    # AuditRepository under a distinct name because `audit_repo` is a
+    # reserved factory-handler kwarg — same convention as the clinician
+    # spec's after_create.
+    after_create_path=(
+        "src.domain.logic.organizations.handlers"
+        ".after_create_organization_owner_grant"
+    ),
+    after_create_repos=(
+        ("org_rep_repo", OrgRepresentationRepository),
+        ("verification_repo", VerificationRepository),
+        ("organization_repo", OrganizationRepository),
+        ("verification_audit_repo", AuditRepository),
+    ),
     # Templates pull dropdown labels from the spec — same pattern as
     # `CLINICIAN_ENTITY.static_context` for credential vocabularies.
     static_context={

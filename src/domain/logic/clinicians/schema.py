@@ -83,8 +83,9 @@ def _validate_npi(v: str | None) -> str | None:
 
 # NPI is a National Provider Identifier — 10 ASCII digits. The HTML
 # `pattern` hint mirrors the validator so the form's `<input>` rejects
-# bad values client-side too. Local to this module because only the
-# clinician entity has the column (rule-of-three).
+# bad values client-side too. Also imported by `OrganizationCreate` (the
+# org's Type-2 NPI); stays here as the single definition until a third
+# consumer justifies hoisting to `framework/schema_validators`.
 NpiText = Annotated[
     str | None,
     AfterValidator(_validate_npi),

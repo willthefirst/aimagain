@@ -25,6 +25,10 @@
   {% call form_section("Organization") %}
     {{ text_field("name", "Name", maxlength=200) }}
     {{ select_field("type", "Type", ORGANIZATION_TYPES, labels=ORGANIZATION_TYPES_LABELS, current=selected_type) }}
+    {# Optional Type-2 NPI. When filled, `POST /organizations` runs NPPES
+       verification inline; leaving it blank registers the org unverified
+       (addable later). Pattern/maxlength mirror `NpiText`. #}
+    {{ text_field("npi", "NPI", required=false, pattern="\\d{10}", maxlength=10, help="Your organization's 10-digit Type-2 NPI. Optional — you can add it later.") }}
     {# Parent-Org picker — replaces the free-text UUID input from #581.
        `parent_org_options` is populated by `organization_form_extras`
        (see `ORGANIZATION_ENTITY.form_extras_path`). Empty value =
