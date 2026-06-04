@@ -67,6 +67,36 @@ logger = logging.getLogger(__name__)
 _AO_NAME_MATCH_THRESHOLD = 0.80
 
 
+async def grant_owner_representation(
+    *,
+    user_id: UUID,
+    org_id: UUID,
+    org_rep_repo: OrgRepresentationRepository,
+) -> OrgRepresentation:
+    """Grant the user who just created an org an immediately-verified
+    *owner* representation.
+
+    Self-creating an org — a clinician's solo-practice auto-org, or a
+    self-service org registration — is itself proof of authority, so the
+    owner skips the `pending` review the `authorized_official` /
+    `rep_approval` methods go through: `authority_status='verified'` from
+    the start. `authority_method='admin_review'` records that the grant
+    rests on the create action rather than an external proof.
+
+    Shared by the clinician solo-practice create path
+    (`_assert_clinician_payload_org_ownership`) and the organization
+    create path so the two can't drift on the owner-grant shape.
+    """
+    rep = OrgRepresentation(
+        user_id=user_id,
+        org_id=org_id,
+        role="owner",
+        authority_method="admin_review",
+        authority_status="verified",
+    )
+    return await org_rep_repo.create(rep)
+
+
 def _verified_clinician_full_name(user: User) -> str | None:
     """First-verified Clinician's `<first> <last>` form, or None if the
     user has no `clinician_verified=True` row with both names."""
