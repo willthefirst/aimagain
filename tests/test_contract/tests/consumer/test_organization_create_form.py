@@ -56,10 +56,13 @@ async def test_consumer_organization_create_form_submits(
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # Browser serializes inputs in DOM order. `parent_org_id` is the
-    # third field in `form_new.html` and is left blank — the empty
-    # value is what shipped #550.
-    expected_request_body = "name=Acme+Counseling" "&type=clinic" "&parent_org_id="
+    # Browser serializes inputs in DOM order: name, type, npi (optional,
+    # left blank here), parent_org_id. The blank `parent_org_id=` pins the
+    # #550 regression; the blank `npi=` pins that the optional NPI field
+    # serializes empty without 422'ing (#1166).
+    expected_request_body = (
+        "name=Acme+Counseling" "&type=clinic" "&npi=" "&parent_org_id="
+    )
 
     (
         pact.given(PROVIDER_STATE_USER_CAN_CREATE_ORGANIZATION)

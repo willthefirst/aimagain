@@ -30,6 +30,9 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from src.domain.logic.org_representations.repository import (
+    OrgRepresentationRepository,
+)
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Organization, User
@@ -62,6 +65,66 @@ async def organization_form_extras(
     if target is not None:
         orgs = [o for o in orgs if o.id != target.id]
     return {"parent_org_options": orgs}
+
+
+async def after_create_organization_owner_grant(
+    *,
+    row: Organization,
+    requesting_user: User,
+    org_rep_repo: OrgRepresentationRepository,
+    verification_repo: VerificationRepository,
+    organization_repo: OrganizationRepository,
+    verification_audit_repo: AuditRepository,
+    payload: BaseModel | None = None,
+) -> None:
+    """`after_create_path` target for `POST /organizations`.
+
+    Two side effects, both previously living only in the onboarding hub's
+    `POST /profile/org` and now run on the canonical create so a
+    self-service org registration via `/organizations/form` behaves the
+    same:
+
+    1. Grant the creating user an immediately-verified owner
+       `OrgRepresentation` (shared `grant_owner_representation` — see its
+       docstring for why self-create needs no review).
+    2. When the org carries a Type-2 `npi`, run the Claim-B NPPES
+       verification inline (symmetric with the clinician NPI path). No
+       NPI → `org_verified` stays False, addable later.
+
+    Runs inside the framework's `mutate(...)` block; `run_org_verification`
+    commits internally, so the row is refreshed afterwards to keep it
+    usable for the audit after-snapshot (mirrors
+    `after_create_clinician_verification`). `payload` is accepted for the
+    framework's hook signature but unused — everything is read off `row`.
+    """
+    from src.domain.logic.org_representations.handlers import (
+        grant_owner_representation,
+    )
+
+    await grant_owner_representation(
+        user_id=requesting_user.id,
+        org_id=row.id,
+        org_rep_repo=org_rep_repo,
+    )
+
+    if row.npi:
+        import httpx
+
+        from src.domain.logic.verifications.handlers import (
+            HTTP_TIMEOUT_SECONDS,
+            run_org_verification,
+        )
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+            await run_org_verification(
+                org_id=row.id,
+                verification_repo=verification_repo,
+                org_repo=organization_repo,
+                audit_repo=verification_audit_repo,
+                http=http,
+                actor_id=requesting_user.id,
+            )
+        await organization_repo.session.refresh(row)
 
 
 async def handle_set_org_verification_state(

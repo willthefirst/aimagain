@@ -252,19 +252,18 @@ async def handle_org_create(
     """Create an org + auto-grant owner OrgRepresentation for non-clinician
     onboarding (and any user who wants to register a named practice).
 
-    The user becomes the org owner with ``authority_status='verified'``
-    immediately — no external proof required because they are creating the
-    org themselves.  ``org_verified`` stays ``False`` until an org-side NPI
-    verification passes; if ``org_npi`` is supplied the NPPES lookup runs
-    inline exactly as it does for clinician NPI verification.
+    Delegates the owner-grant + inline NPI verification to
+    ``after_create_organization_owner_grant`` — the same hook the canonical
+    ``POST /organizations`` runs — so the hub and the directory create can't
+    drift. The user becomes the org owner with ``authority_status='verified'``
+    immediately (creating the org is its own proof); ``org_verified`` stays
+    ``False`` until the NPPES lookup passes, which runs inline when
+    ``org_npi`` is supplied.
     """
-    import httpx
-
-    from src.domain.logic.verifications.handlers import (
-        HTTP_TIMEOUT_SECONDS,
-        run_org_verification,
+    from src.domain.logic.organizations.handlers import (
+        after_create_organization_owner_grant,
     )
-    from src.domain.models import Organization, OrgRepresentation
+    from src.domain.models import Organization
 
     org = Organization(
         name=org_name,
@@ -274,25 +273,14 @@ async def handle_org_create(
     )
     created_org = await organization_repo.create(org)
 
-    auto_rep = OrgRepresentation(
-        user_id=requesting_user.id,
-        org_id=created_org.id,
-        role="owner",
-        authority_method="admin_review",
-        authority_status="verified",
+    await after_create_organization_owner_grant(
+        row=created_org,
+        requesting_user=requesting_user,
+        org_rep_repo=org_rep_repo,
+        verification_repo=verification_repo,
+        organization_repo=organization_repo,
+        verification_audit_repo=audit_repo,
     )
-    await org_rep_repo.create(auto_rep)
-
-    if org_npi:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
-            await run_org_verification(
-                org_id=created_org.id,
-                verification_repo=verification_repo,
-                org_repo=organization_repo,
-                audit_repo=audit_repo,
-                http=http,
-                actor_id=requesting_user.id,
-            )
 
     return created_org
 
