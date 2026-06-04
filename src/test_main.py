@@ -61,17 +61,19 @@ async def test_home_page_shows_post_buttons_when_claim_a_verified(
     assert tree.css_first('a[href="/posts/form?kind=clinician_opening"]') is not None
 
 
-async def test_home_page_hides_post_buttons_without_claim_a(
+async def test_home_page_no_post_actions_for_no_claim_user(
     authenticated_client: AsyncClient,
 ):
-    """An unverified user (the default dev fixture) sees no post CTAs
-    on /home — they're shown the no-claim "Finish setting up" card
-    instead."""
+    """A no-claim user (the default dev fixture) gets no post-action row on
+    /home at all — neither an active create link nor a disabled locked
+    button. The single chrome `#onboarding-banner` is their one nudge, so
+    the page hosts no finish-setup card either."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first('a[href="/posts/form?kind=referral"]') is None
-    assert "Finish setting up" in response.text
+    assert "+ Post a referral" not in response.text
+    assert tree.css_first("#finish-setup-card") is None
 
 
 async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
@@ -83,13 +85,15 @@ async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
     assert "feed-teaser-blur" not in response.text
 
 
-async def test_home_page_verify_notice_for_unverified_with_network_posts(
+async def test_home_page_has_no_inline_feed_verify_notice(
     authenticated_client: AsyncClient,
     db_test_session_manager,
     logged_in_user,
 ):
-    """When the viewer can't read the full feed and there are network posts,
-    the home page shows a CTA directing them to complete verification."""
+    """The home network feed carries no inline verify notice, even for an
+    unverified viewer with network posts. The single chrome
+    `#onboarding-banner` is the only place that explains verification
+    unlocks the full view — the old `feed-verify-notice` is gone."""
     from tests.helpers import create_test_user, make_referral_detail
 
     author = create_test_user(username="net-poster")
@@ -102,37 +106,8 @@ async def test_home_page_verify_notice_for_unverified_with_network_posts(
 
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    assert "feed-verify-notice" in response.text
-    assert "Complete verification" in response.text
-
-
-async def test_home_page_no_verify_notice_for_verified_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """A verified user (Claim A active) sees no verify-notice on /home."""
-    from tests.helpers import (
-        create_test_user,
-        make_clinician_with_org,
-        make_referral_detail,
-    )
-
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
-    author = create_test_user(username="net-poster-v")
-    post = Post(kind="referral", owner_id=author.id)
-    post.referral_detail = make_referral_detail()
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-            session.add(author)
-            session.add(post)
-
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
     assert "feed-verify-notice" not in response.text
+    assert "Complete verification" not in response.text
 
 
 async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):

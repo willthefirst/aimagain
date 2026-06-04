@@ -9,8 +9,9 @@ full checklist is already on screen. The old `_verify_banner.html`
 remains removed — this banner is the single consolidated signal, not its
 return. These tests assert:
 
-1. `/home` still shows the "Finish setting up" card for a no-claim user
-   (that copy lives in `home.html`, not in the old banner).
+1. `/home` shows no per-page finish-setup card for a no-claim user — the
+   post-action row is suppressed entirely and the only nudge is the chrome
+   `#onboarding-banner`.
 2. `/profile` shows the email-verify section for unverified users and
    hides it for verified users (dev users are auto-verified).
 3. Post CTAs on `/home` are gated on `claims.a` being populated.
@@ -29,15 +30,21 @@ from tests.helpers import (  # noqa: F401  (kept available for future tests)
 pytestmark = pytest.mark.asyncio
 
 
-async def test_new_user_sees_finish_setup_card_on_home(
+async def test_new_user_sees_no_finish_setup_card_on_home(
     authenticated_client: AsyncClient,
 ):
-    """A fresh dev user (no claims) lands on `/home` with the
-    no-claim Finish-setup card pointing at `/profile`."""
+    """A fresh dev user (no claims) lands on `/home` with no per-page
+    finish-setup card: the old `#finish-setup-card` / "Open Profile" CTA is
+    gone, and no post-action buttons stand in for it. The chrome
+    `#onboarding-banner` is the single finish-setup nudge."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    assert "Finish setting up" in response.text
-    assert "Open Profile" in response.text
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#finish-setup-card") is None
+    assert "Open Profile" not in response.text
+    assert "+ Post a referral" not in response.text
+    # The single nudge is the chrome banner.
+    assert tree.css_first("#onboarding-banner") is not None
 
 
 async def test_profile_email_verify_hidden_for_verified_user(
