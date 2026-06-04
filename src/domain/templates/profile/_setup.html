@@ -1,249 +1,69 @@
-{# Setup mode — guided onboarding for users with no verified claims.
+{# Identity step — a dispatching picker (issue #1166).
 
-   Two personas with different minimal onboarding fields:
-     * clinician   — solo or group practitioner (Claim A): verify Type-1
-                     NPI, then attest a license.
-     * org         — organization representative (Claim B): register the
-                     org + its Type-2 NPI.
+   `/profile/identity` is a READ view of the two ways to establish a
+   posting-capable identity; each card links OUT to the canonical create
+   form that owns the work:
+     * clinician → `/clinicians/form` — runs Type-1 NPI verification and
+       grants the solo-practice owner rep.
+     * org       → `/organizations/form` — registers the org + its Type-2
+       NPI and grants the owner rep.
+   No form is hosted here — read xor form. Post-create steps (NPI
+   re-verify on a mismatch, license attestation) live on the clinician's
+   own canonical pages, reached via the "manage" links below.
 
-   `setup_path` (from build_profile_context → resolve_setup_path) picks
-   which sub-flow renders:
-     * none        — show the persona chooser (a fresh user, no hint).
-     * "clinician" — NPI + license cards, with a link across to the org flow.
-     * "org"       — org-registration card, with a link across to the
-                     clinician flow.
-   Once the user has started a claim the path is implied by what they
-   created, so the chooser is not shown again (see resolve_setup_path).
-
-   `is_demo_context` (bool, from build_profile_context): when True the
-   user is associated with a demo org and NPI verification forms show a
-   "Simulate outcome" picker instead of calling real NPPES. The selected
-   value is posted as `demo_outcome` and the server bypasses NPPES.
+   Context (from build_profile_context): `clinicians` and
+   `org_representations` expose the user's current posture.
 #}
-{%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field -%}
-{%- from "_shared/form_meta.html" import form_with_errors with context -%}
-{%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/_picker.html" import picker -%}
-{%- macro _demo_outcome_picker() -%}
-  {# Shown only in demo org context. Lets the user choose which
-     verification result to simulate instead of hitting real NPPES. #}
-  {% if is_demo_context %}
-    <fieldset style="border: 1px dashed var(--pico-muted-border-color);
-                     padding: 0.75rem;
-                     border-radius: var(--pico-border-radius)">
-      <legend style="color: var(--pico-muted-color);
-                     font-size: 0.85em;
-                     padding: 0 0.5rem">Demo: simulate verification outcome</legend>
-      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-        <label style="display: flex;
-                      align-items: center;
-                      gap: 0.4rem;
-                      font-weight: normal">
-          <input type="radio"
-                 name="demo_outcome"
-                 value="verified"
-                 checked
-                 style="margin: 0">
-          Verified
-        </label>
-        <label style="display: flex;
-                      align-items: center;
-                      gap: 0.4rem;
-                      font-weight: normal">
-          <input type="radio"
-                 name="demo_outcome"
-                 value="needs_review"
-                 style="margin: 0">
-          Needs review
-        </label>
-        <label style="display: flex;
-                      align-items: center;
-                      gap: 0.4rem;
-                      font-weight: normal">
-          <input type="radio" name="demo_outcome" value="failed" style="margin: 0;">
-          Failed
-        </label>
-      </div>
-    </fieldset>
-  {% endif %}
-{%- endmacro -%}
 {%- set _clinician = clinicians[0] if clinicians else none -%}
-{%- set _npi_ok = _clinician and _clinician.npi_match_status == "matched" -%}
 <section>
-  {% if setup_path is none %}
-    {# ── Persona chooser ───────────────────────────────────────────── #}
-    <p>How will you use Bedlam Connect? Pick the option that fits — you can add the other later.</p>
-    {{ picker([
-      {
-        "href": "/profile/identity?path=clinician",
-        "heading": "I'm a clinician",
-        "description": "A solo or group practitioner — verify your NPI and license."
-      },
-      {
-        "href": "/profile/identity?path=org",
-        "heading": "I represent an organization",
-        "description": "Register your practice, clinic, or facility to post program intakes and on behalf of its clinicians."
-      }
-    ]) }}
-  {% elif setup_path == "clinician" %}
-    {# ── Clinician path: verify NPI, then attest a license ──────────── #}
-    {{ picker([
-      {
-        "selected": true,
-        "heading": "I'm a clinician",
-        "description": "A solo or group practitioner — verify your NPI and license."
-      },
-      {
-        "href": "/profile/identity?path=org",
-        "heading": "I represent an organization",
-        "description": "Register your practice, clinic, or facility to post program intakes."
-      }
-    ]) }}
-    <article class="step-card{% if not _npi_ok %} step-card--action{% endif %}"
-             id="claim-a-card">
+  <p>Verify your identity to start posting. Pick how you'll use Bedlam Connect — you can add the other later.</p>
+  {{ picker([
+    {
+    "href": entity_form_url("clinician") ,
+  "heading": "I'm a clinician",
+  "description": "A solo or group practitioner — verify your NPI and attest a license."
+  },
+  {
+  "href": entity_form_url("organization"),
+  "heading": "I represent an organization",
+  "description": "Register your practice, clinic, or facility to post program intakes and on behalf of its clinicians."
+  }
+  ]) }}
+  {% if _clinician or org_representations %}
+    <article>
       <header>
-        <div class="step-card-meta">
-          {% if _npi_ok %}
-            <span class="step-status step-status--complete"><i class="icon-shield-check"></i> NPI verified</span>
-          {% elif _clinician and _clinician.npi_match_status == "mismatch" %}
-            <span class="step-status step-status--error"><i class="icon-shield-x"></i> Verification failed</span>
-          {% elif _clinician and _clinician.npi_match_status == "pending" %}
-            <span class="step-status step-status--pending"><i class="icon-loader"></i> Verifying…</span>
-          {% else %}
-            <span class="step-status step-status--action"><i class="icon-alert-triangle"></i> Required</span>
-          {% endif %}
-          <strong>Verify your NPI</strong>
-          <small>Confirms your identity in NPPES — required to post and see full referral details</small>
-        </div>
+        <strong>What you've started</strong>
       </header>
-      {% if _npi_ok %}
-        <p>
-          NPI {{ _clinician.npi }}
-          {% if _clinician.first_name or _clinician.last_name %}
-            — {{ _clinician.first_name or "" }} {{ _clinician.last_name or "" }}
-          {% endif %}
-          {# title-case-ignore #}
-          resolves in NPPES.
-        </p>
-      {% elif _clinician and _clinician.npi_match_status == "mismatch" %}
-        <p>
-          NPI {{ _clinician.npi }} did not match your name in NPPES. Correct your name or NPI to match your NPPES record exactly, then retry.
-        </p>
-        {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/identity", method="post") %}
-          <div class="grid">
-            {{ text_field("first_name", "First name", current=_clinician.first_name or "", required=false) }}
-            {{ text_field("last_name", "Last name", current=_clinician.last_name or "", required=false) }}
-          </div>
-          {{ text_field("npi", "NPI (Type-1)", current=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
-          {{ _demo_outcome_picker() }}
-          {{ actions("Retry verification") }}
-        {% endcall %}
-      {% elif _clinician and _clinician.npi_match_status == "pending" %}
-        <p>
-          {# title-case-ignore #}
-          Checking NPPES… <a href="/profile?path=clinician">Refresh</a>
-        </p>
-      {% elif _clinician %}
-        {# Clinician exists but NPI not submitted yet #}
-        {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/identity", method="post") %}
-          <div class="grid">
-            {{ text_field("first_name", "First name", current=_clinician.first_name or "", required=false) }}
-            {{ text_field("last_name", "Last name", current=_clinician.last_name or "", required=false) }}
-          </div>
-          {{ text_field("npi", "NPI (Type-1)", current=_clinician.npi or "", required=true, pattern="\\d{10}", maxlength=10) }}
-          {{ _demo_outcome_picker() }}
-          {{ actions("Start verification") }}
-        {% endcall %}
-      {% else %}
-        {# No clinician record yet — show the create form #}
-        {% call form_with_errors(action="/profile/clinician", method="post") %}
-          <div class="grid">
-            {{ text_field("first_name", "First name", required=false) }}
-            {{ text_field("last_name", "Last name", required=false) }}
-          </div>
-          {{ text_field("npi", "NPI (Type-1)", required=true, pattern="\\d{10}", maxlength=10) }}
-          {{ text_field("practice_name", "Practice name (optional)", required=false,
-                    help="e.g. Single Thread Psychiatry — leave blank to use your name") }}
-          {{ _demo_outcome_picker() }}
-          {{ actions("Start verification") }}
-        {% endcall %}
-      {% endif %}
-    </article>
-    {# Step 2: Add a license — only shown after NPI matches #}
-    {% if _npi_ok %}
-      <article class="step-card step-card--action">
-        <header>
-          <div class="step-card-meta">
-            <span class="step-status step-status--action"><i class="icon-alert-triangle"></i> Required</span>
-            <strong>Add an active license</strong>
-            <small>Attests a valid state license — required to post referrals and openings</small>
-          </div>
-        </header>
-        {% call form_with_errors(action="/profile/clinician/" ~ _clinician.id|string ~ "/license", method="post") %}
-          {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
-          <div class="grid">
-            {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
-            {{ text_field('license_number', 'License number') }}
-          </div>
-          {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
-          {{ checkbox_field("_attest_confirm", "I attest this license is active and in good standing.", required=true) }}
-          {{ actions("Add license") }}
-        {% endcall %}
-      </article>
-    {% endif %}
-  {% elif setup_path == "org" %}
-    {# ── Org path: register the organization + its Type-2 NPI ───────── #}
-    {{ picker([
-      {
-        "href": "/profile/identity?path=clinician",
-        "heading": "I'm a clinician",
-        "description": "A solo or group practitioner — verify your NPI and license."
-      },
-      {
-        "selected": true,
-        "heading": "I represent an organization",
-        "description": "Register your practice, clinic, or facility to post program intakes."
-      }
-    ]) }}
-    <article class="step-card{% if not org_representations %} step-card--action{% endif %}"
-             id="claim-b-card">
-      <header>
-        <div class="step-card-meta">
-          {% if org_representations %}
-            <span class="step-status step-status--complete"><i class="icon-shield-check"></i> Organization registered</span>
-          {% else %}
-            <span class="step-status step-status--action"><i class="icon-building"></i> Required</span>
-          {% endif %}
-          <strong>Register an organization</strong>
-          <small>Post program intakes on behalf of a practice or facility — requires a Type-2 NPI for full verification</small>
-        </div>
-      </header>
-      {% if org_representations %}
-        <ul style="margin: 0; padding-left: 1.25rem;">
-          {% for rep in org_representations %}
-            {% if rep.authority_status == "verified" and rep.archived_at is none %}
-              <li>
-                {{ rep.org.name if rep.org else rep.org_id }}
-                {% if rep.org and rep.org.org_verified %}
-                  <span style="color: var(--pico-ins-color); font-size: 0.85em">— verified</span>
-                {% else %}
-                  <span style="color: var(--pico-muted-color); font-size: 0.85em">— NPI verification pending</span>
-                {% endif %}
-              </li>
+      <ul style="margin: 0; padding-left: 1.25rem;">
+        {% if _clinician %}
+          <li>
+            Clinician profile —
+            {% if _clinician.npi_match_status == "matched" %}
+              NPI verified
+            {% elif _clinician.npi_match_status == "mismatch" %}
+              NPI didn't match — correct and re-verify
+            {% elif _clinician.npi_match_status == "pending" %}
+              {# title-case-ignore #}
+              verifying NPI…
+            {% else %}
+              NPI not submitted
             {% endif %}
-          {% endfor %}
-        </ul>
-      {% else %}
-        {% call form_with_errors(action="/profile/org", method="post") %}
-          {{ text_field("org_name", "Organization name", required=true) }}
-          {{ select_field("org_type", "Organization type", ORGANIZATION_TYPES,
-                    labels=ORGANIZATION_TYPES_LABELS, placeholder=true) }}
-          {{ text_field("org_npi", "Type-2 NPI (optional)", required=false,
-                    pattern="\\d{10}", maxlength=10,
-                    help="10-digit organizational NPI — enables program intake posting") }}
-          {{ actions("Register organization") }}
-        {% endcall %}
-      {% endif %}
+            — <a href="{{ entity_form_url('clinician', id=_clinician.id) }}">Manage</a>
+          </li>
+        {% endif %}
+        {% for rep in org_representations if rep.authority_status == "verified" and rep.archived_at is none %}
+          <li>
+            {{ rep.org.name if rep.org else rep.org_id }} —
+            {% if rep.org and rep.org.org_verified %}
+              verified
+            {% else %}
+              NPI verification pending
+            {% endif %}
+            — <a href="{{ entity_form_url('organization', id=rep.org_id) }}">Manage</a>
+          </li>
+        {% endfor %}
+      </ul>
     </article>
   {% endif %}
 </section>
