@@ -89,6 +89,38 @@ async def after_create_clinician_verification(
     await clinician_repo.session.refresh(row)
 
 
+async def after_update_clinician_verification(
+    *,
+    row: Clinician,
+    payload: BaseModel,
+    requesting_user: User,
+    changed_fields: set[str],
+    verification_repo: VerificationRepository,
+    clinician_repo: ClinicianRepository,
+    verification_audit_repo: AuditRepository,
+) -> None:
+    """Re-run NPI verification when a `PATCH /clinicians/{id}` changes the
+    clinician's `npi`.
+
+    Canonical replacement for the retired `POST /profile/clinician/{id}/identity`
+    retry flow: editing the NPI on the clinician's own page re-checks NPPES
+    instead of leaving the row stuck at its prior `npi_match_status`. Keyed
+    on the *value* changing (not merely being present in the payload), so an
+    edit that only touches location/availability doesn't fire a needless
+    NPPES lookup. Other edits are a no-op.
+    """
+    if "npi" not in changed_fields:
+        return
+    await after_create_clinician_verification(
+        row=row,
+        payload=payload,
+        requesting_user=requesting_user,
+        verification_repo=verification_repo,
+        clinician_repo=clinician_repo,
+        verification_audit_repo=verification_audit_repo,
+    )
+
+
 async def _assert_clinician_payload_org_ownership(
     *,
     payload: BaseModel,

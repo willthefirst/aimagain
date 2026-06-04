@@ -560,6 +560,30 @@ class EntitySpec:
     after_create_path: str | None = None
     after_create_repos: tuple[tuple[str, type], ...] = ()
 
+    # `after_update_path` is the update-side mirror of `after_create_path`:
+    # a dotted path to an async callable `handle_update` invokes AFTER the
+    # row is patched and BEFORE the audit `after`-snapshot, inside the same
+    # `mutate(...)` block. Unlike the create hook it also receives
+    # `changed_fields: set[str]` — the column names whose value actually
+    # changed — so it can react to real changes (e.g. re-run verification
+    # only when `npi` differs).
+    #
+    #   async def hook(
+    #       *,
+    #       row: <model>,                   # the just-patched row
+    #       payload: BaseModel,             # the validated update payload
+    #       requesting_user: User,
+    #       changed_fields: set[str],
+    #       **typed_repos,                  # one kwarg per entry in after_update_repos
+    #   ) -> None:
+    #       ...
+    #
+    # Only fires on the non-polymorphic update path (the discriminator
+    # branch patches a detail row and is left alone); declaring it on a
+    # spec with a `discriminator` is rejected below.
+    after_update_path: str | None = None
+    after_update_repos: tuple[tuple[str, type], ...] = ()
+
     # Static context bindings -------------------------------------------
     # Constant key→value pairs that `handle_detail` / `handle_list` merge
     # into the template context after the framework's auto-injected keys
@@ -955,6 +979,26 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) declares after_create_repos but "
                 "no after_create_path — the typed-repo kwargs would have "
                 "no consumer."
+            )
+        # `after_update` only fires from `handle_update`'s non-polymorphic
+        # path; declaring it without `routes.update=True`, with leftover
+        # repos, or on a polymorphic spec is dead/unsupported config.
+        if self.after_update_path is not None and not self.routes.update:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares after_update_path but "
+                "routes.update is False — the hook would never run."
+            )
+        if self.after_update_repos and self.after_update_path is None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares after_update_repos but "
+                "no after_update_path — the typed-repo kwargs would have "
+                "no consumer."
+            )
+        if self.after_update_path is not None and self.discriminator is not None:
+            raise ValueError(
+                f"EntitySpec({self.name!r}) declares after_update_path with a "
+                "discriminator — the polymorphic update path patches a detail "
+                "row and does not run the hook. Not supported."
             )
         if self.read_schema is not None:
             schema = self.read_schema

@@ -185,6 +185,13 @@ def mount_entity(
             "— pick one. The hook runs in the factory-built create path; "
             "an explicit create handler would silently bypass it."
         )
+    if entity.after_update_path is not None and "update" in handlers:
+        raise ValueError(
+            f"mount_entity({entity.name!r}): spec declares "
+            "after_update_path alongside an explicit handlers['update'] "
+            "— pick one. The hook runs in the factory-built update path; "
+            "an explicit update handler would silently bypass it."
+        )
 
     detail_extras = (
         resolve_dotted_path(entity, entity.detail_extras_path, "detail_extras_path")
@@ -209,6 +216,11 @@ def mount_entity(
     after_create = (
         resolve_dotted_path(entity, entity.after_create_path, "after_create_path")
         if entity.after_create_path is not None
+        else None
+    )
+    after_update = (
+        resolve_dotted_path(entity, entity.after_update_path, "after_update_path")
+        if entity.after_update_path is not None
         else None
     )
 
@@ -267,6 +279,8 @@ def mount_entity(
                 entity,
                 payload_authz=payload_authz,
                 payload_authz_repos=entity.payload_authz_repos,
+                after_update=after_update,
+                after_update_repos=entity.after_update_repos,
             )
         else:
             built = maker(entity)

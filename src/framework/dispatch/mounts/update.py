@@ -106,6 +106,8 @@ async def handle_update(
     parent_id: UUID | None = None,
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_kwargs: dict[str, Any] | None = None,
+    after_update: Callable[..., Awaitable[None]] | None = None,
+    after_update_kwargs: dict[str, Any] | None = None,
 ) -> Any:
     """Generic update handler driven by `spec`.
 
@@ -113,7 +115,15 @@ async def handle_update(
     and AFTER `write_authz` has run on parent-or-target, and BEFORE the
     payload is consumed (discriminator dispatch / patch). When the
     target 404s, the hook is never called — the 404 fires first. See
-    `EntitySpec.payload_authz_path` for the contract."""
+    `EntitySpec.payload_authz_path` for the contract.
+
+    `after_update` (if supplied) is invoked AFTER the row is patched and
+    BEFORE the audit `after`-snapshot, inside the same `mutate(...)`
+    block (raises roll back the whole update). It receives `row=`,
+    `payload=`, `requesting_user=`, `changed_fields=` (the set of column
+    names whose value actually changed) and `**after_update_kwargs`. Only
+    fires on the non-polymorphic update path — see
+    `EntitySpec.after_update_path`."""
     if spec.audit is None:
         raise ValueError(
             f"handle_update: spec {spec.name!r} has no audit binding; "
@@ -188,6 +198,13 @@ async def handle_update(
         return target
 
     update_fields = payload.model_dump(exclude_unset=True)
+    # Compute which columns actually change *before* the patch so an
+    # `after_update` hook can react to real value changes (e.g. re-run
+    # verification only when `npi` differs), not merely to a field being
+    # present in the payload.
+    changed_fields = {
+        f for f, v in update_fields.items() if getattr(target, f, None) != v
+    }
     async with mutate(
         repo,
         audit_repo,
@@ -197,6 +214,14 @@ async def handle_update(
         verb="update",
     ):
         await repo.patch(target, **update_fields)
+        if after_update is not None:
+            await after_update(
+                row=target,
+                payload=payload,
+                requesting_user=requesting_user,
+                changed_fields=changed_fields,
+                **(after_update_kwargs or {}),
+            )
     return target
 
 
@@ -205,6 +230,8 @@ def make_update_handler(
     *,
     payload_authz: Callable[..., Awaitable[None]] | None = None,
     payload_authz_repos: tuple[tuple[str, type], ...] = (),
+    after_update: Callable[..., Awaitable[None]] | None = None,
+    after_update_repos: tuple[tuple[str, type], ...] = (),
 ):
     from src.framework.dispatch.mounts._factory import (
         _UPDATE_SHAPE,
@@ -217,4 +244,6 @@ def make_update_handler(
         handle_update,
         payload_authz=payload_authz,
         payload_authz_repos=payload_authz_repos,
+        after_update=after_update,
+        after_update_repos=after_update_repos,
     )
