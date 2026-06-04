@@ -196,7 +196,7 @@ async def handle_clinician_create(
         after_create_clinician_verification,
     )
     from src.domain.logic.clinicians.schema import ClinicianCreate
-    from src.domain.models import Clinician, OrgRepresentation
+    from src.domain.models import Clinician
 
     payload = ClinicianCreate(
         first_name=first_name,
@@ -209,21 +209,15 @@ async def handle_clinician_create(
         location_zip=location_zip,
     )
 
-    auto_org = await _assert_clinician_payload_org_ownership(
+    # Auto-creates the solo-practice org, patches `payload.org_id`, and
+    # grants the owner OrgRepresentation — the same owner-grant the
+    # canonical `POST /clinicians` solo path runs.
+    await _assert_clinician_payload_org_ownership(
         payload=payload,
         requesting_user=requesting_user,
         organization_repo=organization_repo,
+        org_rep_repo=org_rep_repo,
     )
-
-    if auto_org is not None:
-        auto_rep = OrgRepresentation(
-            user_id=requesting_user.id,
-            org_id=auto_org.id,
-            role="owner",
-            authority_method="admin_review",
-            authority_status="verified",
-        )
-        await org_rep_repo.create(auto_rep)
 
     clinician = Clinician(
         owner_id=requesting_user.id,

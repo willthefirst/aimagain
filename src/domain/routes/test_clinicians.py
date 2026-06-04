@@ -272,8 +272,10 @@ async def test_create_clinician_solo_practice_auto_creates_org(
     logged_in_user: User,
 ):
     """POST /clinicians with solo_practice=true auto-creates a solo-practice
-    Org named after the clinician — no separate /organizations/form step (#699)."""
-    from src.domain.models import Organization
+    Org named after the clinician — no separate /organizations/form step (#699)
+    — and grants the user an immediately-verified owner OrgRepresentation over
+    it, so the canonical create matches the onboarding hub (#1166)."""
+    from src.domain.models import Organization, OrgRepresentation
 
     response = await authenticated_client.post(
         "/clinicians",
@@ -305,6 +307,18 @@ async def test_create_clinician_solo_practice_auto_creates_org(
         assert auto_org.name == "Jane Smith"
         assert auto_org.type == "solo_practice"
         assert auto_org.owner_id == logged_in_user.id
+
+        rep_result = await session.execute(
+            select(OrgRepresentation).filter(
+                OrgRepresentation.user_id == logged_in_user.id,
+                OrgRepresentation.org_id == auto_org.id,
+            )
+        )
+        owner_rep = rep_result.scalars().first()
+        assert owner_rep is not None
+        assert owner_rep.role == "owner"
+        assert owner_rep.authority_method == "admin_review"
+        assert owner_rep.authority_status == "verified"
 
 
 # --- Clinician reads -------------------------------------------------------

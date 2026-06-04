@@ -20,7 +20,7 @@ A clinician can be affiliated with an org without being authorized to speak for 
 - `authorized_official` — NPPES Authorized-Official name-match against the requesting user's verified `Clinician` name. Auto, covers most solos.
 - `domain_email` — verified email at the org's domain. **v1 stub**: handler returns "not yet enabled" until an `OrganizationDomain` table + email-at-domain verification flow lands.
 - `rep_approval` — an existing verified rep (or admin) approves the new rep via the `authority` state axis. Sets `approved_by` to the approver's user id.
-- `admin_review` — fallback for orgs where neither auto-path applies.
+- `admin_review` — fallback for orgs where neither auto-path applies. Also the method recorded when a user **creates the org themselves** — a clinician's solo-practice auto-org or a self-service org registration — where the create action is its own proof: the owner rep is granted immediately `verified` (no pending review) via `grant_owner_representation` in [`logic/org_representations/handlers.py`](../../logic/org_representations/handlers.py), the single helper shared by the clinician solo-create and organization-create paths.
 
 The org's Type-2 NPI is verified **once per Organization** (`Organization.org_verified`). Authority is per-(user, org) and lives here.
 
