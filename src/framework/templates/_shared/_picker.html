@@ -1,8 +1,14 @@
 {# _picker(options) — renders a "choose your path" card grid.
 
-Adopted from the `/posts/form` picker pattern (issue #704). Use this
-macro anywhere a multi-option entry point needs to funnel the user to a
-kind- or type-specific sub-form before showing fields.
+Two species, one component (full contract: the picker entry in
+`framework/templates/README.md`, which extends RESOURCE_GRAMMAR.md):
+a *discriminator/type picker* funnels to a kind-/type-specific sub-form of
+the SAME resource via a selecting query param (`/posts/form?kind=…`,
+`/organizations/form?type=…`); a *dispatching picker* points its cards OUT
+at OTHER resources' create forms (`/profile/identity` → `/clinicians/form`
++ `/organizations/form`). The macro only renders {href, heading,
+description} — self- vs cross-resource hrefs are the caller's business.
+Adopted from the `/posts/form` pattern (issue #704).
 
 Each option is a dict with keys:
   href:        URL to navigate to on click (ignored when selected=true)
