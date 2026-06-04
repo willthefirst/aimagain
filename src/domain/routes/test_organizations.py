@@ -13,7 +13,7 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import Organization, User
+from src.domain.models import Organization, OrgRepresentation, User
 from src.framework.audit.repository import AuditRepository
 from tests.helpers import create_test_user, make_organization_row
 
@@ -64,6 +64,26 @@ async def test_create_organization_happy_path(
         # Root invariant — created with no parent, root points at self.
         assert loaded.parent_org_id is None
         assert loaded.root_org_id == new_id
+
+        # Self-registering an org grants the creator an immediately-verified
+        # owner OrgRepresentation (#1166) — previously only the onboarding
+        # hub did this; the canonical create now matches.
+        owner_rep = (
+            (
+                await session.execute(
+                    select(OrgRepresentation).filter(
+                        OrgRepresentation.user_id == logged_in_user.id,
+                        OrgRepresentation.org_id == new_id,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert owner_rep is not None
+        assert owner_rep.role == "owner"
+        assert owner_rep.authority_method == "admin_review"
+        assert owner_rep.authority_status == "verified"
 
     rows = await _audit_rows_for(db_test_session_manager, resource_id=new_id)
     assert len(rows) == 1
