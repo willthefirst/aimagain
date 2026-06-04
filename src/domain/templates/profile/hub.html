@@ -1,20 +1,25 @@
 {% extends "base.html" %}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 {% block title %}Profile{% endblock %}
+{# Profile title + mode line flow through the unified page-header slots:
+   the title via the toolbar `<h1>`, the mode-dependent line via the
+   subtitle slot (rendered below the band's rule as muted meta text). #}
+{% block toolbar %}
+  {% call page_toolbar(heading="Profile") %}
+  {% endcall %}
+{% endblock %}
+{% block subtitle %}
+  {% if mode == "setup" %}
+    Complete these steps to start posting and see full referral details.
+  {% elif mode == "manage" %}
+    Manage your verification claims and profile.
+  {% elif mode == "add-a-claim" %}
+    Add a capability to your account.
+  {% elif mode == "re-verify" %}
+    Something needs your attention.
+  {% endif %}
+{% endblock %}
 {% block content %}
-  <header>
-    <h1>Profile</h1>
-    <p style="color: var(--pico-muted-color); margin-top: -0.25rem;">
-      {% if mode == "setup" %}
-        Complete these steps to start posting and see full referral details.
-      {% elif mode == "manage" %}
-        Manage your verification claims and profile.
-      {% elif mode == "add-a-claim" %}
-        Add a capability to your account.
-      {% elif mode == "re-verify" %}
-        Something needs your attention.
-      {% endif %}
-    </p>
-  </header>
   {# Registry-driven setup table of contents. In setup mode this *is* the
      page: it lists the onboarding steps and links each incomplete one to
      its own subroute (`/profile/email`, `/profile/identity`), where the
