@@ -59,6 +59,10 @@ class _FactoryShape:
     # signature params for each declared typed repo, and forwards both
     # to the underlying handler.
     after_create_call: bool = False
+    # Verbs that route through `after_update` (update only). Same plumbing
+    # as `after_create_call`, on the update shape. A shape uses one of
+    # `after_create_call` / `after_update_call`, never both.
+    after_update_call: bool = False
 
 
 _DELETE_SHAPE = _FactoryShape(
@@ -82,6 +86,7 @@ _UPDATE_SHAPE = _FactoryShape(
     include_parent_id=True,
     include_audit_repo=True,
     payload_authz_call=True,
+    after_update_call=True,
 )
 _EDIT_FORM_SHAPE = _FactoryShape(
     name_template="_handle_get_{name}_edit_form",
@@ -129,6 +134,8 @@ def _make_factory_handler(
     payload_authz_repos: tuple[tuple[str, type], ...] = (),
     after_create: Callable[..., Awaitable[None]] | None = None,
     after_create_repos: tuple[tuple[str, type], ...] = (),
+    after_update: Callable[..., Awaitable[None]] | None = None,
+    after_update_repos: tuple[tuple[str, type], ...] = (),
 ):
     """Build the wrapper the mount layer introspects and calls.
 
@@ -154,7 +161,13 @@ def _make_factory_handler(
     after_create_repo_names = (
         tuple(name for name, _ in after_create_repos) if shape.after_create_call else ()
     )
-    if shape.payload_authz_call or shape.after_create_call:
+    after_update_repo_names = (
+        tuple(name for name, _ in after_update_repos) if shape.after_update_call else ()
+    )
+    # The post-persist hook for this shape — `after_create` on the create
+    # shape, `after_update` on the update shape (never both).
+    after_hook_repo_names = after_create_repo_names + after_update_repo_names
+    if shape.payload_authz_call or shape.after_create_call or shape.after_update_call:
         reserved = {
             "payload",
             "repo",
@@ -166,24 +179,25 @@ def _make_factory_handler(
             reserved.add(parent_id_param)
         clashes = [
             n
-            for n in (*payload_authz_repo_names, *after_create_repo_names)
+            for n in (*payload_authz_repo_names, *after_hook_repo_names)
             if n in reserved
         ]
         if clashes:
             raise ValueError(
                 f"_make_factory_handler({spec.name!r}): payload_authz_repos / "
-                f"after_create_repos name(s) {clashes!r} collide with the "
-                "factory-generated signature params — pick distinct names."
+                f"after_create_repos / after_update_repos name(s) {clashes!r} "
+                "collide with the factory-generated signature params — pick "
+                "distinct names."
             )
         # Names must also not collide with each other (a single
         # `inspect.Parameter` per name).
         seen: set[str] = set()
-        for n in (*payload_authz_repo_names, *after_create_repo_names):
+        for n in (*payload_authz_repo_names, *after_hook_repo_names):
             if n in seen:
                 raise ValueError(
                     f"_make_factory_handler({spec.name!r}): repo name "
-                    f"{n!r} declared in both payload_authz_repos and "
-                    "after_create_repos — synthesize one slot, share it via "
+                    f"{n!r} declared in both payload_authz_repos and the "
+                    "after-hook repos — synthesize one slot, share it via "
                     "a single declaration."
                 )
             seen.add(n)
@@ -235,11 +249,14 @@ def _make_factory_handler(
     if shape.payload_authz_call:
         for name, repo_type in payload_authz_repos:
             sig_params.append(_param(name, repo_type))
-    if shape.after_create_call:
+    if shape.after_create_call or shape.after_update_call:
         # Skip names already added via `payload_authz_repos` — a spec
         # can reuse the same repo for both hooks; one slot is enough.
         existing = set(payload_authz_repo_names) if shape.payload_authz_call else set()
-        for name, repo_type in after_create_repos:
+        after_hook_repos = (
+            after_create_repos if shape.after_create_call else after_update_repos
+        )
+        for name, repo_type in after_hook_repos:
             if name in existing:
                 continue
             sig_params.append(_param(name, repo_type))
@@ -279,6 +296,11 @@ def _make_factory_handler(
             call_kwargs["after_create"] = after_create
             call_kwargs["after_create_kwargs"] = {
                 n: kwargs[n] for n in after_create_repo_names
+            }
+        if shape.after_update_call and after_update is not None:
+            call_kwargs["after_update"] = after_update
+            call_kwargs["after_update_kwargs"] = {
+                n: kwargs[n] for n in after_update_repo_names
             }
         return await handler_fn(spec, **call_kwargs)
 

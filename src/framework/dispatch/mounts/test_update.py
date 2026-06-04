@@ -584,3 +584,135 @@ def test_make_update_handler_with_payload_authz_signature():
     sig = inspect.signature(handler)
     assert "organization_repo" in sig.parameters
     assert sig.parameters["organization_repo"].annotation is _StubOrgRepo
+
+
+# --- after_update hook ---------------------------------------------------
+
+
+class _StubVerifyRepo:
+    """Stand-in typed repo passed through `after_update_repos`."""
+
+
+@pytest.mark.asyncio
+async def test_update_invokes_after_update_with_changed_fields_and_repos():
+    """`after_update` is awaited with `row`, `payload`, `requesting_user`,
+    the typed repos, and `changed_fields` reflecting only columns whose
+    value actually changed (not merely fields present in the payload)."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=make_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    # `location_city` is set in the payload to its existing value, so it
+    # must NOT appear in changed_fields.
+    target = _AnyRow(id=target_id, practice_name="Old", location_city="SameCity")
+    repo.seed(_AnyRow, target)
+    audit_repo = FakeAuditRepo()
+    seen: dict[str, _Any] = {}
+    stub_repo = _StubVerifyRepo()
+
+    async def hook(*, row, payload, requesting_user, changed_fields, verify_repo):
+        seen["row"] = row
+        seen["payload"] = payload
+        seen["changed_fields"] = changed_fields
+        seen["verify_repo"] = verify_repo
+
+    await handle_update(
+        spec,
+        target_id=target_id,
+        payload=_UpdatePayload(practice_name="New", location_city="SameCity"),
+        repo=repo,
+        audit_repo=audit_repo,
+        requesting_user=make_user(),
+        after_update=hook,
+        after_update_kwargs={"verify_repo": stub_repo},
+    )
+
+    assert seen["row"] is target
+    assert seen["verify_repo"] is stub_repo
+    # practice_name changed Old→New; location_city was set but unchanged.
+    assert seen["changed_fields"] == {"practice_name"}
+
+
+@pytest.mark.asyncio
+async def test_update_skips_after_update_when_not_supplied():
+    """`after_update=None` is the default — the update path still patches."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=make_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    repo.seed(_AnyRow, _AnyRow(id=target_id, practice_name="Old"))
+    await handle_update(
+        spec,
+        target_id=target_id,
+        payload=_UpdatePayload(practice_name="New"),
+        repo=repo,
+        audit_repo=FakeAuditRepo(),
+        requesting_user=make_user(),
+    )
+    assert repo.patched[0][1] == {"practice_name": "New"}
+
+
+@pytest.mark.asyncio
+async def test_update_after_update_exception_rolls_back_transaction():
+    """If `after_update` raises, the `mutate(...)` block rolls back — no
+    audit row is written."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=make_audit(),
+    )
+    repo = _update_fake_repo()
+    target_id = uuid4()
+    repo.seed(_AnyRow, _AnyRow(id=target_id, practice_name="Old"))
+    audit_repo = FakeAuditRepo()
+
+    async def hook(*, row, payload, requesting_user, changed_fields):
+        raise ValueError("after_update rejected this row")
+
+    with pytest.raises(ValueError, match="after_update rejected"):
+        await handle_update(
+            spec,
+            target_id=target_id,
+            payload=_UpdatePayload(practice_name="New"),
+            repo=repo,
+            audit_repo=audit_repo,
+            requesting_user=make_user(),
+            after_update=hook,
+        )
+    assert audit_repo.calls == []
+
+
+def test_make_update_handler_with_after_update_signature():
+    """Synthesized update-handler signature includes declared
+    `after_update_repos` kwargs as typed params."""
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=_AnyRow,
+        audit=make_audit(),
+    )
+
+    async def hook(**_kw):  # pragma: no cover
+        return None
+
+    handler = make_update_handler(
+        spec,
+        after_update=hook,
+        after_update_repos=(("verify_repo", _StubVerifyRepo),),
+    )
+    sig = inspect.signature(handler)
+    assert "verify_repo" in sig.parameters
+    assert sig.parameters["verify_repo"].annotation is _StubVerifyRepo
