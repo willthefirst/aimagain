@@ -529,34 +529,19 @@ async def test_create_form_preselects_first_clinician(
 # --- Anonymization gate (can_read_full_feed) ---------------------------------
 
 
-async def test_list_shows_verify_notice_for_unverified(
+async def test_list_has_no_inline_verify_notice_for_unverified(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """Unverified users see a CTA on /posts directing them to complete
-    verification, since poster names and contact info are hidden."""
-    response = await authenticated_client.get("/posts")
-    assert response.status_code == 200
-    assert "posts-verify-notice" in response.text
-    assert "Complete verification" in response.text
-
-
-async def test_list_hides_verify_notice_for_verified(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user,
-):
-    """Verified users (Claim A active) see no verify-notice on /posts."""
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-
+    """The /posts list carries no inline verify notice, even for an
+    unverified viewer. Poster names / contact are anonymized server-side;
+    the single chrome `#onboarding-banner` is the only place that explains
+    verification unlocks the full view — the old `posts-verify-notice` is
+    gone."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     assert "posts-verify-notice" not in response.text
+    assert "Complete verification" not in response.text
 
 
 # --- Toolbar Create CTA gate (posting-capable claim) -------------------------
