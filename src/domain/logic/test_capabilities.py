@@ -511,15 +511,29 @@ def test_fix_url_table_covers_every_reason_constant():
 
 
 def test_reason_meta_known_reason_carries_full_copy():
-    """A known reason resolves to non-empty unlock copy, a fix label, and
-    the same deep-link `fix_url_for` returns — one source for both."""
+    """A known reason resolves to a title, non-empty unlock copy, a fix
+    label, and the same deep-link `fix_url_for` returns — one source for
+    every display string."""
     meta = capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED)
+    assert meta.title
     assert meta.unlock
     assert meta.fix_label
     assert meta.fix_url == "/profile/identity"
     assert meta.fix_url == capabilities.fix_url_for(
         capabilities.REASON_CLAIM_A_UNVERIFIED
     )
+
+
+def test_reason_meta_lapsed_reasons_carry_resume_copy():
+    """Both lapsed reasons (A and the newly-added B) resolve to a section
+    title + a re-verify CTA — the re-verify card reads entirely from this,
+    so a missing B entry would have rendered a raw reason code."""
+    a = capabilities.reason_meta(capabilities.REASON_CLAIM_A_LAPSED)
+    b = capabilities.reason_meta(capabilities.REASON_CLAIM_B_LAPSED)
+    assert a.title == "Clinician identity"
+    assert b.title == "Organization representation"
+    assert a.fix_label == "Re-verify license"
+    assert b.fix_label == "Re-verify authority"
 
 
 def test_reason_meta_view_unverified_is_the_read_side_gate():
@@ -543,10 +557,11 @@ def test_reason_meta_unknown_reason_falls_back():
 
 def test_reason_meta_covers_every_reason_constant_with_nonempty_copy():
     """Guardrail mirroring the fix-URL one, for the human copy: every
-    REASON_* must resolve to non-empty unlock + fix_label text so no
-    surface renders an empty locked affordance."""
+    REASON_* must resolve to non-empty title + unlock + fix_label text so
+    no surface renders an empty locked affordance or an untitled card."""
     for reason in _declared_reasons():
         meta = capabilities.reason_meta(reason)
+        assert meta.title, f"REASON {reason!r} has empty title"
         assert meta.unlock, f"REASON {reason!r} has empty unlock copy"
         assert meta.fix_label, f"REASON {reason!r} has empty fix_label"
 
