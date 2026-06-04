@@ -107,6 +107,8 @@ The URL grammar above says which pages exist; this says what each `GET` *shows*.
 
 - **A `GET` is *either* a read view (`/<resource>`, `/<resource>/{id}`) *or* a form (`/<resource>/form`, `/<resource>/{id}/form`).** A read view never embeds a create/edit form; a form page never doubles as a listing. (The fix that motivated writing this down: `/profile/identity` used to be a read URL hosting the create forms — it's now a read-only dispatching picker, see below.)
 - **An empty collection read view is a *designed* empty-state**, not a blank page: its primary affordance routes to `/<resource>/form`.
+- **An aggregate read view is an *index* of its sub-resources, not a wizard.** A read view whose subject owns other resources (a user hub, an org dashboard) renders their state posture plus links *into* them — it does not walk the user through creating them inline. Each create lives behind its own `/form` (reached directly or via a dispatching picker, below). The read view reports "what exists / what's missing"; it never *is* the form.
+- **A derived gate is not a resource.** State *computed from* other resources — a KYC/onboarding gate that exists only because "does a verified clinician or org belong to this user?" resolves to yes/no — gets no stored row and no CRUD surface of its own. At most it earns a thin read view that shows the derived posture and a dispatching picker into the canonical forms that change the underlying resources. Don't mint a `/<gate>` resource, a `<gate>_status` table, or a bespoke `POST /<gate>` for something the existing resources already determine.
 
 #### Pickers — two species, one component
 
@@ -116,6 +118,10 @@ When a create entry point is multi-option, `GET /<resource>/form` renders a **pi
 - **Dispatching picker** — options point *out* to **other** resources' create forms: `/profile/identity` → `/clinicians/form` and `/organizations/form`. The picker page is itself a pure read view (a derived gate that owns no row — KYC posture here); the canonical forms it links to own all the create work (NPI verification, owner-grant, etc.).
 
 A resource with a **single** create form (no subtypes, no variant) needs no picker and no selector query param: `/<resource>/form` *is* that form. Don't add a `?kind=`/`?type=` selector to a single-form resource. Reference implementations: `/posts/form` (discriminator picker), `/profile/identity` (dispatching picker), `/clinicians/form` + `/organizations/form` (single-form).
+
+**A selector value names a create-form *variant*, not necessarily a persisted subtype.** Bare `/<resource>/form` is the maximal/full form (or the picker, when multi-option); a named `?kind=`/`?type=` value selects a *narrower* variant. Often the variant **is** a polymorphic subtype — posts' kinds land in distinct detail tables — so the selector marks *which table the row lands in*. But a variant can also be a *completeness* variant over the **same** table: a minimal `kind=onboarding` "get enabled fast" form for a clinician asks for fewer fields and lands in the same row shape as the full form. There the selector marks *which fields the form asks for*, not which table. Either way the parameterless form remains the authoritative full surface; named variants only ever ask for a subset or branch the persisted shape.
+
+**The selector is always a query param on `/<resource>/form`** (`?kind=` for a polymorphic subtype, `?type=` for a plain enum column) — never a bespoke word on a read URL. A read URL carrying a `?path=`/`?step=`/`?mode=` that swaps in a form is the read-xor-form violation above wearing a query string; route it through `/<resource>/form?kind=…` instead.
 
 ### 4. revisions
 
