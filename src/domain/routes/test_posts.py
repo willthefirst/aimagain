@@ -666,3 +666,75 @@ async def test_detail_shows_email_for_verified(
     assert response.status_code == 200
     assert f"mailto:{author_email}" in response.text
     assert "Verify to contact" not in response.text
+
+
+async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A viewer who can't read the full feed sees the practice /
+    organization / address rows on post detail as `locked_field`
+    placeholders ("Hidden — Complete verification →"), not silently
+    dropped. The real links + address value are NOT emitted — withholding,
+    not CSS-hiding."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    clinician = make_clinician_with_org(owner_id=author.id, practice_name="Acme Health")
+    clinician.id = clinician.id or uuid.uuid4()
+    post = _opening_post(owner_id=author.id, clinician=clinician)
+    org_id = clinician.org.id
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    # The rows still render (the viewer knows the detail exists)...
+    for fact_key in ("practice", "organization", "address"):
+        dd = tree.css_first(f'div[data-fact="{fact_key}"] dd')
+        assert dd is not None, f"{fact_key} row should still render when redacted"
+        assert (
+            dd.css_first("span.locked-field") is not None
+        ), f"{fact_key} should render a locked placeholder"
+        assert dd.css_first("a").attributes.get("href") == "/profile"
+
+    # ...but the real navigable links + the address value are withheld.
+    assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is None
+    assert tree.css_first(f"a[href='/organizations/{org_id}']") is None
+    assert "Springfield, IL" not in response.text
+    assert "Complete verification" in response.text
+
+
+async def test_detail_shows_identity_rows_for_verified_viewer(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A verified viewer (can read the full feed) sees the real practice /
+    organization links and the full address — no locked placeholders."""
+    viewer_clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id, npi="1234567890"
+    )
+    viewer_clinician.npi_match_status = "matched"
+    viewer_clinician.clinician_verified = True
+
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    clinician = make_clinician_with_org(owner_id=author.id, practice_name="Acme Health")
+    clinician.id = clinician.id or uuid.uuid4()
+    post = _opening_post(owner_id=author.id, clinician=clinician)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer_clinician)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
+    assert "Springfield, IL" in response.text
+    assert tree.css_first("span.locked-field") is None

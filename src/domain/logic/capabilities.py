@@ -41,6 +41,11 @@ REASON_CLAIM_A_UNVERIFIED = "claim_a_unverified"
 REASON_CLAIM_B_UNVERIFIED = "claim_b_unverified"
 REASON_CLAIM_A_LAPSED = "claim_a_lapsed"
 REASON_AFFILIATION_MISSING = "affiliation_missing"
+# Read-side gate (not a write affordance): the viewer hasn't cleared
+# verification, so contact/identity details on a post detail are withheld
+# (`can_read_full_feed` is False). Distinct from the claim-to-*post*
+# reasons above — this one fixes by completing any verification path.
+REASON_VIEW_UNVERIFIED = "view_unverified"
 
 
 @dataclass(frozen=True)
@@ -93,6 +98,11 @@ _REASON_META = {
     REASON_AFFILIATION_MISSING: ReasonMeta(
         unlock="Add a clinician affiliation to unlock this.",
         fix_label="Manage affiliations",
+        fix_url="/profile",
+    ),
+    REASON_VIEW_UNVERIFIED: ReasonMeta(
+        unlock="Verify your account to see contact details.",
+        fix_label="Complete verification",
         fix_url="/profile",
     ),
 }

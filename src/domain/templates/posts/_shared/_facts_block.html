@@ -22,6 +22,13 @@ Two modes:
     (PA/program only), languages (suppressed when ["en"] alone),
     insurance_posture, treatment_modality.
 
+  redacted=True (detail page, viewer who can't read the full feed) —
+    the identity/contact rows (practice, program, organization, address)
+    render a `locked_field` placeholder ("Hidden — Complete verification →")
+    instead of the real value/link. The row stays visible so the viewer
+    knows the detail exists and how to unlock it; the value itself is
+    never emitted. All other rows render normally.
+
   expanded=True (detail page) — every chunk the compact mode shows
     PLUS the detail-only rows: practice link (PA) / program link
     (program), organization link (PA + program — clickable jump to
@@ -47,6 +54,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 `DESIRED_TIME_SLOT_LABELS`, `REFERRAL_SERVICE_LABELS`,
 `TREATMENT_SETTINGS_LABELS`) are Jinja globals. #}
 {%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/_locked.html" import locked_field -%}
 {% macro facts_block(view, expanded=False, redacted=False) -%}
   <section class="entity-facts">
     <dl>
@@ -123,40 +131,62 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                     {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
                       {{ fact('age', 'Age', ages | join(", ") , icon='users') }}
                     {%- endif %}
-                    {%- if view.practice_link and not redacted %}
-                      {%- call fact('practice', 'Practice') %}<a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>
-                    {% endcall %}
-                  {%- endif %}
-                  {%- if view.program_link and not redacted %}
-                    {%- call fact('program', 'Program') %}<a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>
-                  {% endcall %}
-                {%- endif %}
-                {%- if view.organization_link and not redacted %}
-                  {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>
-                {% endcall %}
-              {%- endif %}
-              {%- if view.full_address and not redacted %}{{ fact('address', 'Address', view.full_address, icon='map-pin') }}{%- endif %}
-                {%- if view.in_person is not none %}
-                  {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person], icon='monitor') }}
-                {%- endif %}
-                {%- if view.virtual is not none %}
-                  {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual], icon='monitor') }}
-                {%- endif %}
-                {%- if view.desired_times %}
-                  {%- set times = [] -%}
-                  {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
-                    {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
-                  {%- endif %}
-                  {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
-                    {%- if view.network_preference %}
-                      {{ fact('network_preference', 'Network preference', NETWORK_PREFERENCE_LABELS[view.network_preference], icon='shield') }}
+                    {%- if view.practice_link %}
+                      {%- call fact('practice', 'Practice') %}
+                        {% if redacted %}
+                          {{ locked_field(capabilities.REASON_VIEW_UNVERIFIED) }}
+                        {% else %}
+                          <a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>
+                        {% endif %}
+                      {% endcall %}
                     {%- endif %}
-                    {%- if view.insurance_carrier and view.network_preference and view.network_preference != "no_preference" %}
-                      {{ fact('insurance_carrier', 'Insurance carrier', INSURANCE_CARRIER_LABELS[view.insurance_carrier], icon='shield') }}
+                    {%- if view.program_link %}
+                      {%- call fact('program', 'Program') %}
+                        {% if redacted %}
+                          {{ locked_field(capabilities.REASON_VIEW_UNVERIFIED) }}
+                        {% else %}
+                          <a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>
+                        {% endif %}
+                      {% endcall %}
                     {%- endif %}
-                    {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
-                      {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
+                    {%- if view.organization_link %}
+                      {%- call fact('organization', 'Organization') %}
+                        {% if redacted %}
+                          {{ locked_field(capabilities.REASON_VIEW_UNVERIFIED) }}
+                        {% else %}
+                          <a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>
+                        {% endif %}
+                      {% endcall %}
+                    {%- endif %}
+                    {%- if view.full_address %}
+                      {% if redacted %}
+                        {%- call fact('address', 'Address', icon='map-pin') %}{{ locked_field(capabilities.REASON_VIEW_UNVERIFIED) }}
+                        {% endcall %}
+                      {% else %}
+                        {{ fact('address', 'Address', view.full_address, icon='map-pin') }}
+                      {% endif %}
+                    {%- endif %}
+                    {%- if view.in_person is not none %}
+                      {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person], icon='monitor') }}
+                    {%- endif %}
+                    {%- if view.virtual is not none %}
+                      {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual], icon='monitor') }}
+                    {%- endif %}
+                    {%- if view.desired_times %}
+                      {%- set times = [] -%}
+                      {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
+                        {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
                       {%- endif %}
-                    </dl>
-                  </section>
-                {%- endmacro %}
+                      {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
+                        {%- if view.network_preference %}
+                          {{ fact('network_preference', 'Network preference', NETWORK_PREFERENCE_LABELS[view.network_preference], icon='shield') }}
+                        {%- endif %}
+                        {%- if view.insurance_carrier and view.network_preference and view.network_preference != "no_preference" %}
+                          {{ fact('insurance_carrier', 'Insurance carrier', INSURANCE_CARRIER_LABELS[view.insurance_carrier], icon='shield') }}
+                        {%- endif %}
+                        {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
+                          {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
+                          {%- endif %}
+                        </dl>
+                      </section>
+                    {%- endmacro %}

@@ -9,12 +9,15 @@
      (e.g. `_assert_post_payload_authz`), so a disabled control leaks no
      data.
 
-   - `locked_field(reason, label)` — for withheld DATA values (practice
-     name, description, full address). Renders a placeholder that names
-     the field in place of its value. The caller passes the field's NAME,
-     never its value — so this macro CANNOT leak the data. Withholding the
-     real value is the VIEW layer's job (null it server-side); this macro
-     only renders the gap and the path to unlock it.
+   - `locked_field(reason, label="")` — for withheld DATA values (practice
+     name, description, full address). Renders a placeholder in place of
+     the value. Pass the field's NAME as `label` when the placeholder
+     stands alone ("Practice name hidden — …"); omit it inside an already-
+     labeled row (a `<dl>` `<dt>` carries the name, so the `<dd>` reads
+     just "Hidden — …"). The caller passes the field's NAME, never its
+     value — so this macro CANNOT leak the data. Withholding the real
+     value is the VIEW layer's job; this macro only renders the gap and
+     the path to unlock it.
 
    Copy + fix link both come from `capabilities.reason_meta(reason)` so a
    given reason reads identically everywhere. `capabilities` is a Jinja
@@ -31,10 +34,16 @@
     </small>
   </div>
 {%- endmacro %}
-{% macro locked_field(reason, label) -%}
+{% macro locked_field(reason, label="") -%}
   {%- set meta = capabilities.reason_meta(reason) -%}
   <span class="locked-field" title="{{ meta.unlock }}">
-    <i class="icon-lock" aria-hidden="true"></i>{{ label }} hidden —
+    <i class="icon-lock" aria-hidden="true"></i>
+    {% if label %}
+      {{ label }} hidden
+    {% else %}
+      Hidden
+    {% endif %}
+    —
     <a href="{{ meta.fix_url }}">{{ meta.fix_label }} →</a>
   </span>
 {%- endmacro %}
