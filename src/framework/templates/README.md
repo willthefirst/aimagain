@@ -4,8 +4,8 @@ The framework's template root holds the domain-agnostic pieces: the site shell, 
 
 ```
 src/framework/templates/
-├── base.html         ← every page extends this. HTMX setup + primary nav + chrome strips.
-├── _shared/          ← cross-resource macros (form fields, table chrome, breadcrumb/toolbar primitives, etc.).
+├── base.html         ← every page extends this. HTMX setup + the unified page-header band + content/footer slots.
+├── _shared/          ← cross-resource macros + partials (form fields, table chrome, breadcrumb/toolbar primitives, the `_page_header.html` band, etc.).
 └── views/            ← generic view-type chrome: list, detail, form_new, form_edit.
 ```
 
@@ -30,7 +30,7 @@ A template under `<resource>/` in either root may only `{% extends %}` / `{% inc
 
 ## Generic view-type templates (`views/`)
 
-Each view-type template wires the same three-strip chrome (nav + breadcrumb + toolbar + content) from `base.html` with the breadcrumb and toolbar shape that matches the verb. A child template extending one of these declares only what's unique: a label, a URL, the body markup, and an optional action cluster.
+Each view-type template fills the same unified page-header band (nav + breadcrumb + toolbar + boundary rule, see "Page chrome contract" below) from `base.html` with the breadcrumb and toolbar shape that matches the verb. A child template extending one of these declares only what's unique: a label, a URL, the body markup, and an optional action cluster.
 
 | View type     | Breadcrumb back target                    | Toolbar                                    | Child must declare                                       |
 | ------------- | ----------------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
@@ -56,21 +56,29 @@ The macros under `_shared/` are still the primitives — `views/*` compose them.
 
 ## Page chrome contract
 
-Every page extending `base.html` lands the same three-strip chrome above its content. From top to bottom:
+Every page extending `base.html` lands the same unified page-header **band** — a single `<header class="page-header">` ([`_shared/_page_header.html`](_shared/_page_header.html)) that stacks the chrome rows and closes with **one** horizontal rule. The rule is the page's only divider and sits at the **same Y on every app page at a given screen size**. Two rows are reserved to make that true, both intrinsically (no pinned size units, so the boundary still changes across screen sizes):
+
+- **Breadcrumb row** — pages with no real breadcrumb (list pages) get an invisible back-affordance placeholder (`.page-header-crumb-placeholder`, `visibility: hidden`), so a list page's rule lines up with a detail page's.
+- **Toolbar action row** — a button is taller than the bare `<h1>`, so a hidden non-interactive reserve `<button class="toolbar-reserve">` shares the H1's grid cell on every toolbar; the row is always one real-button tall whether or not the page has actions. The actions cell still auto-flows (to col 2 on desktop, to row 2 in the ≤640px stack — where actions-below-heading is the intended layout).
+
+From top to bottom:
 
 ```
 ┌───────────────────────────────────────────────────────────┐
-│ <header> primary nav        brand + auth-aware right slot │  ← `base.html`
+│ <header class="page-header">                              │  ← `_shared/_page_header.html`
+│   primary nav        brand + auth-aware links             │
+│   breadcrumb row     ← Resource   (hidden placeholder if none) │  ← captured `{% block breadcrumb %}`
+│   toolbar row        <h1> title              [actions ▶]  │  ← captured `{% block toolbar %}`
+│   ─────────────────────────────────────────────────────  │  ← single `<hr class="page-header-rule">`
 ├───────────────────────────────────────────────────────────┤
-│ breadcrumb zone bar          Resource › … › Current        │  ← `{% block breadcrumb %}` (detail/form pages only)
-├───────────────────────────────────────────────────────────┤
-│ toolbar / action bar         [filters left]    [actions ▶] │  ← `{% block toolbar %}`
-├───────────────────────────────────────────────────────────┤
+│ subtitle (optional)  NPI · Verified                       │  ← `{% block subtitle %}` (rendered below the rule, top of `<main>`)
 │ page content                                              │  ← `{% block content %}`
 ├───────────────────────────────────────────────────────────┤
 │ <footer> site chrome           &copy; … · support@ …      │  ← `{% block footer %}` (default body in `base.html`)
 └───────────────────────────────────────────────────────────┘
 ```
+
+`{% include %}` can't see the including template's blocks, so `base.html` captures the `breadcrumb` / `toolbar` / `subtitle` block output into context vars and hands the pre-rendered HTML to the band partial. Children still just override `{% block breadcrumb %}` / `{% block toolbar %}` / `{% block subtitle %}` — the capture indirection is transparent. The band's lower rows + rule render only when there's app chrome to show (any breadcrumb/toolbar content, or an authenticated viewer), so anonymous public pages (landing, the `/auth/*` flow) keep their bare brand nav with no rule.
 
 **Body layout.** `<header>`, `<main>`, and `<footer>` are direct siblings of `<body>`, and `<body>` is a three-row CSS grid (`grid-template-rows: auto 1fr auto`) sized to `min-height: 100dvh`. Short pages pin the footer to the viewport bottom instead of leaving it floating; tall pages flow normally and push the footer below. The landing page reuses this scaffold to vertically center its hero inside the `<main>` row (see [`../../domain/templates/landing.html`](../../domain/templates/landing.html)).
 
@@ -90,7 +98,7 @@ The active tab carries `aria-current="page"` plus `class="contrast"`, and `base.
 | Resource edit    | `/posts/{id}/form`             | `Posts › Post › Edit`                 |
 | Subresource list | `/users/{id}/clinicians`        | `Users › <username> › Clinicians`      |
 
-Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). Single-segment list breadcrumbs are still wrapped in the nav so the chrome strip is present and the strip height stays consistent across pages.
+Every prior segment is a link (`<a href="…">`); the trailing segment is the current page (no `href`, gets `aria-current="page"`). List pages render no breadcrumb at all; the band reserves the breadcrumb row with a hidden placeholder (`.page-header-crumb-placeholder`) so the boundary rule still lines up with detail/form pages — the strip height stays consistent across pages without a stray single-segment trail.
 
 Public auth-flow pages (`/auth/login`, `/auth/register`, …) opt out — they aren't in the resource hierarchy.
 
@@ -113,7 +121,7 @@ Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_credential_
 - `_card.html` — `card(id, headline_url, headline, subtitle=None, data_kind=None)`: the universal list-item card. Every `/<collection>` list page wraps its items in this macro and provides the per-resource body (and optional `<footer>`) via `{% call %}`. The card emits an `<article class="entity-card" data-row-id="…">` with a header band carrying the headline link and an optional `<small class="meta">` subtitle. Tests select rows by `article[data-row-id="…"]`. Fact-row bodies use a `<section class="entity-facts">` containing a `<dl>` of `<div data-fact="key">` rows so tests resolve fact cells via `div[data-fact="…"] dd` rather than the display-string `<dt>` text. The post family's `posts/_shared/_item.html` composes `card` + `_facts_block` for its kind-specific body; non-post lists call `card` directly with an inline `<section class="entity-facts">`.
 - `_clinician_card.html` — `clinician_card(clinician)`: the shared clinician directory card, used by `/clinicians`, `/users/me/favorites`, `/users/{id}/clinicians`, and the embedded preview on `/users/{id}`. Headline is `"{first_name} {last_name}"` (falls back to whichever is set, then to the literal `"Unnamed clinician"`), linked to `/clinicians/{id}`. Body emits Practice / Location / Licensed in / Insurance fact rows. Lives at the framework level (not under the clinicians cluster) because four templates across three clusters render it; cross-cluster template imports aren't allowed (see the layering rule).
 - `_feed_row.html` — `post_feed_row(post, show_poster=True)` and `post_feed_empty(message, link_href=None, link_label=…)`: the description-led feed row + empty state for `Post` lists. Emits `<article class="post-feed-row" data-kind="…">` (type-tag pill · poster · timestamp, full-width headline link, muted meta strip); `post_feed_empty` emits `<article class="post-feed-empty">`. Reads the `post_card_view` / `post_feed_headline` template globals and the `can_read_full_feed` context flag. Rendered by the home feed (`home.html`), `/posts` (`posts/list.html`), and the per-owner projections (`/clinicians/{id}/openings`, `/clinicians/{id}/referrals`, `/organizations/{id}/intakes`). Lives at the framework level — same rationale as `_clinician_card.html`: it's rendered across the posts, home, clinicians, and organizations clusters, and cross-cluster template imports aren't allowed.
-- `_toolbar.html` — `page_toolbar(active_filters=(), search_url=None)`: the toolbar shell that both `views/list.html` and `views/detail.html` compose. Emits a right-aligned `<div class="toolbar">` strip with up to two pieces — a filter link `<a class="toolbar-filter-link">` (omitted when `search_url` is `None`, as on detail pages) and the action `<menu class="toolbar-right">` (caller body is `<li>` items). The filter link reads ``Filters`` when none are active and collapses to a two-chip-plus-`+N` summary otherwise. There is no in-toolbar Clear-all — the search page's form owns clearing. On list pages the context comes from `handle_list` (`active_filters`, `search_url`); detail pages pass no args.
+- `_toolbar.html` — `page_toolbar(active_filters=(), search_url=None)`: the toolbar shell that both `views/list.html` and `views/detail.html` compose. Emits a right-aligned `<div class="toolbar">` strip with up to two pieces — a filter link `<a class="toolbar-filter-link">` (omitted when `search_url` is `None`, as on detail pages) and the action `<menu class="toolbar-right">` (caller body is `<li>` items). The macro emits **no** separator — the single boundary rule below the toolbar is owned by the page-header band (`_page_header.html`). The filter link reads ``Filters`` when none are active and collapses to a two-chip-plus-`+N` summary otherwise. There is no in-toolbar Clear-all — the search page's form owns clearing. On list pages the context comes from `handle_list` (`active_filters`, `search_url`); detail pages pass no args.
 - `_picker.html` — `picker(options)`: the "choose your path" card grid. Each option is a dict of `href` / `heading` / `description`; the macro emits a `<div class="picker">` grid wrapping one `<a class="picker-option"><hgroup><h2>…</h2><p>…</p></hgroup></a>` card per option. The `.picker` / `.picker-option` styling lives in `framework.css` — bordered cards with a link-coloured heading and muted (non-underlined) description, so the chooser reads as the page's primary action rather than a stack of underlined links. Two usages, one component: a *discriminator/type picker* funnels to a kind-/type-specific sub-form of the **same** resource via a selecting query param (`/posts/form` `?kind=`, `/organizations/form` `?type=`); a *dispatching picker* points its cards at **other** resources' create forms (`/profile/identity` → `/clinicians/form` and `/organizations/form`). The macro only takes `{href, heading, description}` — self- vs cross-resource hrefs are the caller's business. Extracted from the posts pattern (#704).
 - `pagination.html` — `pagination(page_meta, paginator_base_query)`: Prev / Page N / Next footer rendered automatically by `views/list.html` after the `{% block content %}`. Reads the `Page` snapshot from [`../dispatch/pagination.py`](../dispatch/pagination.py) (set by `handle_list` and the bespoke list handlers) and emits nothing when the result fits on a single page. `paginator_base_query` is the request's query string with `page=` stripped, so the Prev/Next links round-trip filter state across page navigation.
 
@@ -148,4 +156,5 @@ Handlers pass only resource-specific data. Chrome scalars (`is_authenticated`, `
 ## Tests
 
 - `test_views.py` (colocated): renders each view-type template via stub child templates and pins the breadcrumb / toolbar / content contract. A regression in the chrome wiring is caught here even before any domain page is changed.
+- `test_page_header.py` (colocated): pins the unified band — the toolbar `<h1>` and breadcrumb render *inside* `header.page-header`, list pages reserve the breadcrumb row with a hidden placeholder, exactly one `<hr>` lives in the band (none in `<main>`), plus CSS-regex pins for the no-wrap / truncation / reserved-placeholder rules.
 - Per-entity rendering is exercised indirectly via route tests under [`../../domain/routes/`](../../domain/routes/). Selector conventions for template tests live in [`../../../tests/README.md`](../../../tests/README.md).

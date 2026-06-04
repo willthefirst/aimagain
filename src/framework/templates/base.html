@@ -140,44 +140,22 @@
     {%- set _on_home = is_authenticated and request.url.path == '/home' -%}
     {%- set _posts_path = entity_url('post') -%}
     {%- set _on_posts = is_authenticated and (request.url.path == _posts_path or request.url.path.startswith(_posts_path + '/')) -%}
-    <header class="container">
-      <nav aria-label="Primary" id="primary-nav">
-        <a href="/"><strong>Bedlam Connect</strong></a>
-        {% if is_authenticated %}
-          <details id="nav-menu">
-            <summary class="nav-menu-toggle" aria-label="Menu">
-              <i class="icon-menu nav-menu-open-icon"></i>
-              <i class="icon-x nav-menu-close-icon"></i>
-            </summary>
-            <ul>
-              <li>
-                <a href="/home" {% if _on_home %}aria-current="page"{% endif %}>Home</a>
-              </li>
-              <li>
-                <a href="{{ entity_url('post') }}"
-                   {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>
-              </li>
-              <li>
-                <a href="/profile" {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
-              </li>
-              <li>
-                <a href="#" hx-post="/auth/sign-out">Sign out</a>
-              </li>
-            </ul>
-          </details>
-          <script>
-            (function () {
-              var mq = window.matchMedia("(min-width: 641px)");
-              var menu = document.getElementById("nav-menu");
-              function sync() { menu.open = mq.matches; }
-              sync();
-              mq.addEventListener("change", sync);
-            })();
-          </script>
-        {% endif %}
-        {# Anonymous visitors get only the brand link. #}
-      </nav>
-    </header>
+    {# Unified page-header band. `{% include %}` can't see this template's
+       blocks, so capture each chrome block's output into a context var and
+       hand the pre-rendered HTML to the partial, which assembles the single
+       fixed band (nav + breadcrumb slot + toolbar slot + boundary rule).
+       The captured subtitle is rendered below the band, at the top of
+       `<main>`. See `_shared/_page_header.html` and `templates/README.md`. #}
+    {%- set _breadcrumb_html %}
+      {% block breadcrumb %}{% endblock %}
+    {% endset -%}
+    {%- set _toolbar_html %}
+      {% block toolbar %}{% endblock %}
+    {% endset -%}
+    {%- set _subtitle_html %}
+      {% block subtitle %}{% endblock %}
+    {% endset -%}
+    {% include "_shared/_page_header.html" %}
     {# Single global incomplete-profile banner — the *only* place the app
        nags about verification. One chrome signal that reads
        `onboarding_incomplete` from `base_context` — itself the
@@ -197,18 +175,19 @@
       </aside>
     {% endif %}
     <main class="container">
-      {# Breadcrumb zone bar — `{% block breadcrumb %}` accepts the
-         `breadcrumb(items)` macro from `_shared/_breadcrumb.html`.
-         Pages set their own location context; list pages and the
-         top-level home leave the block empty. #}
-      {% block breadcrumb %}{% endblock %}
-      {# Toolbar primitive — `{% block toolbar %}` accepts a `{% call %}`
-         of the shared `page_toolbar(...)` macro from
-         `_shared/_toolbar.html`. Renders page-scoped controls
-         right-aligned (with an optional left-zone search link on list
-         pages) and a horizontal rule below. Pages without a toolbar
-         leave the block empty. #}
-      {% block toolbar %}{% endblock %}
+      {# Subtitle slot — a one-line muted meta string rendered directly
+         below the page-header band's rule, above content (e.g. a
+         clinician's "NPI · Verified", a profile-mode line). The block is
+         captured in the band-assembly section above and rendered here so
+         it lands outside the reserved single-row band but at the top of
+         the body. Wrapped in `<small class="meta">` so multiple `<span>`
+         children auto-join with " · " (see the `.meta` rule). Empty on
+         pages that don't set `{% block subtitle %}`. #}
+      {%- if _subtitle_html | trim %}
+        <p>
+          <small class="meta">{{ _subtitle_html | trim | safe }}</small>
+        </p>
+      {%- endif %}
       {% block content %}{% endblock %}
       {# Post-content slot. `views/list.html` populates this with the
          pagination footer; non-list views leave it empty. Reserved

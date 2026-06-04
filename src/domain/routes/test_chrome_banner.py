@@ -178,6 +178,19 @@ async def test_home_renders_post_ctas_when_claim_a_verified(
     assert "+ Post a referral" in response.text
     assert "+ Post an opening" in response.text
 
+    # The post CTAs ride the unified page-header toolbar (not an inline
+    # content section): each active create link is a `<li>` inside the
+    # band's `menu.toolbar-right`, and the page title is the band's H1.
+    tree = HTMLParser(response.text)
+    h1 = tree.css_first("header.page-header div.toolbar h1")
+    assert h1 is not None and h1.text(strip=True) == "Home"
+    cta_labels = {
+        li.text(strip=True)
+        for li in tree.css("header.page-header menu.toolbar-right li")
+        if li.text(strip=True).startswith("+ Post")
+    }
+    assert cta_labels == {"+ Post a referral", "+ Post an opening"}
+
 
 async def test_home_shows_locked_post_actions_for_claim_b_only_org_rep(
     authenticated_client: AsyncClient,

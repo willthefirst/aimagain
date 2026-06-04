@@ -1,0 +1,86 @@
+{# Unified page-header band — the app's permanent top chrome.
+
+Renders one `<header class="container page-header">` whose rows, top to
+bottom, are: primary nav → breadcrumb slot → page-title/toolbar slot →
+a single `<hr class="page-header-rule">` boundary. The rule sits at the
+same Y on every app page at a given screen size: the breadcrumb row is
+reserved with an invisible intrinsic-height placeholder when a page has
+no real breadcrumb (list pages), so a list page's rule lines up with a
+detail page's. The reserved height is content-derived (a real
+back-affordance shape, hidden via `visibility: hidden`), never pinned
+with a CSS size unit — so it changes across screen sizes but is
+identical across pages at one size.
+
+`{% include %}` can't see the including template's `{% block %}`s, so
+`base.html` captures the breadcrumb / toolbar block output into context
+vars and this partial renders them as pre-rendered HTML. The partial
+inherits the caller's context, so `_on_home` / `_on_posts` /
+`_on_profile` / `is_authenticated` resolve normally.
+
+The band's lower rows (breadcrumb + toolbar + rule) render only when
+there's app chrome to show — any breadcrumb or toolbar content, or an
+authenticated viewer. Anonymous public pages (landing, the `/auth/*`
+flow) thus keep their bare brand nav with no rule, while every
+authenticated app page gets the full constant-boundary band.
+
+Required context (set by `base.html` before the include):
+  _breadcrumb_html — rendered `{% block breadcrumb %}` output (may be empty)
+  _toolbar_html    — rendered `{% block toolbar %}` output (may be empty)
+  is_authenticated, _on_home, _on_posts, _on_profile — nav state
+
+See `templates/README.md` § "Page chrome contract" for the slot list
+and the constant-boundary rationale (one source of truth).
+#}
+<header class="container page-header">
+  <nav aria-label="Primary" id="primary-nav">
+    <a href="/"><strong>Bedlam Connect</strong></a>
+    {% if is_authenticated %}
+      <details id="nav-menu">
+        <summary class="nav-menu-toggle" aria-label="Menu">
+          <i class="icon-menu nav-menu-open-icon"></i>
+          <i class="icon-x nav-menu-close-icon"></i>
+        </summary>
+        <ul>
+          <li>
+            <a href="/home" {% if _on_home %}aria-current="page"{% endif %}>Home</a>
+          </li>
+          <li>
+            <a href="{{ entity_url('post') }}"
+               {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>
+          </li>
+          <li>
+            <a href="/profile" {% if _on_profile %}aria-current="page"{% endif %}>Profile</a>
+          </li>
+          <li>
+            <a href="#" hx-post="/auth/sign-out">Sign out</a>
+          </li>
+        </ul>
+      </details>
+      <script>
+        (function () {
+          var mq = window.matchMedia("(min-width: 641px)");
+          var menu = document.getElementById("nav-menu");
+          function sync() { menu.open = mq.matches; }
+          sync();
+          mq.addEventListener("change", sync);
+        })();
+      </script>
+    {% endif %}
+    {# Anonymous visitors get only the brand link. #}
+  </nav>
+  {%- if (_breadcrumb_html | trim) or (_toolbar_html | trim) or is_authenticated %}
+    {# Breadcrumb row. Reserves its height with an invisible
+       back-affordance placeholder when a page has no real breadcrumb,
+       so the rule below sits at a constant Y across pages. #}
+    <div class="page-header-crumb">
+      {%- if _breadcrumb_html | trim %}{{ _breadcrumb_html }}
+      {%- else %}
+        <nav aria-hidden="true" class="page-header-crumb-placeholder">
+          <a class="breadcrumb-back"><i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">&nbsp;</span></a>
+        </nav>
+      {%- endif %}
+    </div>
+    {{ _toolbar_html }}
+    <hr class="page-header-rule" />
+  {%- endif %}
+</header>

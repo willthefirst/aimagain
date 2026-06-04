@@ -1,8 +1,10 @@
 {# Top-of-page zone bar primitive.
 
-Every page renders one toolbar strip above its content, followed
-by an `<hr />` separator. The row carries up to three things,
-left-to-right:
+Every page renders one toolbar strip above its content. The
+single boundary `<hr>` below the toolbar is owned by the
+page-header band (`_shared/_page_header.html`), not this macro —
+the macro emits only the `<div class="toolbar">` row. The row
+carries up to three things, left-to-right:
 
   Heading (`<h1>`) — the page title. Required arg. Lives in the
     same row as the actions so the chrome compacts to a single
@@ -85,6 +87,18 @@ Args:
   {%- set has_actions = actions_html | trim -%}
   <div class="toolbar">
     <h1>{{ heading }}</h1>
+    {# Reserve the action-row height on every page so the band's boundary
+       rule sits at a constant Y whether or not a page has toolbar actions:
+       a hidden, non-interactive real `<button>` shares the H1's grid cell
+       and contributes a real button's intrinsic height (taller than the
+       bare H1). Pages with real actions are unaffected (same height);
+       action-free pages reserve the maximal single-row layout. Same
+       "reserve via real content, not a pinned size unit" approach the
+       breadcrumb placeholder uses — see `_page_header.html`. #}
+    <button type="button"
+            tabindex="-1"
+            aria-hidden="true"
+            class="toolbar-reserve">&nbsp;</button>
     {%- if search_url or has_actions %}
       {# Filter + menu live in one grid cell so the actions cluster
      reflows as a single unit (atomic wrap). See `.toolbar`'s grid
@@ -114,5 +128,4 @@ Args:
     </div>
   {%- endif %}
 </div>
-<hr />
 {%- endmacro %}
