@@ -163,6 +163,18 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
         ("clinician_repo", ClinicianRepository),
         ("verification_audit_repo", AuditRepository),
     ),
+    # Re-run NPI verification when a `PATCH /clinicians/{id}` changes `npi`
+    # (canonical replacement for the retired
+    # `POST /profile/clinician/{id}/identity` retry). Keyed on the value
+    # changing, so non-NPI edits don't trigger a needless NPPES lookup.
+    after_update_path=(
+        "src.domain.logic.clinicians.handlers.after_update_clinician_verification"
+    ),
+    after_update_repos=(
+        ("verification_repo", VerificationRepository),
+        ("clinician_repo", ClinicianRepository),
+        ("verification_audit_repo", AuditRepository),
+    ),
     # Clinician templates render credential-type display labels and the
     # tuples behind the filter/select dropdowns. Tying them to the spec
     # (instead of Jinja globals) means a new credential-type tuple

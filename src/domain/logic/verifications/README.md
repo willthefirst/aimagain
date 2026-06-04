@@ -12,11 +12,12 @@ Persistence + pure-function primitives for the clinician verification pipeline. 
 - `handlers.py` — NPPES pipeline: `run_clinician_verification(...)`, `run_org_verification(...)`, and their admin-only retrigger wrappers. Composes the primitives with persistence + audit + an `httpx.AsyncClient`. The bespoke route lives at [`../../routes/verifications.py`](../../routes/verifications.py) and is wired into `src/main.py` next to the other hand-rolled routers.
 - `events.py` — `recompute_clinician_claim(clinician)`, `recompute_org_claim(org)`, and `record_verification_event(...)`. These three live outside the NPPES pipeline because they are called by `clinicians/handlers.py` and `org_representations/handlers.py` without any HTTP dependency. The recompute helpers are nearly pure (no I/O; they mutate their argument in place); `record_verification_event` is the single append-only writer for the non-NPPES §9 transitions.
 
-The pipeline orchestrators have three callers each:
+The pipeline orchestrators have these callers:
 
 1. **`after_create_clinician_verification`** in [`../clinicians/handlers.py`](../clinicians/handlers.py) (post-create hook wired to `CLINICIAN_ENTITY.after_create_path`; runs inline on `POST /clinicians` so the first Verification row lands in the same request as the row itself).
-2. **`submit_clinician_npi` / `submit_organization_npi`** in [`../../routes/verifications.py`](../../routes/verifications.py) (end-user NPI submission; the route runs the pipeline inline so the response carries the resolved state — see that file's docstring).
-3. **`handle_create_clinician_verification` / `handle_create_org_verification`** in `handlers.py` (admin retrigger; `actor_id=requesting_user.id`).
+2. **`after_update_clinician_verification`** in [`../clinicians/handlers.py`](../clinicians/handlers.py) (post-update hook wired to `CLINICIAN_ENTITY.after_update_path`; re-runs the pipeline inline on `PATCH /clinicians/{id}` **only when the `npi` value changes** — the canonical replacement for the retired profile identity-retry flow).
+3. **`submit_clinician_npi` / `submit_organization_npi`** in [`../../routes/verifications.py`](../../routes/verifications.py) (end-user NPI submission; the route runs the pipeline inline so the response carries the resolved state — see that file's docstring).
+4. **`handle_create_clinician_verification` / `handle_create_org_verification`** in `handlers.py` (admin retrigger; `actor_id=requesting_user.id`).
 
 There is no scheduled job — see [`../../../jobs/README.md`](../../../jobs/README.md) for the rationale (NPPES is fast enough to run inline; a worker buys polling and pending-state complexity in exchange for no real latency win).
 

@@ -1792,3 +1792,81 @@ async def test_get_clinician_openings_404_for_missing_clinician(
     """A nonexistent clinician id 404s rather than rendering an empty list."""
     response = await authenticated_client.get(f"/clinicians/{uuid.uuid4()}/openings")
     assert response.status_code == 404
+
+
+async def test_patch_clinician_npi_change_reruns_verification(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """PATCH /clinicians/{id} changing `npi` re-runs NPPES verification via
+    the `after_update` hook — the canonical replacement for the retired
+    `POST /profile/clinician/{id}/identity` retry (#1166). `nppes_lookup` is
+    patched so no real HTTP fires; LEIE points at the fixture CSV."""
+    import os
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from src.domain.logic.verifications import oig as oig_module
+    from src.domain.logic.verifications.nppes import NppesResult
+
+    leie_fixture = (
+        Path(__file__).parent.parent
+        / "logic"
+        / "verifications"
+        / "test_data"
+        / "leie_sample.csv"
+    )
+    oig_module._reset_cache_for_tests()
+    old_path = os.environ.get("LEIE_CSV_PATH")
+    os.environ["LEIE_CSV_PATH"] = str(leie_fixture)
+    try:
+        clinician = make_clinician_with_org(
+            owner_id=logged_in_user.id,
+            npi="1111111111",
+            npi_match_status="mismatch",
+            first_name="Jane",
+            last_name="Smith",
+        )
+        clinician.clinician_verified = False
+        async with db_test_session_manager() as session:
+            async with session.begin():
+                session.add(clinician)
+        clinician_id = clinician.id
+
+        nppes_match = NppesResult(
+            found=True, first_name="Jane", last_name="Smith", raw={}
+        )
+        with patch(
+            "src.domain.logic.verifications.handlers.nppes_lookup",
+            new=AsyncMock(return_value=nppes_match),
+        ):
+            response = await authenticated_client.patch(
+                f"/clinicians/{clinician_id}",
+                data={"npi": "9999999999"},
+            )
+        assert response.status_code == 200
+
+        async with db_test_session_manager() as session:
+            loaded = await session.get(Clinician, clinician_id)
+            assert loaded.npi == "9999999999"
+            # Re-verification ran and resolved the new NPI as a match.
+            assert loaded.npi_match_status == "matched"
+            rows = (
+                (
+                    await session.execute(
+                        select(Verification).filter(
+                            Verification.clinician_id == clinician_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert any(r.event_type == "npi_resolved" for r in rows)
+    finally:
+        if old_path is None:
+            os.environ.pop("LEIE_CSV_PATH", None)
+        else:
+            os.environ["LEIE_CSV_PATH"] = old_path
+        oig_module._reset_cache_for_tests()

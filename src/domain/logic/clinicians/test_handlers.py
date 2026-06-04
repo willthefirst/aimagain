@@ -1038,3 +1038,65 @@ async def test_after_create_clinician_verification_no_npi_records_skipped(
         else:
             os.environ["LEIE_CSV_PATH"] = old_path
         oig_module._reset_cache_for_tests()
+
+
+# --- after_update_clinician_verification (re-verify on npi change) -------
+
+
+async def test_after_update_reverifies_when_npi_changed(monkeypatch):
+    """When `npi` is among the changed fields, the update hook delegates to
+    the NPI-verification pipeline. (The pipeline mechanics are covered by the
+    after_create DB test; this pins the change-gating + delegation.)"""
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from src.domain.logic.clinicians import handlers as h
+
+    seen: dict = {}
+
+    async def _fake_verify(**kwargs):
+        seen.update(kwargs)
+
+    monkeypatch.setattr(h, "after_create_clinician_verification", _fake_verify)
+
+    row = SimpleNamespace(id=uuid4())
+    user = SimpleNamespace(id=uuid4())
+    await h.after_update_clinician_verification(
+        row=row,
+        payload=SimpleNamespace(),
+        requesting_user=user,
+        changed_fields={"npi", "first_name"},
+        verification_repo="vr",
+        clinician_repo="cr",
+        verification_audit_repo="ar",
+    )
+    assert seen.get("row") is row
+    assert seen.get("clinician_repo") == "cr"
+
+
+async def test_after_update_noop_when_npi_unchanged(monkeypatch):
+    """A non-NPI edit (e.g. location only) must NOT re-run NPI verification —
+    no needless NPPES lookup."""
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from src.domain.logic.clinicians import handlers as h
+
+    called = False
+
+    async def _fake_verify(**kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(h, "after_create_clinician_verification", _fake_verify)
+
+    await h.after_update_clinician_verification(
+        row=SimpleNamespace(id=uuid4()),
+        payload=SimpleNamespace(),
+        requesting_user=SimpleNamespace(id=uuid4()),
+        changed_fields={"location_city", "location_state"},
+        verification_repo="vr",
+        clinician_repo="cr",
+        verification_audit_repo="ar",
+    )
+    assert called is False
