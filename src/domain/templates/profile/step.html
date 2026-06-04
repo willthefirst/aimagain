@@ -5,8 +5,8 @@
    incomplete step's satisfying form.
 
    `step` is the `OnboardingStep` row; the rest of the context is the
-   ordinary `build_profile_context` (setup_path, clinicians, etc.) so the
-   identity flow renders exactly as it does elsewhere. #}
+   ordinary `build_profile_context` (clinicians, org_representations, etc.)
+   so the identity dispatching picker renders its current posture. #}
 {% extends "base.html" %}
 {% block title %}{{ step.title }}{% endblock %}
 {% block content %}

@@ -4,6 +4,12 @@ Confirms the page renders for an authenticated user, the mode dispatch
 flows through to the right partial, and the route is admin-free (any
 active user can see their own hub — Claim B coordinators must be able
 to use it without holding Claim A).
+
+The `/profile/identity` step is a *dispatching picker* (issue #1166): its
+two cards link out to the canonical `/clinicians/form` and
+`/organizations/form`. It hosts no create form of its own; the bespoke
+`POST /profile/clinician|org|.../identity|.../license` endpoints were
+removed in favor of the canonical creates.
 """
 
 import pytest
@@ -12,7 +18,7 @@ from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from src.domain.models import Clinician, ClinicianLicensure, User
+from src.domain.models import Clinician, User
 
 pytestmark = pytest.mark.asyncio
 
@@ -27,9 +33,8 @@ async def test_profile_hub_links_identity_row_to_step_subroute(
     response = await authenticated_client.get("/profile")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
-    # The hub is a TOC — the persona chooser has moved to the step page.
+    # The hub is a TOC — the dispatching picker lives on the step page.
     assert "I&#39;m a clinician" not in response.text
-    assert "Verify your NPI" not in response.text
     identity_row = HTMLParser(response.text).css_first(
         '#onboarding-checklist [data-step="identity"]'
     )
@@ -40,58 +45,36 @@ async def test_profile_hub_links_identity_row_to_step_subroute(
     assert link.attributes.get("href") == "/profile/identity"
 
 
-async def test_profile_identity_step_renders_persona_chooser_for_new_user(
+async def test_profile_identity_step_renders_dispatching_picker(
     authenticated_client: AsyncClient,
 ):
-    """A fresh dev user with no `?path=` hint sees the persona chooser on
-    the `/profile/identity` step page — not either onboarding sub-flow yet."""
+    """`/profile/identity` is a dispatching picker: two cards linking OUT to
+    the canonical create forms. It carries no `?path=` selector and hosts no
+    inline create form."""
     response = await authenticated_client.get("/profile/identity")
     assert response.status_code == 200
-    # The two persona cards from the chooser branch of `_setup.html`.
-    # Jinja HTML-escapes the apostrophe, so match the rendered form.
+    # The two persona cards, rendered as the shared picker grid.
     assert "I&#39;m a clinician" in response.text
     assert "I represent an organization" in response.text
-    assert "?path=clinician" in response.text
-    assert "?path=org" in response.text
-    # The chooser renders as the shared picker card grid — each option is a
-    # bordered `.picker-option` card, not a bare underlined link. This is the
-    # primary action on the step page, so it must read as a card.
     assert 'class="picker"' in response.text
     assert 'class="picker-option"' in response.text
-    # Neither sub-flow's form is shown until a persona is picked.
+    # Cards dispatch to the canonical create forms (via entity_form_url),
+    # not the retired `?path=` selector or inline forms.
+    assert 'href="/clinicians/form"' in response.text
+    assert 'href="/organizations/form"' in response.text
+    assert "?path=" not in response.text
+    # No inline create form is hosted here anymore (read xor form).
     assert "Verify your NPI" not in response.text
 
 
-async def test_profile_identity_step_clinician_path_shows_npi_flow(
-    authenticated_client: AsyncClient,
-):
-    """`/profile/identity?path=clinician` renders the clinician onboarding
-    flow — NPI verification — and not the org-registration form."""
-    response = await authenticated_client.get("/profile/identity?path=clinician")
-    assert response.status_code == 200
-    assert "Verify your NPI" in response.text
-    assert "Register an organization" not in response.text
-
-
-async def test_profile_identity_step_org_path_shows_org_flow(
-    authenticated_client: AsyncClient,
-):
-    """`/profile/identity?path=org` renders the org-registration flow and
-    not the clinician NPI form."""
-    response = await authenticated_client.get("/profile/identity?path=org")
-    assert response.status_code == 200
-    assert "Register an organization" in response.text
-    assert "Verify your NPI" not in response.text
-
-
-async def test_profile_identity_step_started_clinician_ignores_path_hint(
+async def test_profile_identity_step_shows_started_clinician_with_manage_link(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A user who already created a clinician resumes the clinician flow
-    even with `?path=org` — the started path wins over the hint, so they
-    aren't bounced back to the chooser or the wrong sub-flow."""
+    """When the user has already created a clinician, the dispatching picker
+    also surfaces a read-only posture row linking to the clinician's own
+    canonical page (where NPI re-verify / license attestation live)."""
     from tests.helpers import make_clinician_with_org
 
     clinician = make_clinician_with_org(
@@ -104,12 +87,14 @@ async def test_profile_identity_step_started_clinician_ignores_path_hint(
         async with session.begin():
             session.add(clinician)
 
-    response = await authenticated_client.get("/profile/identity?path=org")
+    response = await authenticated_client.get("/profile/identity")
     assert response.status_code == 200
-    assert "Verify your NPI" in response.text
-    # The org registration form should not appear; the path switcher picker
-    # still shows "I represent an organization" as a non-selected link option.
-    assert "Register an organization" not in response.text
+    # Static template text isn't HTML-escaped (only `{{ }}` vars are), so the
+    # apostrophe renders literally.
+    assert "What you've started" in response.text
+    # Posture row links to the canonical clinician edit page, not a bespoke
+    # profile sub-form.
+    assert f'href="/clinicians/{clinician.id}/form"' in response.text
 
 
 async def test_profile_step_unknown_key_returns_404(
@@ -161,196 +146,6 @@ async def test_profile_hub_add_claim_mode_renders_unlocks_unchanged(
     assert "Add a capability" in response.text
     assert "Unlocks" in response.text
     assert "Unchanged" in response.text
-
-
-async def test_post_profile_clinician_creates_and_redirects(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """POST /profile/clinician creates a minimal clinician + fires NPI
-    verification inline, then returns HX-Redirect: /profile/identity so the
-    identity step re-renders with the NPPES result."""
-    response = await authenticated_client.post(
-        "/profile/clinician",
-        data={
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "npi": "1234567890",
-            "location_city": "Portland",
-            "location_state": "OR",
-            "location_zip": "97201",
-        },
-    )
-
-    assert response.status_code == 201
-    assert response.headers.get("HX-Redirect") == "/profile/identity"
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(
-            select(Clinician).where(Clinician.owner_id == logged_in_user.id)
-        )
-        clinician = result.scalars().first()
-        assert clinician is not None
-        assert clinician.npi == "1234567890"
-        assert clinician.org_id is not None
-
-
-async def test_post_profile_clinician_without_location(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """POST /profile/clinician works without location fields — the fast
-    path only needs name + NPI.  Location columns stay NULL on the
-    affiliation row and can be filled in later via the details endpoint."""
-    response = await authenticated_client.post(
-        "/profile/clinician",
-        data={
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "npi": "1234567890",
-        },
-    )
-
-    assert response.status_code == 201
-    assert response.headers.get("HX-Redirect") == "/profile/identity"
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(
-            select(Clinician).where(Clinician.owner_id == logged_in_user.id)
-        )
-        clinician = result.scalars().first()
-        assert clinician is not None
-        assert clinician.npi == "1234567890"
-        assert clinician.location_city is None
-        assert clinician.location_state is None
-
-
-async def test_post_profile_clinician_requires_authentication(
-    test_client: AsyncClient,
-):
-    """Unauthenticated POST to /profile/clinician is rejected."""
-    response = await test_client.post(
-        "/profile/clinician",
-        data={
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "npi": "1234567890",
-            "location_city": "Portland",
-            "location_state": "OR",
-            "location_zip": "97201",
-        },
-        follow_redirects=False,
-    )
-    assert response.status_code != 201
-
-
-async def test_post_profile_clinician_license_creates_attests_and_redirects(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """POST /profile/clinician/{id}/license creates a licensure, attests
-    it active in one step, and returns HX-Redirect: /profile/identity."""
-    from tests.helpers import make_clinician_with_org
-
-    clinician = make_clinician_with_org(
-        owner_id=logged_in_user.id,
-        npi="1234567890",
-        npi_match_status="matched",
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-    clinician_id = clinician.id
-
-    response = await authenticated_client.post(
-        f"/profile/clinician/{clinician_id}/license",
-        data={
-            "license_type": "lcsw",
-            "license_number": "LCS-99999",
-            "issuing_state": "OR",
-        },
-    )
-
-    assert response.status_code == 201
-    assert response.headers.get("HX-Redirect") == "/profile/identity"
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(
-            select(ClinicianLicensure).where(
-                ClinicianLicensure.clinician_id == clinician_id
-            )
-        )
-        licensure = result.scalars().first()
-        assert licensure is not None
-        assert licensure.attested_active is True
-        assert licensure.status == "active"
-
-
-async def test_post_profile_clinician_identity_update_retries_verification(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """POST /profile/clinician/{id}/identity updates name + NPI and
-    re-runs verification inline, returning HX-Redirect: /profile/identity."""
-    from tests.helpers import make_clinician_with_org
-
-    clinician = make_clinician_with_org(
-        owner_id=logged_in_user.id,
-        npi="1111111111",
-        npi_match_status="mismatch",
-    )
-    clinician.clinician_verified = False
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-    clinician_id = clinician.id
-
-    response = await authenticated_client.post(
-        f"/profile/clinician/{clinician_id}/identity",
-        data={
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "npi": "9999999999",
-        },
-    )
-
-    assert response.status_code == 200
-    assert response.headers.get("HX-Redirect") == "/profile/identity"
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(
-            select(Clinician).where(Clinician.id == clinician_id)
-        )
-        updated = result.scalars().first()
-        assert updated.npi == "9999999999"
-        assert updated.first_name == "Jane"
-
-
-async def test_post_profile_clinician_identity_update_rejects_wrong_owner(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A user cannot update another user's clinician identity."""
-    from tests.helpers import create_test_user, make_clinician_with_org
-
-    other = create_test_user(username="other-identity")
-    clinician = make_clinician_with_org(owner_id=other.id, npi="2222222222")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(clinician)
-
-    response = await authenticated_client.post(
-        f"/profile/clinician/{clinician.id}/identity",
-        data={"first_name": "Evil", "last_name": "Hacker", "npi": "3333333333"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 403
 
 
 async def test_post_profile_clinician_details_update_saves_location(
@@ -414,52 +209,6 @@ async def test_post_profile_clinician_details_update_rejects_wrong_owner(
     response = await authenticated_client.post(
         f"/profile/clinician/{clinician.id}/details",
         data={"location_city": "Evil", "location_state": "CA", "location_zip": "90210"},
-        follow_redirects=False,
-    )
-    assert response.status_code == 403
-
-
-async def test_post_profile_clinician_license_requires_authentication(
-    test_client: AsyncClient,
-):
-    """Unauthenticated POST to /profile/clinician/{id}/license is rejected."""
-    import uuid
-
-    response = await test_client.post(
-        f"/profile/clinician/{uuid.uuid4()}/license",
-        data={
-            "license_type": "lcsw",
-            "license_number": "LCS-99999",
-            "issuing_state": "OR",
-        },
-        follow_redirects=False,
-    )
-    assert response.status_code != 201
-
-
-async def test_post_profile_clinician_license_rejects_wrong_owner(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A user cannot add a license to another user's clinician."""
-    from tests.helpers import create_test_user, make_clinician_with_org
-
-    other = create_test_user(username="other-owner")
-    clinician = make_clinician_with_org(owner_id=other.id, npi="9999999999")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-            session.add(clinician)
-    clinician_id = clinician.id
-
-    response = await authenticated_client.post(
-        f"/profile/clinician/{clinician_id}/license",
-        data={
-            "license_type": "lcsw",
-            "license_number": "LCS-STOLEN",
-            "issuing_state": "CA",
-        },
         follow_redirects=False,
     )
     assert response.status_code == 403

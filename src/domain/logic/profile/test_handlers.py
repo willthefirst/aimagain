@@ -17,11 +17,8 @@ from src.domain.logic.profile.handlers import (
     MODE_REVERIFY,
     MODE_SETUP,
     PROFILE_MODES,
-    SETUP_PATH_CLINICIAN,
-    SETUP_PATH_ORG,
     build_profile_context,
     resolve_profile_mode,
-    resolve_setup_path,
 )
 
 
@@ -191,47 +188,20 @@ def test_archived_org_rep_stays_in_setup():
 
 
 # ---------------------------------------------------------------------------
-# resolve_setup_path: persona chooser vs. resume-by-state
+# build_profile_context shape
 # ---------------------------------------------------------------------------
 
 
-def test_setup_path_none_for_fresh_user_without_hint():
-    """A fresh user (no clinician, no org rep) and no `?path=` hint gets
-    `None` → the persona chooser."""
-    assert resolve_setup_path(_user()) is None
-
-
-def test_setup_path_honors_clinician_hint_when_fresh():
-    assert resolve_setup_path(_user(), path_hint="clinician") == SETUP_PATH_CLINICIAN
-
-
-def test_setup_path_honors_org_hint_when_fresh():
-    assert resolve_setup_path(_user(), path_hint="org") == SETUP_PATH_ORG
-
-
-def test_setup_path_ignores_out_of_range_hint():
-    """An unknown `?path=` value is treated as absent — back to the chooser
-    rather than rendering an empty sub-flow."""
-    assert resolve_setup_path(_user(), path_hint="bogus") is None
-
-
-def test_setup_path_resumes_clinician_when_clinician_exists():
-    """A started clinician implies the clinician flow even when the hint
-    says org — `POST /profile/clinician` also auto-creates the solo org
-    rep, so we key off the clinician, not the rep."""
-    user = _user(clinicians=[_clinician()], org_representations=[_rep()])
-    assert resolve_setup_path(user, path_hint="org") == SETUP_PATH_CLINICIAN
-
-
-def test_setup_path_resumes_org_when_only_org_rep_exists():
-    """An org rep with no clinician implies the org flow, hint or not."""
-    user = _user(org_representations=[_rep()])
-    assert resolve_setup_path(user, path_hint="clinician") == SETUP_PATH_ORG
-
-
-def test_build_profile_context_exposes_setup_path():
-    ctx = build_profile_context(_user(), path_hint="org")
-    assert ctx["setup_path"] == SETUP_PATH_ORG
+def test_build_profile_context_shape():
+    """The hub context carries the mode + posture keys the partials read.
+    The `?path=`-driven `setup_path` key was removed when `/profile/identity`
+    became a dispatching picker (#1166)."""
+    ctx = build_profile_context(_user())
+    assert ctx["mode"] == MODE_SETUP
+    assert "checklist" in ctx
+    assert "clinicians" in ctx
+    assert "org_representations" in ctx
+    assert "setup_path" not in ctx
 
 
 # ---------------------------------------------------------------------------
