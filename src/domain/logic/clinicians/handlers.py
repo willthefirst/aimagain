@@ -9,6 +9,9 @@ from pydantic import BaseModel
 
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.org_representations.repository import (
+    OrgRepresentationRepository,
+)
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.verifications.repository import VerificationRepository
@@ -91,14 +94,24 @@ async def _assert_clinician_payload_org_ownership(
     payload: BaseModel,
     requesting_user: User,
     organization_repo: OrganizationRepository,
+    org_rep_repo: OrgRepresentationRepository,
 ) -> Organization | None:
     """Payload authz for clinician create/update.
 
     Solo-practice path: when ``payload.solo_practice`` is True,
     auto-create a solo-practice Organization, patch ``payload.org_id``,
-    and return the created org so the caller can wire up an OrgRepresentation.
+    grant the user an immediately-verified owner ``OrgRepresentation`` over
+    it, and return the created org. Wiring the owner rep here (rather than
+    in each caller) keeps the canonical ``POST /clinicians`` solo path and
+    the onboarding hub on the same owner-grant — previously only the hub
+    created the rep, so a solo clinician made via ``/clinicians/form`` got
+    an org with no authority over it.
     Normal path: delegate to the framework's FK-ownership guard, return None.
     """
+    from src.domain.logic.org_representations.handlers import (
+        grant_owner_representation,
+    )
+
     if getattr(payload, "solo_practice", False):
         practice_name = (getattr(payload, "practice_name", None) or "").strip()
         if not practice_name:
@@ -115,6 +128,11 @@ async def _assert_clinician_payload_org_ownership(
         )
         created_org = await organization_repo.create(auto_org)
         payload.org_id = created_org.id
+        await grant_owner_representation(
+            user_id=requesting_user.id,
+            org_id=created_org.id,
+            org_rep_repo=org_rep_repo,
+        )
         return created_org
     await assert_fk_ownership(
         payload=payload,

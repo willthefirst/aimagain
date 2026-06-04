@@ -239,6 +239,97 @@ def test_build_profile_context_exposes_setup_path():
 # ---------------------------------------------------------------------------
 
 
+class _RepMockRepo:
+    """Captures the OrgRepresentation passed to `create`."""
+
+    def __init__(self):
+        self.created = None
+
+    async def create(self, obj):
+        self.created = obj
+        obj.id = uuid4()
+        return obj
+
+
+async def test_clinician_solo_path_grants_owner_representation():
+    """The solo-practice branch must grant the user an immediately-verified
+    owner OrgRepresentation over the auto-created org, on both the canonical
+    create path and the onboarding hub (they share this function)."""
+    from types import SimpleNamespace
+
+    from src.domain.logic.clinicians.handlers import (
+        _assert_clinician_payload_org_ownership,
+    )
+
+    class _OrgRepo:
+        async def create(self, obj):
+            obj.id = uuid4()
+            return obj
+
+    user = SimpleNamespace(
+        id=uuid4(), username="alice", is_superuser=False, is_verified=True
+    )
+
+    class _Payload:
+        solo_practice = True
+        practice_name = "Solo Practice"
+        first_name = "Katie"
+        last_name = "Reeves"
+        org_id = None
+
+    org_repo = _OrgRepo()
+    rep_repo = _RepMockRepo()
+    created_org = await _assert_clinician_payload_org_ownership(
+        payload=_Payload(),
+        requesting_user=user,
+        organization_repo=org_repo,
+        org_rep_repo=rep_repo,
+    )
+
+    assert rep_repo.created is not None
+    assert rep_repo.created.user_id == user.id
+    assert rep_repo.created.org_id == created_org.id
+    assert rep_repo.created.role == "owner"
+    assert rep_repo.created.authority_method == "admin_review"
+    assert rep_repo.created.authority_status == "verified"
+
+
+async def test_clinician_non_solo_path_grants_no_representation():
+    """The non-solo path delegates to the FK-ownership guard and must not
+    create an OrgRepresentation."""
+    from types import SimpleNamespace
+    from uuid import uuid4 as _uuid4
+
+    from src.domain.logic.clinicians.handlers import (
+        _assert_clinician_payload_org_ownership,
+    )
+
+    owned_org_id = _uuid4()
+
+    class _OrgRepo:
+        async def get_by_model_id(self, model, _id):
+            return SimpleNamespace(id=owned_org_id, owner_id=user.id)
+
+    user = SimpleNamespace(
+        id=uuid4(), username="alice", is_superuser=False, is_verified=True
+    )
+
+    class _Payload:
+        solo_practice = False
+        org_id = owned_org_id
+
+    rep_repo = _RepMockRepo()
+    result = await _assert_clinician_payload_org_ownership(
+        payload=_Payload(),
+        requesting_user=user,
+        organization_repo=_OrgRepo(),
+        org_rep_repo=rep_repo,
+    )
+
+    assert result is None
+    assert rep_repo.created is None
+
+
 async def test_clinician_create_handler_uses_practice_name():
     """_assert_clinician_payload_org_ownership should use practice_name over
     first+last when it is provided, so the auto-org gets the right display name."""
@@ -275,6 +366,7 @@ async def test_clinician_create_handler_uses_practice_name():
         payload=_Payload(),
         requesting_user=user,
         organization_repo=repo,
+        org_rep_repo=_RepMockRepo(),
     )
     assert result is not None
     assert _MockRepo.last_created.name == "Single Thread Psychiatry"
@@ -311,5 +403,6 @@ async def test_clinician_create_handler_falls_back_to_name():
         payload=_Payload(),
         requesting_user=user,
         organization_repo=_MockRepo(),
+        org_rep_repo=_RepMockRepo(),
     )
     assert _MockRepo.last_created.name == "Katie Reeves"

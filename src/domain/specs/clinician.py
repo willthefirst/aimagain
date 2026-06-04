@@ -28,6 +28,9 @@ from src.domain.logic.clinicians.schema import (
     ClinicianVerificationStateUpdate,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
+from src.domain.logic.org_representations.repository import (
+    OrgRepresentationRepository,
+)
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.verifications.repository import VerificationRepository
@@ -139,10 +142,15 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     form_extras_path="src.domain.logic.clinicians.handlers.clinician_form_extras",
     form_extras_repos=(("organization_repo", OrganizationRepository),),
     # Write-time check: a user may only attach a Clinician to an Org they own.
+    # On the solo-practice path it also auto-creates the org and grants the
+    # user an owner OrgRepresentation over it (hence `org_rep_repo`).
     payload_authz_path=(
         "src.domain.logic.clinicians.handlers._assert_clinician_payload_org_ownership"
     ),
-    payload_authz_repos=(("organization_repo", OrganizationRepository),),
+    payload_authz_repos=(
+        ("organization_repo", OrganizationRepository),
+        ("org_rep_repo", OrgRepresentationRepository),
+    ),
     # Run NPI verification immediately after a clinician row is persisted.
     # `verification_audit_repo` is the AuditRepository under a distinct
     # name because `audit_repo` is a reserved factory-handler kwarg and
