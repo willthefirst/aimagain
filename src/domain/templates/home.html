@@ -5,37 +5,19 @@
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
   {% block content %}
-    {# Three-branch home per handoff §8.2:
-       1. No claim → "Finish setting up" card + anonymized teaser feed.
-       2. ≥1 claim → existing body (my posts + network feed).
-       3. Any claim lapsed → yellow banner above the existing body
-          naming the lapsed claim. The banner copy is owned by
-          `_verify_banner.html` (claim-aware) above the chrome — the
-          per-page repeat here would be redundant. #}
-    {% set _no_claim = not claims.a and not claims.b %}
-    {% if _no_claim %}
-      <article id="finish-setup-card">
-        <header>
-          <strong>Finish setting up</strong>
-          <small style="display: block; color: var(--pico-muted-color);">
-            Tell us what you want to do on Bedlam Connect — we'll only ask for what that needs.
-          </small>
-        </header>
-        <p>
-          {# title-case-ignore: "Claim A" / "Claim B" are user-facing labels for the two-claim model #}
-          Add a verified clinician profile (Claim A) to post referrals or openings as yourself, and/or become a verified representative of an organization (Claim B) to post program intakes on its behalf.
-        </p>
-        {# title-case-ignore: "Profile" is the page label, kept capitalized #}
-        <a href="/profile" role="button">Open Profile</a>
-      </article>
-    {% else %}
-      {# Post CTAs gate on `can_post` (Claim A only). A Claim-B-only org
-         rep can't post as themselves, but rather than hide the actions we
-         render them DISABLED with the unlock path (`locked_action`), so
-         the user sees the capability exists and how to reach it. The
-         server's `_assert_post_payload_authz` is the real gate; a disabled
-         button leaks nothing. `can_post` is derived once in
-         `base_context()` — don't re-derive from raw `claims.*`. #}
+    {# Home per handoff §8.2. The post-action row shows only once the user
+       holds at least one claim: a posting-capable user (Claim A) gets
+       active create links; a Claim-B-only org rep gets the same actions
+       DISABLED with the unlock path (`locked_action`), since that's their
+       only signal — the chrome banner is silent for them (onboarding
+       complete). A *no-claim* user is suppressed here entirely: the single
+       chrome `#onboarding-banner` (base.html) is their one finish-setup
+       nudge, so a per-page card or locked-button repeat would be the exact
+       redundancy that banner replaced. The server's
+       `_assert_post_payload_authz` is the real gate; a disabled button
+       leaks nothing. `can_post` is derived once in `base_context()` —
+       don't re-derive from raw `claims.*`. #}
+    {% if claims.a or claims.b %}
       <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
         {% if can_post %}
           <a href="{{ entity_form_url('post') }}?kind=referral"
@@ -83,19 +65,11 @@
         <a href="{{ entity_url('post') }}">Adjust filters</a>
           {# djlint:on #}
         </p>
-        {# Identifying info (poster name, practice, contact) is
-           anonymized server-side via `can_read_full_feed`. Show a
-           CTA so unverified users know verification unlocks the full
-           view. Verified users see nothing extra here. #}
-        {% if not can_read_full_feed %}
-          <p id="feed-verify-notice"
-             style="font-size: 0.875rem;
-                    color: var(--pico-muted-color);
-                    margin-bottom: 1rem">
-            Clinician names and contact details are hidden until you verify.
-            <a href="/profile">Complete verification →</a>
-          </p>
-        {% endif %}
+        {# Identifying info (poster name, practice, contact) is anonymized
+           server-side via `can_read_full_feed`. The chrome
+           `#onboarding-banner` (base.html) is the single place that
+           explains verification unlocks the full view — no per-feed
+           notice repeats it. #}
         {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
       </section>
     {% endif %}

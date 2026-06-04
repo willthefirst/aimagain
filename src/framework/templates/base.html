@@ -178,14 +178,16 @@
         {# Anonymous visitors get only the brand link. #}
       </nav>
     </header>
-    {# Single global incomplete-profile banner. One chrome signal that
-       reads `onboarding_incomplete` from `base_context` — itself the
+    {# Single global incomplete-profile banner — the *only* place the app
+       nags about verification. One chrome signal that reads
+       `onboarding_incomplete` from `base_context` — itself the
        `onboarding_checklist` registry projection — so it can't disagree
        with the itemized steps on `/profile`. Explains *why* content is
-       gated and links to the next actionable step (a `/profile?focus=…`
-       deep-link). Suppressed on `/profile` itself, where the full
-       checklist is already on screen — a banner there would just point
-       at the page you're on. #}
+       gated and links to the next actionable step (`onboarding_next_href`,
+       a `/profile/<step>` deep-link). Pages don't repeat this with their
+       own finish-setup cards or feed notices. Suppressed on `/profile`
+       itself, where the full checklist is already on screen — a banner
+       there would just point at the page you're on. #}
     {% if is_authenticated and onboarding_incomplete and not _on_profile %}
       <aside role="status" id="onboarding-banner" class="container">
         <strong>Finish setting up your profile.</strong>
