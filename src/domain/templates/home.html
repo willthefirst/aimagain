@@ -2,34 +2,44 @@
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_locked.html" import locked_action -%}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
-  {% block content %}
-    {# Home per handoff §8.2. The post-action row shows only once the user
-       holds at least one claim: a posting-capable user (Claim A) gets
-       active create links; a Claim-B-only org rep gets the same actions
-       DISABLED with the unlock path (`locked_action`), since that's their
-       only signal — the chrome banner is silent for them (onboarding
-       complete). A *no-claim* user is suppressed here entirely: the single
-       chrome `#onboarding-banner` (base.html) is their one finish-setup
-       nudge, so a per-page card or locked-button repeat would be the exact
-       redundancy that banner replaced. The server's
-       `_assert_post_payload_authz` is the real gate; a disabled button
-       leaks nothing. `can_post` is derived once in `base_context()` —
-       don't re-derive from raw `claims.*`. #}
-    {% if claims.a or claims.b %}
-      <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        {% if can_post %}
+  {# Home title + post actions ride the unified page-header toolbar. The
+     active create links appear only for a posting-capable user (`can_post`).
+     A Claim-B-only org rep (holds a claim but can't post yet) keeps the
+     DISABLED locked controls — but those are a two-line affordance that
+     can't sit in the single-row band, so they stay in `{% block content %}`
+     below. A *no-claim* user gets neither: the chrome `#onboarding-banner`
+     (base.html) is their one finish-setup nudge. The server's
+     `_assert_post_payload_authz` is the real gate; a disabled button leaks
+     nothing. `can_post` is derived once in `base_context()` — don't
+     re-derive from raw `claims.*`. #}
+  {% block toolbar %}
+    {% call page_toolbar(heading="Home") %}
+      {% if can_post %}
+        <li>
           <a href="{{ entity_form_url('post') }}?kind=referral"
              role="button"
              class="outline">+ Post a referral</a>
+        </li>
+        <li>
           <a href="{{ entity_form_url('post') }}?kind=clinician_opening"
              role="button"
              class="outline">+ Post an opening</a>
-        {% else %}
-          {{ locked_action(capabilities.REASON_CLAIM_A_UNVERIFIED, "+ Post a referral") }}
-          {{ locked_action(capabilities.REASON_CLAIM_A_UNVERIFIED, "+ Post an opening") }}
-        {% endif %}
+        </li>
+      {% endif %}
+    {% endcall %}
+  {% endblock %}
+  {% block content %}
+    {# Claim-B-only org rep: the locked create controls are their only
+       signal (the chrome banner is silent once onboarding is complete).
+       Suppressed for a posting-capable user (actions are in the toolbar
+       above) and for a no-claim user (covered by the chrome banner). #}
+    {% if (claims.a or claims.b) and not can_post %}
+      <section style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        {{ locked_action(capabilities.REASON_CLAIM_A_UNVERIFIED, "+ Post a referral") }}
+        {{ locked_action(capabilities.REASON_CLAIM_A_UNVERIFIED, "+ Post an opening") }}
       </section>
     {% endif %}
     {% if can_post %}

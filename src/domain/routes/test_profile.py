@@ -45,6 +45,26 @@ async def test_profile_hub_links_identity_row_to_step_subroute(
     assert link.attributes.get("href") == "/profile/identity"
 
 
+async def test_profile_hub_title_and_mode_line_flow_through_page_header(
+    authenticated_client: AsyncClient,
+):
+    """The Profile hub routes its title + mode line through the unified
+    page-header slots instead of a hand-rolled `<header>`: the title is the
+    band's toolbar `<h1>`, and the mode-dependent line renders below the
+    band's rule as the subtitle `<small class="meta">`. Pins the outlier
+    migration so a regression back to inline `<header><h1>` is caught."""
+    response = await authenticated_client.get("/profile")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    h1 = tree.css_first("header.page-header div.toolbar h1")
+    assert h1 is not None and h1.text(strip=True) == "Profile"
+    # Setup-mode subtitle renders in the meta slot (top of <main>, below
+    # the band's rule), not inside the header band.
+    subtitle = tree.css_first("main small.meta")
+    assert subtitle is not None
+    assert "Complete these steps" in subtitle.text(strip=True)
+
+
 async def test_profile_identity_step_renders_dispatching_picker(
     authenticated_client: AsyncClient,
 ):

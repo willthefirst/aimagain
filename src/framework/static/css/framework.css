@@ -338,20 +338,80 @@ dd { margin: 0; }
   align-items: center;
   gap: 0.75rem;
 }
+/* The H1 is the `minmax(0, 1fr)` cell, so it must be allowed to shrink
+   (`min-width: 0`) and truncate (`white-space: nowrap` + `overflow` +
+   `text-overflow: ellipsis`) rather than wrap to a second line and push
+   the band's boundary down. The `auto` actions cell keeps its single
+   row beside it. */
+.toolbar h1 {
+  /* Explicitly pinned to row 1 / col 1 so it overlaps the hidden reserve
+     button (also at 1/1) instead of being pushed to a second row by
+     auto-placement. The actions cell still auto-flows — to col 2 on
+     desktop, to row 2 on the ≤640px single-column stack. */
+  grid-row: 1;
+  grid-column: 1;
+  min-width: 0;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* Pico's default `<button>` is `display: block; width: 100%`
    (form-shaped); the toolbar overrides to natural-width inline
    buttons. Reaches every nested `<button>` / `[role="button"]`
    regardless of whether it lives in a form, menu, or `<li>`. */
 .toolbar button, .toolbar [role="button"] { width: auto; margin: 0; }
+/* Action-row height reservation. The hidden reserve button shares the
+   H1's grid cell (`grid-area: 1 / 1`) so the toolbar row is always one
+   real-button tall — the band boundary lands at the same Y on pages with
+   and without actions. Hidden and removed from interaction; its only job
+   is to contribute the button's intrinsic height. */
+.toolbar-reserve {
+  grid-row: 1;
+  grid-column: 1;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* The actions cell never wraps among itself and never shrinks — it keeps
+   its single row so the band stays one row tall and the boundary rule
+   doesn't get pushed down. The H1 (the flexible grid cell) ellipsizes
+   instead. The intentional ≤640px stacking (whole actions cell drops
+   below the heading, atomically) lives in the grid media query and is
+   unaffected. */
 .toolbar-actions {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 .toolbar-filter-link { min-width: 0; }
-.toolbar-right { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.toolbar-right { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.5rem; }
+/* Mobile: the toolbar collapses to a single column so the whole actions
+   cell drops below the heading atomically (the heading keeps its own
+   row; the filter link + action menu move to the next row together). The
+   actions never wrap *among themselves* at any width (`nowrap` above);
+   this is the page-level stack, not an intra-cluster wrap. The band's
+   height grows by one row on mobile — that's the intended intrinsic
+   change across screen sizes, and it stays identical across pages at a
+   given size because the heading row is always one (ellipsized) line. */
+@media (max-width: 640px) {
+  .toolbar { grid-template-columns: 1fr; }
+}
+/* Page-header band — the single fixed top-chrome element
+   (`_shared/_page_header.html`). Stacks nav → breadcrumb row → toolbar
+   row → boundary rule. The rule is the page's one horizontal divider and
+   sits at a constant Y across pages at a given screen size (see the
+   partial's header for the reservation rationale). */
+.page-header { display: flex; flex-direction: column; }
+.page-header-crumb { margin-block-start: 0.25rem; }
+/* Reserve the breadcrumb row's intrinsic height on pages without a real
+   breadcrumb (list pages): the placeholder is a real back-affordance
+   shape, hidden — so the reserved height equals a rendered breadcrumb's
+   and the rule lines up with detail pages. No size unit is pinned. */
+.page-header-crumb-placeholder { visibility: hidden; }
+.page-header-rule { margin-block: var(--pico-spacing) 0; }
 /* `<menu>` is HTML's native "list of commands" element — used
    by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
    and any in-row action cluster (e.g. the users-table Actions
@@ -514,6 +574,12 @@ legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; co
   align-items: center;
   gap: 1rem;
   padding-block: 0.5rem;
+  /* Positioning context for the mobile menu's absolutely-positioned
+     dropdown (`#nav-menu[open] > ul`, below). Scoped to the nav rather
+     than the whole `.page-header` band so the menu drops directly under
+     the nav row (`top: 100%`) instead of below the breadcrumb + toolbar
+     + rule that now share the band. */
+  position: relative;
 }
 /* Primary nav hamburger — strip Pico's built-in chevron */
 .nav-menu-toggle { list-style: none; margin-bottom: 0; }
@@ -531,9 +597,9 @@ legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; co
   #nav-menu { flex: 1; display: flex; }
   #nav-menu > ul { list-style: none; padding: 0; margin: 0 0 0 auto; gap: 1rem; display: flex; }
 }
-/* Mobile: hamburger shows, open menu covers full screen below nav */
+/* Mobile: hamburger shows, open menu covers full screen below nav.
+   The positioning context lives on `#primary-nav` (above), not here. */
 @media (max-width: 640px) {
-  header.container { position: relative; }
   #nav-menu:not([open]) .nav-menu-close-icon { display: none; }
   #nav-menu[open] .nav-menu-open-icon { display: none; }
   #nav-menu[open] > ul {

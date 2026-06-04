@@ -70,13 +70,9 @@ Child contract:
   {% call page_toolbar(heading=current | trim) %}
     {{ actions_body }}
   {% endcall %}
-  {%- set sub %}
-    {% block subtitle %}{% endblock %}
-  {% endset -%}
-  {%- if sub | trim %}
-    <p>
-      <small class="meta">{{ sub | trim | safe }}</small>
-    </p>
-  {% endif %}
 {% endblock %}
+{# Subtitle renders below the band's rule (top of `<main>`) — base.html
+   captures this block and wraps it in `<p><small class="meta">…`. Net
+   position is unchanged from when it lived after the toolbar call. #}
+{% block subtitle %}{% endblock %}
 {% block content %}{% endblock %}
