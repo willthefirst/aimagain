@@ -215,12 +215,12 @@ def test_onboarding_banner_is_first_child_of_main() -> None:
     assert first.attributes.get("id") == "onboarding-banner"
     assert first.tag == "aside"
     assert "container" not in (first.attributes.get("class") or "")
-    # The banner's copy is wrapped in a single `<section>` (block-level body,
-    # not bare inline text directly under the `<aside>`).
-    section = first.css_first("section")
-    assert section is not None
-    assert section.css_first("strong") is not None
-    assert section.css_first("a") is not None
+    # The banner's copy is wrapped in a single `<p>` (block-level body, not
+    # bare inline text directly under the `<aside>`).
+    paragraph = first.css_first("p")
+    assert paragraph is not None
+    assert paragraph.css_first("strong") is not None
+    assert paragraph.css_first("a") is not None
 
 
 def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:

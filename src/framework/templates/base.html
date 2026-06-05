@@ -176,12 +176,12 @@
          `framework/templates/test_page_header.py`.) #}
       {% if is_authenticated and onboarding_incomplete and not _on_profile %}
         <aside role="status" id="onboarding-banner">
-          <section>
+          <p>
             <strong>Finish setting up your profile.</strong>
             Clinician names and contact details stay hidden, and you can't post,
             until you verify.
             <a href="{{ onboarding_next_href }}">Continue setup →</a>
-          </section>
+          </p>
         </aside>
       {% endif %}
       {# Subtitle slot — a one-line muted meta string rendered directly
