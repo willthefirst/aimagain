@@ -11,6 +11,14 @@ exists (in the band, none in ``<main>``).
 A second group pins the CSS rules the constant-boundary + no-wrap
 guarantees depend on, mirroring the regex-against-``framework.css`` style in
 ``test_views.py``.
+
+A third group pins the **body-layout invariant**: ``base.html`` emits
+exactly ``<header>``, ``<main>``, ``<footer>`` as the top-level children of
+``<body>`` (the three rows of the body grid). This holds even with the
+incomplete-profile banner showing — the banner is the first child of
+``<main>``, never a fourth top-level ``<aside>`` band. Pinned across view
+types since they all compose ``base.html``; this is the structural
+enforcement that replaces a "keep it inside ``<main>``" comment.
 """
 
 from __future__ import annotations
@@ -161,6 +169,58 @@ def test_every_toolbar_reserves_the_action_row_height() -> None:
         assert reserve is not None, f"{name}: toolbar must render the reserve button"
         assert reserve.attributes.get("aria-hidden") == "true"
         assert reserve.attributes.get("tabindex") == "-1"
+
+
+# Context that makes the incomplete-profile banner render: an authenticated
+# viewer who hasn't finished onboarding, on a non-`/profile` page (the stub
+# request path is "/"). `onboarding_next_href` is the banner's CTA target.
+_BANNER_CTX: dict[str, object] = dict(
+    is_authenticated=True,
+    onboarding_incomplete=True,
+    onboarding_next_href="/profile/email",
+)
+
+
+def test_body_top_level_children_are_header_main_footer_only() -> None:
+    """The body scaffold emits exactly three top-level elements —
+    `<header>`, `<main>`, `<footer>`, the three rows of the body grid — and
+    nothing else. Pinned with the incomplete-profile banner SHOWING, which
+    is the case that would regress: the banner must be a child of `<main>`,
+    never a fourth top-level `<aside>` band. Checked across both generic
+    view types since every full page composes one of them via `base.html`."""
+    env = _make_env()
+    _add_child(env, "liststub.html", _LIST_STUB)
+    _add_child(env, "detailstub.html", _DETAIL_STUB)
+    for name in ("liststub.html", "detailstub.html"):
+        tree = HTMLParser(_render(env, name, **_BANNER_CTX))
+        # The banner really is rendered for this context (guards against the
+        # assertion below passing vacuously if the gate ever changes).
+        assert tree.css_first("#onboarding-banner") is not None, name
+        top_level = [n.tag for n in tree.css("body > *")]
+        assert top_level == ["header", "main", "footer"], f"{name}: {top_level}"
+
+
+def test_onboarding_banner_is_first_child_of_main() -> None:
+    """When shown, the incomplete-profile banner is the first *element*
+    child of `<main>` — ahead of the subtitle and content — so it reads as
+    the page's lead nudge and `<main>` stays the body grid's single content
+    row. Carries no `.container` class (the parent `<main>` already does)."""
+    env = _make_env()
+    _add_child(env, "detailstub.html", _DETAIL_STUB)
+    tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
+
+    main_children = tree.css("main > *")
+    assert main_children, "main has no element children"
+    first = main_children[0]
+    assert first.attributes.get("id") == "onboarding-banner"
+    assert first.tag == "aside"
+    assert "container" not in (first.attributes.get("class") or "")
+    # The banner's copy is wrapped in a single `<p>` (block-level body, not
+    # bare inline text directly under the `<aside>`).
+    paragraph = first.css_first("p")
+    assert paragraph is not None
+    assert paragraph.css_first("strong") is not None
+    assert paragraph.css_first("a") is not None
 
 
 def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:
