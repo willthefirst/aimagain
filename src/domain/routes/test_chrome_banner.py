@@ -17,6 +17,9 @@ return. These tests assert:
 3. Post CTAs on `/home` are gated on `claims.a` being populated.
 4. The global `#onboarding-banner` shows for an incomplete authed user
    off `/profile`, hides on `/profile`, and hides once a claim verifies.
+5. When shown, the banner is the *first child of `<main>`* — so the only
+   top-level body elements stay `<header>`, `<main>`, `<footer>` (the three
+   rows of the body grid), never a stray top-level `<aside>` band.
 """
 
 import pytest
@@ -260,6 +263,23 @@ async def test_onboarding_banner_shown_off_profile_for_incomplete_user(
     banner = tree.css_first("#onboarding-banner")
     assert banner is not None
     assert banner.css_first("a").attributes["href"].startswith("/profile")
+
+
+async def test_onboarding_banner_renders_inside_main(
+    authenticated_client: AsyncClient,
+):
+    """End-to-end (real route + `base_context` wiring): when shown, the
+    banner is the first element child of `<main>`, not a top-level `<aside>`
+    band. The structural invariant across view types is pinned at the
+    template level in `framework/templates/test_page_header.py`; this just
+    proves the live `/home` render lands the banner in the right place."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#onboarding-banner") is not None
+    main_children = tree.css("main > *")
+    assert main_children, "main has no element children"
+    assert main_children[0].attributes.get("id") == "onboarding-banner"
 
 
 async def test_onboarding_banner_suppressed_on_profile(

@@ -71,6 +71,7 @@ From top to bottom:
 │   toolbar row        <h1> title              [actions ▶]  │  ← captured `{% block toolbar %}`
 │   ─────────────────────────────────────────────────────  │  ← single `<hr class="page-header-rule">`
 ├───────────────────────────────────────────────────────────┤
+│ onboarding banner    Finish setting up your profile… →    │  ← `#onboarding-banner` (first child of `<main>`, incomplete authed off `/profile`)
 │ subtitle (optional)  NPI · Verified                       │  ← `{% block subtitle %}` (rendered below the rule, top of `<main>`)
 │ page content                                              │  ← `{% block content %}`
 ├───────────────────────────────────────────────────────────┤
