@@ -97,6 +97,65 @@ def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
     assert '<div id="body">ok</div>' in html
 
 
+def test_list_view_renders_auto_breadcrumb_when_items_injected() -> None:
+    """When the mount injects ``_breadcrumb_items`` into the context,
+    ``views/list.html`` renders it as the breadcrumb back-affordance
+    automatically — no per-template ``{% block breadcrumb %}`` needed.
+    The back link points at the deepest parent with a non-None href."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block content %}<div id="body">ok</div>{% endblock %}
+        """,
+    )
+
+    items = [
+        ("Users", "/users"),
+        ("will", "/users/me"),
+        ("Clinicians", None),
+    ]
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        _breadcrumb_items=items,
+    )
+
+    tree = HTMLParser(html)
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert back is not None, "breadcrumb must render when _breadcrumb_items is injected"
+    assert back.attributes.get("href") == "/users/me"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == "will"
+
+
+def test_list_view_omits_breadcrumb_without_items() -> None:
+    """Without ``_breadcrumb_items`` in context the breadcrumb block
+    renders nothing — top-level list pages are unaffected."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Clinicians{% endblock %}
+        {% block content %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+    )
+
+    tree = HTMLParser(html)
+    assert tree.css_first('nav[aria-label="breadcrumb"]') is None
+
+
 def test_list_view_renders_toolbar_with_h1_even_without_actions() -> None:
     """The toolbar shell always renders on list pages now because
     it owns the page `<h1>`; previously it was suppressed when

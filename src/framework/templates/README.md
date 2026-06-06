@@ -34,13 +34,15 @@ Each view-type template fills the same unified page-header band (nav + breadcrum
 
 | View type     | Breadcrumb back target                    | Toolbar                                    | Child must declare                                       |
 | ------------- | ----------------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
-| `list.html`   | _(none — list pages omit the breadcrumb)_ | optional filter widget + actions cluster   | `resource_label`, `content`. Optional: `actions`, `filters`/`filter_action`/`filter_values` (context). |
+| `list.html`   | _(auto-injected when `_breadcrumb_items` is in context — see below)_ | optional filter widget + actions cluster   | `resource_label`, `content`. Optional: `actions`, `filters`/`filter_action`/`filter_values` (context). |
 | `detail.html` | `← Resource`                              | optional actions cluster                   | `resource_label`, `current_label`, `content`, `resource_url` (context). Optional: `actions`. |
 | `form_new.html` | `← Resource`                            | none — form's submit button is the action  | `resource_label`, `content`, `resource_url` (context). H1 = `create_heading`, sourced from `entity_create_label(spec.name, kind=...)` via the form handler — children don't override the H1. |
 | `form_edit.html` | `← <current>`                          | none — form's Save/Cancel buttons are the actions | `resource_label`, `current_label`, `content`, `resource_url`, `resource_detail_url` (context). `current_label` is the **specific resource being edited** (e.g. `{{ organization.name }}`, `{{ view.headline }}`) — not a generic kind noun. |
 | `search.html` | `← Resource`                              | none — form's submit button is the action  | `resource_label` (context). H1 = `filter_heading`, sourced from `entity_filter_label(spec.name)` via the search handler. |
 
-The breadcrumb is always a single back affordance — a left chevron + the deepest clickable parent's label — at every viewport. The macro picks the back target by walking the chain backward to the last item with a non-`None` href, so a child template can override `{% block breadcrumb %}` with a multi-item chain (e.g. `[("Users", …), (username, /users/<id>), ("Clinicians", None)]` on `/users/{id}/clinicians`) to shift the back link one level up the tree without changing the visible shape.
+The breadcrumb is always a single back affordance — a left chevron + the deepest clickable parent's label — at every viewport. The macro picks the back target by walking the chain backward to the last item with a non-`None` href.
+
+**Automatic breadcrumbs on subresource list pages.** `mount_related_list` and `mount_edge_routes` inject `_breadcrumb_items` — a list of `(label, href|None)` tuples — into the template context when the parent entity's spec declares `display_label_fn`. `views/list.html` renders the breadcrumb block automatically when `_breadcrumb_items` is present; top-level list pages have no such injection and render no breadcrumb. Child templates that need a custom chain (labels derived from multiple context variables) still override `{% block breadcrumb %}` directly.
 
 ### Create / filter labels — single source of truth
 

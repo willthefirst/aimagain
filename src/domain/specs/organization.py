@@ -53,6 +53,7 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
     url_collection="organizations",
     id_param="organization_id",
     model=Organization,
+    display_label_fn=lambda o: o.name,
     repo_dep=get_organization_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,

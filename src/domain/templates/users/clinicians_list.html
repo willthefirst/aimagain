@@ -1,18 +1,10 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{# Subresource list — three-segment breadcrumb instead of the default
-   single-segment `resource_label`. Suppress the auto-injected label so
-   the breadcrumb carries all the navigation context. #}
+{# Subresource list — breadcrumb is auto-injected by mount_related_list via
+   USER_ENTITY.display_label_fn. Suppress resource_label so the breadcrumb
+   carries all navigation context. #}
 {% block resource_label %}{% endblock %}
-{% block breadcrumb %}
-  {{ breadcrumb([
-    ("Users", entity_url('user') ),
-  (target_user.username, entity_url('user', id=target_user.id)),
-  ("Clinicians", none),
-  ]) }}
-{% endblock %}
 {% block actions %}
   {% if is_self %}
     <li>

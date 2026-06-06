@@ -82,6 +82,8 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     url_collection="clinicians",
     id_param="clinician_id",
     model=Clinician,
+    display_label_fn=lambda c: f"{c.first_name or ''} {c.last_name or ''}".strip()
+    or "Clinician",
     repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
