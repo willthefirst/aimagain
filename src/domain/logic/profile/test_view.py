@@ -73,12 +73,12 @@ def test_claim_b_alone_unlocks_posting():
     assert r.next_label is None
 
 
-def test_lapsed_clinician_retains_feed_but_cannot_post():
-    """Once-verified (ever_verified_at set) but not currently verified:
-    full-feed read is retained, but posting is not — the projection
-    surfaces the identity next-step again (the `/profile/identity` subroute,
-    where the re-verification flow lives)."""
+def test_lapsed_clinician_loses_feed_access():
+    """The `ever_verified_at` retention rule was removed — access reverts
+    immediately when the underlying claim lapses. A clinician with only
+    `ever_verified_at` set (no current `clinician_verified=True`) is denied
+    feed access and is directed back to the identity step."""
     r = onboarding_readiness(_user(claim_a=False, ever_verified=True))
-    assert r.can_read_full_feed is True
+    assert r.can_read_full_feed is False
     assert r.can_post is False
     assert r.next_href == "/profile/identity"

@@ -261,10 +261,10 @@ def test_can_read_full_feed_verified_clinician_true():
     assert capabilities.can_read_full_feed(user) is True
 
 
-def test_can_read_full_feed_ever_verified_retains_access():
-    """Per handoff §7.1: once a user has been verified, they retain
-    feed read-access after a regression. A clinician with
-    `clinician_verified=False` but `ever_verified_at` set still passes."""
+def test_can_read_full_feed_ever_verified_no_longer_retains_access():
+    """The `ever_verified_at` retention clause was removed — access reverts
+    immediately when the underlying claim lapses. A clinician with
+    `clinician_verified=False` and only `ever_verified_at` set is denied."""
     import datetime as _dt
 
     user = _user(
@@ -277,7 +277,7 @@ def test_can_read_full_feed_ever_verified_retains_access():
             )
         ],
     )
-    assert capabilities.can_read_full_feed(user) is True
+    assert capabilities.can_read_full_feed(user) is False
 
 
 def test_can_read_full_feed_org_rep_unlocks_for_user_without_clinician():
@@ -538,11 +538,11 @@ def test_reason_meta_lapsed_reasons_carry_resume_copy():
 
 def test_reason_meta_view_unverified_is_the_read_side_gate():
     """The redaction reason (withheld post-detail contact/identity rows)
-    carries verification-oriented copy and points at the hub root, where
-    the viewer can complete any verification path."""
+    carries verification-oriented copy and points at the capability detail
+    page where the viewer can see exactly what needs to change."""
     meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
     assert "Complete verification" == meta.fix_label
-    assert meta.fix_url == "/profile"
+    assert meta.fix_url == "/users/me/access/capabilities/can_read_feed"
     assert meta.unlock
 
 
@@ -564,6 +564,93 @@ def test_reason_meta_covers_every_reason_constant_with_nonempty_copy():
         assert meta.title, f"REASON {reason!r} has empty title"
         assert meta.unlock, f"REASON {reason!r} has empty unlock copy"
         assert meta.fix_label, f"REASON {reason!r} has empty fix_label"
+
+
+# ---------- check_can_read_feed -------------------------------------------
+
+
+def test_check_can_read_feed_anon_denied():
+    """None user: email not verified → entire Bundle fails."""
+    check = capabilities.check_can_read_feed(None)
+    assert check.granted is False
+    assert check.name == "can_read_feed"
+
+
+def test_check_can_read_feed_email_unverified_denied():
+    """Email unverified: Bundle root fails even if a claim would pass."""
+    user = _user(
+        is_verified=False,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
+    check = capabilities.check_can_read_feed(user)
+    assert check.granted is False
+    # The Condition for email should be unmet.
+    email_condition = check.tree.children[0]
+    assert email_condition.label == "Email verified"
+    assert email_condition.met is False
+
+
+def test_check_can_read_feed_email_verified_no_claims_denied():
+    """Email verified but no clinician or org rep claim → Gate fails."""
+    user = _user(is_verified=True)
+    check = capabilities.check_can_read_feed(user)
+    assert check.granted is False
+    email_condition = check.tree.children[0]
+    assert email_condition.met is True
+    gate = check.tree.children[1]
+    assert gate.met is False
+
+
+def test_check_can_read_feed_clinician_verified_granted():
+    """Email + clinician_verified → Bundle passes."""
+    user = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
+    check = capabilities.check_can_read_feed(user)
+    assert check.granted is True
+    gate = check.tree.children[1]
+    clin_condition = gate.children[0]
+    assert clin_condition.label == "Clinician identity verified"
+    assert clin_condition.met is True
+
+
+def test_check_can_read_feed_org_rep_granted():
+    """Email + verified org rep → Bundle passes via the Gate's second child."""
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    check = capabilities.check_can_read_feed(user)
+    assert check.granted is True
+    gate = check.tree.children[1]
+    org_condition = gate.children[1]
+    assert org_condition.label == "Organization representative verified"
+    assert org_condition.met is True
+
+
+def test_check_can_read_feed_fix_urls_present():
+    """Unmet Condition nodes carry fix_url links to the canonical resources."""
+    user = _user(is_verified=True)  # no claims
+    check = capabilities.check_can_read_feed(user)
+    gate = check.tree.children[1]
+    clin_condition = gate.children[0]
+    org_condition = gate.children[1]
+    assert clin_condition.fix_url == "/clinicians/form"
+    assert org_condition.fix_url == "/organizations/form"
+
+
+def test_check_can_read_feed_tree_structure():
+    """The tree is always Bundle > (Condition, Gate > (Condition, Condition))."""
+    check = capabilities.check_can_read_feed(_user())
+    assert check.tree.__class__.__name__ == "Bundle"
+    assert len(check.tree.children) == 2
+    assert check.tree.children[0].__class__.__name__ == "Condition"
+    gate = check.tree.children[1]
+    assert gate.__class__.__name__ == "Gate"
+    assert len(gate.children) == 2
+    assert all(c.__class__.__name__ == "Condition" for c in gate.children)
 
 
 # ---------- UUID type sanity for claim_state.b ----------------------------
