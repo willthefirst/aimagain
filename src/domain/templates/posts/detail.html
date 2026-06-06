@@ -35,9 +35,12 @@
              role="button"
              class="secondary outline">Email</a>
         {% else %}
-          <a href="{{ entity_url('user', id='me') }}"
-             role="button"
-             class="secondary outline">Verify to contact →</a>
+          {%- set _meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED) -%}
+          <span data-tooltip="{{ _meta.unlock }}">
+            <button type="button" disabled aria-disabled="true" class="secondary outline">
+              <i class="icon-lock" aria-hidden="true"></i> Email
+            </button>
+          </span>
         {% endif %}
       </footer>
     </section>

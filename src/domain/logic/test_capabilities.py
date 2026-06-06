@@ -539,7 +539,7 @@ def test_reason_meta_view_unverified_is_the_read_side_gate():
     carries verification-oriented copy and points at the capability detail
     page where the viewer can see exactly what needs to change."""
     meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
-    assert "Complete verification" == meta.fix_label
+    assert "Get access" == meta.fix_label
     assert meta.fix_url == "/users/me/access/capabilities/provider-network"
     assert meta.unlock
 

@@ -131,8 +131,8 @@ _REASON_META = {
     ),
     REASON_VIEW_UNVERIFIED: ReasonMeta(
         title="Contact details",
-        unlock="Verify your account to see contact details.",
-        fix_label="Complete verification",
+        unlock="Get provider network access to see this.",
+        fix_label="Get access",
         fix_url="/users/me/access/capabilities/provider-network",
     ),
 }

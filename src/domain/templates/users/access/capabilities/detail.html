@@ -15,6 +15,4 @@
   {% call page_toolbar(heading=check.tree.label_active) %}
   {% endcall %}
 {% endblock %}
-{% block content %}
-  {{ capability_requirements_panel(check.tree, check.granted, check.description) }}
-{% endblock %}
+{% block content %}{{ capability_requirements_panel(check.tree, check.granted, check.description) }}{% endblock %}

@@ -541,7 +541,7 @@ async def test_list_has_no_inline_verify_notice_for_unverified(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     assert "posts-verify-notice" not in response.text
-    assert "Complete verification" not in response.text
+    assert "Get access" not in response.text
 
 
 # --- Toolbar Create CTA gate (posting-capable claim) -------------------------
@@ -621,8 +621,8 @@ async def test_detail_hides_email_and_shows_cta_for_unverified(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """Unverified users see a 'Verify to contact' CTA on post detail instead
-    of the poster's email address — contact info is not sent to the browser."""
+    """Unverified users see a disabled Email button (not a mailto link) on
+    post detail — contact info is not sent to the browser."""
     author = create_test_user(
         username=f"detail-author-{uuid.uuid4()}",
         email=f"detail-author-{uuid.uuid4()}@example.com",
@@ -637,7 +637,8 @@ async def test_detail_hides_email_and_shows_cta_for_unverified(
     assert response.status_code == 200
     assert f"mailto:{author.email}" not in response.text
     assert author.email not in response.text
-    assert "Verify to contact" in response.text
+    assert "disabled" in response.text
+    assert "Email" in response.text
 
 
 async def test_detail_shows_email_for_verified(
@@ -665,7 +666,6 @@ async def test_detail_shows_email_for_verified(
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
     assert f"mailto:{author_email}" in response.text
-    assert "Verify to contact" not in response.text
 
 
 async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverified(
@@ -675,9 +675,8 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
 ):
     """A viewer who can't read the full feed sees the practice /
     organization / address rows on post detail as `locked_field`
-    placeholders ("Hidden — Complete verification →"), not silently
-    dropped. The real links + address value are NOT emitted — withholding,
-    not CSS-hiding."""
+    placeholders (lock icon + fix link), not silently dropped. The real
+    links + address value are NOT emitted — withholding, not CSS-hiding."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     clinician = make_clinician_with_org(owner_id=author.id, practice_name="Acme Health")
     clinician.id = clinician.id or uuid.uuid4()
@@ -708,7 +707,7 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
     assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is None
     assert tree.css_first(f"a[href='/organizations/{org_id}']") is None
     assert "Springfield, IL" not in response.text
-    assert "Complete verification" in response.text
+    assert "Get access" in response.text
 
 
 async def test_detail_shows_identity_rows_for_verified_viewer(

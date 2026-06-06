@@ -1,3 +1,4 @@
+{%- from "_shared/_locked.html" import locked_name -%}
 {# Feed-row macro — renders a single clickable row for the home feed and
    browse list views.
 
@@ -42,9 +43,9 @@ under the "Feed rows" section. #}
 {%- else -%}
 {%- set _fix_url = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED).fix_url -%}
 {%- if post.kind == "program_intake" -%}
-<small class="locked-field"><a href="{{ _fix_url }}"><i class="icon-lock" aria-hidden="true"></i> Doe Health Group</a></small>{# title-case-ignore: placeholder org name #}
+<small>{{ locked_name("Doe Health Group", _fix_url) }}</small>{# title-case-ignore: placeholder org name #}
 {%- else -%}
-<small class="locked-field"><a href="{{ _fix_url }}"><i class="icon-lock" aria-hidden="true"></i> Dr. J. Doe</a></small>
+<small>{{ locked_name("Dr. J. Doe", _fix_url) }}</small>
 {%- endif -%}
 {%- endif -%}
 {%- endif -%}
