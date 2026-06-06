@@ -67,6 +67,15 @@ def test_gate_empty_is_false():
 # ---------- CapabilityCheck ------------------------------------------------
 
 
+def test_capability_check_description_defaults_to_none():
+    assert CapabilityCheck(name="x", tree=_met()).description is None
+
+
+def test_capability_check_accepts_description():
+    check = CapabilityCheck(name="x", tree=_met(), description="Some text")
+    assert check.description == "Some text"
+
+
 def test_capability_check_granted_delegates_to_tree_met():
     check_granted = CapabilityCheck(name="x", tree=_met())
     assert check_granted.granted is True

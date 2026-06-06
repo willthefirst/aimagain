@@ -651,6 +651,12 @@ def test_check_network_tree_structure():
     assert all(c.__class__.__name__ == "Condition" for c in gate.children)
 
 
+def test_check_network_label_and_description():
+    check = capabilities.check_network(_user())
+    assert check.tree.label_active == "Connect with providers"
+    assert check.description == "See full provider details and reach out directly."
+
+
 # ---------- UUID type sanity for claim_state.b ----------------------------
 
 

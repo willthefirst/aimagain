@@ -13,7 +13,7 @@
     <span>
       <input type="checkbox"
              {% if node.met %}checked{% endif %}
-             readonly
+             disabled
              aria-hidden="true">
       {% if not node.met and node.fix_url %}
         <a href="{{ node.fix_url }}">{{ node.label_active }}</a>

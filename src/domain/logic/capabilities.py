@@ -245,9 +245,10 @@ def check_network(user: Any) -> CapabilityCheck:
 
     return CapabilityCheck(
         name="network",
+        description="See full provider details and reach out directly.",
         tree=Bundle(
-            label_active="Read full feed",
-            label_done="Read full feed",
+            label_active="Connect with providers",
+            label_done="Connect with providers",
             children=(
                 Condition(
                     label_active="Verify email",

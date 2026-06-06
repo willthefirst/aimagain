@@ -67,7 +67,7 @@ async def test_capability_detail_network_returns_200(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     # Capability label_active appears in the page heading and breadcrumb.
-    assert "Read full feed" in response.text
+    assert "Connect with providers" in response.text
     # Tree node labels appear — active form for unmet, done form for met.
     assert "Verify email" in response.text or "Email verified" in response.text
     assert (

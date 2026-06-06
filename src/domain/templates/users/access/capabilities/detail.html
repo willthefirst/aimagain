@@ -16,8 +16,6 @@
   {% endcall %}
 {% endblock %}
 {% block content %}
+  {% if check.description %}<p>{{ check.description }}</p>{% endif %}
   {{ capability_requirements_panel(check.tree, check.granted) }}
-  <p>
-    <a href="{{ access_index_url }}">← All capabilities</a>
-  </p>
 {% endblock %}
