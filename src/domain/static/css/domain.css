@@ -303,14 +303,12 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .cap-reqs ul { margin-left: .6rem; border-left: 1px solid var(--pico-muted-border-color); padding-left: 1.25rem; }
 /* Satisfied branch children: HTML inert → non-interactive; opacity for visual */
 .cap-reqs [inert] { opacity: .55; }
-/* Row: flex line — direct child span or a of each li */
-.cap-reqs li > span, .cap-reqs li > a { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; }
-/* Label span takes remaining space */
-.cap-reqs li > span > span, .cap-reqs li > a > span { flex: 1; }
+/* Row: flex line — checkbox + label (or link) */
+.cap-reqs li > span { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; }
+/* Label (span or a) takes remaining space */
+.cap-reqs li > span > span, .cap-reqs li > span > a { flex: 1; }
 /* Done row: muted text */
 .cap-reqs li > span.done { color: var(--pico-muted-color); }
-/* Link row: inherit color, no underline */
-.cap-reqs li > a { color: inherit; text-decoration: none; border-radius: var(--pico-border-radius); margin: 0 -.5rem; padding-inline: .5rem; }
 /* Checkboxes are display-only state indicators; pointer-events prevents toggling */
 .cap-reqs input[type="checkbox"] { pointer-events: none; flex: none; margin: 0; }
 .cap-reqs li > span.done input[type="checkbox"] { accent-color: var(--pico-ins-color); }

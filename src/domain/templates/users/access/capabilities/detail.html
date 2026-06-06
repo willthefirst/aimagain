@@ -7,23 +7,19 @@
 {% endblock %}
 {% block content %}
   {# render_leaf: picks label_active (imperative) when unmet, label_done (passive-past)
-     when met. Actionable unmet leaves render as links with a chevron; everything else
-     is a span. The macro enforces the active/done grammar — callers supply both labels. #}
+     when met. Actionable unmet leaves are plain links inside the row span.
+     The macro enforces the active/done grammar — callers supply both labels. #}
   {% macro render_leaf(node) %}
-    {% if not node.met and node.fix_url %}
-      <a href="{{ node.fix_url }}">
-        <input type="checkbox" aria-hidden="true">
-        <span>{{ node.label_active }}</span>
-        <i class="icon-chevron-right" aria-hidden="true"></i>
-      </a>
-    {% else %}
-      <span {% if node.met %}class="done"{% endif %}>
-        <input type="checkbox"
-               {% if node.met %}checked{% endif %}
-               aria-hidden="true">
+    <span {% if node.met %}class="done"{% endif %}>
+      <input type="checkbox"
+             {% if node.met %}checked{% endif %}
+             aria-hidden="true">
+      {% if not node.met and node.fix_url %}
+        <a href="{{ node.fix_url }}">{{ node.label_active }}</a>
+      {% else %}
         <span>{{ node.label_done if node.met else node.label_active }}</span>
-      </span>
-    {% endif %}
+      {% endif %}
+    </span>
   {% endmacro %}
   {# render_node: dispatches on __class__.__name__. Branches get a <small> operator chip
      and a child <ul>; when met the <ul> gets `inert` (non-interactive + dimmed).
