@@ -1,70 +1,126 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
-{% block title %}{{ check.name }}{% endblock %}
-{% block breadcrumb %}
-  {{ breadcrumb([
-    ("Profile", entity_url('user', id='me') ),
-  ("Access", access_index_url),
-  ("Capabilities", capabilities_url),
-  (check.name, none),
-  ]) }}
-{% endblock %}
+{% block title %}{{ check.tree.label }}{% endblock %}
 {% block toolbar %}
-  {% call page_toolbar(heading=check.name) %}
+  {% call page_toolbar(heading=check.tree.label) %}
   {% endcall %}
 {% endblock %}
 {% block content %}
-  {# Recursive macro — dispatches on node.__class__.__name__. Jinja macros
-     cannot call themselves directly; we work around that by rendering
-     children in a loop and relying on the macro being defined before use.
-     For the two-level tree in `network` this is sufficient: the root
-     is always a Bundle whose children are a Condition and a Gate, and the
-     Gate's children are always Conditions. #}
+  {# Icon sprite for capability requirement icons — paste once per page #}
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="ic-check" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8.4 12.4l2.5 2.5 4.7-5.2" stroke-linecap="round" stroke-linejoin="round" />
+    </symbol>
+    <symbol id="ic-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /></symbol>
+    <symbol id="ic-lock" viewBox="0 0 24 24">
+    <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke-linecap="round" />
+    <rect x="5" y="10" width="14" height="9.5" rx="2" />
+    </symbol>
+    <symbol id="ic-chevron" viewBox="0 0 24 24">
+    <path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+    </symbol>
+  </svg>
+  {# Leaf: clickable link when not yet met and has a fix URL, plain span otherwise.
+     Icon color comes from parent .cap-row state via currentColor — no per-icon class. #}
+  {% macro render_leaf(node) %}
+    {% set icon = "check" if node.met else "circle" %}
+    {% if not node.met and node.fix_url %}
+      <a class="cap-row" href="{{ node.fix_url }}">
+        <svg class="cap-icon">
+          <use href="#ic-{{ icon }}" />
+        </svg>
+        <span class="cap-label">{{ node.label }}</span>
+        <svg class="cap-icon cap-chevron">
+          <use href="#ic-chevron" />
+        </svg>
+      </a>
+    {% else %}
+      <span class="cap-row{% if node.met %} done{% endif %}">
+        <svg class="cap-icon">
+          <use href="#ic-{{ icon }}" />
+        </svg>
+        <span class="cap-label">{{ node.label }}</span>
+      </span>
+    {% endif %}
+  {% endmacro %}
+  {# Node: dispatches on __class__.__name__. Branches get a <kbd> operator chip and
+     a child <ul>; when met the <ul> gets `inert` (HTML state → non-interactive + dim).
+     Jinja macros cannot self-call; children are inlined to cover the current two-level tree. #}
   {% macro render_node(node) %}
     {% set kind = node.__class__.__name__ %}
     {% if kind == "Condition" %}
-      <li class="capability-node capability-node--condition">
-        {% if node.met %}
-          <span class="capability-check capability-check--met">&#10003;</span>
-        {% else %}
-          <span class="capability-check capability-check--unmet">&#10007;</span>
-        {% endif %}
-        {{ node.label }}
-        {% if not node.met %}<a href="{{ node.fix_url }}">Fix →</a>{% endif %}
-      </li>
-    {% elif kind == "Bundle" %}
-      <li class="capability-node capability-node--bundle">
-        <span class="capability-operator">AND</span> {{ node.label }}
-        <ul class="capability-children">
-          {% for child in node.children %}{{ render_node(child) }}{% endfor %}
-        </ul>
-      </li>
-    {% elif kind == "Gate" %}
-      <li class="capability-node capability-node--gate">
-        <span class="capability-operator">OR</span> {{ node.label }}
-        <ul class="capability-children">
-          {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+      <li>{{ render_leaf(node) }}</li>
+    {% else %}
+      {% set op_text = "All of these" if kind == "Bundle" else "Any one of these" %}
+      {% set branch_icon = "check" if node.met else "circle" %}
+      <li>
+        <span class="cap-row{% if node.met %} done{% endif %}">
+          <svg class="cap-icon">
+            <use href="#ic-{{ branch_icon }}" />
+          </svg>
+          <span class="cap-label">{{ node.label }}</span>
+        </span>
+        <ul {% if node.met %}inert{% endif %}>
+          <li>
+            <kbd>{{ op_text }}</kbd>
+          </li>
+          {% for child in node.children %}
+            {% set ckind = child.__class__.__name__ %}
+            {% if ckind == "Condition" %}
+              <li>{{ render_leaf(child) }}</li>
+            {% else %}
+              {% set cop_text = "All of these" if ckind == "Bundle" else "Any one of these" %}
+              {% set cbranch_icon = "check" if child.met else "circle" %}
+              <li>
+                <span class="cap-row{% if child.met %} done{% endif %}">
+                  <svg class="cap-icon">
+                    <use href="#ic-{{ cbranch_icon }}" />
+                  </svg>
+                  <span class="cap-label">{{ child.label }}</span>
+                </span>
+                <ul {% if child.met %}inert{% endif %}>
+                  <li>
+                    <kbd>{{ cop_text }}</kbd>
+                  </li>
+                  {% for gc in child.children %}<li>{{ render_leaf(gc) }}</li>{% endfor %}
+                </ul>
+              </li>
+            {% endif %}
+          {% endfor %}
         </ul>
       </li>
     {% endif %}
   {% endmacro %}
-  <section class="entity-card">
-    <header class="entity-header">
-      <strong>{{ check.name }}</strong>
-      {% if check.granted %}
-        <span class="capability-badge capability-badge--granted">Granted</span>
-      {% else %}
-        <span class="capability-badge capability-badge--denied">Denied</span>
-      {% endif %}
+  {% set root = check.tree %}
+  {% set root_met = root.children | selectattr("met") | list | length %}
+  {% set root_total = root.children | list | length %}
+  {% set root_op = "All of these" if root.__class__.__name__ == "Bundle" else "Any one of these" %}
+  {% set badge_icon = "check" if check.granted else "lock" %}
+  <article>
+    <header>
+      <hgroup>
+        <h3>{{ root.label }}</h3>
+      </hgroup>
+      <kbd class="cap-badge"
+           data-state="{{ 'unlocked' if check.granted else 'locked' }}">
+        <svg class="cap-icon">
+          <use href="#ic-{{ badge_icon }}" />
+        </svg>
+        {{ "Available" if check.granted else "Not available yet" }}
+      </kbd>
+      <small>{{ root_met }} of {{ root_total }} requirements met</small>
+      <progress value="{{ root_met }}" max="{{ root_total }}"></progress>
     </header>
-    <section class="entity-facts">
-      <ul class="capability-tree">
-        {{ render_node(check.tree) }}
-      </ul>
-    </section>
-    <footer class="entity-footer">
-      <a href="{{ access_index_url }}">← All capabilities</a>
-    </footer>
-  </section>
+    <hr>
+    <ul class="cap-reqs">
+      <li>
+        <kbd>{{ root_op }}</kbd>
+      </li>
+      {% for child in root.children %}{{ render_node(child) }}{% endfor %}
+    </ul>
+  </article>
+  <p>
+    <a href="{{ access_index_url }}">← All capabilities</a>
+  </p>
 {% endblock %}

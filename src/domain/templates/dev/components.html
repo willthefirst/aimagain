@@ -222,6 +222,14 @@ it's dev-only chrome that should never ship to production. #}
                 </ul>
               </li>
               <li>
+                <span class="gallery-nav-subgroup">Access</span>
+                <ul>
+                  <li>
+                    <a href="#capability-requirements">Capability requirements</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
                 <span class="gallery-nav-subgroup">Layouts</span>
                 <ul>
                   <li>
@@ -721,6 +729,161 @@ it's dev-only chrome that should never ship to production. #}
               </li>
             </ul>
           </div>
+        </div>
+      </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# DOMAIN: ACCESS                                               #}
+      {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="capability-requirements">
+        <h2>Capability requirements</h2>
+        <p>
+          <small>Classes: <code>.cap-reqs</code> / <code>.cap-row</code> / <code>.cap-badge</code>. Operator chips and badges use <code>&lt;kbd&gt;</code> (Pico-styled). Satisfied branches use the HTML <code>inert</code> attribute. SVG sprite must be on the page — see <code>detail.html</code>.</small>
+        </p>
+        {# Local sprite IDs prefixed gc- to avoid collision with the detail-page sprite #}
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+          <symbol id="gc-check" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8.4 12.4l2.5 2.5 4.7-5.2" stroke-linecap="round" stroke-linejoin="round" />
+          </symbol>
+          <symbol id="gc-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /></symbol>
+          <symbol id="gc-lock" viewBox="0 0 24 24">
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke-linecap="round" />
+          <rect x="5" y="10" width="14" height="9.5" rx="2" />
+          </symbol>
+          <symbol id="gc-chevron" viewBox="0 0 24 24">
+          <path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+          </symbol>
+        </svg>
+        <div class="gallery-row">
+          {# Locked: 1 of 2 met — email done, status group pending #}
+          <article style="max-width:420px">
+            <header>
+              <hgroup>
+                <h3>Read full feed</h3>
+                <p>Clinical case discussions, peer commentary, and member-only research notes.</p>
+              </hgroup>
+              <kbd class="cap-badge" data-state="locked">
+                <svg class="cap-icon">
+                  <use href="#gc-lock" />
+                </svg>
+                Not available yet
+              </kbd>
+              <small>1 of 2 requirements met</small>
+              <progress value="1" max="2"></progress>
+            </header>
+            <hr>
+            <ul class="cap-reqs">
+              <li>
+                <kbd>All of these</kbd>
+              </li>
+              <li>
+                <span class="cap-row done">
+                  <svg class="cap-icon">
+                    <use href="#gc-check" />
+                  </svg>
+                  <span class="cap-label">Email verified</span>
+                </span>
+              </li>
+              <li>
+                <span class="cap-row">
+                  <svg class="cap-icon">
+                    <use href="#gc-circle" />
+                  </svg>
+                  <span class="cap-label">Verified via any one</span>
+                </span>
+                <ul>
+                  <li>
+                    <kbd>Any one of these</kbd>
+                  </li>
+                  <li>
+                    <a class="cap-row" href="#">
+                      <svg class="cap-icon">
+                        <use href="#gc-circle" />
+                      </svg>
+                      <span class="cap-label">Clinician identity verified</span>
+                      <svg class="cap-icon cap-chevron">
+                        <use href="#gc-chevron" />
+                      </svg>
+                    </a>
+                  </li>
+                  <li>
+                    <a class="cap-row" href="#">
+                      <svg class="cap-icon">
+                        <use href="#gc-circle" />
+                      </svg>
+                      <span class="cap-label">Organization representative verified</span>
+                      <svg class="cap-icon cap-chevron">
+                        <use href="#gc-chevron" />
+                      </svg>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </article>
+          {# Unlocked: 2 of 2 met — satisfied branch uses HTML inert #}
+          <article style="max-width:420px">
+            <header>
+              <hgroup>
+                <h3>Read full feed</h3>
+                <p>Clinical case discussions, peer commentary, and member-only research notes.</p>
+              </hgroup>
+              <kbd class="cap-badge" data-state="unlocked">
+                <svg class="cap-icon">
+                  <use href="#gc-check" />
+                </svg>
+                Available
+              </kbd>
+              <small>2 of 2 requirements met</small>
+              <progress value="2" max="2"></progress>
+            </header>
+            <hr>
+            <ul class="cap-reqs">
+              <li>
+                <kbd>All of these</kbd>
+              </li>
+              <li>
+                <span class="cap-row done">
+                  <svg class="cap-icon">
+                    <use href="#gc-check" />
+                  </svg>
+                  <span class="cap-label">Email verified</span>
+                </span>
+              </li>
+              <li>
+                <span class="cap-row done">
+                  <svg class="cap-icon">
+                    <use href="#gc-check" />
+                  </svg>
+                  <span class="cap-label">Verified via any one</span>
+                </span>
+                <ul inert>
+                  <li>
+                    <kbd>Any one of these</kbd>
+                  </li>
+                  <li>
+                    <span class="cap-row done">
+                      <svg class="cap-icon">
+                        <use href="#gc-check" />
+                      </svg>
+                      <span class="cap-label">Clinician identity verified</span>
+                    </span>
+                  </li>
+                  <li>
+                    <a class="cap-row" href="#">
+                      <svg class="cap-icon">
+                        <use href="#gc-circle" />
+                      </svg>
+                      <span class="cap-label">Organization representative verified</span>
+                      <svg class="cap-icon cap-chevron">
+                        <use href="#gc-chevron" />
+                      </svg>
+                    </a>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </article>
         </div>
       </section>
     </div>
