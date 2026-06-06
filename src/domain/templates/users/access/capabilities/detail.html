@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {% block title %}{{ check.name }}{% endblock %}
+{% block breadcrumb %}
+  {{ breadcrumb([
+    ("Profile", entity_url('user', id='me') ),
+  ("Access", access_index_url),
+  ("Capabilities", capabilities_url),
+  (check.name, none),
+  ]) }}
+{% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading=check.name) %}
   {% endcall %}

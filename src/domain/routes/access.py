@@ -22,6 +22,7 @@ _CHECKS = {
 
 
 _ACCESS_INDEX_URL = "/users/me/access"
+_CAPABILITIES_URL = "/users/me/access/capabilities"
 _CAPABILITY_BASE_URL = "/users/me/access/capabilities"
 
 
@@ -30,12 +31,28 @@ async def access_index(
     request: Request,
     user=Depends(current_active_user),
 ):
-    checks = {name: fn(user) for name, fn in _CHECKS.items()}
     return APIResponse.html_response(
         template_name="users/access/index.html",
         context={
+            "capabilities_url": _CAPABILITIES_URL,
+        },
+        request=request,
+        current_user=user,
+    )
+
+
+@access_router.get("/capabilities")
+async def capabilities_index(
+    request: Request,
+    user=Depends(current_active_user),
+):
+    checks = {name: fn(user) for name, fn in _CHECKS.items()}
+    return APIResponse.html_response(
+        template_name="users/access/capabilities/index.html",
+        context={
             "checks": checks,
             "capability_base_url": _CAPABILITY_BASE_URL,
+            "access_index_url": _ACCESS_INDEX_URL,
         },
         request=request,
         current_user=user,
@@ -57,6 +74,7 @@ async def capability_detail(
         context={
             "check": check,
             "access_index_url": _ACCESS_INDEX_URL,
+            "capabilities_url": _CAPABILITIES_URL,
         },
         request=request,
         current_user=user,
