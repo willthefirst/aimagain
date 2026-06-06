@@ -163,6 +163,9 @@ def _make_cr_post(**detail_overrides):
     defaults.update(detail_overrides)
     return SimpleNamespace(
         kind="referral",
+        owner=SimpleNamespace(
+            clinicians=[SimpleNamespace(first_name="Carlos", last_name="Rivera")]
+        ),
         referral_detail=SimpleNamespace(**defaults),
     )
 
@@ -171,6 +174,8 @@ def _make_pa_post(*, clinician_attrs=None, **detail_overrides):
     """Realistic PA stub. Defaults populate clinician + detail fields."""
     p = dict(
         id="prov-1",
+        first_name="Jane",
+        last_name="Smith",
         org=SimpleNamespace(id="org-1", name="Acme Counseling"),
         location_city="Brooklyn",
         location_state="NY",
@@ -590,6 +595,78 @@ def test_view_returns_dict_for_jinja_attribute_access():
     v = post_card_view(_make_cr_post())
     assert isinstance(v, dict)
     assert v["kind"] == "referral"
+
+
+# --- post_card_view: poster_name ----------------------------------------
+
+
+def test_poster_name_opening_uses_clinician_first_last():
+    v = post_card_view(_make_pa_post())
+    assert v["poster_name"] == "Jane Smith"
+
+
+def test_poster_name_opening_partial_name():
+    v = post_card_view(
+        _make_pa_post(clinician_attrs={"first_name": "Jane", "last_name": None})
+    )
+    assert v["poster_name"] == "Jane"
+
+
+def test_poster_name_opening_none_when_no_names():
+    v = post_card_view(
+        _make_pa_post(clinician_attrs={"first_name": None, "last_name": None})
+    )
+    assert v["poster_name"] is None
+
+
+def test_poster_name_opening_none_when_no_clinician():
+    post = SimpleNamespace(
+        kind="clinician_opening",
+        opening_detail=SimpleNamespace(
+            clinician=None,
+            services=[],
+            settings=[],
+            age_groups=[],
+            languages=[],
+            genders=[],
+            treatment_modality=None,
+            description=None,
+            schedule_text=None,
+            desired_times=[],
+            website=None,
+            referral_instructions=None,
+        ),
+    )
+    assert post_card_view(post)["poster_name"] is None
+
+
+def test_poster_name_intake_uses_org_name():
+    v = post_card_view(_make_program_post())
+    assert v["poster_name"] == "Acme Health"
+
+
+def test_poster_name_intake_none_when_no_org():
+    v = post_card_view(_make_program_post(program_attrs={"organization": None}))
+    assert v["poster_name"] is None
+
+
+def test_poster_name_referral_uses_owner_clinician_name():
+    v = post_card_view(_make_cr_post())
+    assert v["poster_name"] == "Carlos Rivera"
+
+
+def test_poster_name_referral_none_when_no_owner_clinicians():
+    post = _make_cr_post()
+    post.owner = SimpleNamespace(clinicians=[])
+    assert post_card_view(post)["poster_name"] is None
+
+
+def test_poster_name_referral_none_when_clinician_has_no_name():
+    post = _make_cr_post()
+    post.owner = SimpleNamespace(
+        clinicians=[SimpleNamespace(first_name=None, last_name=None)]
+    )
+    assert post_card_view(post)["poster_name"] is None
 
 
 # --- post_row_summary ---------------------------------------------------

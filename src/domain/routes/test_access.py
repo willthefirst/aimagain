@@ -47,7 +47,7 @@ async def test_capabilities_index_authenticated_returns_200(
     response = await authenticated_client.get("/users/me/access/capabilities")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
-    assert "network" in response.text
+    assert "provider-network" in response.text
 
 
 async def test_capabilities_index_shows_granted_or_denied(
@@ -56,18 +56,20 @@ async def test_capabilities_index_shows_granted_or_denied(
     """The capabilities list surfaces a granted/denied label for each capability."""
     response = await authenticated_client.get("/users/me/access/capabilities")
     assert response.status_code == 200
-    assert "Granted" in response.text or "Denied" in response.text
+    assert "Available" in response.text or "Not available yet" in response.text
 
 
 async def test_capability_detail_network_returns_200(
     authenticated_client: AsyncClient,
 ):
-    """GET /users/me/access/capabilities/network renders the requirement tree."""
-    response = await authenticated_client.get("/users/me/access/capabilities/network")
+    """GET /users/me/access/capabilities/provider-network renders the requirement tree."""
+    response = await authenticated_client.get(
+        "/users/me/access/capabilities/provider-network"
+    )
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     # Capability label_active appears in the page heading and breadcrumb.
-    assert "Read full feed" in response.text
+    assert "Provider network" in response.text
     # Tree node labels appear — active form for unmet, done form for met.
     assert "Verify email" in response.text or "Email verified" in response.text
     assert (
@@ -84,7 +86,9 @@ async def test_capability_detail_shows_status(
     authenticated_client: AsyncClient,
 ):
     """The detail page shows an available/locked badge."""
-    response = await authenticated_client.get("/users/me/access/capabilities/network")
+    response = await authenticated_client.get(
+        "/users/me/access/capabilities/provider-network"
+    )
     assert response.status_code == 200
     assert "Available" in response.text or "Not available yet" in response.text
 
@@ -100,9 +104,9 @@ async def test_capability_detail_nonexistent_returns_404(
 
 
 async def test_capability_detail_unauthenticated_redirected(test_client: AsyncClient):
-    """Unauthenticated GET /users/me/access/capabilities/network is bounced."""
+    """Unauthenticated GET /users/me/access/capabilities/provider-network is bounced."""
     response = await test_client.get(
-        "/users/me/access/capabilities/network",
+        "/users/me/access/capabilities/provider-network",
         follow_redirects=False,
     )
     assert response.status_code != 200

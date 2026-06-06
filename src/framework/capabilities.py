@@ -71,6 +71,7 @@ class CapabilityCheck:
 
     name: str
     tree: Any  # Condition | Bundle | Gate
+    description: str | None = None
 
     @property
     def granted(self) -> bool:

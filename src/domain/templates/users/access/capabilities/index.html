@@ -14,23 +14,26 @@
   {% endcall %}
 {% endblock %}
 {% block content %}
-  <section class="entity-card">
-    <section class="entity-facts">
-      <dl>
-        {% for name, check in checks.items() %}
-          <div>
-            <dt>{{ name }}</dt>
-            <dd>
+  <ul class="capability-list">
+    {% for name, check in checks.items() %}
+      <li>
+        <article>
+          <header>
+            <hgroup>
+              <h3>{{ check.tree.label_active }}</h3>
+              {% if check.description %}<p>{{ check.description }}</p>{% endif %}
+            </hgroup>
+            <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
               {% if check.granted %}
-                <span class="capability-badge capability-badge--granted">Granted</span>
+                <i class="icon-check" aria-hidden="true"></i>Available
               {% else %}
-                <span class="capability-badge capability-badge--denied">Denied</span>
+                <i class="icon-lock" aria-hidden="true"></i>Not available yet
               {% endif %}
-              <a href="{{ capability_base_url }}/{{ name }}">View details →</a>
-            </dd>
-          </div>
-        {% endfor %}
-      </dl>
-    </section>
-  </section>
+            </small>
+          </header>
+          <a href="{{ capability_base_url }}/{{ name }}">View requirements →</a>
+        </article>
+      </li>
+    {% endfor %}
+  </ul>
 {% endblock %}

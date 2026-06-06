@@ -539,8 +539,8 @@ def test_reason_meta_view_unverified_is_the_read_side_gate():
     carries verification-oriented copy and points at the capability detail
     page where the viewer can see exactly what needs to change."""
     meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
-    assert "Complete verification" == meta.fix_label
-    assert meta.fix_url == "/users/me/access/capabilities/network"
+    assert "Get access" == meta.fix_label
+    assert meta.fix_url == "/users/me/access/capabilities/provider-network"
     assert meta.unlock
 
 
@@ -571,7 +571,7 @@ def test_check_network_anon_denied():
     """None user: email not verified → entire Bundle fails."""
     check = capabilities.check_network(None)
     assert check.granted is False
-    assert check.name == "network"
+    assert check.name == "provider-network"
 
 
 def test_check_network_email_unverified_denied():
@@ -649,6 +649,12 @@ def test_check_network_tree_structure():
     assert gate.__class__.__name__ == "Gate"
     assert len(gate.children) == 2
     assert all(c.__class__.__name__ == "Condition" for c in gate.children)
+
+
+def test_check_network_label_and_description():
+    check = capabilities.check_network(_user())
+    assert check.tree.label_active == "Provider network"
+    assert check.description == "See full provider details and reach out directly."
 
 
 # ---------- UUID type sanity for claim_state.b ----------------------------
