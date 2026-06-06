@@ -26,6 +26,9 @@ The predicates remain duck-typed via `getattr` so test stubs (and any
 non-ORM Actor-like object) keep working without constructing real
 SQLAlchemy rows. Templates and routes both call into the same surface,
 so a visible affordance and its server-side gate can't disagree.
+
+Fix URLs (`fix_url_for`, `reason_meta`) point at `/users/me` and its
+subresource paths — the profile hub at `/profile` has been removed.
 """
 
 from __future__ import annotations
@@ -45,7 +48,7 @@ REASON_CLAIM_B_LAPSED = "claim_b_lapsed"
 REASON_AFFILIATION_MISSING = "affiliation_missing"
 # Read-side gate (not a write affordance): the viewer hasn't cleared
 # verification, so contact/identity details on a post detail are withheld
-# (`can_read_full_feed` is False). Distinct from the claim-to-*post*
+# (`can_access_network` is False). Distinct from the claim-to-*post*
 # reasons above — this one fixes by completing any verification path.
 REASON_VIEW_UNVERIFIED = "view_unverified"
 
@@ -62,11 +65,10 @@ class ReasonMeta:
       of a withheld field, or as the re-verify card's body ("Add a verified
       clinician profile to unlock this.").
     - `fix_label`: CTA link text ("Complete clinician setup").
-    - `fix_url`: deep-link to where the reason gets fixed. The two
-      onboarding-floor reasons (email, claim A) point at their dedicated
-      step subroute (`/profile/email`, `/profile/identity`); the additive
-      and lapsed reasons point at the hub root (`/profile`), which
-      mode-dispatches them (add-a-claim / re-verify / manage).
+    - `fix_url`: deep-link to where the reason gets fixed. The email
+      reason points at `/users/me/email/form`; identity reasons point
+      at `/users/me`, which hosts the Verification card and links to
+      the relevant claim setup flows.
 
     Templates read this via the `capabilities.reason_meta(reason)` Jinja
     global so a given reason reads identically on every surface — the
@@ -85,43 +87,43 @@ _REASON_META = {
         title="Email verification",
         unlock="Verify your email to unlock this.",
         fix_label="Verify email",
-        fix_url="/profile/email",
+        fix_url="/users/me/email/form",
     ),
     REASON_CLAIM_A_UNVERIFIED: ReasonMeta(
         title="Clinician identity",
         unlock="Add a verified clinician profile to unlock this.",
         fix_label="Complete clinician setup",
-        fix_url="/profile/identity",
+        fix_url="/users/me",
     ),
     REASON_CLAIM_A_LAPSED: ReasonMeta(
         title="Clinician identity",
         unlock="Re-attest your license to resume this.",
         fix_label="Re-verify license",
-        fix_url="/profile",
+        fix_url="/users/me",
     ),
     REASON_CLAIM_B_UNVERIFIED: ReasonMeta(
         title="Organization representation",
         unlock="Become a verified organization representative to unlock this.",
         fix_label="Complete organization setup",
-        fix_url="/profile",
+        fix_url="/users/me",
     ),
     REASON_CLAIM_B_LAPSED: ReasonMeta(
         title="Organization representation",
         unlock="Re-verify your authority to resume this.",
         fix_label="Re-verify authority",
-        fix_url="/profile",
+        fix_url="/users/me",
     ),
     REASON_AFFILIATION_MISSING: ReasonMeta(
         title="Clinician affiliation",
         unlock="Add a clinician affiliation to unlock this.",
         fix_label="Manage affiliations",
-        fix_url="/profile",
+        fix_url="/users/me",
     ),
     REASON_VIEW_UNVERIFIED: ReasonMeta(
         title="Contact details",
         unlock="Verify your account to see contact details.",
         fix_label="Complete verification",
-        fix_url="/users/me/access/capabilities/can_read_feed",
+        fix_url="/users/me/access/capabilities/network",
     ),
 }
 
@@ -131,7 +133,7 @@ _FALLBACK_META = ReasonMeta(
     title="Profile",
     unlock="Finish setting up your profile to unlock this.",
     fix_label="Open profile",
-    fix_url="/profile",
+    fix_url="/users/me",
 )
 
 
@@ -264,7 +266,7 @@ def any_org_rep_verified(user: Any) -> bool:
     return bool(_verified_active_reps(user))
 
 
-def check_can_read_feed(user: Any) -> CapabilityCheck:
+def check_network(user: Any) -> CapabilityCheck:
     """Structured capability check for full-feed read access.
 
     Tree: email_verified AND (clinician_verified OR org_rep_verified).
@@ -277,7 +279,7 @@ def check_can_read_feed(user: Any) -> CapabilityCheck:
     _org_met = bool(_verified_active_reps(user))
 
     return CapabilityCheck(
-        name="can_read_feed",
+        name="network",
         tree=Bundle(
             label="Read full feed",
             children=(
@@ -306,9 +308,9 @@ def check_can_read_feed(user: Any) -> CapabilityCheck:
     )
 
 
-def can_read_full_feed(user: Any) -> bool:
-    """Feed-teaser gate: delegates to `check_can_read_feed`."""
-    return check_can_read_feed(user).granted
+def can_access_network(user: Any) -> bool:
+    """Feed-teaser gate: delegates to `check_network`."""
+    return check_network(user).granted
 
 
 def can_post_referral(user: Any) -> bool:
@@ -394,8 +396,8 @@ def reason_meta(reason: str) -> ReasonMeta:
 
 
 def fix_url_for(reason: str) -> str:
-    """Deep-link a gated affordance into the relevant section of `/profile`.
+    """Deep-link a gated affordance to the relevant fix URL.
     Thin accessor over `reason_meta(reason).fix_url`, kept as a named
     function because routes/banners reference the URL without the rest of
-    the metadata. Unknown reasons fall back to the hub root."""
+    the metadata. Unknown reasons fall back to `/users/me`."""
     return reason_meta(reason).fix_url

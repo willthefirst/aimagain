@@ -31,7 +31,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     keeping all links visible inline on desktop via CSS.
 
     The "Create clinician" chrome CTA was removed in #697 — the
-    /profile hub is the discoverable entry point."""
+    /users/me detail page is the discoverable entry point."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
@@ -41,8 +41,8 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
     # Brand link is a direct child of the nav element.
     assert tree.css_first('#primary-nav > a[href="/"]') is not None
-    # Profile link points at the dedicated Profile Hub.
-    assert tree.css_first('#primary-nav a[href="/profile"]') is not None
+    # Profile link points at /users/me.
+    assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
     # The four authed-chrome destinations render in this exact order
     # inside #nav-menu. Sign-out is the `#` placeholder href on the
     # `<a hx-post>` that drives the HTMX POST.
@@ -51,7 +51,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert nav_hrefs == [
         "/home",
         "/posts",
-        "/profile",
+        "/users/me",
         "#",
     ]
 
@@ -430,96 +430,13 @@ async def test_detail_hides_admin_actions_for_non_admin(
     assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is None
 
 
-async def test_detail_shows_clinicians_empty_state(
+async def test_detail_no_inline_clinicians_section(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """User with no clinicians → empty-state copy on the detail page."""
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first("#user-detail-clinicians") is None
-    empty = tree.css_first("#user-detail-clinicians-empty")
-    assert empty is not None
-    assert "No clinician entries yet" in empty.text()
-
-
-async def test_detail_lists_owned_clinicians(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """User with multiple clinicians → all are linked from the detail page."""
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-    first = make_clinician_with_org(owner_id=target.id, practice_name="First")
-    second = make_clinician_with_org(owner_id=target.id, practice_name="Second")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add_all([first, second])
-        await session.refresh(first)
-        await session.refresh(second)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first("#user-detail-clinicians-empty") is None
-    rows = tree.css("#user-detail-clinicians article.entity-card")
-    assert len(rows) == 2
-    # After #642 PR 3 the Practice cell anchors to the owning Org per
-    # affiliation (each Clinician here has its own auto-built Org via
-    # `make_clinician_with_org`). The Clinician id rides on the row's
-    # `data-row-id`; assert both Clinicians surface via that attribute.
-    row_ids = {row.attributes.get("data-row-id") for row in rows}
-    assert row_ids == {str(first.id), str(second.id)}
-
-
-def _inline_create_clinician_link(tree: HTMLParser):
-    """The detail page's Clinicians card renders the self-only Create
-    CTA as `<a role="button">Create clinician</a>` inside the
-    `.entity-card`'s `<footer>`. Distinct from the toolbar variant on
-    `/users/{id}/clinicians` — this one is the profile inline preview."""
-    for anchor in tree.css(".entity-card a[role='button']"):
-        if "Create clinician" in (anchor.text() or ""):
-            return anchor
-    return None
-
-
-async def test_detail_shows_inline_create_clinician_for_self(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`/users/me` (and `/users/{my_id}`) renders an inline 'Create
-    clinician' button inside the Clinicians section so the profile is
-    a self-discovery entry point — without the user clicking through
-    to the dedicated `/users/me/clinicians` page."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    action = _inline_create_clinician_link(tree)
-    assert action is not None, "self profile is missing inline Create clinician link"
-    assert action.attributes.get("href") == "/clinicians/form"
-
-
-async def test_users_me_verification_card_signposts_hub_when_unverified(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`GET /users/me` for an email-verified user who holds no
-    posting-capable claim shows the read-only Verification card whose
-    only CTA deep-links into the `/profile` hub's next step — never a
-    "Post an opening" or "Create clinician" action, which live in the hub
-    (handoff §8.1). The deep-link follows `onboarding_readiness.next_href`,
-    which for this user is the `/profile/identity` step subroute.
-    The card is self-only; other users' profiles are unaffected."""
+    """The inline Clinicians section was removed from the user detail page —
+    clinicians are accessible via /users/me/clinicians instead."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -527,49 +444,31 @@ async def test_users_me_verification_card_signposts_hub_when_unverified(
         el.text(strip=True)
         for el in tree.css("section.entity-card header.entity-header strong")
     ]
-    assert (
-        "Verification" in headings
-    ), "/users/me is missing the 'Verification' status card"
-    # The card's sole CTA signposts the hub's next step; it carries no
-    # in-page onboarding action (no Post CTA, and the only clinician-form
-    # link on the page is the separate Clinicians-card footer, not this card).
-    cta = tree.css_first(
-        "section.entity-card a[href='/profile/identity'][role='button']"
-    )
-    assert cta is not None, "Verification card is missing its hub deep-link CTA"
-    assert "Set up and verify your practice" in cta.text()
-    assert (
-        tree.css_first(
-            "section.entity-card a[href='/posts/form?kind=clinician_opening']"
-        )
-        is None
-    ), "Verification card must not host a 'Post an opening' action"
+    assert "Clinicians" not in headings
+    return None
 
 
-async def test_users_me_verification_card_manage_cta_when_can_post(
+async def test_users_me_access_card_links_to_access_page(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /users/me` for a user who can post (verified clinician) shows
-    the Verification card with a "Manage your practice" CTA into the hub
-    — not a "Post an opening" action, which lives on the hub / posts list.
-    Regression guard: the card must render without crashing for a user
-    who already has a clinician profile."""
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-
+    """`GET /users/me` shows an Access card with a link to the access overview.
+    Capability status is on /users/me/access, not embedded here. Self-only."""
     response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200, response.text
+    assert response.status_code == 200
     tree = HTMLParser(response.text)
-    cta = tree.css_first("section.entity-card a[href='/profile'][role='button']")
-    assert cta is not None, "Verification card is missing its '/profile' hub CTA"
-    assert "Manage your practice and verification" in cta.text()
+    headings = [
+        el.text(strip=True)
+        for el in tree.css("section.entity-card header.entity-header strong")
+    ]
+    assert "Access" in headings, "/users/me is missing the Access card"
+    access_link = tree.css_first("section.entity-card a[href$='/users/me/access']")
     assert (
-        tree.css_first("section.entity-card a[href*='/posts/form']") is None
-    ), "Verification card must not host a 'Post an opening' action"
+        access_link is not None
+    ), "Access card is missing the link to /users/me/access"
+    assert (
+        "Network access" not in response.text
+    ), "Capability status must not be embedded on /users/me"
 
 
 async def test_users_me_verification_card_not_shown_for_other_users(
@@ -596,14 +495,13 @@ async def test_users_me_verification_card_not_shown_for_other_users(
     ), "Verification card unexpectedly shown on another user's profile"
 
 
-async def test_detail_omits_inline_create_clinician_for_other_user(
+async def test_detail_no_inline_clinicians_section_for_other_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Viewing another user's profile (including as admin) does NOT
-    surface the Create clinician CTA — that affordance is self-only,
-    mirroring the toolbar variant on `/users/{id}/clinicians`."""
+    """Viewing another user's profile has no Clinicians section — it was
+    removed entirely from the user detail page."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -613,7 +511,11 @@ async def test_detail_omits_inline_create_clinician_for_other_user(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert _inline_create_clinician_link(tree) is None
+    headings = [
+        el.text(strip=True)
+        for el in tree.css("section.entity-card header.entity-header strong")
+    ]
+    assert "Clinicians" not in headings
 
 
 # --- Sign out -----------------------------------------------------------
@@ -715,22 +617,19 @@ async def test_base_template_preloads_lucide_icon_font(
 # --- Chrome: nav active state -------------------------------------------
 
 
-async def test_primary_nav_marks_profile_active_on_profile_hub(
+async def test_primary_nav_marks_profile_active_on_users_me(
     authenticated_client: AsyncClient,
 ):
-    """The Profile link in the primary nav points at the dedicated
-    `/profile` hub and carries `aria-current="page"` when the user is
-    on it. The legacy `/users/me` detail page is still reachable by
-    URL but is no longer chrome-promoted (the active-state rule
-    follows the chrome promotion, not the underlying entity)."""
-    response = await authenticated_client.get("/profile")
+    """The Profile link in the primary nav points at `/users/me` and
+    carries `aria-current="page"` when the user is on it."""
+    response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    profile_link = tree.css_first('#primary-nav a[href="/profile"]')
+    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
     assert (
         profile_link is not None
         and profile_link.attributes.get("aria-current") == "page"
-    ), "expected Profile link to carry aria-current=page on /profile"
+    ), "expected Profile link to carry aria-current=page on /users/me"
 
 
 # --- Activation endpoint -------------------------------------------------

@@ -47,6 +47,23 @@ _NPPES_ORG_NAME_THRESHOLD = 0.80
 _SKIPPED_NPPES = NppesResult(found=False, first_name=None, last_name=None, raw=None)
 
 
+def _user_is_demo_context(user: User) -> bool:
+    """Return True if the user is associated with any demo organization.
+
+    Checks both org representations (Claim B links) and directly owned
+    organizations — both relationships are selectin-loaded on User, so
+    this is free after the initial user fetch.
+    """
+    for rep in getattr(user, "org_representations", None) or ():
+        org = getattr(rep, "org", None)
+        if org and getattr(org, "is_demo", False):
+            return True
+    for org in getattr(user, "organizations", None) or ():
+        if getattr(org, "is_demo", False):
+            return True
+    return False
+
+
 def _clinician_names(clinician: Clinician, owner: User | None) -> tuple[str, str]:
     """Best-available (first, last) name for a clinician.
 

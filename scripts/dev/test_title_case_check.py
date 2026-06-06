@@ -613,7 +613,7 @@ def test_nested_li_dropdown_rollup_does_not_false_positive(tmp_path):
             <details>
               <summary aria-label="Profile menu">Profile</summary>
               <ul>
-                <li><a href="/profile">Profile</a></li>
+                <li><a href="/users/me">Profile</a></li>
                 <li><a href="#" hx-post="/auth/sign-out">Sign out</a></li>
               </ul>
             </details>

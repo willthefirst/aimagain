@@ -189,10 +189,10 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 }
 
 /* ── Profile step cards ───────────────────────────────────────
-   Each verification requirement on /profile renders as a step card.
+   Verification step cards used on profile-adjacent surfaces.
    Status badges surface completion state; border-left accents mark
    cards that need action. All state is expressed via classes — no
-   inline styles on the profile templates. */
+   inline styles. */
 .step-card > header {
   display: flex;
   justify-content: space-between;
@@ -246,12 +246,10 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 }
 
 /* ── Onboarding setup table of contents ───────────────────────
-   Registry-driven step index at the top of /profile
-   (profile/_checklist.html). One row per onboarding step: mark ·
-   title/hint · trailing Done tag (complete) or chevron (incomplete).
-   An incomplete row is a single link to the step's subroute; a complete
-   row is static. The mark and muted/strong treatment express completion.
-   All state via classes — no inline styles on the template. */
+   Registry-driven step index for onboarding progress. One row per
+   onboarding step: mark · title/hint · trailing Done tag (complete)
+   or chevron (incomplete). An incomplete row is a single link; a
+   complete row is static. All state via classes — no inline styles. */
 .onboarding-progress {
   list-style: none;
   margin: 0 0 var(--pico-spacing);

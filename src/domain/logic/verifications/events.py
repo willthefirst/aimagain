@@ -70,7 +70,7 @@ def recompute_clinician_claim(clinician: Clinician) -> None:
         clinician.clinician_verified = False
         # Leave `verified_at` and `ever_verified_at` alone — the
         # first-ever timestamp is preserved across regressions so the
-        # `can_read_full_feed` retention rule keeps working.
+        # `can_access_network` retention rule keeps working.
 
 
 def recompute_org_claim(org: Organization) -> None:

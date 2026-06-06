@@ -245,23 +245,23 @@ def test_any_org_rep_verified_requires_email_verified():
 # ---------- derived gates -------------------------------------------------
 
 
-def test_can_read_full_feed_anon_false():
-    assert capabilities.can_read_full_feed(None) is False
+def test_can_access_network_anon_false():
+    assert capabilities.can_access_network(None) is False
 
 
-def test_can_read_full_feed_unverified_clinician_false():
-    assert capabilities.can_read_full_feed(_user(is_verified=True)) is False
+def test_can_access_network_unverified_clinician_false():
+    assert capabilities.can_access_network(_user(is_verified=True)) is False
 
 
-def test_can_read_full_feed_verified_clinician_true():
+def test_can_access_network_verified_clinician_true():
     user = _user(
         is_verified=True,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    assert capabilities.can_read_full_feed(user) is True
+    assert capabilities.can_access_network(user) is True
 
 
-def test_can_read_full_feed_ever_verified_no_longer_retains_access():
+def test_can_access_network_ever_verified_no_longer_retains_access():
     """The `ever_verified_at` retention clause was removed — access reverts
     immediately when the underlying claim lapses. A clinician with
     `clinician_verified=False` and only `ever_verified_at` set is denied."""
@@ -277,10 +277,10 @@ def test_can_read_full_feed_ever_verified_no_longer_retains_access():
             )
         ],
     )
-    assert capabilities.can_read_full_feed(user) is False
+    assert capabilities.can_access_network(user) is False
 
 
-def test_can_read_full_feed_org_rep_unlocks_for_user_without_clinician():
+def test_can_access_network_org_rep_unlocks_for_user_without_clinician():
     """A program coordinator with no Type-1 NPI but a verified org rep
     gets full feed access — handoff §3, §7.1."""
     org = _org(org_verified=True)
@@ -288,7 +288,7 @@ def test_can_read_full_feed_org_rep_unlocks_for_user_without_clinician():
         is_verified=True,
         org_representations=[_rep(org_id=org.id, authority_status="verified")],
     )
-    assert capabilities.can_read_full_feed(coordinator) is True
+    assert capabilities.can_access_network(coordinator) is True
 
 
 def test_can_post_referral_tracks_clinician_verified():
@@ -462,28 +462,26 @@ def test_claim_state_b_set_is_frozenset():
 
 
 def test_fix_url_for_onboarding_reasons_route_to_step_subroutes():
-    # The two onboarding-floor reasons deep-link to their dedicated step
-    # subroute; the additive / lapsed reasons land on the hub, which
-    # mode-dispatches them.
+    # The email reason points at the email form subresource; identity
+    # and additive / lapsed reasons all point at /users/me.
     assert (
         capabilities.fix_url_for(capabilities.REASON_EMAIL_UNVERIFIED)
-        == "/profile/email"
+        == "/users/me/email/form"
     )
     assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED)
-        == "/profile/identity"
+        capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED) == "/users/me"
     )
-    assert capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED) == "/profile"
+    assert capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED) == "/users/me"
     assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED) == "/profile"
+        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED) == "/users/me"
     )
     assert (
-        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING) == "/profile"
+        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING) == "/users/me"
     )
 
 
-def test_fix_url_for_unknown_reason_falls_back_to_hub_root():
-    assert capabilities.fix_url_for("totally-not-a-reason") == "/profile"
+def test_fix_url_for_unknown_reason_falls_back_to_users_me():
+    assert capabilities.fix_url_for("totally-not-a-reason") == "/users/me"
 
 
 def _declared_reasons() -> set[str]:
@@ -518,7 +516,7 @@ def test_reason_meta_known_reason_carries_full_copy():
     assert meta.title
     assert meta.unlock
     assert meta.fix_label
-    assert meta.fix_url == "/profile/identity"
+    assert meta.fix_url == "/users/me"
     assert meta.fix_url == capabilities.fix_url_for(
         capabilities.REASON_CLAIM_A_UNVERIFIED
     )
@@ -542,7 +540,7 @@ def test_reason_meta_view_unverified_is_the_read_side_gate():
     page where the viewer can see exactly what needs to change."""
     meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
     assert "Complete verification" == meta.fix_label
-    assert meta.fix_url == "/users/me/access/capabilities/can_read_feed"
+    assert meta.fix_url == "/users/me/access/capabilities/network"
     assert meta.unlock
 
 
@@ -550,7 +548,7 @@ def test_reason_meta_unknown_reason_falls_back():
     """An unmapped code returns the generic hub pointer, never raises —
     a stray reason renders a sane nudge rather than blank chrome."""
     meta = capabilities.reason_meta("totally-not-a-reason")
-    assert meta.fix_url == "/profile"
+    assert meta.fix_url == "/users/me"
     assert meta.unlock
     assert meta.fix_label
 
@@ -566,23 +564,23 @@ def test_reason_meta_covers_every_reason_constant_with_nonempty_copy():
         assert meta.fix_label, f"REASON {reason!r} has empty fix_label"
 
 
-# ---------- check_can_read_feed -------------------------------------------
+# ---------- check_network -------------------------------------------
 
 
-def test_check_can_read_feed_anon_denied():
+def test_check_network_anon_denied():
     """None user: email not verified → entire Bundle fails."""
-    check = capabilities.check_can_read_feed(None)
+    check = capabilities.check_network(None)
     assert check.granted is False
-    assert check.name == "can_read_feed"
+    assert check.name == "network"
 
 
-def test_check_can_read_feed_email_unverified_denied():
+def test_check_network_email_unverified_denied():
     """Email unverified: Bundle root fails even if a claim would pass."""
     user = _user(
         is_verified=False,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    check = capabilities.check_can_read_feed(user)
+    check = capabilities.check_network(user)
     assert check.granted is False
     # The Condition for email should be unmet.
     email_condition = check.tree.children[0]
@@ -590,10 +588,10 @@ def test_check_can_read_feed_email_unverified_denied():
     assert email_condition.met is False
 
 
-def test_check_can_read_feed_email_verified_no_claims_denied():
+def test_check_network_email_verified_no_claims_denied():
     """Email verified but no clinician or org rep claim → Gate fails."""
     user = _user(is_verified=True)
-    check = capabilities.check_can_read_feed(user)
+    check = capabilities.check_network(user)
     assert check.granted is False
     email_condition = check.tree.children[0]
     assert email_condition.met is True
@@ -601,13 +599,13 @@ def test_check_can_read_feed_email_verified_no_claims_denied():
     assert gate.met is False
 
 
-def test_check_can_read_feed_clinician_verified_granted():
+def test_check_network_clinician_verified_granted():
     """Email + clinician_verified → Bundle passes."""
     user = _user(
         is_verified=True,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    check = capabilities.check_can_read_feed(user)
+    check = capabilities.check_network(user)
     assert check.granted is True
     gate = check.tree.children[1]
     clin_condition = gate.children[0]
@@ -615,14 +613,14 @@ def test_check_can_read_feed_clinician_verified_granted():
     assert clin_condition.met is True
 
 
-def test_check_can_read_feed_org_rep_granted():
+def test_check_network_org_rep_granted():
     """Email + verified org rep → Bundle passes via the Gate's second child."""
     org = _org(org_verified=True)
     user = _user(
         is_verified=True,
         org_representations=[_rep(org_id=org.id, authority_status="verified")],
     )
-    check = capabilities.check_can_read_feed(user)
+    check = capabilities.check_network(user)
     assert check.granted is True
     gate = check.tree.children[1]
     org_condition = gate.children[1]
@@ -630,10 +628,10 @@ def test_check_can_read_feed_org_rep_granted():
     assert org_condition.met is True
 
 
-def test_check_can_read_feed_fix_urls_present():
+def test_check_network_fix_urls_present():
     """Unmet Condition nodes carry fix_url links to the canonical resources."""
     user = _user(is_verified=True)  # no claims
-    check = capabilities.check_can_read_feed(user)
+    check = capabilities.check_network(user)
     gate = check.tree.children[1]
     clin_condition = gate.children[0]
     org_condition = gate.children[1]
@@ -641,9 +639,9 @@ def test_check_can_read_feed_fix_urls_present():
     assert org_condition.fix_url == "/organizations/form"
 
 
-def test_check_can_read_feed_tree_structure():
+def test_check_network_tree_structure():
     """The tree is always Bundle > (Condition, Gate > (Condition, Condition))."""
-    check = capabilities.check_can_read_feed(_user())
+    check = capabilities.check_network(_user())
     assert check.tree.__class__.__name__ == "Bundle"
     assert len(check.tree.children) == 2
     assert check.tree.children[0].__class__.__name__ == "Condition"
