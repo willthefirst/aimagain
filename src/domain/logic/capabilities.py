@@ -131,9 +131,9 @@ _REASON_META = {
     ),
     REASON_VIEW_UNVERIFIED: ReasonMeta(
         title="Contact details",
-        unlock="Verify your account to see contact details.",
-        fix_label="Complete verification",
-        fix_url="/users/me/access/capabilities/network",
+        unlock="Get provider network access to see this.",
+        fix_label="Get access",
+        fix_url="/users/me/access/capabilities/provider-network",
     ),
 }
 
@@ -244,10 +244,11 @@ def check_network(user: Any) -> CapabilityCheck:
     _org_met = bool(_verified_active_reps(user))
 
     return CapabilityCheck(
-        name="network",
+        name="provider-network",
+        description="See full provider details and reach out directly.",
         tree=Bundle(
-            label_active="Read full feed",
-            label_done="Read full feed",
+            label_active="Provider network",
+            label_done="Provider network",
             children=(
                 Condition(
                     label_active="Verify email",

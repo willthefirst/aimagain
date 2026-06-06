@@ -8,12 +8,12 @@
    Leaf nodes have no `children`; branches carry `op` ("all" / "any") and a
    `children` sequence. The macro detects which is which via duck-typing so
    it works with both Python dataclass instances and plain Jinja dicts. #}
-{% macro capability_requirements_panel(tree, granted) %}
+{% macro capability_requirements_panel(tree, granted, description=none) %}
   {% macro render_leaf(node) %}
     <span>
       <input type="checkbox"
              {% if node.met %}checked{% endif %}
-             readonly
+             disabled
              aria-hidden="true">
       {% if not node.met and node.fix_url %}
         <a href="{{ node.fix_url }}">{{ node.label_active }}</a>
@@ -30,7 +30,7 @@
         <span>
           <input type="checkbox"
                  {% if node.met %}checked{% endif %}
-                 readonly
+                 disabled
                  aria-hidden="true">
           <span>{{ node.label_done if node.met else node.label_active }}</span>
         </span>
@@ -45,7 +45,7 @@
                 <span>
                   <input type="checkbox"
                          {% if child.met %}checked{% endif %}
-                         readonly
+                         disabled
                          aria-hidden="true">
                   <span>{{ child.label_done if child.met else child.label_active }}</span>
                 </span>
@@ -73,6 +73,7 @@
     <header>
       <hgroup>
         <h3>{{ tree.label_active }}</h3>
+        {% if description %}<p>{{ description }}</p>{% endif %}
       </hgroup>
       <small data-state="{{ 'unlocked' if granted else 'locked' }}">
         {% if granted %}
