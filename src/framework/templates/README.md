@@ -71,7 +71,7 @@ From top to bottom:
 │   primary nav        brand + auth-aware links             │
 │   breadcrumb row     ← Resource   (hidden placeholder if none) │  ← captured `{% block breadcrumb %}`
 │   toolbar row        <h1> title              [actions ▶]  │  ← captured `{% block toolbar %}`
-│   ─────────────────────────────────────────────────────  │  ← single `<hr class="page-header-rule">`
+│   ─────────────────────────────────────────────────────  │  ← single `<hr>`
 ├───────────────────────────────────────────────────────────┤
 │ (onboarding banner removed)                               │
 │ subtitle (optional)  NPI · Verified                       │  ← `{% block subtitle %}` (rendered below the rule, top of `<main>`)
