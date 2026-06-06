@@ -36,18 +36,16 @@ under the "Feed rows" section. #}
 <span class="post-feed-byline">
 {%- if show_poster and post.owner -%}
 {%- if can_access_network -%}
-{%- set _fn = post.owner.first_name -%}
-{%- set _ln = post.owner.last_name -%}
-{%- set _poster_name -%}
-{%- if _fn and _ln %}{{ _fn[0] }} . {{ _ln }}
-{%- elif _fn %}{{ _fn }}
-{%- elif _ln %}{{ _ln }}
-{%- else %}{{ post.owner.email }}
-{%- endif %}
-{%- endset -%}
-<small>{{ _poster_name | trim }}</small>
+{%- if view.poster_name -%}
+<small>{{ view.poster_name }}</small>
+{%- endif -%}
 {%- else -%}
-<small>Clinician</small>
+{%- set _fix_url = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED).fix_url -%}
+{%- if post.kind == "program_intake" -%}
+<small class="locked-field"><a href="{{ _fix_url }}"><i class="icon-lock" aria-hidden="true"></i> Doe Health Group</a></small>{# title-case-ignore: placeholder org name #}
+{%- else -%}
+<small class="locked-field"><a href="{{ _fix_url }}"><i class="icon-lock" aria-hidden="true"></i> Dr. J. Doe</a></small>
+{%- endif -%}
 {%- endif -%}
 {%- endif -%}
 <small>{{ post.created_at | days_ago }}</small>

@@ -280,6 +280,7 @@ def post_card_view(post) -> dict[str, Any]:
         "description": None,
         "schedule_text": None,
         "desired_times": [],
+        "poster_name": None,
         "practice_link": None,
         "program_link": None,
         "organization_link": None,
@@ -298,7 +299,13 @@ def post_card_view(post) -> dict[str, Any]:
         if d is None:
             return base
         _forward_detail_passthrough(base, d)
+        _owner = getattr(post, "owner", None)
+        _owner_clinicians = getattr(_owner, "clinicians", None) or []
+        _rc = _owner_clinicians[0] if _owner_clinicians else None
+        _fn = getattr(_rc, "first_name", None) if _rc else None
+        _ln = getattr(_rc, "last_name", None) if _rc else None
         base.update(
+            poster_name=" ".join(filter(None, [_fn, _ln])) or None,
             headline=referral_headline(d),
             in_person=getattr(d, "location_in_person", None),
             virtual=getattr(d, "location_virtual", None),
@@ -326,7 +333,10 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         _forward_detail_passthrough(base, d)
         p = getattr(d, "clinician", None)
+        _fn = getattr(p, "first_name", None) if p else None
+        _ln = getattr(p, "last_name", None) if p else None
         base.update(
+            poster_name=" ".join(filter(None, [_fn, _ln])) or None,
             headline=(p.org.name if p and getattr(p, "org", None) else None),
             # `header_state` stays None — opening's location lives in
             # the demographics column via `location_chunk` (same row
@@ -388,7 +398,9 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         _forward_detail_passthrough(base, d)
         prog = getattr(d, "program", None)
+        _prog_org = getattr(prog, "organization", None) if prog else None
         base.update(
+            poster_name=(getattr(_prog_org, "name", None) if _prog_org else None),
             headline=(getattr(prog, "name", None) if prog else None),
             header_state=(getattr(prog, "state_preference", None) if prog else None),
             program_link=(
