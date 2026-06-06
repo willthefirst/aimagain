@@ -11,21 +11,21 @@
      is a span. The macro enforces the active/done grammar — callers supply both labels. #}
   {% macro render_leaf(node) %}
     {% if not node.met and node.fix_url %}
-      <a class="cap-row" href="{{ node.fix_url }}">
+      <a href="{{ node.fix_url }}">
         <input type="checkbox" aria-hidden="true">
-        <span class="cap-label">{{ node.label_active }}</span>
+        <span>{{ node.label_active }}</span>
         <i class="icon-chevron-right" aria-hidden="true"></i>
       </a>
     {% else %}
-      <span class="cap-row{% if node.met %} done{% endif %}">
+      <span {% if node.met %}class="done"{% endif %}>
         <input type="checkbox"
                {% if node.met %}checked{% endif %}
                aria-hidden="true">
-        <span class="cap-label">{{ node.label_done if node.met else node.label_active }}</span>
+        <span>{{ node.label_done if node.met else node.label_active }}</span>
       </span>
     {% endif %}
   {% endmacro %}
-  {# render_node: dispatches on __class__.__name__. Branches get a <kbd> operator chip
+  {# render_node: dispatches on __class__.__name__. Branches get a <small> operator chip
      and a child <ul>; when met the <ul> gets `inert` (non-interactive + dimmed).
      Jinja macros cannot self-call; children are inlined for the two-level tree. #}
   {% macro render_node(node) %}
@@ -35,15 +35,15 @@
     {% else %}
       {% set op_text = "All of these" if kind == "Bundle" else "Any one of these" %}
       <li>
-        <span class="cap-row{% if node.met %} done{% endif %}">
+        <span {% if node.met %}class="done"{% endif %}>
           <input type="checkbox"
                  {% if node.met %}checked{% endif %}
                  aria-hidden="true">
-          <span class="cap-label">{{ node.label_done if node.met else node.label_active }}</span>
+          <span>{{ node.label_done if node.met else node.label_active }}</span>
         </span>
         <ul {% if node.met %}inert{% endif %}>
           <li>
-            <kbd>{{ op_text }}</kbd>
+            <small>{{ op_text }}</small>
           </li>
           {% for child in node.children %}
             {% set ckind = child.__class__.__name__ %}
@@ -52,15 +52,15 @@
             {% else %}
               {% set cop_text = "All of these" if ckind == "Bundle" else "Any one of these" %}
               <li>
-                <span class="cap-row{% if child.met %} done{% endif %}">
+                <span {% if child.met %}class="done"{% endif %}>
                   <input type="checkbox"
                          {% if child.met %}checked{% endif %}
                          aria-hidden="true">
-                  <span class="cap-label">{{ child.label_done if child.met else child.label_active }}</span>
+                  <span>{{ child.label_done if child.met else child.label_active }}</span>
                 </span>
                 <ul {% if child.met %}inert{% endif %}>
                   <li>
-                    <kbd>{{ cop_text }}</kbd>
+                    <small>{{ cop_text }}</small>
                   </li>
                   {% for gc in child.children %}<li>{{ render_leaf(gc) }}</li>{% endfor %}
                 </ul>
@@ -80,21 +80,20 @@
       <hgroup>
         <h3>{{ root.label_active }}</h3>
       </hgroup>
-      <kbd class="cap-badge"
-           data-state="{{ 'unlocked' if check.granted else 'locked' }}">
+      <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
         {% if check.granted %}
           <i class="icon-check" aria-hidden="true"></i>Available
         {% else %}
           <i class="icon-lock" aria-hidden="true"></i>Not available yet
         {% endif %}
-      </kbd>
+      </small>
       <small>{{ root_met }} of {{ root_total }} requirements met</small>
       <progress value="{{ root_met }}" max="{{ root_total }}"></progress>
     </header>
     <hr>
     <ul class="cap-reqs">
       <li>
-        <kbd>{{ root_op }}</kbd>
+        <small>{{ root_op }}</small>
       </li>
       {% for child in root.children %}{{ render_node(child) }}{% endfor %}
     </ul>

@@ -737,54 +737,53 @@ it's dev-only chrome that should never ship to production. #}
       <section class="gallery-section" id="capability-requirements">
         <h2>Capability requirements</h2>
         <p>
-          <small>Classes: <code>.cap-reqs</code> / <code>.cap-row</code> / <code>.cap-badge</code>. Operator chips and badges use <code>&lt;kbd&gt;</code>. State indicators are native checkboxes (<code>pointer-events:none</code>). Satisfied branches use HTML <code>inert</code>. Labels follow active/done grammar: imperative when unmet, passive-past when met.</small>
+          <small>One scoping class (<code>.cap-reqs</code>) on the root <code>&lt;ul&gt;</code>. Operator chips and badge use <code>&lt;small&gt;</code> (Pico-muted natively). State indicators are native checkboxes (<code>pointer-events:none</code>). Satisfied branches use HTML <code>inert</code>. Labels follow active/done grammar: imperative when unmet, passive-past when met.</small>
         </p>
         <div class="gallery-row">
-          {# Locked: 1 of 2 met — email done, status branch pending.
-             Labels: label_active (verb subject) for unmet, label_done (subject verb-past) for met. #}
+          {# Locked: 1 of 2 met — email done, status branch pending. #}
           <article style="max-width:420px">
             <header>
               <hgroup>
                 <h3>Read full feed</h3>
                 <p>Clinical case discussions, peer commentary, and member-only research notes.</p>
               </hgroup>
-              <kbd class="cap-badge" data-state="locked">
+              <small data-state="locked">
                 <i class="icon-lock" aria-hidden="true"></i>Not available yet
-              </kbd>
+              </small>
               <small>1 of 2 requirements met</small>
               <progress value="1" max="2"></progress>
             </header>
             <hr>
             <ul class="cap-reqs">
               <li>
-                <kbd>All of these</kbd>
+                <small>All of these</small>
               </li>
               <li>
-                <span class="cap-row done">
+                <span class="done">
                   <input type="checkbox" checked aria-hidden="true">
-                  <span class="cap-label">Email verified</span>
+                  <span>Email verified</span>
                 </span>
               </li>
               <li>
-                <span class="cap-row">
+                <span>
                   <input type="checkbox" aria-hidden="true">
-                  <span class="cap-label">Verify your status</span>
+                  <span>Verify your status</span>
                 </span>
                 <ul>
                   <li>
-                    <kbd>Any one of these</kbd>
+                    <small>Any one of these</small>
                   </li>
                   <li>
-                    <a class="cap-row" href="#">
+                    <a href="#">
                       <input type="checkbox" aria-hidden="true">
-                      <span class="cap-label">Verify clinician identity</span>
+                      <span>Verify clinician identity</span>
                       <i class="icon-chevron-right" aria-hidden="true"></i>
                     </a>
                   </li>
                   <li>
-                    <a class="cap-row" href="#">
+                    <a href="#">
                       <input type="checkbox" aria-hidden="true">
-                      <span class="cap-label">Verify organization rep</span>
+                      <span>Verify organization rep</span>
                       <i class="icon-chevron-right" aria-hidden="true"></i>
                     </a>
                   </li>
@@ -799,42 +798,42 @@ it's dev-only chrome that should never ship to production. #}
                 <h3>Read full feed</h3>
                 <p>Clinical case discussions, peer commentary, and member-only research notes.</p>
               </hgroup>
-              <kbd class="cap-badge" data-state="unlocked">
+              <small data-state="unlocked">
                 <i class="icon-check" aria-hidden="true"></i>Available
-              </kbd>
+              </small>
               <small>2 of 2 requirements met</small>
               <progress value="2" max="2"></progress>
             </header>
             <hr>
             <ul class="cap-reqs">
               <li>
-                <kbd>All of these</kbd>
+                <small>All of these</small>
               </li>
               <li>
-                <span class="cap-row done">
+                <span class="done">
                   <input type="checkbox" checked aria-hidden="true">
-                  <span class="cap-label">Email verified</span>
+                  <span>Email verified</span>
                 </span>
               </li>
               <li>
-                <span class="cap-row done">
+                <span class="done">
                   <input type="checkbox" checked aria-hidden="true">
-                  <span class="cap-label">Status verified</span>
+                  <span>Status verified</span>
                 </span>
                 <ul inert>
                   <li>
-                    <kbd>Any one of these</kbd>
+                    <small>Any one of these</small>
                   </li>
                   <li>
-                    <span class="cap-row done">
+                    <span class="done">
                       <input type="checkbox" checked aria-hidden="true">
-                      <span class="cap-label">Clinician identity verified</span>
+                      <span>Clinician identity verified</span>
                     </span>
                   </li>
                   <li>
-                    <span class="cap-row">
+                    <span>
                       <input type="checkbox" aria-hidden="true">
-                      <span class="cap-label">Verify organization rep</span>
+                      <span>Verify organization rep</span>
                     </span>
                   </li>
                 </ul>
