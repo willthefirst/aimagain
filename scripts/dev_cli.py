@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -770,20 +771,28 @@ class WorktreeCommands:
         return 0
 
     def _assign_worktree_port(self) -> int:
-        # Find the lowest unused port starting from 8001 by scanning all
-        # existing .worktree-port files under the worktrees root.
-        used: set = set()
+        # Find the lowest available port starting from 8001. A port from a
+        # .worktree-port file is only treated as occupied if a process is
+        # actually listening on it — stopped containers release their
+        # reservation automatically without needing GC.
+        claimed: set = set()
         wt_root = self._worktrees_root()
         if wt_root.is_dir():
             for port_file in wt_root.glob("*/.worktree-port"):
                 try:
-                    used.add(int(port_file.read_text().split()[0]))
+                    claimed.add(int(port_file.read_text().split()[0]))
                 except (ValueError, IndexError):
                     pass
         port = 8001
-        while port in used:
+        while port in claimed and self._port_bound(port):
             port += 1
         return port
+
+    @staticmethod
+    def _port_bound(port: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.05)
+            return s.connect_ex(("127.0.0.1", port)) == 0
 
     def _looks_like_uuid(self, name: str) -> bool:
         # Heuristic: 6+ consecutive hex chars and no human-meaningful
