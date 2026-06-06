@@ -79,7 +79,9 @@ def test_capability_check_granted_uses_bundle_met():
     tree = Bundle(label_active="root", label_done="root", children=(_met(), _met()))
     assert CapabilityCheck(name="x", tree=tree).granted is True
 
-    tree_fail = Bundle(label_active="root", label_done="root", children=(_met(), _unmet()))
+    tree_fail = Bundle(
+        label_active="root", label_done="root", children=(_met(), _unmet())
+    )
     assert CapabilityCheck(name="x", tree=tree_fail).granted is False
 
 
@@ -87,7 +89,9 @@ def test_capability_check_granted_uses_gate_met():
     tree = Gate(label_active="root", label_done="root", children=(_unmet(), _met()))
     assert CapabilityCheck(name="x", tree=tree).granted is True
 
-    tree_fail = Gate(label_active="root", label_done="root", children=(_unmet(), _unmet()))
+    tree_fail = Gate(
+        label_active="root", label_done="root", children=(_unmet(), _unmet())
+    )
     assert CapabilityCheck(name="x", tree=tree_fail).granted is False
 
 
@@ -97,7 +101,9 @@ def test_capability_check_granted_uses_gate_met():
 def test_nested_bundle_inside_gate():
     """Gate OR (Bundle AND (met, unmet), met) → True because the second Gate
     child is met."""
-    inner = Bundle(label_active="inner", label_done="inner", children=(_met(), _unmet()))
+    inner = Bundle(
+        label_active="inner", label_done="inner", children=(_met(), _unmet())
+    )
     g = Gate(label_active="root", label_done="root", children=(inner, _met()))
     assert g.met is True
 
@@ -105,6 +111,8 @@ def test_nested_bundle_inside_gate():
 def test_nested_gate_inside_bundle():
     """Bundle AND (met, Gate OR (unmet, unmet)) → False because the Gate
     fails."""
-    inner = Gate(label_active="inner", label_done="inner", children=(_unmet(), _unmet()))
+    inner = Gate(
+        label_active="inner", label_done="inner", children=(_unmet(), _unmet())
+    )
     b = Bundle(label_active="root", label_done="root", children=(_met(), inner))
     assert b.met is False
