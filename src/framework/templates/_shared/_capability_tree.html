@@ -1,0 +1,43 @@
+{# Framework-layer macro for rendering a capability tree node.
+
+   `render_node(node)` dispatches on `node.__class__.__name__` to one of
+   three shapes — Condition (leaf), Bundle (AND), Gate (OR) — and renders
+   the sub-tree recursively via a loop over `node.children`.
+
+   Jinja macros cannot call themselves directly; children are rendered in
+   a loop that re-calls the macro by name. For the two-level tree in
+   `check_can_read_feed` this is sufficient: root Bundle → (Condition,
+   Gate → (Condition, Condition)). Deeper nesting is supported so long as
+   the macro is imported before the first call.
+
+   Import in any template that needs to render a capability tree:
+     {%- from "_shared/_capability_tree.html" import render_node -%}
+#}
+{% macro render_node(node) %}
+  {% set kind = node.__class__.__name__ %}
+  {% if kind == "Condition" %}
+    <li class="capability-node capability-node--condition">
+      {% if node.met %}
+        <span class="capability-check capability-check--met">&#10003;</span>
+      {% else %}
+        <span class="capability-check capability-check--unmet">&#10007;</span>
+      {% endif %}
+      {{ node.label_done if node.met else node.label_active }}
+      {% if not node.met %}<a href="{{ node.fix_url }}">Fix →</a>{% endif %}
+    </li>
+  {% elif kind == "Bundle" %}
+    <li class="capability-node capability-node--bundle">
+      <span class="capability-operator">AND</span> {{ node.label_done if node.met else node.label_active }}
+      <ul class="capability-children">
+        {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+      </ul>
+    </li>
+  {% elif kind == "Gate" %}
+    <li class="capability-node capability-node--gate">
+      <span class="capability-operator">OR</span> {{ node.label_done if node.met else node.label_active }}
+      <ul class="capability-children">
+        {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+      </ul>
+    </li>
+  {% endif %}
+{% endmacro %}

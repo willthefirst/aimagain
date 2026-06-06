@@ -37,6 +37,16 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
+# Re-export the framework-layer tree primitives so existing callers
+# (`check_can_read_feed`, tests, templates) keep working without changes.
+# The types themselves are domain-agnostic and live in `src/framework/`.
+from src.framework.capabilities import (  # noqa: F401
+    Bundle,
+    CapabilityCheck,
+    Condition,
+    Gate,
+)
+
 # Reason codes used by the `_shared/_locked.html` macros and
 # `fix_url_for(...)`. Closed vocab: any new reason must be added here and
 # given a `ReasonMeta` entry in `_REASON_META` below.
@@ -135,76 +145,6 @@ _FALLBACK_META = ReasonMeta(
     fix_label="Open profile",
     fix_url="/users/me",
 )
-
-
-@dataclass(frozen=True)
-class Condition:
-    """Atomic boolean leaf in a capability tree.
-
-    Two labels encode the verb-subject grammar: `label_active` is the
-    imperative action shown when the condition is unmet ("Verify email");
-    `label_done` is the passive-past confirmation shown when met ("Email
-    verified"). Templates must never show the wrong label for the state.
-    """
-
-    label_active: str  # imperative: "Verify email"
-    label_done: str  # passive-past: "Email verified"
-    met: bool
-    fix_url: str  # the resource that changes this condition
-
-
-@dataclass(frozen=True)
-class Bundle:
-    """AND node — all children must pass.
-
-    Same two-label grammar as Condition: `label_active` when the bundle
-    is unmet, `label_done` when every child is satisfied.
-    """
-
-    label_active: str
-    label_done: str
-    children: tuple  # tuple[Condition | Bundle | Gate, ...]
-
-    @property
-    def op(self) -> str:
-        return "all"
-
-    @property
-    def met(self) -> bool:
-        return all(c.met for c in self.children)
-
-
-@dataclass(frozen=True)
-class Gate:
-    """OR node — any one child suffices.
-
-    Same two-label grammar as Condition: `label_active` when unmet,
-    `label_done` when at least one child is satisfied.
-    """
-
-    label_active: str
-    label_done: str
-    children: tuple  # tuple[Condition | Bundle | Gate, ...]
-
-    @property
-    def op(self) -> str:
-        return "any"
-
-    @property
-    def met(self) -> bool:
-        return any(c.met for c in self.children)
-
-
-@dataclass(frozen=True)
-class CapabilityCheck:
-    """Evaluated capability tree for a specific user."""
-
-    name: str
-    tree: Any  # Condition | Bundle | Gate
-
-    @property
-    def granted(self) -> bool:
-        return self.tree.met
 
 
 @dataclass(frozen=True)
