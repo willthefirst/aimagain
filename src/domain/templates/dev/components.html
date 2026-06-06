@@ -737,7 +737,7 @@ it's dev-only chrome that should never ship to production. #}
       <section class="gallery-section" id="capability-requirements">
         <h2>Capability requirements</h2>
         <p>
-          <small>One scoping class (<code>.cap-reqs</code>) on the root <code>&lt;ul&gt;</code>. Operator chips and badge use <code>&lt;small&gt;</code> (Pico-muted natively). State indicators are native checkboxes (<code>pointer-events:none</code>). Satisfied branches use HTML <code>inert</code>. Labels follow active/done grammar: imperative when unmet, passive-past when met.</small>
+          <small>One scoping class (<code>.cap-reqs</code>) on the root <code>&lt;ul&gt;</code>. Operator chips and badge use <code>&lt;small&gt;</code> (Pico-muted natively). State indicators are native checkboxes (<code>pointer-events:none</code>). Labels follow active/done grammar: imperative when unmet, passive-past when met.</small>
         </p>
         <div class="gallery-row">
           {# Locked: 1 of 2 met — email done, status branch pending. #}
@@ -789,7 +789,7 @@ it's dev-only chrome that should never ship to production. #}
               </li>
             </ul>
           </article>
-          {# Unlocked: 2 of 2 met — all done. Satisfied branch uses inert to dim its children. #}
+          {# Unlocked: 2 of 2 met — all done. #}
           <article style="max-width:420px">
             <header>
               <hgroup>
@@ -818,7 +818,7 @@ it's dev-only chrome that should never ship to production. #}
                   <input type="checkbox" checked aria-hidden="true">
                   <span>Status verified</span>
                 </span>
-                <ul inert>
+                <ul>
                   <li>
                     <small>Any one of these</small>
                   </li>

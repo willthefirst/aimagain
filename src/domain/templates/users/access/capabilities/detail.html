@@ -22,7 +22,7 @@
     </span>
   {% endmacro %}
   {# render_node: dispatches on __class__.__name__. Branches get a <small> operator chip
-     and a child <ul>; when met the <ul> gets `inert` (non-interactive + dimmed).
+     and a child <ul>. Jinja macros cannot self-call; children are inlined for the two-level tree.
      Jinja macros cannot self-call; children are inlined for the two-level tree. #}
   {% macro render_node(node) %}
     {% set kind = node.__class__.__name__ %}
@@ -37,7 +37,7 @@
                  aria-hidden="true">
           <span>{{ node.label_done if node.met else node.label_active }}</span>
         </span>
-        <ul {% if node.met %}inert{% endif %}>
+        <ul>
           <li>
             <small>{{ op_text }}</small>
           </li>
@@ -54,7 +54,7 @@
                          aria-hidden="true">
                   <span>{{ child.label_done if child.met else child.label_active }}</span>
                 </span>
-                <ul {% if child.met %}inert{% endif %}>
+                <ul>
                   <li>
                     <small>{{ cop_text }}</small>
                   </li>
