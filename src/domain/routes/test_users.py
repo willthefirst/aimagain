@@ -1009,3 +1009,22 @@ async def test_get_user_clinicians_404_for_unknown_user(
 
     response = await authenticated_client.get(f"/users/{uuid.uuid4()}/clinicians")
     assert response.status_code == 404
+
+
+async def test_get_my_clinicians_renders_breadcrumb(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /users/me/clinicians` renders a breadcrumb back-affordance
+    pointing at the current user's profile — auto-injected by
+    `mount_related_list` via `USER_ENTITY.display_label_fn`."""
+    response = await authenticated_client.get("/users/me/clinicians")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert (
+        back is not None
+    ), "user clinicians list must render a breadcrumb back-affordance"
+    assert back.attributes.get("href") == f"/users/{logged_in_user.id}"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == logged_in_user.username

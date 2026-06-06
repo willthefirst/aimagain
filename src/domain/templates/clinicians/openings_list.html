@@ -1,19 +1,9 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
-{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{# Owner-scoped projection over /posts — this clinician's openings. #}
+{# Owner-scoped projection over /posts — this clinician's openings.
+   Breadcrumb auto-injected by mount_related_list via CLINICIAN_ENTITY.display_label_fn. #}
 {% block resource_label %}{% endblock %}
-{%- set _fn = clinician.first_name or "" -%}
-{%- set _ln = clinician.last_name or "" -%}
-{%- set clinician_label = (_fn ~ " " ~ _ln) | trim or "Clinician" -%}
-{% block breadcrumb %}
-  {{ breadcrumb([
-    ("Clinicians", entity_url('clinician') ),
-  (clinician_label, entity_url('clinician', id=clinician.id)),
-  ("Openings", none),
-  ]) }}
-{% endblock %}
 {% block content %}
   {%- set _empty %}{{ post_feed_empty("No openings posted for this clinician yet.") }}{%- endset %}
     {{ item_list(posts, post_feed_row, "clinician-openings-list", "post-feed-list",

@@ -79,6 +79,12 @@ def mount_edge_routes(
     # cluster mate `entity_spec`).
     from src.framework.persistence.dependencies import get_audit_repository
 
+    # Resolve breadcrumb metadata once at mount time. Edge routes are
+    # self-only (the "parent" is always the requesting user), so the
+    # ancestry chain is: from_entity collection → user row → edge collection.
+    _from_entity = entity.relation.from_entity
+    _from_label_fn = _from_entity.display_label_fn
+
     @router.get("", name=f"{entity.name}:list")
     async def _list_route(  # noqa: F811 — closure, not re-exported
         request: Request,
@@ -86,6 +92,19 @@ def mount_edge_routes(
         repo: Any = Depends(repo_dep),
     ):
         context = await list_handler(request=request, repo=repo, requesting_user=user)
+        if _from_label_fn is not None:
+            collection = _from_entity.url_collection
+            # Use the singleton alias path (e.g. /users/me) when available
+            # so the back link reads the canonical self-path, not a bare UUID.
+            alias = _from_entity.singleton_alias
+            parent_path = (
+                f"/{collection}/{alias[0]}" if alias else f"/{collection}/{user.id}"
+            )
+            context["_breadcrumb_items"] = [
+                (collection.capitalize(), f"/{collection}"),
+                (_from_label_fn(user), parent_path),
+                (entity.url_collection.capitalize(), None),
+            ]
         return APIResponse.html_response(
             template_name=list_template,
             context=context,
