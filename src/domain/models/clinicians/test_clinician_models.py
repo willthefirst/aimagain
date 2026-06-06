@@ -34,6 +34,8 @@ def _make_clinician(user, **overrides) -> Clinician:
     defaults = dict(
         owner_id=user.id,
         org_id=org.id,
+        first_name="Jane",
+        last_name="Smith",
         location_city="Springfield",
         location_state="IL",
         location_zip="62701",

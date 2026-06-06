@@ -204,11 +204,9 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     # verification pipeline to look up the clinician in NPPES. No UNIQUE
     # constraint at the DB layer yet.
     npi: str | None = None
-    # Legal first / last name — surfaced via `from_attributes` through
-    # `Clinician.first_name` / `last_name`. Optional on read because
-    # backfill is operator-driven.
-    first_name: str | None = None
-    last_name: str | None = None
+    # Legal first / last name — required on the model (NOT NULL).
+    first_name: str
+    last_name: str
     # `(city, state, zip)` arrive flat — from ORM attributes via
     # ``from_attributes`` or from a flat dict — and dump flat (JSON
     # responses still expose ``location_city`` / ``location_state`` /
@@ -262,15 +260,12 @@ class ClinicianCreate(FlatLocationSchema, WirePayload):
             raise ValueError("org_id is required unless solo_practice is True")
         return self
 
-    # Optional on create; backfill is operator-driven. Empty input
-    # normalizes to `None` so an unfilled form field doesn't 422.
+    # Optional on create; empty input normalizes to `None`.
     npi: NpiText = None
-    # Legal first / last name — both optional, both normalize empty
-    # string to `None` via `StrippedOptionalText` so an unfilled form
-    # field doesn't persist `""`. Forwarded to the linked Clinician
-    # via `Clinician.__init__`'s kwarg peeling.
-    first_name: StrippedOptionalText = None
-    last_name: StrippedOptionalText = None
+    # Legal first / last name — required; empty input fails validation.
+    # Forwarded to the linked Clinician via `Clinician.__init__`'s kwarg peeling.
+    first_name: StrippedText
+    last_name: StrippedText
     location: Location | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
@@ -307,12 +302,11 @@ class ClinicianUpdate(FlatLocationSchema, PartialUpdate):
     # Patch the NPI by writing a 10-digit string or empty (→ `None`,
     # clearing the field). Same validator as :class:`ClinicianCreate`.
     npi: NpiText = None
-    # Patch the linked Clinician's first / last name. Empty input
-    # normalizes to `None` so submitting a blank field clears the
-    # column; absent fields pass through `exclude_unset=True` and
-    # don't touch the persisted value.
-    first_name: StrippedOptionalText = None
-    last_name: StrippedOptionalText = None
+    # Patch the linked Clinician's first / last name. Empty input raises
+    # a 422 (cannot clear to NULL); absent fields pass through
+    # `exclude_unset=True` and don't touch the persisted value.
+    first_name: StrippedText | None = None
+    last_name: StrippedText | None = None
     location: LocationPartial | None = None
     in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None

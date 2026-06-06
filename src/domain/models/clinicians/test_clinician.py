@@ -47,6 +47,8 @@ def _make_clinician(
     return Clinician(
         owner_id=owner.id,
         org_id=org.id,
+        first_name="Jane",
+        last_name="Smith",
         npi=npi,
         in_person_sessions="yes",
         virtual_sessions="please_contact",
@@ -106,6 +108,8 @@ async def test_clinician_construct_with_existing_affiliation_skips_auto_create()
     )
     clinician = Clinician(
         owner_id=user.id,
+        first_name="Jane",
+        last_name="Smith",
         npi="9876543210",
         clinician_affiliations=[existing],
     )
@@ -134,7 +138,9 @@ async def test_setting_clinician_npi_persists(session):
 async def test_clinician_npi_check_constraint_rejects_non_ten_digits(session):
     """The CHECK constraint on ``clinicians.npi`` — defense-in-
     depth behind the Pydantic ``_validate_npi``."""
-    clinician = Clinician(npi="12345")  # 5 digits, not 10
+    clinician = Clinician(
+        first_name="Jane", last_name="Smith", npi="12345"
+    )  # 5 digits, not 10
     session.add(clinician)
     with pytest.raises(IntegrityError):
         await session.flush()

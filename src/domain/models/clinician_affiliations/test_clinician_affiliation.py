@@ -40,6 +40,8 @@ def _make_clinician(*, owner: User, org: Organization, **overrides) -> Clinician
     defaults = dict(
         owner_id=owner.id,
         org_id=org.id,
+        first_name="Jane",
+        last_name="Smith",
         in_person_sessions="yes",
         virtual_sessions="please_contact",
         accepts_out_of_network=True,
