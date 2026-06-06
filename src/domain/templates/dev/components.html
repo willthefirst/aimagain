@@ -84,32 +84,6 @@ it's dev-only chrome that should never ship to production. #}
     align-items: flex-start;
     margin-bottom: 1rem;
   }
-  .gallery-token-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-  .gallery-token-table td { padding: 0.25rem 0.5rem; vertical-align: middle; }
-  .gallery-token-table td:first-child { font-family: monospace; color: var(--pico-muted-color); }
-  .gallery-token-swatch {
-    display: inline-block;
-    width: 1.25rem;
-    height: 1.25rem;
-    border-radius: 0.25rem;
-    border: 1px solid var(--pico-muted-border-color);
-    vertical-align: middle;
-    margin-right: 0.5rem;
-  }
-  .gallery-icon-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-    gap: 0.5rem;
-  }
-  .gallery-icon-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8rem;
-    color: var(--pico-muted-color);
-    padding: 0.25rem;
-  }
-  .gallery-icon-item i { font-size: 1.1em; color: var(--pico-color); }
   @media (max-width: 640px) {
     .gallery-layout { grid-template-columns: 1fr; }
     .gallery-layout > aside { position: static; }
@@ -133,13 +107,7 @@ it's dev-only chrome that should never ship to production. #}
                 <span class="gallery-nav-subgroup">Foundations</span>
                 <ul>
                   <li>
-                    <a href="#tokens">Design tokens</a>
-                  </li>
-                  <li>
-                    <a href="#typography">Typography</a>
-                  </li>
-                  <li>
-                    <a href="#icons">Icons</a>
+                    <a href="#foundations">Pico.css + Lucide</a>
                   </li>
                 </ul>
               </li>
@@ -239,93 +207,14 @@ it's dev-only chrome that should never ship to production. #}
       {# ═══════════════════════════════════════════════════════════ #}
       {# FRAMEWORK: FOUNDATIONS                                       #}
       {# ═══════════════════════════════════════════════════════════ #}
-      <section class="gallery-section" id="tokens">
-        <h2>Design tokens</h2>
-        <table class="gallery-token-table">
-          <tr>
-            <td>--pico-spacing</td>
-            <td>0.75rem — base spacing unit</td>
-          </tr>
-          <tr>
-            <td>--pico-form-element-spacing-vertical</td>
-            <td>0.5rem</td>
-          </tr>
-          <tr>
-            <td>--pico-line-height</td>
-            <td>1.4</td>
-          </tr>
-          <tr>
-            <td>--pico-font-size-h1</td>
-            <td>1.75rem</td>
-          </tr>
-          <tr>
-            <td>--pico-font-size-h2</td>
-            <td>1.375rem</td>
-          </tr>
-          <tr>
-            <td>--pico-font-size-h3</td>
-            <td>1.125rem</td>
-          </tr>
-          <tr>
-            <td>--pico-font-size-h4</td>
-            <td>1rem (body size)</td>
-          </tr>
-          <tr>
-            <td>--form-max-width</td>
-            <td>720px — entity form cap</td>
-          </tr>
-          <tr>
-            <td>--pico-primary</td>
-            <td>
-              <span class="gallery-token-swatch" style="background:var(--pico-primary)"></span>Primary color
-            </td>
-          </tr>
-          <tr>
-            <td>--pico-secondary</td>
-            <td>
-              <span class="gallery-token-swatch" style="background:var(--pico-secondary)"></span>Secondary color
-            </td>
-          </tr>
-          <tr>
-            <td>--pico-muted-color</td>
-            <td>
-              <span class="gallery-token-swatch"
-                    style="background:var(--pico-muted-color)"></span>Muted text
-            </td>
-          </tr>
-          <tr>
-            <td>--pico-del-color</td>
-            <td>
-              <span class="gallery-token-swatch" style="background:var(--pico-del-color)"></span>Error / destructive
-            </td>
-          </tr>
-        </table>
-      </section>
-      <section class="gallery-section" id="typography">
-        <h2>Typography</h2>
-        <h1>H1 — page heading (1.75rem)</h1>
-        <h2>H2 — section heading (1.375rem)</h2>
-        <h3>H3 — card heading (1.125rem)</h3>
-        <h4>H4 — Sub-heading (1rem)</h4>
+      <section class="gallery-section" id="foundations">
+        <h2>Foundations</h2>
         <p>
-          Body paragraph. <strong>Bold text.</strong> <em>Italic text.</em> <small>Small/muted text.</small> <code>inline code</code>. <mark>highlighted text.</mark>
+          The UI is built on <a href="https://picocss.com" target="_blank" rel="noopener">Pico.css</a> — a classless semantic CSS framework. Typography, color tokens, form elements, buttons, and spacing all come from Pico. Refer to the <a href="https://picocss.com/docs" target="_blank" rel="noopener">Pico docs</a> for the full token reference and component catalog.
         </p>
         <p>
-          <small>Small standalone — used for timestamps, helper text, muted metadata.</small>
+          Icons are from <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a>, served as a static icon font (<code>framework.css</code> loads it via <code>@font-face</code>). Use any icon with <code>&lt;i class="icon-{name}"&gt;&lt;/i&gt;</code> where <code>{name}</code> is the Lucide icon name in kebab-case. Browse the full set at <a href="https://lucide.dev/icons" target="_blank" rel="noopener">lucide.dev/icons</a>.
         </p>
-      </section>
-      <section class="gallery-section" id="icons">
-        <h2>Icons (Lucide static font)</h2>
-        <div class="gallery-icon-grid">
-          {% for name in ["map-pin", "shield", "shield-check", "graduation-cap", "baby",
-            "monitor", "layers", "chevron-left", "menu", "x",
-            "user", "heart", "search", "filter", "plus",
-            "pencil", "trash-2", "arrow-left", "check", "alert-circle"] %}
-            <div class="gallery-icon-item">
-              <i class="icon-{{ name }}"></i><code>{{ name }}</code>
-            </div>
-          {% endfor %}
-        </div>
       </section>
       {# ═══════════════════════════════════════════════════════════ #}
       {# FRAMEWORK: CONTENT                                           #}
