@@ -147,7 +147,7 @@ async def validate_org_representation_payload(
                 detail=(
                     "The Authorized-Official path requires a verified "
                     "clinician profile with first + last name. Visit "
-                    "/profile to complete Claim A first."
+                    "/users/me to complete Claim A first."
                 )
             )
         similarity = _name_similarity(clinician_name, org.authorized_official_name)

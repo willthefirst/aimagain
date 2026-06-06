@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.domain.logic.profile.view import onboarding_readiness
+from src.domain.logic.users.view import onboarding_readiness
 
 
 def _user(*, email=True, claim_a=False, claim_b=False, ever_verified=False):
@@ -45,7 +45,7 @@ def test_unverified_email_blocks_everything_and_points_at_email():
     assert r.claim_a_verified is False
     assert r.can_post is False
     assert r.next_label == "Verify your email"
-    assert r.next_href == "/profile/email"
+    assert r.next_href == "/users/me/email/form"
 
 
 def test_email_verified_no_claim_points_at_identity():
@@ -53,14 +53,14 @@ def test_email_verified_no_claim_points_at_identity():
     assert r.email_verified is True
     assert r.can_post is False
     assert r.next_label == "Verify your identity to start posting"
-    assert r.next_href == "/profile/identity"
+    assert r.next_href == "/users/me"
 
 
 def test_claim_a_unlocks_posting_and_clears_next_step():
     r = onboarding_readiness(_user(claim_a=True))
     assert r.claim_a_verified is True
     assert r.can_post is True
-    assert r.can_read_full_feed is True
+    assert r.can_access_network is True
     assert r.next_label is None
     assert r.next_href is None
 
@@ -79,6 +79,6 @@ def test_lapsed_clinician_loses_feed_access():
     `ever_verified_at` set (no current `clinician_verified=True`) is denied
     feed access and is directed back to the identity step."""
     r = onboarding_readiness(_user(claim_a=False, ever_verified=True))
-    assert r.can_read_full_feed is False
+    assert r.can_access_network is False
     assert r.can_post is False
-    assert r.next_href == "/profile/identity"
+    assert r.next_href == "/users/me"

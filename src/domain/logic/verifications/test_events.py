@@ -114,7 +114,7 @@ def test_recompute_clinician_claim_happy_path():
 def test_recompute_clinician_claim_preserves_ever_verified_at_on_regression():
     """A clinician who was previously verified and now isn't (license
     expired) must keep `ever_verified_at` set — that's what the
-    `can_read_full_feed` retention rule reads."""
+    `can_access_network` retention rule reads."""
     historic = datetime(2025, 6, 1, tzinfo=timezone.utc)
     clinician = Clinician(id=uuid4(), owner_id=uuid4())
     clinician.npi_match_status = "matched"

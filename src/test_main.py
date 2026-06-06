@@ -78,7 +78,7 @@ async def test_home_page_no_post_actions_for_no_claim_user(
 
 async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
     """The blur wrapper (`feed-teaser-blur`) is removed regardless of
-    verification state — anonymization is now server-side via `can_read_full_feed`,
+    verification state — anonymization is now server-side via `can_access_network`,
     not a CSS filter on the client."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200

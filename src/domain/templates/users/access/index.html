@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {% block title %}Access{% endblock %}
+{% block breadcrumb %}
+  {{ breadcrumb([
+    ("Profile", entity_url('user', id='me') ),
+  ("Access", none),
+  ]) }}
+{% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading="Access") %}
   {% endcall %}
@@ -10,22 +17,8 @@
     <header class="entity-header">
       <strong>Capabilities</strong>
     </header>
-    <section class="entity-facts">
-      <dl>
-        {% for name, check in checks.items() %}
-          <div>
-            <dt>{{ name }}</dt>
-            <dd>
-              {% if check.granted %}
-                <span class="capability-badge capability-badge--granted">Granted</span>
-              {% else %}
-                <span class="capability-badge capability-badge--denied">Denied</span>
-              {% endif %}
-              <a href="{{ capability_base_url }}/{{ name }}">View details →</a>
-            </dd>
-          </div>
-        {% endfor %}
-      </dl>
-    </section>
+    <footer class="entity-footer">
+      <a href="{{ capabilities_url }}" role="button" class="outline">View capabilities</a>
+    </footer>
   </section>
 {% endblock %}

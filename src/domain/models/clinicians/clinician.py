@@ -80,7 +80,7 @@ class Clinician(BaseModel):
     )
     verified_at = Column(TIMESTAMP, nullable=True)
     # First-ever verification timestamp; preserved across regressions.
-    # Drives `capabilities.can_read_full_feed(...)` retention rule per
+    # Drives `capabilities.can_access_network(...)` retention rule per
     # handoff §7.1: once verified, the user keeps full feed access even
     # if a license later lapses.
     ever_verified_at = Column(TIMESTAMP, nullable=True)

@@ -1,5 +1,4 @@
 {% extends "views/detail.html" %}
-{%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/sections.html" import fact -%}
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
@@ -23,17 +22,7 @@
   {% endif %}
   {% include "users/_admin_actions.html" %}
 {% endblock %}
-{# User detail uses the `.entity-card` chrome shared with the other
-   detail pages. The Clinicians section is a separate card below the
-   main user card — embedded card-in-card would read as visual noise,
-   so the page is two stacked cards: identity + private-fields on top,
-   the clinician-entries index table on bottom.
-
-   The identity card has no `<header>` — the toolbar H1 above already
-   carries `target_user.username`, so an in-card header would just
-   restate it. The Clinicians card keeps its header because the
-   `<strong>Clinicians</strong>` is a section label, not a duplicate
-   of any heading above. #}
+{# User detail: identity card (email/active) + Favorites + Access. #}
 {% block content %}
   <section class="entity-card">
     {# Private rows (email, active) are gated by `can_view_private`,
@@ -75,57 +64,18 @@
       </footer>
     </section>
   {% endif %}
-  {# Verification status — self-only, read-only. This is a *status
-   signpost*, not an onboarding wizard: the single place to verify and
-   manage claims is the /profile hub (handoff §8.1 — "onboarding IS the
-   hub in setup mode; no separate wizard"). This card reports where the
-   user stands (email + identity) and links into the hub to act; it
-   deliberately carries no "Post an opening" / "Create clinician" action
-   CTAs, which would re-create the duplicate onboarding surface the hub
-   is meant to own. Status reads from `onboarding_readiness`, the same
-   capability-accurate projection the post gate uses. Other users'
-   profiles (/users/{id}) omit this section entirely. #}
+  {# Access — self-only. Links to the access overview where the user
+   can inspect their capability status. #}
   {% if is_self %}
-    {% set readiness = onboarding_readiness(current_user) %}
     <section class="entity-card">
       <header class="entity-header">
-        <strong>Verification</strong>
+        <strong>Access</strong>
       </header>
-      <section class="entity-facts">
-        <dl>
-          {{ fact('verify-email', 'Email', 'Verified' if readiness.email_verified else 'Not verified') }}
-          {{ fact('verify-identity', 'Identity', 'Verified' if readiness.can_post else 'Not verified') }}
-        </dl>
-      </section>
       <footer class="entity-footer">
-        {% if readiness.can_post %}
-          <a href="/profile" role="button" class="outline">Manage your practice and verification</a>
-        {% else %}
-          <a href="{{ readiness.next_href or '/profile' }}" role="button">Set up and verify your practice</a>
-        {% endif %}
+        <a href="{{ entity_url('user', id='me') }}/access"
+           role="button"
+           class="outline">View access</a>
       </footer>
     </section>
   {% endif %}
-  <section class="entity-card">
-    <header class="entity-header">
-      <strong>Clinicians</strong>
-    </header>
-    {% if clinicians %}
-      <section id="user-detail-clinicians">
-        {%- for clinician in clinicians %}{{ clinician_card(clinician) }}{%- endfor %}
-        </section>
-      {% else %}
-        <p id="user-detail-clinicians-empty">No clinician entries yet.</p>
-      {% endif %}
-      {# Self-only Create CTA — the profile is the natural discovery
-     point for "make my own clinician entry". The dedicated
-     `/users/me/clinicians` page carries the same action in its
-     toolbar (added in 3b59933f); this inline button is the version
-     a user sees on the profile preview, without an extra click. #}
-      {% if is_self %}
-        <footer class="entity-footer">
-          <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label("clinician") }}</a>
-        </footer>
-      {% endif %}
-    </section>
-  {% endblock %}
+{% endblock %}

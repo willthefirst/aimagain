@@ -123,11 +123,10 @@
        `/posts?kind=referral` (the "find new clients" journey home —
        see `src/main.py:read_root` for the bias rationale) and unauthed
        users to the login page — safe on either side of the auth gate. #}
-    {# `/profile` is the dedicated Profile Hub (bespoke route — see
-       `src/domain/routes/profile.py`). The legacy `/users/me` detail
-       page is still reachable by URL but isn't chrome-promoted. #}
-    {%- set _profile_path = "/profile" -%}
-    {%- set _on_profile = is_authenticated and (request.url.path == _profile_path or request.url.path.startswith(_profile_path + '/')) -%}
+    {# Self-profile page. The nav lights up for any path under
+       the self-alias URL. #}
+    {%- set _users_me_path = entity_url('user', id='me') -%}
+    {%- set _on_users_me = is_authenticated and (request.url.path == _users_me_path or request.url.path.startswith(_users_me_path + '/')) -%}
     {# Section shortcuts. The primary nav promotes the unified `/posts`
        feed, which lists every post kind (referrals, clinician openings,
        program intakes) and exposes a `kind` filter. The other URL
@@ -157,33 +156,7 @@
     {% endset -%}
     {% include "_shared/_page_header.html" %}
     <main class="container">
-      {# Single global incomplete-profile banner — the *only* place the app
-         nags about verification. One chrome signal that reads
-         `onboarding_incomplete` from `base_context` — itself the
-         `onboarding_checklist` registry projection — so it can't disagree
-         with the itemized steps on `/profile`. Explains *why* content is
-         gated and links to the next actionable step (`onboarding_next_href`,
-         a `/profile/<step>` deep-link). Pages don't repeat this with their
-         own finish-setup cards or feed notices. Suppressed on `/profile`
-         itself, where the full checklist is already on screen — a banner
-         there would just point at the page you're on.
-
-         No `.container` class here: the parent `<main class="container">`
-         already supplies the max-width centering; a nested `.container`
-         would inset the banner from the rest of the body. (That it's the
-         first child of `<main>`, and that `<header><main><footer>` stay the
-         only top-level body elements, is pinned by
-         `framework/templates/test_page_header.py`.) #}
-      {% if is_authenticated and onboarding_incomplete and not _on_profile %}
-        <aside role="status" id="onboarding-banner">
-          <p>
-            <strong>Finish setting up your profile.</strong>
-            Clinician names and contact details stay hidden, and you can't post,
-            until you verify.
-            <a href="{{ onboarding_next_href }}">Continue setup →</a>
-          </p>
-        </aside>
-      {% endif %}
+      {# Onboarding banner removed. #}
       {# Subtitle slot — a one-line muted meta string rendered directly
          below the page-header band's rule, above content (e.g. a
          clinician's "NPI · Verified", a profile-mode line). The block is

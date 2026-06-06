@@ -526,7 +526,7 @@ async def test_create_form_preselects_first_clinician(
     ), "selected option value should be the first affiliation's id"
 
 
-# --- Anonymization gate (can_read_full_feed) ---------------------------------
+# --- Anonymization gate (can_access_network) ---------------------------------
 
 
 async def test_list_has_no_inline_verify_notice_for_unverified(
@@ -701,7 +701,7 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
         ), f"{fact_key} should render a locked placeholder"
         assert (
             dd.css_first("a").attributes.get("href")
-            == "/users/me/access/capabilities/can_read_feed"
+            == "/users/me/access/capabilities/network"
         )
 
     # ...but the real navigable links + the address value are withheld.

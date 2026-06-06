@@ -29,7 +29,7 @@ from src.domain.logic.posts.view import (
     post_row_summary,
     referral_headline,
 )
-from src.domain.logic.profile.view import onboarding_readiness
+from src.domain.logic.users.view import onboarding_readiness
 from src.domain.models import enums
 from src.framework.rendering.form_fields import register_choice_labels
 from src.framework.rendering.templating import register_template_globals
@@ -122,7 +122,7 @@ register_template_globals(
     clinician_card_view=clinician_card_view,
     # `onboarding_readiness(user)` is the compact capability-accurate
     # readiness summary the "Getting started" checklist reads — see its
-    # docstring in `src.domain.logic.profile.view`. Reuses the same
+    # docstring in `src.domain.logic.users.view`. Reuses the same
     # `capabilities` predicates the post gate uses, so the checklist
     # can't invite a user into an action the server would 403.
     onboarding_readiness=onboarding_readiness,

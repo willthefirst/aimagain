@@ -1,4 +1,4 @@
-"""Onboarding readiness projection.
+"""Onboarding readiness projection for the users domain.
 
 `onboarding_readiness(user)` collapses the two-claim verification model
 into one capability-accurate summary of "what does this user still need
@@ -8,23 +8,10 @@ reads the *same* readiness from the *same* predicates the server-side
 post gate uses (`capabilities.*`). That's the whole point of the
 capabilities module: a status signpost can't disagree with the gate.
 
-The single place a user *acts* on verification is the `/profile` hub
-(handoff §8.1 — "onboarding IS the hub in setup mode; no separate
-wizard"); `/users/me` reports state and links into the hub, it does not
-re-host the onboarding wizard. So this projection drives a status line,
-not an action checklist — `next_href` is a deep-link *into the hub*, not
-a substitute for it.
-
 This is a pure projection (no I/O): it reads already-loaded relationships
 off `user` via the `capabilities` predicates and returns a frozen view
 object. Mirror of `clinician_card_view` / `post_card_view`; exposed as a
 Jinja global in `template_globals.py`.
-
-The rich step-by-step setup UI (`profile/_setup.html`) is a *different*
-surface — it walks NPI-pending/mismatch sub-states the bare readiness
-summary intentionally omits. This projection is the compact "are you
-ready, and if not what's the single next click" view; `_setup.html`
-stays the detailed guided flow.
 """
 
 from __future__ import annotations
@@ -45,7 +32,7 @@ class OnboardingReadiness:
       (`any_org_rep_verified`).
     - `can_post` — holds at least one posting-capable claim (A or B). The
       gate a "Post an opening / referral" CTA must respect.
-    - `can_read_full_feed` — full (un-teased) feed access.
+    - `can_access_network` — full (un-teased) feed access.
     - `next_label` / `next_href` — the single next verification step, or
       ``None`` when nothing remains (the user can post). Hrefs come from
       `capabilities.fix_url_for` (the step subroutes) so the deep-link
@@ -56,7 +43,7 @@ class OnboardingReadiness:
     claim_a_verified: bool
     claim_b_verified: bool
     can_post: bool
-    can_read_full_feed: bool
+    can_access_network: bool
     next_label: str | None
     next_href: str | None
 
@@ -68,7 +55,7 @@ def onboarding_readiness(user: Any) -> OnboardingReadiness:
     `getattr` like the rest of that module, so template stubs and the
     real `User` ORM row both work. `can_post` is "holds a posting-capable
     claim" (Claim A or any verified Claim B), matching the structure of
-    `can_read_full_feed`; the per-kind gates (`can_post_referral`,
+    `can_access_network`; the per-kind gates (`can_post_referral`,
     `can_post_program_intake`) refine it at the actual post boundary.
     """
     email = capabilities.email_verified(user)
@@ -93,7 +80,7 @@ def onboarding_readiness(user: Any) -> OnboardingReadiness:
         claim_a_verified=claim_a,
         claim_b_verified=claim_b,
         can_post=can_post,
-        can_read_full_feed=capabilities.can_read_full_feed(user),
+        can_access_network=capabilities.can_access_network(user),
         next_label=next_label,
         next_href=next_href,
     )

@@ -35,7 +35,7 @@ under the "Feed rows" section. #}
 <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
 <span class="post-feed-byline">
 {%- if show_poster and post.owner -%}
-{%- if can_read_full_feed -%}
+{%- if can_access_network -%}
 {%- set _fn = post.owner.first_name -%}
 {%- set _ln = post.owner.last_name -%}
 {%- set _poster_name -%}

@@ -5,7 +5,7 @@ Two species, one component (full contract: the picker entry in
 a *discriminator/type picker* funnels to a kind-/type-specific sub-form of
 the SAME resource via a selecting query param (`/posts/form?kind=…`,
 `/organizations/form?type=…`); a *dispatching picker* points its cards OUT
-at OTHER resources' create forms (`/profile/identity` → `/clinicians/form`
+at OTHER resources' create forms (e.g. an identity picker → `/clinicians/form`
 + `/organizations/form`). The macro only renders {href, heading,
 description} — self- vs cross-resource hrefs are the caller's business.
 Adopted from the `/posts/form` pattern (issue #704).

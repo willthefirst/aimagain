@@ -51,25 +51,10 @@ def base_context(user: Actor | None) -> dict:
     which also accepts verified org reps (Claim B). Org-rep posting has no
     chrome entry point by design; templates gate on `can_post` so they all
     use the same definition instead of re-deriving `claims.a`.
-
-    `onboarding_incomplete` / `onboarding_next_href` drive the single
-    global incomplete-profile banner in `base.html`. They read the same
-    `onboarding_checklist(user)` registry every other onboarding surface
-    reads, so the chrome signal can't disagree with the `/profile`
-    checklist. Both default to the silent state (`False` / `None`) for
-    anonymous viewers — the checklist is only computed for an authed user.
     """
-    from src.domain.logic.capabilities import can_read_full_feed, claim_state
-    from src.domain.logic.profile.onboarding import onboarding_checklist
+    from src.domain.logic.capabilities import can_access_network, claim_state
 
     state = claim_state(user)
-    checklist = onboarding_checklist(user) if user is not None else None
-    onboarding_incomplete = checklist is not None and checklist.incomplete
-    onboarding_next_href = (
-        checklist.next_step.action_href
-        if checklist is not None and checklist.next_step is not None
-        else None
-    )
     return {
         "is_authenticated": user is not None,
         "is_admin": is_admin(user),
@@ -84,13 +69,11 @@ def base_context(user: Actor | None) -> dict:
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": bool(state.lapsed),
-        # `can_read_full_feed` is the chrome-level feed-teaser gate
+        # `can_access_network` is the chrome-level feed-teaser gate
         # (handoff §7.1: full feed once verified, retained after lapse
         # via `ever_verified_at`). Anonymous viewers always see the
         # teaser (predicate returns False for `user=None`).
-        "can_read_full_feed": can_read_full_feed(user),
-        "onboarding_incomplete": onboarding_incomplete,
-        "onboarding_next_href": onboarding_next_href or "/profile",
+        "can_access_network": can_access_network(user),
     }
 
 
