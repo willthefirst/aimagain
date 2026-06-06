@@ -701,7 +701,7 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
         ), f"{fact_key} should render a locked placeholder"
         assert (
             dd.css_first("a").attributes.get("href")
-            == "/users/me/access/capabilities/network"
+            == "/users/me/access/capabilities/provider-network"
         )
 
     # ...but the real navigable links + the address value are withheld.
