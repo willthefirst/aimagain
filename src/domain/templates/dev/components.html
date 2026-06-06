@@ -19,6 +19,7 @@ it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_picker.html" import picker -%}
+{%- from "_shared/_capability_requirements.html" import capability_requirements_panel -%}
 {% extends "base.html" %}
 {% block head %}
   <style>
@@ -186,6 +187,14 @@ it's dev-only chrome that should never ship to production. #}
                 <ul>
                   <li>
                     <a href="#credentials">Credential rows</a>
+                  </li>
+                </ul>
+              </li>
+              <li>
+                <span class="gallery-nav-subgroup">Access</span>
+                <ul>
+                  <li>
+                    <a href="#capability-requirements">Capability requirements</a>
                   </li>
                 </ul>
               </li>
@@ -610,6 +619,89 @@ it's dev-only chrome that should never ship to production. #}
               </li>
             </ul>
           </div>
+        </div>
+      </section>
+      {# ═══════════════════════════════════════════════════════════ #}
+      {# DOMAIN: ACCESS                                               #}
+      {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="capability-requirements">
+        <h2>Capability requirements</h2>
+        <p>
+          <small>One scoping class (<code>.cap-reqs</code>) on the root <code>&lt;ul&gt;</code>. Operator chips and badge use <code>&lt;small&gt;</code> (Pico-muted natively). State indicators are native checkboxes (<code>pointer-events:none</code>). Labels follow active/done grammar: imperative when unmet, passive-past when met.</small>
+        </p>
+        <div class="gallery-row">
+          {# Locked: 1 of 2 met — email done, status branch pending. #}
+          {% set locked_tree = {
+            "label_active": "Read full feed",
+            "label_done": "Read full feed",
+            "op": "all",
+            "met": false,
+            "children": [
+              {
+                "label_active": "Verify email",
+                "label_done": "Email verified",
+                "met": true,
+                "fix_url": "#"
+              },
+              {
+                "label_active": "Verify your status",
+                "label_done": "Status verified",
+                "op": "any",
+                "met": false,
+                "children": [
+                  {
+                    "label_active": "Verify clinician identity",
+                    "label_done": "Clinician identity verified",
+                    "met": false,
+                    "fix_url": "#"
+                  },
+                  {
+                    "label_active": "Verify organization rep",
+                    "label_done": "Organization rep verified",
+                    "met": false,
+                    "fix_url": "#"
+                  }
+                ]
+              }
+            ]
+          } %}
+          <div style="max-width:420px">{{ capability_requirements_panel(locked_tree, false) }}</div>
+          {# Unlocked: 2 of 2 met — email + clinician identity both done. #}
+          {% set unlocked_tree = {
+            "label_active": "Read full feed",
+            "label_done": "Read full feed",
+            "op": "all",
+            "met": true,
+            "children": [
+              {
+                "label_active": "Verify email",
+                "label_done": "Email verified",
+                "met": true,
+                "fix_url": "#"
+              },
+              {
+                "label_active": "Verify your status",
+                "label_done": "Status verified",
+                "op": "any",
+                "met": true,
+                "children": [
+                  {
+                    "label_active": "Verify clinician identity",
+                    "label_done": "Clinician identity verified",
+                    "met": true,
+                    "fix_url": "#"
+                  },
+                  {
+                    "label_active": "Verify organization rep",
+                    "label_done": "Organization rep verified",
+                    "met": false,
+                    "fix_url": "#"
+                  }
+                ]
+              }
+            ]
+          } %}
+          <div style="max-width:420px">{{ capability_requirements_panel(unlocked_tree, true) }}</div>
         </div>
       </section>
     </div>

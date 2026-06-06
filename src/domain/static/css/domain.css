@@ -295,3 +295,7 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 /* ── Onboarding step page (profile/step.html) ─────────────────── */
 .onboarding-step-back { margin-bottom: 0.5rem; font-size: 0.9em; }
 .onboarding-step-action > form { margin-bottom: 0; }
+
+/* ── Capability requirements panel (users/access/capabilities/detail.html) ── */
+.cap-reqs { list-style: none; margin: 0; padding: 0; }
+.cap-reqs li { list-style: none; }
