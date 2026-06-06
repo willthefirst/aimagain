@@ -297,25 +297,23 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .onboarding-step-action > form { margin-bottom: 0; }
 
 /* ── Capability requirements panel (users/access/capabilities/detail.html) ── */
-/* Row: flex line of icon + label + optional action chevron */
+/* Row: flex line — native checkbox + label + optional Lucide chevron */
 .cap-row { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; }
-.cap-row .cap-label { flex: 1; min-width: 0; }
-/* Done state: muted label; icon goes green via currentColor cascade */
+.cap-row .cap-label { flex: 1; }
 .cap-row.done { color: var(--pico-muted-color); }
-.cap-row.done .cap-icon { color: var(--pico-ins-color); }
-/* Clickable row: suppress default link styles; add hover surface */
 a.cap-row { color: inherit; text-decoration: none; border-radius: var(--pico-border-radius); margin: 0 -.5rem; padding-inline: .5rem; }
 a.cap-row:hover { background: var(--pico-secondary-background); }
-a.cap-row:hover .cap-chevron { color: var(--pico-primary); }
-/* SVG icons: muted by default; parent state overrides color via currentColor */
-.cap-icon { width: 1.25rem; height: 1.25rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; color: var(--pico-muted-color); }
-.cap-chevron { color: var(--pico-muted-color); }
+a.cap-row:hover i { color: var(--pico-primary); }
+/* Checkboxes are display-only state indicators; pointer-events prevents toggling */
+.cap-row input[type="checkbox"] { pointer-events: none; flex: none; margin: 0; }
+.cap-row.done input[type="checkbox"] { accent-color: var(--pico-ins-color); }
 /* Tree: no bullets; nested gets indent + left guide rule */
 .cap-reqs, .cap-reqs ul { list-style: none; margin: 0; padding: 0; }
+.cap-reqs li { list-style: none; }
 .cap-reqs ul { margin-left: .6rem; border-left: 1px solid var(--pico-muted-border-color); padding-left: 1.25rem; }
-/* Satisfied branch children: HTML `inert` → non-interactive; opacity for visual */
+/* Satisfied branch children: HTML inert → non-interactive; opacity for visual */
 .cap-reqs [inert] { opacity: .55; }
-/* <kbd> used for operator chips and status badge: reset Pico's monospace font */
-.cap-reqs kbd, .cap-badge { font-family: inherit; display: inline-flex; align-items: center; gap: .35rem; }
-/* Unlocked badge: green text + border cascade to child SVG via currentColor */
+/* <kbd> for operator chips and status badge: clear Pico code bg, muted text */
+.cap-reqs kbd, .cap-badge { font-family: inherit; background: transparent; display: inline-flex; align-items: center; gap: .35rem; color: var(--pico-muted-color); }
+/* Unlocked badge: green (cascades to child icon via currentColor) */
 .cap-badge[data-state="unlocked"] { color: var(--pico-ins-color); border-color: var(--pico-ins-color); }

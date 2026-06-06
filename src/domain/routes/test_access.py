@@ -51,10 +51,16 @@ async def test_capability_detail_can_read_feed_returns_200(
     assert response.headers["content-type"].startswith("text/html")
     # Capability label appears in the page heading.
     assert "Read full feed" in response.text
-    # Tree node labels appear.
-    assert "Email verified" in response.text
-    assert "Clinician identity verified" in response.text
-    assert "Organization representative verified" in response.text
+    # Tree node labels appear — active form for unmet, done form for met.
+    assert "Verify email" in response.text or "Email verified" in response.text
+    assert (
+        "Verify clinician identity" in response.text
+        or "Clinician identity verified" in response.text
+    )
+    assert (
+        "Verify organization rep" in response.text
+        or "Organization rep verified" in response.text
+    )
 
 
 async def test_capability_detail_shows_status(

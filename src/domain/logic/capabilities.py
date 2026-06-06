@@ -139,18 +139,30 @@ _FALLBACK_META = ReasonMeta(
 
 @dataclass(frozen=True)
 class Condition:
-    """Atomic boolean leaf in a capability tree."""
+    """Atomic boolean leaf in a capability tree.
 
-    label: str
+    Two labels encode the verb-subject grammar: `label_active` is the
+    imperative action shown when the condition is unmet ("Verify email");
+    `label_done` is the passive-past confirmation shown when met ("Email
+    verified"). Templates must never show the wrong label for the state.
+    """
+
+    label_active: str  # imperative: "Verify email"
+    label_done: str  # passive-past: "Email verified"
     met: bool
     fix_url: str  # the resource that changes this condition
 
 
 @dataclass(frozen=True)
 class Bundle:
-    """AND node — all children must pass."""
+    """AND node — all children must pass.
 
-    label: str
+    Same two-label grammar as Condition: `label_active` when the bundle
+    is unmet, `label_done` when every child is satisfied.
+    """
+
+    label_active: str
+    label_done: str
     children: tuple  # tuple[Condition | Bundle | Gate, ...]
 
     @property
@@ -160,9 +172,14 @@ class Bundle:
 
 @dataclass(frozen=True)
 class Gate:
-    """OR node — any one child suffices."""
+    """OR node — any one child suffices.
 
-    label: str
+    Same two-label grammar as Condition: `label_active` when unmet,
+    `label_done` when at least one child is satisfied.
+    """
+
+    label_active: str
+    label_done: str
     children: tuple  # tuple[Condition | Bundle | Gate, ...]
 
     @property
@@ -281,23 +298,28 @@ def check_network(user: Any) -> CapabilityCheck:
     return CapabilityCheck(
         name="network",
         tree=Bundle(
-            label="Read full feed",
+            label_active="Read full feed",
+            label_done="Read full feed",
             children=(
                 Condition(
-                    label="Email verified",
+                    label_active="Verify email",
+                    label_done="Email verified",
                     met=_email_met,
                     fix_url="/users/me/email/form",
                 ),
                 Gate(
-                    label="Verified via any one",
+                    label_active="Verify your status",
+                    label_done="Status verified",
                     children=(
                         Condition(
-                            label="Clinician identity verified",
+                            label_active="Verify clinician identity",
+                            label_done="Clinician identity verified",
                             met=_clin_met,
                             fix_url="/clinicians/form",
                         ),
                         Condition(
-                            label="Organization representative verified",
+                            label_active="Verify organization rep",
+                            label_done="Organization rep verified",
                             met=_org_met,
                             fix_url="/organizations/form",
                         ),
