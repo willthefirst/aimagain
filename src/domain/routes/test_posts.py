@@ -699,7 +699,10 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
         assert (
             dd.css_first("span.locked-field") is not None
         ), f"{fact_key} should render a locked placeholder"
-        assert dd.css_first("a").attributes.get("href") == "/profile"
+        assert (
+            dd.css_first("a").attributes.get("href")
+            == "/users/me/access/capabilities/can_read_feed"
+        )
 
     # ...but the real navigable links + the address value are withheld.
     assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is None
