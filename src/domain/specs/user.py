@@ -53,6 +53,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     id_param="user_id",
     model=User,
     owner_attr=None,  # the resource *is* the user; not owned by another user
+    display_label_fn=lambda u: u.username,
     repo_dep=get_user_repository,
     auth_deps=ADMIN_FOR_WRITE,
     audit_snapshot=UserAuditSnapshot,

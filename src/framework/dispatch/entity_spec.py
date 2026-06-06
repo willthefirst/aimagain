@@ -197,6 +197,12 @@ class EntitySpec:
     # and `src/framework/rendering/labels.py`. The pin test
     # `test_form_chrome_labels` asserts the structural equivalence.
     singular_label: str | None = None
+    # Human-readable label for a single row of this entity — used by the
+    # framework to auto-inject breadcrumb items on related-list and edge
+    # pages. Return a short, user-visible string (e.g. a username, a full
+    # name, an org name). Leave None for entities that never appear as a
+    # parent in a URL ancestry chain.
+    display_label_fn: Callable[[Any], str] | None = None
     owner_attr: str | None = "owner_id"
 
     # Parent (owned subentity link) --------------------------------------

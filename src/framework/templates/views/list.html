@@ -1,13 +1,16 @@
 {# Generic list-view chrome.
 
-A list view (`/posts`, `/clinicians`, `/users`,
-`/users/me/favorites`, `/users/{id}/clinicians`) renders the page
-heading + actions in a single toolbar row above the list body. No
-breadcrumb: a single-segment "Posts" trail duplicates what the
-active global-nav tab already communicates (the breadcrumb guide
-flags this case explicitly), so list pages skip the breadcrumb
-block and let the `<h1>` in the toolbar carry the section name.
-Detail/form pages keep the breadcrumb for real ancestry.
+A list view (`/posts`, `/clinicians`, `/users`) renders the page
+heading + actions in a single toolbar row above the list body. Top-level
+list pages carry no breadcrumb — a single-segment "Posts" trail duplicates
+what the active global-nav tab already communicates.
+
+Subresource list pages (`/users/me/favorites`, `/users/{id}/clinicians`,
+`/clinicians/{id}/openings`) get a breadcrumb automatically when the
+mount injects `_breadcrumb_items` into the context (set by
+`mount_related_list` / `mount_edge_routes` when the parent entity's spec
+declares `display_label_fn`). The breadcrumb block below renders it when
+present; templates that need a custom chain override the block as before.
 
 Toolbar row contents (left-to-right):
   - `<h1>` heading (resource_label)
@@ -39,38 +42,48 @@ Child contract:
                      `<li>` because the menu is
                      `<menu class="toolbar-right">` (a commands
                      list). Empty by default.
-    breadcrumb     — full breadcrumb override for subresource lists
-                     with multi-segment chains (e.g.
-                     `/users/{id}/clinicians`). The default list
-                     view renders no breadcrumb; this override lets
-                     subresource list pages opt back in when there's
-                     real ancestry worth showing.
+    breadcrumb     — override the auto-injected breadcrumb. Use when
+                     `_breadcrumb_items` can't express the chain (e.g.
+                     a label computed from multiple context variables).
+                     Top-level list pages don't need this — they have
+                     no `_breadcrumb_items` and the block renders nothing.
 
   Context the framework's `handle_list` injects (children don't set
   these by hand):
     active_filters, search_url, resource_label, pager.
+
+  Context the framework's mount helpers inject for subresource pages:
+    _breadcrumb_items — list of (label, href|None) tuples; the last
+                        entry's href is None (current page). Injected
+                        by `mount_related_list` and `mount_edge_routes`
+                        when the parent entity spec declares
+                        `display_label_fn`. Absent on top-level lists.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
-{% block toolbar %}
-  {%- set label %}
-    {% block resource_label %}{{ resource_label | default("") }}{% endblock %}
-  {% endset -%}
-  {%- set actions_body %}
-    {% block actions %}{% endblock %}
-  {% endset -%}
-  {%- set has_search = search_url is defined and search_url -%}
-  {# `filter_heading` is `entity_filter_label(spec.name)` from `handle_list`
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{% block breadcrumb %}
+  {%- if _breadcrumb_items is defined %}{{ breadcrumb(_breadcrumb_items) }}{%- endif %}
+  {% endblock %}
+  {% block toolbar %}
+    {%- set label %}
+      {% block resource_label %}{{ resource_label | default("") }}{% endblock %}
+    {% endset -%}
+    {%- set actions_body %}
+      {% block actions %}{% endblock %}
+    {% endset -%}
+    {%- set has_search = search_url is defined and search_url -%}
+    {# `filter_heading` is `entity_filter_label(spec.name)` from `handle_list`
    (set only when `routes.search` is opted in). When absent, the toolbar
    macro falls back to its default ``"Filters"`` label. #}
-  {% call page_toolbar(
-    heading=label | trim,
-    active_filters=active_filters|default([]),
-    search_url=search_url if has_search else none,
-    filter_label=filter_heading or "Filters"
-    ) %}
-    {{ actions_body }}
-  {% endcall %}
-{% endblock %}
-{% block content %}{% endblock %}
-{% block after_content %}{% endblock %}
+    {% call page_toolbar(
+      heading=label | trim,
+      active_filters=active_filters|default([]),
+      search_url=search_url if has_search else none,
+      filter_label=filter_heading or "Filters"
+      ) %}
+      {{ actions_body }}
+    {% endcall %}
+  {% endblock %}
+  {% block content %}{% endblock %}
+  {% block after_content %}{% endblock %}

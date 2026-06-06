@@ -202,3 +202,20 @@ async def test_add_favorite_requires_auth(
     clinician_id = await _seed_clinician(db_test_session_manager)
     response = await test_client.post(f"/users/me/favorites/{clinician_id}")
     assert response.status_code in (302, 401)
+
+
+async def test_list_my_favorites_renders_breadcrumb(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /users/me/favorites` now renders a breadcrumb back-affordance
+    pointing at the current user's profile page — auto-injected by
+    `mount_edge_routes` via `USER_ENTITY.display_label_fn`."""
+    response = await authenticated_client.get("/users/me/favorites")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    assert back is not None, "favorites list must render a breadcrumb back-affordance"
+    assert back.attributes.get("href") == "/users/me"
+    label = back.css_first("span.breadcrumb-back-label")
+    assert label is not None and label.text(strip=True) == logged_in_user.username

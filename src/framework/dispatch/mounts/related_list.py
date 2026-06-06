@@ -47,6 +47,11 @@ def mount_related_list(
     ``current_active_user().id`` and passed to the handler — same handler,
     same template, same response. The alias is purely an id-derivation
     convenience.
+
+    When ``parent_spec.entity_spec`` declares a ``display_label_fn``, the
+    mount fetches the parent row (one PK lookup) and injects
+    ``_breadcrumb_items`` into the template context so ``views/list.html``
+    can auto-render the ancestry chain without any per-template boilerplate.
     """
     if not template:
         raise ValueError(
@@ -57,15 +62,44 @@ def mount_related_list(
     parent_id_param = parent_spec.id_param
     path = f"/{{{parent_id_param}}}/{child_spec.collection}"
 
+    # Resolve the parent entity spec once at mount time so the response
+    # builder closure doesn't re-check on every request.
+    _parent_entity_spec = getattr(parent_spec, "entity_spec", None)
+    _parent_label_fn = (
+        _parent_entity_spec.display_label_fn
+        if _parent_entity_spec is not None
+        else None
+    )
+    # Whether to inject an extra parent-repo dep for the breadcrumb fetch.
+    _need_parent_repo = _parent_label_fn is not None
+    _parent_repo_dep = parent_spec.repo_dep if _need_parent_repo else None
+
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
         context = await call_handler_with(handler, handler_kwarg_names, kwargs)
+        if _parent_label_fn is not None:
+            parent_id = kwargs[parent_id_param]
+            parent_repo = kwargs["__parent_repo__"]
+            parent_entity = await parent_repo.get_by_model_id(
+                _parent_entity_spec.model, parent_id
+            )
+            if parent_entity is not None:
+                collection = _parent_entity_spec.url_collection
+                context["_breadcrumb_items"] = [
+                    (collection.capitalize(), f"/{collection}"),
+                    (_parent_label_fn(parent_entity), f"/{collection}/{parent_id}"),
+                    (child_spec.collection.capitalize(), None),
+                ]
         return APIResponse.html_response(
             template_name=template,
             context=context,
             request=request,
             current_user=kwargs.get("requesting_user"),
         )
+
+    _breadcrumb_dep: tuple[tuple[str, Any], ...] = (
+        (("__parent_repo__", _parent_repo_dep),) if _need_parent_repo else ()
+    )
 
     # The route renders children, so the synthesis hands the handler the
     # *child's* repo under `repo`. The parent-id path param is bound by
@@ -76,6 +110,7 @@ def mount_related_list(
         options=SynthOptions(
             user_dep=parent_spec.read_user_dep,
             path_param_names=(parent_id_param,),
+            extra_static_deps=_breadcrumb_dep,
         ),
         response_builder=response_builder,
     )
@@ -101,7 +136,8 @@ def mount_related_list(
             options=SynthOptions(
                 user_dep=None,
                 handler_supplied_names=(parent_id_param, "requesting_user"),
-                extra_static_deps=(("__session_user__", session_dep),),
+                extra_static_deps=(("__session_user__", session_dep),)
+                + _breadcrumb_dep,
             ),
             response_builder=alias_response_builder,
         )
