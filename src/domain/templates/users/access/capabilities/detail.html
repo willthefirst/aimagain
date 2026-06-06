@@ -1,98 +1,22 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
+{%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_capability_requirements.html" import capability_requirements_panel -%}
 {% block title %}{{ check.tree.label_active }}{% endblock %}
+{% block breadcrumb %}
+  {{ breadcrumb([
+    ("Profile", entity_url('user', id='me') ),
+  ("Access", access_index_url),
+  ("Capabilities", capabilities_url),
+  (check.tree.label_active, none),
+  ]) }}
+{% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading=check.tree.label_active) %}
   {% endcall %}
 {% endblock %}
 {% block content %}
-  {# render_leaf: picks label_active (imperative) when unmet, label_done (passive-past)
-     when met. Actionable unmet leaves are plain links inside the row span.
-     The macro enforces the active/done grammar — callers supply both labels. #}
-  {% macro render_leaf(node) %}
-    <span>
-      <input type="checkbox"
-             {% if node.met %}checked{% endif %}
-             aria-hidden="true">
-      {% if not node.met and node.fix_url %}
-        <a href="{{ node.fix_url }}">{{ node.label_active }}</a>
-      {% else %}
-        <span>{{ node.label_done if node.met else node.label_active }}</span>
-      {% endif %}
-    </span>
-  {% endmacro %}
-  {# render_node: dispatches on __class__.__name__. Branches get a <small> operator chip
-     and a child <ul>. Jinja macros cannot self-call; children are inlined for the two-level tree.
-     Jinja macros cannot self-call; children are inlined for the two-level tree. #}
-  {% macro render_node(node) %}
-    {% set kind = node.__class__.__name__ %}
-    {% if kind == "Condition" %}
-      <li>{{ render_leaf(node) }}</li>
-    {% else %}
-      {% set op_text = "All of these" if kind == "Bundle" else "Any one of these" %}
-      <li>
-        <span>
-          <input type="checkbox"
-                 {% if node.met %}checked{% endif %}
-                 aria-hidden="true">
-          <span>{{ node.label_done if node.met else node.label_active }}</span>
-        </span>
-        <ul>
-          <li>
-            <small>{{ op_text }}</small>
-          </li>
-          {% for child in node.children %}
-            {% set ckind = child.__class__.__name__ %}
-            {% if ckind == "Condition" %}
-              <li>{{ render_leaf(child) }}</li>
-            {% else %}
-              {% set cop_text = "All of these" if ckind == "Bundle" else "Any one of these" %}
-              <li>
-                <span>
-                  <input type="checkbox"
-                         {% if child.met %}checked{% endif %}
-                         aria-hidden="true">
-                  <span>{{ child.label_done if child.met else child.label_active }}</span>
-                </span>
-                <ul>
-                  <li>
-                    <small>{{ cop_text }}</small>
-                  </li>
-                  {% for gc in child.children %}<li>{{ render_leaf(gc) }}</li>{% endfor %}
-                </ul>
-              </li>
-            {% endif %}
-          {% endfor %}
-        </ul>
-      </li>
-    {% endif %}
-  {% endmacro %}
-  {% set root = check.tree %}
-  {% set root_met = root.children | selectattr("met") | list | length %}
-  {% set root_total = root.children | list | length %}
-  {% set root_op = "All of these" if root.__class__.__name__ == "Bundle" else "Any one of these" %}
-  <article>
-    <header>
-      <hgroup>
-        <h3>{{ root.label_active }}</h3>
-      </hgroup>
-      <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
-        {% if check.granted %}
-          <i class="icon-check" aria-hidden="true"></i>Available
-        {% else %}
-          <i class="icon-lock" aria-hidden="true"></i>Not available yet
-        {% endif %}
-      </small>
-      <small>{{ root_met }} of {{ root_total }} requirements met</small>
-      <progress value="{{ root_met }}" max="{{ root_total }}"></progress>
-    </header>
-    <ul class="cap-reqs">
-      <li>
-        <small>{{ root_op }}</small>
-      </li>
-      {% for child in root.children %}{{ render_node(child) }}{% endfor %}
-    </ul>
-  </article>
+  {{ capability_requirements_panel(check.tree, check.granted) }}
   <p>
     <a href="{{ access_index_url }}">← All capabilities</a>
   </p>

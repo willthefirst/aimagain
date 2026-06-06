@@ -19,6 +19,7 @@ it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_picker.html" import picker -%}
+{%- from "_shared/_capability_requirements.html" import capability_requirements_panel -%}
 {% extends "base.html" %}
 {% block head %}
   <style>
@@ -741,101 +742,77 @@ it's dev-only chrome that should never ship to production. #}
         </p>
         <div class="gallery-row">
           {# Locked: 1 of 2 met — email done, status branch pending. #}
-          <article style="max-width:420px">
-            <header>
-              <hgroup>
-                <h3>Read full feed</h3>
-                <p>Clinical case discussions, peer commentary, and member-only research notes.</p>
-              </hgroup>
-              <small data-state="locked">
-                <i class="icon-lock" aria-hidden="true"></i>Not available yet
-              </small>
-              <small>1 of 2 requirements met</small>
-              <progress value="1" max="2"></progress>
-            </header>
-            <ul class="cap-reqs">
-              <li>
-                <small>All of these</small>
-              </li>
-              <li>
-                <span>
-                  <input type="checkbox" checked aria-hidden="true">
-                  <span>Email verified</span>
-                </span>
-              </li>
-              <li>
-                <span>
-                  <input type="checkbox" aria-hidden="true">
-                  <span>Verify your status</span>
-                </span>
-                <ul>
-                  <li>
-                    <small>Any one of these</small>
-                  </li>
-                  <li>
-                    <span>
-                      <input type="checkbox" aria-hidden="true">
-                      <a href="#">Verify clinician identity</a>
-                    </span>
-                  </li>
-                  <li>
-                    <span>
-                      <input type="checkbox" aria-hidden="true">
-                      <a href="#">Verify organization rep</a>
-                    </span>
-                  </li>
-                </ul>
-              </li>
-            </ul>
-          </article>
-          {# Unlocked: 2 of 2 met — all done. #}
-          <article style="max-width:420px">
-            <header>
-              <hgroup>
-                <h3>Read full feed</h3>
-                <p>Clinical case discussions, peer commentary, and member-only research notes.</p>
-              </hgroup>
-              <small data-state="unlocked">
-                <i class="icon-check" aria-hidden="true"></i>Available
-              </small>
-              <small>2 of 2 requirements met</small>
-              <progress value="2" max="2"></progress>
-            </header>
-            <ul class="cap-reqs">
-              <li>
-                <small>All of these</small>
-              </li>
-              <li>
-                <span>
-                  <input type="checkbox" checked aria-hidden="true">
-                  <span>Email verified</span>
-                </span>
-              </li>
-              <li>
-                <span>
-                  <input type="checkbox" checked aria-hidden="true">
-                  <span>Status verified</span>
-                </span>
-                <ul>
-                  <li>
-                    <small>Any one of these</small>
-                  </li>
-                  <li>
-                    <span>
-                      <input type="checkbox" checked aria-hidden="true">
-                      <span>Clinician identity verified</span>
-                    </span>
-                  </li>
-                  <li>
-                    <span>
-                      <input type="checkbox" aria-hidden="true">
-                      <a href="#">Verify organization rep</a>
-                    </span>
-                  </li>
-                </ul>
-              </li>
-            </ul>
-          </article>
+          {% set locked_tree = {
+            "label_active": "Read full feed",
+            "label_done": "Read full feed",
+            "op": "all",
+            "met": false,
+            "children": [
+              {
+                "label_active": "Verify email",
+                "label_done": "Email verified",
+                "met": true,
+                "fix_url": "#"
+              },
+              {
+                "label_active": "Verify your status",
+                "label_done": "Status verified",
+                "op": "any",
+                "met": false,
+                "children": [
+                  {
+                    "label_active": "Verify clinician identity",
+                    "label_done": "Clinician identity verified",
+                    "met": false,
+                    "fix_url": "#"
+                  },
+                  {
+                    "label_active": "Verify organization rep",
+                    "label_done": "Organization rep verified",
+                    "met": false,
+                    "fix_url": "#"
+                  }
+                ]
+              }
+            ]
+          } %}
+          <div style="max-width:420px">{{ capability_requirements_panel(locked_tree, false) }}</div>
+          {# Unlocked: 2 of 2 met — email + clinician identity both done. #}
+          {% set unlocked_tree = {
+            "label_active": "Read full feed",
+            "label_done": "Read full feed",
+            "op": "all",
+            "met": true,
+            "children": [
+              {
+                "label_active": "Verify email",
+                "label_done": "Email verified",
+                "met": true,
+                "fix_url": "#"
+              },
+              {
+                "label_active": "Verify your status",
+                "label_done": "Status verified",
+                "op": "any",
+                "met": true,
+                "children": [
+                  {
+                    "label_active": "Verify clinician identity",
+                    "label_done": "Clinician identity verified",
+                    "met": true,
+                    "fix_url": "#"
+                  },
+                  {
+                    "label_active": "Verify organization rep",
+                    "label_done": "Organization rep verified",
+                    "met": false,
+                    "fix_url": "#"
+                  }
+                ]
+              }
+            ]
+          } %}
+          <div style="max-width:420px">{{ capability_requirements_panel(unlocked_tree, true) }}</div>
         </div>
       </section>
     </div>

@@ -166,6 +166,10 @@ class Bundle:
     children: tuple  # tuple[Condition | Bundle | Gate, ...]
 
     @property
+    def op(self) -> str:
+        return "all"
+
+    @property
     def met(self) -> bool:
         return all(c.met for c in self.children)
 
@@ -181,6 +185,10 @@ class Gate:
     label_active: str
     label_done: str
     children: tuple  # tuple[Condition | Bundle | Gate, ...]
+
+    @property
+    def op(self) -> str:
+        return "any"
 
     @property
     def met(self) -> bool:
