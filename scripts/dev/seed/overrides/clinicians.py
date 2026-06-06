@@ -56,11 +56,10 @@ async def generate_clinicians(
         row = Clinician(
             id=cid,
             owner_id=users[i % len(users)].id,
-            # All three are nullable per the model. Exercise the NULL
-            # path so the nullable-coverage test has both samples.
+            # npi is still nullable (not yet required at schema level).
             npi=(None if rng.bool(0.4) else COLUMN_VOCAB["npi"](rng, i)),
-            first_name=(None if rng.bool(0.1) else COLUMN_VOCAB["first_name"](rng, i)),
-            last_name=(None if rng.bool(0.1) else COLUMN_VOCAB["last_name"](rng, i)),
+            first_name=COLUMN_VOCAB["first_name"](rng, i),
+            last_name=COLUMN_VOCAB["last_name"](rng, i),
             npi_match_status=match_status,
             npi_verified_at=verified_ts,
             clinician_verified=clinician_verified,

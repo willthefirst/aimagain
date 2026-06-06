@@ -146,6 +146,8 @@ async def _seed_org(
 def _clinician_create_payload(*, org_id: uuid.UUID, **overrides) -> ClinicianCreate:
     base = dict(
         org_id=org_id,
+        first_name="Jane",
+        last_name="Smith",
         location_city="Springfield",
         location_state="IL",
         location_zip="62701",
@@ -986,6 +988,8 @@ async def test_after_create_clinician_verification_no_npi_records_skipped(
             clinician = Clinician(
                 owner_id=user.id,
                 org_id=org_id,
+                first_name="Jane",
+                last_name="Smith",
                 location_city="Springfield",
                 location_state="IL",
                 location_zip="62701",

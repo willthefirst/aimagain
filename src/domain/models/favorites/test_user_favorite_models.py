@@ -25,6 +25,8 @@ async def _seed_user_and_clinician(
     clinician = Clinician(
         owner_id=owner.id,
         org_id=org.id,
+        first_name="Jane",
+        last_name="Smith",
         in_person_sessions="yes",
         virtual_sessions="no",
         location_city="Springfield",

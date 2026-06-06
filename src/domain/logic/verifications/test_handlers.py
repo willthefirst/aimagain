@@ -81,8 +81,8 @@ async def _seed_clinician(
     *,
     npi: str | None = None,
     username: str = "owner",
-    first_name: str | None = None,
-    last_name: str | None = None,
+    first_name: str = "Jane",
+    last_name: str = "Smith",
 ) -> tuple[Clinician, User]:
     owner = create_test_user(username=f"{username}-{uuid4()}")
     async with db_test_session_manager() as session:
