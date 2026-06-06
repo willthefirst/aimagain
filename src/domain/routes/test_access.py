@@ -27,7 +27,7 @@ async def test_access_index_authenticated_returns_200(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     # The one registered capability name appears in the response.
-    assert "can_read_feed" in response.text
+    assert "network" in response.text
 
 
 async def test_access_index_shows_granted_or_denied(
@@ -40,17 +40,15 @@ async def test_access_index_shows_granted_or_denied(
     assert "Granted" in response.text or "Denied" in response.text
 
 
-async def test_capability_detail_can_read_feed_returns_200(
+async def test_capability_detail_network_returns_200(
     authenticated_client: AsyncClient,
 ):
-    """GET /users/me/access/capabilities/can_read_feed renders the detail tree."""
-    response = await authenticated_client.get(
-        "/users/me/access/capabilities/can_read_feed"
-    )
+    """GET /users/me/access/capabilities/network renders the detail tree."""
+    response = await authenticated_client.get("/users/me/access/capabilities/network")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     # Capability name appears in the page.
-    assert "can_read_feed" in response.text
+    assert "network" in response.text
     # Tree node labels appear.
     assert "Email verified" in response.text
     assert "Clinician identity verified" in response.text
@@ -61,9 +59,7 @@ async def test_capability_detail_shows_status(
     authenticated_client: AsyncClient,
 ):
     """The detail page shows a granted/denied badge."""
-    response = await authenticated_client.get(
-        "/users/me/access/capabilities/can_read_feed"
-    )
+    response = await authenticated_client.get("/users/me/access/capabilities/network")
     assert response.status_code == 200
     assert "Granted" in response.text or "Denied" in response.text
 
@@ -79,9 +75,9 @@ async def test_capability_detail_nonexistent_returns_404(
 
 
 async def test_capability_detail_unauthenticated_redirected(test_client: AsyncClient):
-    """Unauthenticated GET /users/me/access/capabilities/can_read_feed is bounced."""
+    """Unauthenticated GET /users/me/access/capabilities/network is bounced."""
     response = await test_client.get(
-        "/users/me/access/capabilities/can_read_feed",
+        "/users/me/access/capabilities/network",
         follow_redirects=False,
     )
     assert response.status_code != 200

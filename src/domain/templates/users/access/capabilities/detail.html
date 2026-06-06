@@ -9,7 +9,7 @@
   {# Recursive macro — dispatches on node.__class__.__name__. Jinja macros
      cannot call themselves directly; we work around that by rendering
      children in a loop and relying on the macro being defined before use.
-     For the two-level tree in `can_read_feed` this is sufficient: the root
+     For the two-level tree in `network` this is sufficient: the root
      is always a Bundle whose children are a Condition and a Gate, and the
      Gate's children are always Conditions. #}
   {% macro render_node(node) %}

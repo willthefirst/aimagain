@@ -34,7 +34,7 @@ def test_base_context_anonymous():
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": False,
-        "can_read_full_feed": False,
+        "can_access_network": False,
         "can_post": False,
         # Anonymous viewers never see the incomplete-profile banner; the
         # checklist is only computed for an authed user.
@@ -61,7 +61,7 @@ def test_base_context_regular_user():
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": False,
-        "can_read_full_feed": False,
+        "can_access_network": False,
         "can_post": False,
         # Email verified but no claim → identity step incomplete, so the
         # banner shows and deep-links to the identity step subroute.
@@ -94,8 +94,8 @@ def test_base_context_claim_a_verified_user():
     assert ctx["any_claim_lapsed"] is False
 
 
-def test_base_context_can_read_full_feed_true_for_verified_clinician():
-    """The chrome scalar `can_read_full_feed` powers `home.html`'s
+def test_base_context_can_access_network_true_for_verified_clinician():
+    """The chrome scalar `can_access_network` powers `home.html`'s
     network-feed blur — pinned here so a regression in `base_context`
     can't silently re-blur every authed user's feed."""
     user = SimpleNamespace(
@@ -110,7 +110,7 @@ def test_base_context_can_read_full_feed_true_for_verified_clinician():
         ],
         org_representations=[],
     )
-    assert base_context(user)["can_read_full_feed"] is True
+    assert base_context(user)["can_access_network"] is True
 
 
 def test_base_context_claim_b_coordinator():

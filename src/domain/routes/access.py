@@ -17,7 +17,7 @@ from src.framework.http.responses import APIResponse
 access_router = APIRouter(prefix="/users/me/access", tags=["access"])
 
 _CHECKS = {
-    "can_read_feed": capabilities.check_can_read_feed,
+    "network": capabilities.check_network,
 }
 
 

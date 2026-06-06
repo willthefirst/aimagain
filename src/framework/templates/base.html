@@ -174,7 +174,7 @@
          first child of `<main>`, and that `<header><main><footer>` stay the
          only top-level body elements, is pinned by
          `framework/templates/test_page_header.py`.) #}
-      {% if is_authenticated and onboarding_incomplete and not _on_profile %}
+      {# {% if is_authenticated and onboarding_incomplete and not _on_profile %}
         <aside role="status" id="onboarding-banner">
           <p>
             <strong>Finish setting up your profile.</strong>
@@ -183,7 +183,7 @@
             <a href="{{ onboarding_next_href }}">Continue setup →</a>
           </p>
         </aside>
-      {% endif %}
+      {% endif %} #}
       {# Subtitle slot — a one-line muted meta string rendered directly
          below the page-header band's rule, above content (e.g. a
          clinician's "NPI · Verified", a profile-mode line). The block is

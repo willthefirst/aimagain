@@ -44,7 +44,7 @@ def resolve_profile_mode(
       mode; no separate wizard).
     * Any lapsed claim → `re-verify` (one or more required attributes
       regressed; the affected claim's capabilities pause but read access
-      is retained per `can_read_full_feed`).
+      is retained per `can_access_network`).
     * Caller passes `intent='add_claim'` (from `/profile?intent=add_claim`
       after the user clicks "Add a capability") → `add-a-claim`.
     * Otherwise → `manage`.

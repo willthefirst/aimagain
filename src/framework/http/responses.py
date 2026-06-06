@@ -59,7 +59,7 @@ def base_context(user: Actor | None) -> dict:
     checklist. Both default to the silent state (`False` / `None`) for
     anonymous viewers — the checklist is only computed for an authed user.
     """
-    from src.domain.logic.capabilities import can_read_full_feed, claim_state
+    from src.domain.logic.capabilities import can_access_network, claim_state
     from src.domain.logic.profile.onboarding import onboarding_checklist
 
     state = claim_state(user)
@@ -84,11 +84,11 @@ def base_context(user: Actor | None) -> dict:
         "claim_a_lapsed": False,
         "claim_b_lapsed_orgs": [],
         "any_claim_lapsed": bool(state.lapsed),
-        # `can_read_full_feed` is the chrome-level feed-teaser gate
+        # `can_access_network` is the chrome-level feed-teaser gate
         # (handoff §7.1: full feed once verified, retained after lapse
         # via `ever_verified_at`). Anonymous viewers always see the
         # teaser (predicate returns False for `user=None`).
-        "can_read_full_feed": can_read_full_feed(user),
+        "can_access_network": can_access_network(user),
         "onboarding_incomplete": onboarding_incomplete,
         "onboarding_next_href": onboarding_next_href or "/profile",
     }

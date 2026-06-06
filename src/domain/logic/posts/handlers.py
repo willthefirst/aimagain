@@ -367,7 +367,7 @@ async def _post_owner_list_context(
         owner_key: owner,
         "posts": posts,
         "is_self": getattr(owner, "owner_id", None) == requesting_user.id,
-        "can_read_full_feed": capabilities.can_read_full_feed(requesting_user),
+        "can_access_network": capabilities.can_access_network(requesting_user),
         "current_user": requesting_user,
         "pager": Pager(page=page, base_query=base_query(request)),
     }

@@ -193,34 +193,18 @@ def test_body_top_level_children_are_header_main_footer_only() -> None:
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     for name in ("liststub.html", "detailstub.html"):
         tree = HTMLParser(_render(env, name, **_BANNER_CTX))
-        # The banner really is rendered for this context (guards against the
-        # assertion below passing vacuously if the gate ever changes).
-        assert tree.css_first("#onboarding-banner") is not None, name
+        # Banner temporarily disabled — assert absent and structure still holds.
+        assert tree.css_first("#onboarding-banner") is None, name
         top_level = [n.tag for n in tree.css("body > *")]
         assert top_level == ["header", "main", "footer"], f"{name}: {top_level}"
 
 
 def test_onboarding_banner_is_first_child_of_main() -> None:
-    """When shown, the incomplete-profile banner is the first *element*
-    child of `<main>` — ahead of the subtitle and content — so it reads as
-    the page's lead nudge and `<main>` stays the body grid's single content
-    row. Carries no `.container` class (the parent `<main>` already does)."""
+    """Banner temporarily disabled — assert it is absent."""
     env = _make_env()
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
-
-    main_children = tree.css("main > *")
-    assert main_children, "main has no element children"
-    first = main_children[0]
-    assert first.attributes.get("id") == "onboarding-banner"
-    assert first.tag == "aside"
-    assert "container" not in (first.attributes.get("class") or "")
-    # The banner's copy is wrapped in a single `<p>` (block-level body, not
-    # bare inline text directly under the `<aside>`).
-    paragraph = first.css_first("p")
-    assert paragraph is not None
-    assert paragraph.css_first("strong") is not None
-    assert paragraph.css_first("a") is not None
+    assert tree.css_first("#onboarding-banner") is None
 
 
 def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:

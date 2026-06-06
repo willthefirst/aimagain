@@ -60,7 +60,7 @@ def test_claim_a_unlocks_posting_and_clears_next_step():
     r = onboarding_readiness(_user(claim_a=True))
     assert r.claim_a_verified is True
     assert r.can_post is True
-    assert r.can_read_full_feed is True
+    assert r.can_access_network is True
     assert r.next_label is None
     assert r.next_href is None
 
@@ -79,6 +79,6 @@ def test_lapsed_clinician_loses_feed_access():
     `ever_verified_at` set (no current `clinician_verified=True`) is denied
     feed access and is directed back to the identity step."""
     r = onboarding_readiness(_user(claim_a=False, ever_verified=True))
-    assert r.can_read_full_feed is False
+    assert r.can_access_network is False
     assert r.can_post is False
     assert r.next_href == "/profile/identity"

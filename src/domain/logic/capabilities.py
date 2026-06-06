@@ -45,7 +45,7 @@ REASON_CLAIM_B_LAPSED = "claim_b_lapsed"
 REASON_AFFILIATION_MISSING = "affiliation_missing"
 # Read-side gate (not a write affordance): the viewer hasn't cleared
 # verification, so contact/identity details on a post detail are withheld
-# (`can_read_full_feed` is False). Distinct from the claim-to-*post*
+# (`can_access_network` is False). Distinct from the claim-to-*post*
 # reasons above — this one fixes by completing any verification path.
 REASON_VIEW_UNVERIFIED = "view_unverified"
 
@@ -121,7 +121,7 @@ _REASON_META = {
         title="Contact details",
         unlock="Verify your account to see contact details.",
         fix_label="Complete verification",
-        fix_url="/users/me/access/capabilities/can_read_feed",
+        fix_url="/users/me/access/capabilities/network",
     ),
 }
 
@@ -264,7 +264,7 @@ def any_org_rep_verified(user: Any) -> bool:
     return bool(_verified_active_reps(user))
 
 
-def check_can_read_feed(user: Any) -> CapabilityCheck:
+def check_network(user: Any) -> CapabilityCheck:
     """Structured capability check for full-feed read access.
 
     Tree: email_verified AND (clinician_verified OR org_rep_verified).
@@ -277,7 +277,7 @@ def check_can_read_feed(user: Any) -> CapabilityCheck:
     _org_met = bool(_verified_active_reps(user))
 
     return CapabilityCheck(
-        name="can_read_feed",
+        name="network",
         tree=Bundle(
             label="Read full feed",
             children=(
@@ -306,9 +306,9 @@ def check_can_read_feed(user: Any) -> CapabilityCheck:
     )
 
 
-def can_read_full_feed(user: Any) -> bool:
-    """Feed-teaser gate: delegates to `check_can_read_feed`."""
-    return check_can_read_feed(user).granted
+def can_access_network(user: Any) -> bool:
+    """Feed-teaser gate: delegates to `check_network`."""
+    return check_network(user).granted
 
 
 def can_post_referral(user: Any) -> bool:

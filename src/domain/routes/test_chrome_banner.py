@@ -46,8 +46,8 @@ async def test_new_user_sees_no_finish_setup_card_on_home(
     assert tree.css_first("#finish-setup-card") is None
     assert "Open Profile" not in response.text
     assert "+ Post a referral" not in response.text
-    # The single nudge is the chrome banner.
-    assert tree.css_first("#onboarding-banner") is not None
+    # Banner temporarily disabled.
+    assert tree.css_first("#onboarding-banner") is None
 
 
 async def test_profile_email_verify_hidden_for_verified_user(
@@ -254,32 +254,19 @@ async def test_home_shows_locked_post_actions_for_claim_b_only_org_rep(
 async def test_onboarding_banner_shown_off_profile_for_incomplete_user(
     authenticated_client: AsyncClient,
 ):
-    """A fresh dev user (email auto-verified, no claim) is onboarding-
-    incomplete, so the global banner shows on a non-`/profile` page and
-    links into the hub."""
+    """Banner temporarily disabled — assert it is absent."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    banner = tree.css_first("#onboarding-banner")
-    assert banner is not None
-    assert banner.css_first("a").attributes["href"].startswith("/profile")
+    assert HTMLParser(response.text).css_first("#onboarding-banner") is None
 
 
 async def test_onboarding_banner_renders_inside_main(
     authenticated_client: AsyncClient,
 ):
-    """End-to-end (real route + `base_context` wiring): when shown, the
-    banner is the first element child of `<main>`, not a top-level `<aside>`
-    band. The structural invariant across view types is pinned at the
-    template level in `framework/templates/test_page_header.py`; this just
-    proves the live `/home` render lands the banner in the right place."""
+    """Banner temporarily disabled — assert it is absent."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first("#onboarding-banner") is not None
-    main_children = tree.css("main > *")
-    assert main_children, "main has no element children"
-    assert main_children[0].attributes.get("id") == "onboarding-banner"
+    assert HTMLParser(response.text).css_first("#onboarding-banner") is None
 
 
 async def test_onboarding_banner_suppressed_on_profile(
