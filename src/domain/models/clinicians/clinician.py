@@ -56,8 +56,8 @@ class Clinician(BaseModel):
     user = relationship("User", lazy="selectin", foreign_keys=[owner_id])
 
     npi = Column(Text, nullable=True)
-    first_name = Column(Text, nullable=True)
-    last_name = Column(Text, nullable=True)
+    first_name = Column(Text, nullable=False)
+    last_name = Column(Text, nullable=False)
 
     # NPPES Type-1 match state. Source-of-truth field for Claim A: the
     # `verifications` table is the event log; this column is the cache

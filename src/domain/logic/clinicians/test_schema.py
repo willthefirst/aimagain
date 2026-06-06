@@ -56,6 +56,8 @@ def _clinician_create_kwargs(**overrides):
     """
     base = {
         "org_id": uuid.uuid4(),
+        "first_name": "Jane",
+        "last_name": "Smith",
         "location_city": "Boise",
         "location_state": "ID",
         "location_zip": "83702",
@@ -298,6 +300,8 @@ def test_clinician_read_round_trips_npi():
             "org_id": uuid.uuid4(),
             "org_name": "Sunrise",
             "npi": "1234567890",
+            "first_name": "Jane",
+            "last_name": "Smith",
             "location_city": "Boise",
             "location_state": "ID",
             "location_zip": "83702",
@@ -414,6 +418,8 @@ def test_clinician_read_validates_from_nested_dict():
         "updated_at": now,
         "org_id": org_id,
         "org_name": "Sunrise",
+        "first_name": "Jane",
+        "last_name": "Smith",
         "location_city": "Boise",
         "location_state": "ID",
         "location_zip": "83702",

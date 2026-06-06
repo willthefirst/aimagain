@@ -231,6 +231,8 @@ def make_opening_detail(*, clinician_id: UUID, **overrides: Any) -> OpeningDetai
 # instead of a `NOT NULL` violation at flush time.
 
 _CLINICIAN_DEFAULTS: dict[str, Any] = {
+    "first_name": "Jane",
+    "last_name": "Smith",
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
