@@ -297,10 +297,8 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .onboarding-step-action > form { margin-bottom: 0; }
 
 /* ── Capability requirements panel (users/access/capabilities/detail.html) ── */
-/* Tree: no bullets; nested gets indent + left guide rule */
-.cap-reqs, .cap-reqs ul { list-style: none; margin: 0; padding: 0; }
+.cap-reqs { list-style: none; margin: 0; padding: 0; }
 .cap-reqs li { list-style: none; }
-.cap-reqs ul { margin-left: .6rem; border-left: 1px solid var(--pico-muted-border-color); padding-left: 1.25rem; }
 
 /* Row: flex line — checkbox + label (or link) */
 .cap-reqs li > span { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; }
