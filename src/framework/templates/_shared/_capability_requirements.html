@@ -30,7 +30,7 @@
         <span>
           <input type="checkbox"
                  {% if node.met %}checked{% endif %}
-                 readonly
+                 disabled
                  aria-hidden="true">
           <span>{{ node.label_done if node.met else node.label_active }}</span>
         </span>
@@ -45,7 +45,7 @@
                 <span>
                   <input type="checkbox"
                          {% if child.met %}checked{% endif %}
-                         readonly
+                         disabled
                          aria-hidden="true">
                   <span>{{ child.label_done if child.met else child.label_active }}</span>
                 </span>
