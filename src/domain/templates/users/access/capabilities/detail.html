@@ -16,6 +16,5 @@
   {% endcall %}
 {% endblock %}
 {% block content %}
-  {% if check.description %}<p>{{ check.description }}</p>{% endif %}
-  {{ capability_requirements_panel(check.tree, check.granted) }}
+  {{ capability_requirements_panel(check.tree, check.granted, check.description) }}
 {% endblock %}
