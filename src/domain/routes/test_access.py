@@ -62,23 +62,31 @@ async def test_capabilities_index_shows_granted_or_denied(
 async def test_capability_detail_network_returns_200(
     authenticated_client: AsyncClient,
 ):
-    """GET /users/me/access/capabilities/network renders the detail tree."""
+    """GET /users/me/access/capabilities/network renders the requirement tree."""
     response = await authenticated_client.get("/users/me/access/capabilities/network")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
-    assert "network" in response.text
-    assert "Email verified" in response.text
-    assert "Clinician identity verified" in response.text
-    assert "Organization representative verified" in response.text
+    # Capability label_active appears in the page heading and breadcrumb.
+    assert "Read full feed" in response.text
+    # Tree node labels appear — active form for unmet, done form for met.
+    assert "Verify email" in response.text or "Email verified" in response.text
+    assert (
+        "Verify clinician identity" in response.text
+        or "Clinician identity verified" in response.text
+    )
+    assert (
+        "Verify organization rep" in response.text
+        or "Organization rep verified" in response.text
+    )
 
 
 async def test_capability_detail_shows_status(
     authenticated_client: AsyncClient,
 ):
-    """The detail page shows a granted/denied badge."""
+    """The detail page shows an available/locked badge."""
     response = await authenticated_client.get("/users/me/access/capabilities/network")
     assert response.status_code == 200
-    assert "Granted" in response.text or "Denied" in response.text
+    assert "Available" in response.text or "Not available yet" in response.text
 
 
 async def test_capability_detail_nonexistent_returns_404(

@@ -1,0 +1,94 @@
+{# Capability requirements panel.
+
+   Usage: {{ capability_requirements_panel(tree, granted) }}
+     tree    — root Bundle/Gate node (or a plain dict with the same shape:
+               label_active, label_done, op, children, met)
+     granted — bool — whether the root requirement is satisfied
+
+   Leaf nodes have no `children`; branches carry `op` ("all" / "any") and a
+   `children` sequence. The macro detects which is which via duck-typing so
+   it works with both Python dataclass instances and plain Jinja dicts. #}
+{% macro capability_requirements_panel(tree, granted) %}
+  {% macro render_leaf(node) %}
+    <span>
+      <input type="checkbox"
+             {% if node.met %}checked{% endif %}
+             readonly
+             aria-hidden="true">
+      {% if not node.met and node.fix_url %}
+        <a href="{{ node.fix_url }}">{{ node.label_active }}</a>
+      {% else %}
+        <span>{{ node.label_done if node.met else node.label_active }}</span>
+      {% endif %}
+    </span>
+  {% endmacro %}
+  {# render_node: branches inline their children (macros cannot self-call in Jinja). #}
+  {% macro render_node(node) %}
+    {% if node.children %}
+      {% set op_text = "All of these" if node.op == "all" else "Any one of these" %}
+      <li>
+        <span>
+          <input type="checkbox"
+                 {% if node.met %}checked{% endif %}
+                 readonly
+                 aria-hidden="true">
+          <span>{{ node.label_done if node.met else node.label_active }}</span>
+        </span>
+        <ul>
+          <li>
+            <small>{{ op_text }}</small>
+          </li>
+          {% for child in node.children %}
+            {% if child.children %}
+              {% set cop_text = "All of these" if child.op == "all" else "Any one of these" %}
+              <li>
+                <span>
+                  <input type="checkbox"
+                         {% if child.met %}checked{% endif %}
+                         readonly
+                         aria-hidden="true">
+                  <span>{{ child.label_done if child.met else child.label_active }}</span>
+                </span>
+                <ul>
+                  <li>
+                    <small>{{ cop_text }}</small>
+                  </li>
+                  {% for gc in child.children %}<li>{{ render_leaf(gc) }}</li>{% endfor %}
+                </ul>
+              </li>
+            {% else %}
+              <li>{{ render_leaf(child) }}</li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      </li>
+    {% else %}
+      <li>{{ render_leaf(node) }}</li>
+    {% endif %}
+  {% endmacro %}
+  {% set root_met = tree.children | selectattr("met") | list | length %}
+  {% set root_total = tree.children | list | length %}
+  {% set root_op_text = "All of these" if tree.op == "all" else "Any one of these" %}
+  <article>
+    <header>
+      <hgroup>
+        <h3>{{ tree.label_active }}</h3>
+      </hgroup>
+      <small data-state="{{ 'unlocked' if granted else 'locked' }}">
+        {% if granted %}
+          <i class="icon-check" aria-hidden="true"></i>Available
+        {% else %}
+          <i class="icon-lock" aria-hidden="true"></i>Not available yet
+        {% endif %}
+      </small>
+      <small>{{ root_met }} of {{ root_total }} requirements met</small>
+      <progress value="{{ root_met }}" max="{{ root_total }}"></progress>
+    </header>
+    <ul class="cap-reqs">
+      <li>
+        <small>{{ root_op_text }}</small>
+      </li>
+      {% for child in tree.children %}{{ render_node(child) }}{% endfor %}
+    </ul>
+  </article>
+{% endmacro %}
