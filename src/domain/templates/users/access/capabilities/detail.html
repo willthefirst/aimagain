@@ -10,7 +10,7 @@
      when met. Actionable unmet leaves are plain links inside the row span.
      The macro enforces the active/done grammar — callers supply both labels. #}
   {% macro render_leaf(node) %}
-    <span {% if node.met %}class="done"{% endif %}>
+    <span>
       <input type="checkbox"
              {% if node.met %}checked{% endif %}
              aria-hidden="true">
@@ -31,7 +31,7 @@
     {% else %}
       {% set op_text = "All of these" if kind == "Bundle" else "Any one of these" %}
       <li>
-        <span {% if node.met %}class="done"{% endif %}>
+        <span>
           <input type="checkbox"
                  {% if node.met %}checked{% endif %}
                  aria-hidden="true">
@@ -48,7 +48,7 @@
             {% else %}
               {% set cop_text = "All of these" if ckind == "Bundle" else "Any one of these" %}
               <li>
-                <span {% if child.met %}class="done"{% endif %}>
+                <span>
                   <input type="checkbox"
                          {% if child.met %}checked{% endif %}
                          aria-hidden="true">

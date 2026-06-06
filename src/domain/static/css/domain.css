@@ -307,10 +307,7 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .cap-reqs li > span { display: flex; align-items: center; gap: .6rem; padding: .35rem 0; }
 /* Label (span or a) takes remaining space */
 .cap-reqs li > span > span, .cap-reqs li > span > a { flex: 1; }
-/* Done row: muted text */
-.cap-reqs li > span.done { color: var(--pico-muted-color); }
 /* Checkboxes are display-only state indicators; pointer-events prevents toggling */
 .cap-reqs input[type="checkbox"] { pointer-events: none; flex: none; margin: 0; }
-.cap-reqs li > span.done input[type="checkbox"] { accent-color: var(--pico-ins-color); }
 /* Unlocked badge: green */
 article header small[data-state="unlocked"] { color: var(--pico-ins-color); }
