@@ -18,8 +18,9 @@ not import domain models — see `src/README.md` import discipline.
 Phase status: production reads. `clinician_verified` consults the
 `Clinician.clinician_verified` denorm cache; `org_rep_verified(user, org)`
 walks `User.org_representations` against `Organization.org_verified`;
-feed read-access honors `Clinician.ever_verified_at` (the once-verified
-retention rule per handoff §7.1).
+feed read-access is gated on email + any current claim (the `ever_verified_at`
+once-verified retention rule was removed — access reverts immediately when
+the underlying claim lapses).
 
 The predicates remain duck-typed via `getattr` so test stubs (and any
 non-ORM Actor-like object) keep working without constructing real
@@ -120,7 +121,7 @@ _REASON_META = {
         title="Contact details",
         unlock="Verify your account to see contact details.",
         fix_label="Complete verification",
-        fix_url="/profile",
+        fix_url="/users/me/access/capabilities/can_read_feed",
     ),
 }
 
@@ -132,6 +133,51 @@ _FALLBACK_META = ReasonMeta(
     fix_label="Open profile",
     fix_url="/profile",
 )
+
+
+@dataclass(frozen=True)
+class Condition:
+    """Atomic boolean leaf in a capability tree."""
+
+    label: str
+    met: bool
+    fix_url: str  # the resource that changes this condition
+
+
+@dataclass(frozen=True)
+class Bundle:
+    """AND node — all children must pass."""
+
+    label: str
+    children: tuple  # tuple[Condition | Bundle | Gate, ...]
+
+    @property
+    def met(self) -> bool:
+        return all(c.met for c in self.children)
+
+
+@dataclass(frozen=True)
+class Gate:
+    """OR node — any one child suffices."""
+
+    label: str
+    children: tuple  # tuple[Condition | Bundle | Gate, ...]
+
+    @property
+    def met(self) -> bool:
+        return any(c.met for c in self.children)
+
+
+@dataclass(frozen=True)
+class CapabilityCheck:
+    """Evaluated capability tree for a specific user."""
+
+    name: str
+    tree: Any  # Condition | Bundle | Gate
+
+    @property
+    def granted(self) -> bool:
+        return self.tree.met
 
 
 @dataclass(frozen=True)
@@ -218,17 +264,51 @@ def any_org_rep_verified(user: Any) -> bool:
     return bool(_verified_active_reps(user))
 
 
-def can_read_full_feed(user: Any) -> bool:
-    """Feed-teaser gate per handoff §7.1: full feed once any claim is
-    verified; once-verified users retain read access after a lapse
-    (`ever_verified_at`). New users see the blurred teaser until they
-    clear the first verification."""
-    if user is None:
-        return False
-    if clinician_verified(user) or any_org_rep_verified(user):
-        return True
+def check_can_read_feed(user: Any) -> CapabilityCheck:
+    """Structured capability check for full-feed read access.
+
+    Tree: email_verified AND (clinician_verified OR org_rep_verified).
+    `ever_verified_at` retention is intentionally excluded — access
+    reverts immediately when the underlying claim lapses.
+    """
+    _email_met = email_verified(user)
     clinicians = getattr(user, "clinicians", None) or ()
-    return any(getattr(c, "ever_verified_at", None) for c in clinicians)
+    _clin_met = any(getattr(c, "clinician_verified", False) for c in clinicians)
+    _org_met = bool(_verified_active_reps(user))
+
+    return CapabilityCheck(
+        name="can_read_feed",
+        tree=Bundle(
+            label="Read full feed",
+            children=(
+                Condition(
+                    label="Email verified",
+                    met=_email_met,
+                    fix_url="/users/me/email/form",
+                ),
+                Gate(
+                    label="Verified via any one",
+                    children=(
+                        Condition(
+                            label="Clinician identity verified",
+                            met=_clin_met,
+                            fix_url="/clinicians/form",
+                        ),
+                        Condition(
+                            label="Organization representative verified",
+                            met=_org_met,
+                            fix_url="/organizations/form",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
+def can_read_full_feed(user: Any) -> bool:
+    """Feed-teaser gate: delegates to `check_can_read_feed`."""
+    return check_can_read_feed(user).granted
 
 
 def can_post_referral(user: Any) -> bool:

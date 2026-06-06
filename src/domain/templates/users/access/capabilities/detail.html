@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{%- from "_shared/_toolbar.html" import page_toolbar -%}
+{% block title %}{{ check.name }}{% endblock %}
+{% block toolbar %}
+  {% call page_toolbar(heading=check.name) %}
+  {% endcall %}
+{% endblock %}
+{% block content %}
+  {# Recursive macro — dispatches on node.__class__.__name__. Jinja macros
+     cannot call themselves directly; we work around that by rendering
+     children in a loop and relying on the macro being defined before use.
+     For the two-level tree in `can_read_feed` this is sufficient: the root
+     is always a Bundle whose children are a Condition and a Gate, and the
+     Gate's children are always Conditions. #}
+  {% macro render_node(node) %}
+    {% set kind = node.__class__.__name__ %}
+    {% if kind == "Condition" %}
+      <li class="capability-node capability-node--condition">
+        {% if node.met %}
+          <span class="capability-check capability-check--met">&#10003;</span>
+        {% else %}
+          <span class="capability-check capability-check--unmet">&#10007;</span>
+        {% endif %}
+        {{ node.label }}
+        {% if not node.met %}<a href="{{ node.fix_url }}">Fix →</a>{% endif %}
+      </li>
+    {% elif kind == "Bundle" %}
+      <li class="capability-node capability-node--bundle">
+        <span class="capability-operator">AND</span> {{ node.label }}
+        <ul class="capability-children">
+          {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+        </ul>
+      </li>
+    {% elif kind == "Gate" %}
+      <li class="capability-node capability-node--gate">
+        <span class="capability-operator">OR</span> {{ node.label }}
+        <ul class="capability-children">
+          {% for child in node.children %}{{ render_node(child) }}{% endfor %}
+        </ul>
+      </li>
+    {% endif %}
+  {% endmacro %}
+  <section class="entity-card">
+    <header class="entity-header">
+      <strong>{{ check.name }}</strong>
+      {% if check.granted %}
+        <span class="capability-badge capability-badge--granted">Granted</span>
+      {% else %}
+        <span class="capability-badge capability-badge--denied">Denied</span>
+      {% endif %}
+    </header>
+    <section class="entity-facts">
+      <ul class="capability-tree">
+        {{ render_node(check.tree) }}
+      </ul>
+    </section>
+    <footer class="entity-footer">
+      <a href="{{ access_index_url }}">← All capabilities</a>
+    </footer>
+  </section>
+{% endblock %}

@@ -19,6 +19,7 @@ from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.users.schema import UserRead
 from src.domain.models.posts.post import Post
 from src.domain.routes import (
+    access,
     auth_pages,
     auth_routes,
     dev_auth,
@@ -207,6 +208,7 @@ app.include_router(
 )
 app.include_router(verifications.verifications_api_router)
 app.include_router(profile.profile_pages_router)
+app.include_router(access.access_router)
 
 # Every entity route file calls `register_entity(SPEC)` at import time
 # (see `src/framework/dispatch/registry.py`). The package import above
