@@ -345,7 +345,7 @@ def test_assign_worktree_port_starts_at_8001(tmp_path: Path, monkeypatch):
 
 
 def test_assign_worktree_port_skips_used_ports(tmp_path: Path, monkeypatch):
-    """Ports already taken by existing .worktree-port files are skipped."""
+    """Ports claimed by .worktree-port files AND actually bound are skipped."""
     runner = _make_worktree_runner(tmp_path, monkeypatch)
     wt_root = tmp_path / ".claude" / "worktrees"
     (wt_root / "issue-1").mkdir(parents=True)
@@ -353,7 +353,25 @@ def test_assign_worktree_port_skips_used_ports(tmp_path: Path, monkeypatch):
     (wt_root / "issue-1" / ".worktree-port").write_text("8001 35730\n")
     (wt_root / "issue-2" / ".worktree-port").write_text("8002 35731\n")
     wt_cmds = WorktreeCommands(runner)
+    # Simulate both ports having live containers behind them.
+    monkeypatch.setattr(
+        WorktreeCommands, "_port_bound", staticmethod(lambda p: p in {8001, 8002})
+    )
     assert wt_cmds._assign_worktree_port() == 8003
+
+
+def test_assign_worktree_port_reuses_stopped_container_port(
+    tmp_path: Path, monkeypatch
+):
+    """A .worktree-port file whose container is stopped does not block reuse."""
+    runner = _make_worktree_runner(tmp_path, monkeypatch)
+    wt_root = tmp_path / ".claude" / "worktrees"
+    (wt_root / "old-feature").mkdir(parents=True)
+    (wt_root / "old-feature" / ".worktree-port").write_text("8001 35730\n")
+    wt_cmds = WorktreeCommands(runner)
+    # Port file exists but nothing is listening — should reclaim 8001.
+    monkeypatch.setattr(WorktreeCommands, "_port_bound", staticmethod(lambda p: False))
+    assert wt_cmds._assign_worktree_port() == 8001
 
 
 def test_assign_worktree_port_ignores_corrupt_sibling(tmp_path: Path, monkeypatch):
