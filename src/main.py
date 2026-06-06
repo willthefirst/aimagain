@@ -24,7 +24,6 @@ from src.domain.routes import (
     auth_routes,
     dev_auth,
     dev_components,
-    profile,
     verifications,
 )
 from src.framework.config import settings
@@ -207,7 +206,6 @@ app.include_router(
     tags=["auth"],
 )
 app.include_router(verifications.verifications_api_router)
-app.include_router(profile.profile_pages_router)
 app.include_router(access.access_router)
 
 # Every entity route file calls `register_entity(SPEC)` at import time

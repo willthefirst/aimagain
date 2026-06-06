@@ -171,13 +171,11 @@ def test_every_toolbar_reserves_the_action_row_height() -> None:
         assert reserve.attributes.get("tabindex") == "-1"
 
 
-# Context that makes the incomplete-profile banner render: an authenticated
-# viewer who hasn't finished onboarding, on a non-`/profile` page (the stub
-# request path is "/"). `onboarding_next_href` is the banner's CTA target.
+# Context for banner-related tests. The onboarding banner has been removed;
+# this context only sets `is_authenticated=True` to exercise the authenticated
+# chrome path. The banner assertions below verify it is absent.
 _BANNER_CTX: dict[str, object] = dict(
     is_authenticated=True,
-    onboarding_incomplete=True,
-    onboarding_next_href="/profile/email",
 )
 
 

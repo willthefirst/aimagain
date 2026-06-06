@@ -31,7 +31,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     keeping all links visible inline on desktop via CSS.
 
     The "Create clinician" chrome CTA was removed in #697 — the
-    /profile hub is the discoverable entry point."""
+    /users/me detail page is the discoverable entry point."""
     response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
@@ -41,8 +41,8 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
     # Brand link is a direct child of the nav element.
     assert tree.css_first('#primary-nav > a[href="/"]') is not None
-    # Profile link points at the dedicated Profile Hub.
-    assert tree.css_first('#primary-nav a[href="/profile"]') is not None
+    # Profile link points at /users/me.
+    assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
     # The four authed-chrome destinations render in this exact order
     # inside #nav-menu. Sign-out is the `#` placeholder href on the
     # `<a hx-post>` that drives the HTMX POST.
@@ -51,7 +51,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     assert nav_hrefs == [
         "/home",
         "/posts",
-        "/profile",
+        "/users/me",
         "#",
     ]
 
@@ -515,11 +515,11 @@ async def test_users_me_verification_card_signposts_hub_when_unverified(
 ):
     """`GET /users/me` for an email-verified user who holds no
     posting-capable claim shows the read-only Verification card whose
-    only CTA deep-links into the `/profile` hub's next step — never a
-    "Post an opening" or "Create clinician" action, which live in the hub
-    (handoff §8.1). The deep-link follows `onboarding_readiness.next_href`,
-    which for this user is the `/profile/identity` step subroute.
-    The card is self-only; other users' profiles are unaffected."""
+    only CTA deep-links to the next step — never a "Post an opening" or
+    "Create clinician" action. The deep-link follows
+    `onboarding_readiness.next_href`, which for this user is `/users/me`
+    (the identity step). The card is self-only; other users' profiles are
+    unaffected."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -530,13 +530,11 @@ async def test_users_me_verification_card_signposts_hub_when_unverified(
     assert (
         "Verification" in headings
     ), "/users/me is missing the 'Verification' status card"
-    # The card's sole CTA signposts the hub's next step; it carries no
+    # The card's sole CTA signposts the next step; it carries no
     # in-page onboarding action (no Post CTA, and the only clinician-form
     # link on the page is the separate Clinicians-card footer, not this card).
-    cta = tree.css_first(
-        "section.entity-card a[href='/profile/identity'][role='button']"
-    )
-    assert cta is not None, "Verification card is missing its hub deep-link CTA"
+    cta = tree.css_first("section.entity-card a[href='/users/me'][role='button']")
+    assert cta is not None, "Verification card is missing its deep-link CTA"
     assert "Set up and verify your practice" in cta.text()
     assert (
         tree.css_first(
@@ -564,8 +562,8 @@ async def test_users_me_verification_card_manage_cta_when_can_post(
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200, response.text
     tree = HTMLParser(response.text)
-    cta = tree.css_first("section.entity-card a[href='/profile'][role='button']")
-    assert cta is not None, "Verification card is missing its '/profile' hub CTA"
+    cta = tree.css_first("section.entity-card a[href='/users/me'][role='button']")
+    assert cta is not None, "Verification card is missing its '/users/me' CTA"
     assert "Manage your practice and verification" in cta.text()
     assert (
         tree.css_first("section.entity-card a[href*='/posts/form']") is None
@@ -715,22 +713,19 @@ async def test_base_template_preloads_lucide_icon_font(
 # --- Chrome: nav active state -------------------------------------------
 
 
-async def test_primary_nav_marks_profile_active_on_profile_hub(
+async def test_primary_nav_marks_profile_active_on_users_me(
     authenticated_client: AsyncClient,
 ):
-    """The Profile link in the primary nav points at the dedicated
-    `/profile` hub and carries `aria-current="page"` when the user is
-    on it. The legacy `/users/me` detail page is still reachable by
-    URL but is no longer chrome-promoted (the active-state rule
-    follows the chrome promotion, not the underlying entity)."""
-    response = await authenticated_client.get("/profile")
+    """The Profile link in the primary nav points at `/users/me` and
+    carries `aria-current="page"` when the user is on it."""
+    response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    profile_link = tree.css_first('#primary-nav a[href="/profile"]')
+    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
     assert (
         profile_link is not None
         and profile_link.attributes.get("aria-current") == "page"
-    ), "expected Profile link to carry aria-current=page on /profile"
+    ), "expected Profile link to carry aria-current=page on /users/me"
 
 
 # --- Activation endpoint -------------------------------------------------

@@ -35,7 +35,9 @@
              role="button"
              class="secondary outline">Email</a>
         {% else %}
-          <a href="/profile" role="button" class="secondary outline">Verify to contact →</a>
+          <a href="{{ entity_url('user', id='me') }}"
+             role="button"
+             class="secondary outline">Verify to contact →</a>
         {% endif %}
       </footer>
     </section>

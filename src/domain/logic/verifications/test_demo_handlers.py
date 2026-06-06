@@ -14,9 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
-from src.domain.logic.profile.handlers import _user_is_demo_context
 from src.domain.logic.verifications import oig as oig_module
 from src.domain.logic.verifications.handlers import (
+    _user_is_demo_context,
     run_clinician_demo_verification,
     run_org_demo_verification,
 )

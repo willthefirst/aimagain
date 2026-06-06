@@ -204,7 +204,7 @@ def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -
         raise ForbiddenError(
             detail=(
                 "Posting a referral requires a verified clinician profile "
-                "(Claim A). Visit /profile to complete verification."
+                "(Claim A). Visit /users/me to complete verification."
             ),
         )
     if kind == "clinician_opening" and not capabilities.can_post_opening(
@@ -213,7 +213,7 @@ def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -
         raise ForbiddenError(
             detail=(
                 "Posting a clinician opening requires a verified clinician "
-                "profile (Claim A). Visit /profile to complete verification."
+                "profile (Claim A). Visit /users/me to complete verification."
             ),
         )
     # `program_intake` Claim-B gate is intentionally deferred — see

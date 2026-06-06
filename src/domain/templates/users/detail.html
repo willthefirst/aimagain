@@ -76,15 +76,11 @@
     </section>
   {% endif %}
   {# Verification status — self-only, read-only. This is a *status
-   signpost*, not an onboarding wizard: the single place to verify and
-   manage claims is the /profile hub (handoff §8.1 — "onboarding IS the
-   hub in setup mode; no separate wizard"). This card reports where the
-   user stands (email + identity) and links into the hub to act; it
-   deliberately carries no "Post an opening" / "Create clinician" action
-   CTAs, which would re-create the duplicate onboarding surface the hub
-   is meant to own. Status reads from `onboarding_readiness`, the same
-   capability-accurate projection the post gate uses. Other users'
-   profiles (/users/{id}) omit this section entirely. #}
+   signpost* that reports where the user stands (email + identity) and
+   links into the relevant claim setup flows to act. Status reads from
+   `onboarding_readiness`, the same capability-accurate projection the
+   post gate uses. Other users' profiles (/users/{id}) omit this
+   section entirely. #}
   {% if is_self %}
     {% set readiness = onboarding_readiness(current_user) %}
     <section class="entity-card">
@@ -99,9 +95,12 @@
       </section>
       <footer class="entity-footer">
         {% if readiness.can_post %}
-          <a href="/profile" role="button" class="outline">Manage your practice and verification</a>
+          <a href="{{ entity_url('user', id='me') }}"
+             role="button"
+             class="outline">Manage your practice and verification</a>
         {% else %}
-          <a href="{{ readiness.next_href or '/profile' }}" role="button">Set up and verify your practice</a>
+          <a href="{{ readiness.next_href or entity_url('user', id='me') }}"
+             role="button">Set up and verify your practice</a>
         {% endif %}
       </footer>
     </section>

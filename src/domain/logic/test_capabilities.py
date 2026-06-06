@@ -462,28 +462,26 @@ def test_claim_state_b_set_is_frozenset():
 
 
 def test_fix_url_for_onboarding_reasons_route_to_step_subroutes():
-    # The two onboarding-floor reasons deep-link to their dedicated step
-    # subroute; the additive / lapsed reasons land on the hub, which
-    # mode-dispatches them.
+    # The email reason points at the email form subresource; identity
+    # and additive / lapsed reasons all point at /users/me.
     assert (
         capabilities.fix_url_for(capabilities.REASON_EMAIL_UNVERIFIED)
-        == "/profile/email"
+        == "/users/me/email/form"
     )
     assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED)
-        == "/profile/identity"
+        capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED) == "/users/me"
     )
-    assert capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED) == "/profile"
+    assert capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED) == "/users/me"
     assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED) == "/profile"
+        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED) == "/users/me"
     )
     assert (
-        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING) == "/profile"
+        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING) == "/users/me"
     )
 
 
-def test_fix_url_for_unknown_reason_falls_back_to_hub_root():
-    assert capabilities.fix_url_for("totally-not-a-reason") == "/profile"
+def test_fix_url_for_unknown_reason_falls_back_to_users_me():
+    assert capabilities.fix_url_for("totally-not-a-reason") == "/users/me"
 
 
 def _declared_reasons() -> set[str]:
@@ -518,7 +516,7 @@ def test_reason_meta_known_reason_carries_full_copy():
     assert meta.title
     assert meta.unlock
     assert meta.fix_label
-    assert meta.fix_url == "/profile/identity"
+    assert meta.fix_url == "/users/me"
     assert meta.fix_url == capabilities.fix_url_for(
         capabilities.REASON_CLAIM_A_UNVERIFIED
     )
@@ -550,7 +548,7 @@ def test_reason_meta_unknown_reason_falls_back():
     """An unmapped code returns the generic hub pointer, never raises —
     a stray reason renders a sane nudge rather than blank chrome."""
     meta = capabilities.reason_meta("totally-not-a-reason")
-    assert meta.fix_url == "/profile"
+    assert meta.fix_url == "/users/me"
     assert meta.unlock
     assert meta.fix_label
 

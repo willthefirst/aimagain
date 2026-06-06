@@ -102,7 +102,7 @@ def test_locked_field_unknown_reason_falls_back_not_raises() -> None:
     html = env.from_string(template).render()
     link = HTMLParser(html).css_first(".locked-field a")
     assert link is not None
-    assert link.attributes.get("href") == "/profile"
+    assert link.attributes.get("href") == "/users/me"
 
 
 def test_locked_field_without_label_reads_just_hidden() -> None:

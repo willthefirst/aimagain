@@ -1,25 +1,16 @@
-"""Pins the profile-as-verification-state-view contract.
+"""Pins the verification status and chrome banner contract.
 
-`/profile` is the single place where all verification state lives:
-email confirmation, NPI, license. The global chrome carries one
-registry-driven incomplete-profile banner (`#onboarding-banner`, copy in
+The global chrome carries one chrome signal (`#onboarding-banner`, copy in
 `base.html`, gated on `onboarding_incomplete` from `base_context` →
-`onboarding_checklist`); it is suppressed on `/profile` itself, where the
-full checklist is already on screen. The old `_verify_banner.html`
-remains removed — this banner is the single consolidated signal, not its
-return. These tests assert:
+`onboarding_checklist`). The old `/profile` hub has been removed; the
+verification card on `/users/me` is the new home for claim setup links.
+These tests assert:
 
 1. `/home` shows no per-page finish-setup card for a no-claim user — the
    post-action row is suppressed entirely and the only nudge is the chrome
    `#onboarding-banner`.
-2. `/profile` shows the email-verify section for unverified users and
-   hides it for verified users (dev users are auto-verified).
-3. Post CTAs on `/home` are gated on `claims.a` being populated.
-4. The global `#onboarding-banner` shows for an incomplete authed user
-   off `/profile`, hides on `/profile`, and hides once a claim verifies.
-5. When shown, the banner is the *first child of `<main>`* — so the only
-   top-level body elements stay `<header>`, `<main>`, `<footer>` (the three
-   rows of the body grid), never a stray top-level `<aside>` band.
+2. Post CTAs on `/home` are gated on `claims.a` being populated.
+3. The global `#onboarding-banner` is currently disabled (absent on all pages).
 """
 
 import pytest
@@ -48,91 +39,6 @@ async def test_new_user_sees_no_finish_setup_card_on_home(
     assert "+ Post a referral" not in response.text
     # Banner temporarily disabled.
     assert tree.css_first("#onboarding-banner") is None
-
-
-async def test_profile_email_verify_hidden_for_verified_user(
-    authenticated_client: AsyncClient,
-):
-    """Dev users are auto-verified on registration, so the email-verify
-    section on `/profile` should not appear for them."""
-    response = await authenticated_client.get("/profile")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first("#verify-banner") is None
-
-
-async def test_profile_email_row_links_to_step_for_unverified_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """For an unverified user the `/profile` table of contents shows the
-    email row as an incomplete link to the `/profile/email` step page —
-    no inline resend on the hub. The resend control lives on the step page
-    (asserted by the step-page test below)."""
-    from sqlalchemy import select
-
-    from src.domain.models import User
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            fresh_user = (
-                await session.execute(select(User).where(User.id == logged_in_user.id))
-            ).scalar_one()
-            fresh_user.is_verified = False
-
-    response = await authenticated_client.get("/profile")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    # The hub is a pure index now — no embedded resend form.
-    assert tree.css_first("#verify-banner") is None
-    # The email row is incomplete and links out to its step subroute.
-    email_row = tree.css_first('#onboarding-checklist [data-step="email"]')
-    assert email_row is not None
-    link = email_row.css_first("a.onboarding-progress-link")
-    assert link is not None
-    assert link.attributes.get("href") == "/profile/email"
-
-
-async def test_profile_email_step_page_hosts_resend_for_unverified_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """The `/profile/email` step page hosts the resend control with the
-    `#verify-banner` swap target. The resend stays a passive outline button
-    so it doesn't shout."""
-    from sqlalchemy import select
-
-    from src.domain.models import User
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            fresh_user = (
-                await session.execute(select(User).where(User.id == logged_in_user.id))
-            ).scalar_one()
-            fresh_user.is_verified = False
-
-    response = await authenticated_client.get("/profile/email")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert "Verify your email" in response.text
-    assert "Resend verification email" in response.text
-    resend = tree.css_first("#verify-banner button[type=submit]")
-    assert resend is not None
-    classes = resend.attributes.get("class", "")
-    assert "outline" in classes
-    assert "verify-resend" in classes
-
-
-async def test_profile_email_step_redirects_to_hub_when_verified(
-    authenticated_client: AsyncClient,
-):
-    """A verified user has nothing to do on `/profile/email`, so it
-    redirects back to the hub table of contents."""
-    response = await authenticated_client.get("/profile/email", follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/profile"
 
 
 async def test_home_shows_empty_my_posts_section_when_no_active_posts(
@@ -269,23 +175,13 @@ async def test_onboarding_banner_renders_inside_main(
     assert HTMLParser(response.text).css_first("#onboarding-banner") is None
 
 
-async def test_onboarding_banner_suppressed_on_profile(
-    authenticated_client: AsyncClient,
-):
-    """The banner never renders on `/profile` itself — the full checklist
-    is already on screen there."""
-    response = await authenticated_client.get("/profile")
-    assert response.status_code == 200
-    assert HTMLParser(response.text).css_first("#onboarding-banner") is None
-
-
 async def test_onboarding_banner_hidden_once_claim_verified(
     authenticated_client: AsyncClient,
     db_test_session_manager,
     logged_in_user,
 ):
     """A verified clinician has completed onboarding, so the global banner
-    is silent even off `/profile`."""
+    is silent."""
     from tests.helpers import make_clinician_with_org
 
     clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
@@ -298,41 +194,3 @@ async def test_onboarding_banner_hidden_once_claim_verified(
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     assert HTMLParser(response.text).css_first("#onboarding-banner") is None
-
-
-async def test_profile_checklist_shows_remaining_steps_for_incomplete_user(
-    authenticated_client: AsyncClient,
-):
-    """The registry-driven progress overview on `/profile` lists the spine
-    steps with their done/remaining state. A fresh dev user has email done
-    and identity pending."""
-    response = await authenticated_client.get("/profile")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    checklist = tree.css_first("#onboarding-checklist")
-    assert checklist is not None
-    email_row = checklist.css_first('[data-step="email"]')
-    identity_row = checklist.css_first('[data-step="identity"]')
-    assert "is-complete" in email_row.attributes["class"]
-    assert "is-pending" in identity_row.attributes["class"]
-
-
-async def test_profile_checklist_hidden_when_onboarding_complete(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """A verified clinician has nothing left to track, so the progress
-    overview is omitted (manage mode)."""
-    from tests.helpers import make_clinician_with_org
-
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-
-    response = await authenticated_client.get("/profile")
-    assert response.status_code == 200
-    assert HTMLParser(response.text).css_first("#onboarding-checklist") is None
