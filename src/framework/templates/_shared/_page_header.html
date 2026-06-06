@@ -2,7 +2,7 @@
 
 Renders one `<header class="container page-header">` whose rows, top to
 bottom, are: primary nav → breadcrumb slot → page-title/toolbar slot →
-a single `<hr class="page-header-rule">` boundary. The rule sits at the
+a single `<hr>` boundary. The rule sits at the
 same Y on every app page at a given screen size: the breadcrumb row is
 reserved with an invisible intrinsic-height placeholder when a page has
 no real breadcrumb (list pages), so a list page's rule lines up with a
@@ -82,6 +82,6 @@ and the constant-boundary rationale (one source of truth).
       {%- endif %}
     </div>
     {{ _toolbar_html }}
-    <hr class="page-header-rule" />
+    <hr />
   {%- endif %}
 </header>

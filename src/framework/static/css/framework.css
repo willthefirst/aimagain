@@ -410,9 +410,7 @@ dd { margin: 0; }
    breadcrumb (list pages): the placeholder is a real back-affordance
    shape, hidden — so the reserved height equals a rendered breadcrumb's
    and the rule lines up with detail pages. No size unit is pinned. */
-.page-header-crumb-placeholder { visibility: hidden; }
-.page-header-rule { margin-block: var(--pico-spacing) 0; }
-/* `<menu>` is HTML's native "list of commands" element — used
+.page-header-crumb-placeholder { visibility: hidden; }/* `<menu>` is HTML's native "list of commands" element — used
    by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
    and any in-row action cluster (e.g. the users-table Actions
    cell). Strip its default `<ul>`-style bullets + padding so

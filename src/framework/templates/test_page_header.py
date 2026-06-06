@@ -135,9 +135,9 @@ def test_list_reserves_breadcrumb_row_with_hidden_placeholder() -> None:
 
 
 def test_band_owns_the_single_boundary_rule_and_main_has_none() -> None:
-    """Exactly one `<hr>` exists and it lives in the band (carrying the
-    `page-header-rule` class); `<main>` has none. The toolbar macro no
-    longer emits its own separator — the band owns the single divider."""
+    """Exactly one `<hr>` exists and it lives in the band; `<main>` has
+    none. The toolbar macro no longer emits its own separator — the band
+    owns the single divider."""
     env = _make_env()
     _add_child(env, "stub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "stub.html"))
@@ -145,7 +145,7 @@ def test_band_owns_the_single_boundary_rule_and_main_has_none() -> None:
     band = tree.css_first("header.page-header")
     assert band is not None
     assert len(band.css("hr")) == 1
-    assert band.css_first("hr.page-header-rule") is not None
+    assert band.css_first("hr") is not None
 
     main = tree.css_first("main")
     assert main is not None
