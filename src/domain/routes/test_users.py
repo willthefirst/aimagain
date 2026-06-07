@@ -471,6 +471,45 @@ async def test_users_me_access_card_links_to_access_page(
     ), "Capability status must not be embedded on /users/me"
 
 
+async def test_users_me_email_card_links_to_email_form(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /users/me` shows an Email card with a link to /users/me/email/form
+    so users can reach the verification resend without going through the
+    capability tree. Self-only."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    headings = [
+        el.text(strip=True)
+        for el in tree.css("section.entity-card header.entity-header strong")
+    ]
+    assert "Email" in headings, "/users/me is missing the Email card"
+    email_link = tree.css_first("section.entity-card a[href$='/users/me/email/form']")
+    assert (
+        email_link is not None
+    ), "Email card is missing the link to /users/me/email/form"
+
+
+async def test_users_me_email_card_not_shown_for_other_users(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The Email card must NOT appear on another user's profile — self-only."""
+    target = create_test_user(username=f"target-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(target)
+
+    response = await authenticated_client.get(f"/users/{target.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    email_link = tree.css_first("section.entity-card a[href$='/email/form']")
+    assert email_link is None, "Email card must not appear on another user's profile"
+
+
 async def test_users_me_verification_card_not_shown_for_other_users(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
