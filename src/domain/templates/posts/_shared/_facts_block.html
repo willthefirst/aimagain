@@ -121,7 +121,6 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
         compact card omits — practice/program identity, full address,
         scheduling, and per-kind insurance details. -#}
                 {%- if expanded %}
-                  {%- set _fix_url = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED).fix_url -%}
                   {%- set _name_placeholder = "Doe Health Group" if view.kind == "program_intake" else "Dr. J. Doe" -%}
                   {%- if view.ages and view.kind == "referral" %}
                     {#- Referral expanded-only Age row: the headline already carries
@@ -136,7 +135,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                     {%- if view.practice_link %}
                       {%- call fact('practice', 'Practice') %}
                         {% if redacted %}
-                          {{ locked_name(_name_placeholder, _fix_url) }}
+                          {{ locked_name(_name_placeholder) }}
                         {% else %}
                           <a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>
                         {% endif %}
@@ -145,7 +144,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                     {%- if view.program_link %}
                       {%- call fact('program', 'Program') %}
                         {% if redacted %}
-                          {{ locked_name(_name_placeholder, _fix_url) }}{# title-case-ignore: placeholder org name #}
+                          {{ locked_name(_name_placeholder) }}{# title-case-ignore: placeholder org name #}
                         {% else %}
                           <a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>
                         {% endif %}
@@ -154,7 +153,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                     {%- if view.organization_link %}
                       {%- call fact('organization', 'Organization') %}
                         {% if redacted %}
-                          {{ locked_name(_name_placeholder, _fix_url) }}{# title-case-ignore: placeholder org name #}
+                          {{ locked_name(_name_placeholder) }}{# title-case-ignore: placeholder org name #}
                         {% else %}
                           <a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>
                         {% endif %}

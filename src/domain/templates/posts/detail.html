@@ -2,6 +2,7 @@
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_facts_block.html" import facts_block -%}
 {%- from "posts/_shared/_how_to_refer.html" import how_to_refer -%}
+{%- from "_shared/_locked.html" import locked_action -%}
 {%- set view = post_card_view(post) -%}
 {% block resource_label %}Posts{% endblock %}
 {# The toolbar H1 is the subject when set; falls back to the
@@ -35,12 +36,7 @@
              role="button"
              class="secondary outline">Email</a>
         {% else %}
-          {%- set _meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED) -%}
-          <span data-tooltip="{{ _meta.unlock }}">
-            <button type="button" disabled aria-disabled="true" class="secondary outline">
-              <i class="icon-lock" aria-hidden="true"></i> Email
-            </button>
-          </span>
+          {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Email", icon="icon-lock", extra_class="secondary") }}
         {% endif %}
       </footer>
     </section>

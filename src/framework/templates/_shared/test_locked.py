@@ -36,10 +36,19 @@ def _make_env() -> Environment:
     return env
 
 
-def _render_action(reason: str, label: str) -> str:
+def _render_action(reason: str, label: str, **kwargs) -> str:
+    kwarg_str = "".join(f", {k}={v!r}" for k, v in kwargs.items())
     template = textwrap.dedent(f"""\
         {{%- from "_shared/_locked.html" import locked_action -%}}
-        {{{{ locked_action(capabilities.{reason}, {label!r}) }}}}
+        {{{{ locked_action(capabilities.{reason}, {label!r}{kwarg_str}) }}}}
+        """)
+    return _make_env().from_string(template).render()
+
+
+def _render_name(placeholder: str) -> str:
+    template = textwrap.dedent(f"""\
+        {{%- from "_shared/_locked.html" import locked_name -%}}
+        {{{{ locked_name({placeholder!r}) }}}}
         """)
     return _make_env().from_string(template).render()
 
@@ -120,3 +129,69 @@ def test_locked_field_no_button_rendered() -> None:
     """A field placeholder is read-only chrome — no interactive button."""
     html = _render_field("REASON_NETWORK_UNVERIFIED")
     assert HTMLParser(html).css_first("button") is None
+
+
+# ---------------------------------------------------------------------------
+# locked_action — optional icon and extra_class params
+# ---------------------------------------------------------------------------
+
+
+def test_locked_action_icon_prepended_when_provided() -> None:
+    """An icon class renders as a `<i>` before the label."""
+    html = _render_action("REASON_NETWORK_UNVERIFIED", "Email", icon="icon-lock")
+    button = HTMLParser(html).css_first("button")
+    assert button is not None
+    icon = button.css_first("i.icon-lock")
+    assert icon is not None, "icon element must be inside the button"
+
+
+def test_locked_action_extra_class_appended_to_outline() -> None:
+    """extra_class appends to the default 'outline' class."""
+    html = _render_action("REASON_NETWORK_UNVERIFIED", "Email", extra_class="secondary")
+    button = HTMLParser(html).css_first("button")
+    assert button is not None
+    cls = button.attributes.get("class", "")
+    assert "outline" in cls
+    assert "secondary" in cls
+
+
+def test_locked_action_no_icon_by_default() -> None:
+    """Without icon= the button contains no <i> element."""
+    html = _render_action("REASON_CLAIM_A_UNVERIFIED", "+ Post a referral")
+    button = HTMLParser(html).css_first("button")
+    assert button is not None
+    assert button.css_first("i") is None
+
+
+# ---------------------------------------------------------------------------
+# locked_name — withheld identity placeholder
+# ---------------------------------------------------------------------------
+
+
+def test_locked_name_renders_placeholder_as_link() -> None:
+    """The placeholder text appears as a link so the viewer knows a real
+    name exists and can navigate to unlock it."""
+    html = _render_name("Dr. J. Doe")
+    link = HTMLParser(html).css_first(".locked-field a")
+    assert link is not None
+    assert link.text(strip=True) == "Dr. J. Doe"
+
+
+def test_locked_name_fix_url_comes_from_network_unverified_reason() -> None:
+    """The fix URL is derived from REASON_NETWORK_UNVERIFIED, not passed
+    by the caller — pins that the macro is self-contained."""
+    html = _render_name("Dr. J. Doe")
+    link = HTMLParser(html).css_first(".locked-field a")
+    assert link is not None
+    assert link.attributes.get("href") == capabilities.fix_url_for(
+        capabilities.REASON_NETWORK_UNVERIFIED
+    )
+
+
+def test_locked_name_tooltip_carries_network_unlock_copy() -> None:
+    """Unlock text from REASON_NETWORK_UNVERIFIED appears in the tooltip."""
+    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
+    html = _render_name("Dr. J. Doe")
+    span = HTMLParser(html).css_first(".locked-field")
+    assert span is not None
+    assert span.attributes.get("data-tooltip") == meta.unlock
