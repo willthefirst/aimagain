@@ -102,6 +102,10 @@ it's dev-only chrome that should never ship to production. #}
     margin-top: var(--pico-spacing);
     margin-bottom: calc(var(--pico-spacing) * 0.25);
   }
+  .gallery-h3-lg { margin-top: 1.5rem; }
+  .gallery-h3 { margin-top: 1rem; }
+  .gallery-form-preview { max-width: var(--form-max-width); }
+  .gallery-panel-preview { max-width: 420px; }
   </style>
 {% endblock %}
 {% block toolbar %}
@@ -342,7 +346,7 @@ it's dev-only chrome that should never ship to production. #}
         {% endmacro %}
         <h3>With items + pagination</h3>
         {{ item_list(fixture_item_list_items, gallery_item_row, "gallery-item-list", pager=fixture_pager) }}
-        <h3 style="margin-top:1.5rem">
+        <h3 class="gallery-h3-lg">
           Empty state (<code>empty_msg</code>)
         </h3>
         {{ item_list([], gallery_item_row, "gallery-item-list-empty", empty_msg="No items found.") }}
@@ -361,7 +365,7 @@ it's dev-only chrome that should never ship to production. #}
             <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
           </li>
         {% endcall %}
-        <h3 style="margin-top:1rem">Detail toolbar (heading + edit)</h3>
+        <h3 class="gallery-h3">Detail toolbar (heading + edit)</h3>
         {% call page_toolbar(heading="Dr. Jane Smith") %}
           <li>
             <a href="{{ entity_form_url('clinician', id=1) }}"
@@ -448,7 +452,7 @@ it's dev-only chrome that should never ship to production. #}
             {{ textarea_field("notes", "Notes", current="Sample notes text.", required=False, help="Any additional context.") }}
           </form>
         </div>
-        <h3 style="margin-top:1.5rem">Error state</h3>
+        <h3 class="gallery-h3-lg">Error state</h3>
         <div class="entity-form-page">
           <form>
             {{ text_field("email", "Email", current="not-an-email", error="Enter a valid email address.", invalid=True) }}
@@ -468,13 +472,11 @@ it's dev-only chrome that should never ship to production. #}
           <small>Rendered via <code>_shared/actions.html</code> → <code>actions()</code>. <code>wrapper="form"</code> for create/edit; <code>wrapper="toolbar"</code> for detail pages.</small>
         </p>
         <h3>Form mode (save + cancel + delete)</h3>
-        <div style="max-width:var(--form-max-width)">
+        <div class="gallery-form-preview">
           {{ actions("Save changes", cancel_url="/example", delete_url="/example/1", delete_confirm="Delete this item?") }}
         </div>
-        <h3 style="margin-top:1rem">Form mode (save + cancel only)</h3>
-        <div style="max-width:var(--form-max-width)">
-          {{ actions("Create clinician", cancel_url=entity_url('clinician') ) }}
-        </div>
+        <h3 class="gallery-h3">Form mode (save + cancel only)</h3>
+        <div class="gallery-form-preview">{{ actions("Create clinician", cancel_url=entity_url('clinician') ) }}</div>
       </section>
       {# ═══════════════════════════════════════════════════════════ #}
       {# DOMAIN: POSTS                                                #}
@@ -749,7 +751,7 @@ it's dev-only chrome that should never ship to production. #}
               }
             ]
           } %}
-          <div style="max-width:420px">{{ capability_requirements_panel(locked_tree, false) }}</div>
+          <div class="gallery-panel-preview">{{ capability_requirements_panel(locked_tree, false) }}</div>
           {# Unlocked: 2 of 2 met — email + clinician identity both done. #}
           {% set unlocked_tree = {
             "label_active": "Read full feed",
@@ -785,7 +787,7 @@ it's dev-only chrome that should never ship to production. #}
               }
             ]
           } %}
-          <div style="max-width:420px">{{ capability_requirements_panel(unlocked_tree, true) }}</div>
+          <div class="gallery-panel-preview">{{ capability_requirements_panel(unlocked_tree, true) }}</div>
         </div>
       </section>
     </div>
