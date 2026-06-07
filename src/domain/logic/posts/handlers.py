@@ -35,7 +35,7 @@ from src.domain.models import (
     Program,
     User,
 )
-from src.framework.authz import assert_fk_ownership
+from src.framework.access.authz.authz import assert_fk_ownership
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
     Pager,
@@ -244,7 +244,7 @@ async def _assert_post_payload_target_ownership(
     payloads where the FK field is None (the PATCH doesn't touch the
     FK) are a no-op — only flow through the ownership check when the
     payload is actually trying to set a new target. Both branches share
-    the generic :func:`~src.framework.authz.assert_fk_ownership` helper.
+    the generic :func:`~src.framework.access.authz.authz.assert_fk_ownership` helper.
 
     See module docstring for why the dispatcher lives here rather than
     on :class:`PostKindSpec` per-kind."""

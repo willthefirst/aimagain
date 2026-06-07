@@ -15,7 +15,7 @@ from uuid import UUID
 from fastapi import Request
 from pydantic import BaseModel
 
-from src.framework.actor import Actor
+from src.framework.access.actor.actor import Actor
 from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.filters import Filter
 from src.framework.dispatch.pagination import (  # noqa: F401

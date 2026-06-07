@@ -28,8 +28,8 @@ from src.domain.logic.users.schema import (
 )
 from src.domain.models import User
 from src.domain.specs.clinician import CLINICIAN_ENTITY
+from src.framework.access.authz.authz import is_self_or_admin
 from src.framework.audit.core import AuditAction
-from src.framework.authz import is_self_or_admin
 from src.framework.dispatch.entity_spec import (
     ADMIN_FOR_WRITE,
     EntitySpec,
