@@ -476,9 +476,7 @@ it's dev-only chrome that should never ship to production. #}
           {{ actions("Save changes", cancel_url="/example", delete_url="/example/1", delete_confirm="Delete this item?") }}
         </div>
         <h3 class="gallery-h3">Form mode (save + cancel only)</h3>
-        <div class="gallery-form-preview">
-          {{ actions("Create clinician", cancel_url=entity_url('clinician') ) }}
-        </div>
+        <div class="gallery-form-preview">{{ actions("Create clinician", cancel_url=entity_url('clinician') ) }}</div>
       </section>
       {# ═══════════════════════════════════════════════════════════ #}
       {# DOMAIN: POSTS                                                #}
