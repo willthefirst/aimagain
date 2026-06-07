@@ -64,16 +64,59 @@ async def test_home_page_shows_post_buttons_when_claim_a_verified(
 async def test_home_page_no_post_actions_for_no_claim_user(
     authenticated_client: AsyncClient,
 ):
-    """A no-claim user (the default dev fixture) gets no post-action row on
-    /home at all — neither an active create link nor a disabled locked
-    button. The single chrome `#onboarding-banner` is their one nudge, so
-    the page hosts no finish-setup card either."""
+    """A no-claim user gets the My posts section but no active toolbar CTAs.
+    The empty-state create button is disabled (locked_action) instead of a
+    live link. No finish-setup card is rendered — the chrome
+    `#onboarding-banner` is the single nudge."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first('a[href="/posts/form?kind=referral"]') is None
     assert "+ Post a referral" not in response.text
     assert tree.css_first("#finish-setup-card") is None
+    # My posts section always renders
+    assert "My posts" in response.text
+    # Empty-state CTA is a disabled button, not a live link
+    assert "No posts yet." in response.text
+    assert tree.css_first("button[disabled]") is not None
+    assert tree.css_first('a[href="/posts/form"]') is None
+
+
+async def test_home_page_empty_my_posts_shows_locked_cta_when_unverified(
+    authenticated_client: AsyncClient,
+):
+    """An unverified user with no posts sees a disabled Create a post button
+    (locked_action pattern) rather than a live link."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert "No posts yet." in response.text
+    btn = tree.css_first("button[disabled]")
+    assert btn is not None
+    assert "Create a post" in btn.text()
+
+
+async def test_home_page_empty_my_posts_shows_active_cta_when_verified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """A verified user with no posts sees a live Create a post link."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert "No posts yet." in response.text
+    assert tree.css_first('a[href="/posts/form"]') is not None
+    assert tree.css_first("button[disabled]") is None
 
 
 async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
