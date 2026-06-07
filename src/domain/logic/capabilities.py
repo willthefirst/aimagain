@@ -56,11 +56,11 @@ REASON_CLAIM_B_UNVERIFIED = "claim_b_unverified"
 REASON_CLAIM_A_LAPSED = "claim_a_lapsed"
 REASON_CLAIM_B_LAPSED = "claim_b_lapsed"
 REASON_AFFILIATION_MISSING = "affiliation_missing"
-# Read-side gate (not a write affordance): the viewer hasn't cleared
-# verification, so contact/identity details on a post detail are withheld
-# (`can_access_network` is False). Distinct from the claim-to-*post*
-# reasons above — this one fixes by completing any verification path.
-REASON_VIEW_UNVERIFIED = "view_unverified"
+# Network-access gate: the user hasn't cleared verification, so both
+# read-side details (contact info, identity) and write-side affordances
+# (create post CTA) are locked. Fixed by completing any verification
+# path (Claim A or Claim B).
+REASON_NETWORK_UNVERIFIED = "network_unverified"
 
 
 @dataclass(frozen=True)
@@ -129,9 +129,9 @@ _REASON_META = {
         fix_label="Manage affiliations",
         fix_url="/users/me",
     ),
-    REASON_VIEW_UNVERIFIED: ReasonMeta(
-        title="Contact details",
-        unlock="Get provider network access to see this.",
+    REASON_NETWORK_UNVERIFIED: ReasonMeta(
+        title="Provider network",
+        unlock="Get provider network access to unlock this.",
         fix_label="Get access",
         fix_url="/users/me/access/capabilities/provider-network",
     ),

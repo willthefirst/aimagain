@@ -85,18 +85,18 @@ def test_locked_action_tooltip_carries_unlock_copy() -> None:
 def test_locked_field_renders_fix_link_with_correct_href() -> None:
     """The fix link points at the capability page so the viewer knows
     exactly what unlocks the field."""
-    html = _render_field("REASON_VIEW_UNVERIFIED")
+    html = _render_field("REASON_NETWORK_UNVERIFIED")
     link = HTMLParser(html).css_first(".locked-field a")
     assert link is not None
     assert link.attributes.get("href") == capabilities.fix_url_for(
-        capabilities.REASON_VIEW_UNVERIFIED
+        capabilities.REASON_NETWORK_UNVERIFIED
     )
 
 
 def test_locked_field_tooltip_carries_unlock_copy() -> None:
     """Unlock text appears in the tooltip attribute, not inline."""
-    meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
-    html = _render_field("REASON_VIEW_UNVERIFIED")
+    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
+    html = _render_field("REASON_NETWORK_UNVERIFIED")
     assert meta.unlock in html
     span = HTMLParser(html).css_first(".locked-field")
     assert span is not None
@@ -118,5 +118,5 @@ def test_locked_field_unknown_reason_falls_back_not_raises() -> None:
 
 def test_locked_field_no_button_rendered() -> None:
     """A field placeholder is read-only chrome — no interactive button."""
-    html = _render_field("REASON_VIEW_UNVERIFIED")
+    html = _render_field("REASON_NETWORK_UNVERIFIED")
     assert HTMLParser(html).css_first("button") is None

@@ -121,7 +121,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
         compact card omits — practice/program identity, full address,
         scheduling, and per-kind insurance details. -#}
                 {%- if expanded %}
-                  {%- set _fix_url = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED).fix_url -%}
+                  {%- set _fix_url = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED).fix_url -%}
                   {%- set _name_placeholder = "Doe Health Group" if view.kind == "program_intake" else "Dr. J. Doe" -%}
                   {%- if view.ages and view.kind == "referral" %}
                     {#- Referral expanded-only Age row: the headline already carries
@@ -162,7 +162,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                     {%- endif %}
                     {%- if view.full_address %}
                       {% if redacted %}
-                        {%- call fact('address', 'Address', icon='map-pin') %}{{ locked_field(capabilities.REASON_VIEW_UNVERIFIED) }}
+                        {%- call fact('address', 'Address', icon='map-pin') %}{{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}
                         {% endcall %}
                       {% else %}
                         {{ fact('address', 'Address', view.full_address, icon='map-pin') }}
