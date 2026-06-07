@@ -67,7 +67,7 @@ def _render_field(reason: str) -> str:
 
 
 def test_locked_action_renders_disabled_button_with_label() -> None:
-    html = _render_action("REASON_CLAIM_A_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None, "expected a <button> for the gated action"
     assert "disabled" in button.attributes, "gated action must be disabled"
@@ -77,8 +77,8 @@ def test_locked_action_renders_disabled_button_with_label() -> None:
 def test_locked_action_tooltip_carries_unlock_copy() -> None:
     """Unlock copy is in the tooltip wrapper, not inline — so a refactor
     can't silently drop it or hard-code copy that drifts from the single source."""
-    meta = capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED)
-    html = _render_action("REASON_CLAIM_A_UNVERIFIED", "+ Post a referral")
+    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
+    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
     assert meta.unlock in html, "unlock copy must appear in data-tooltip"
     # Fix link is NOT inside locked_action — the tooltip is enough.
     # (Users click the button's parent or navigate to capability page separately.)
@@ -157,7 +157,7 @@ def test_locked_action_extra_class_appended_to_outline() -> None:
 
 def test_locked_action_no_icon_by_default() -> None:
     """Without icon= the button contains no <i> element."""
-    html = _render_action("REASON_CLAIM_A_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None
     assert button.css_first("i") is None
