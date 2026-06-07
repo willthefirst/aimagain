@@ -15,7 +15,8 @@ identical across pages at one size.
 `base.html` captures the breadcrumb / toolbar block output into context
 vars and this partial renders them as pre-rendered HTML. The partial
 inherits the caller's context, so `_on_home` / `_on_posts` /
-`_on_profile` / `is_authenticated` resolve normally.
+`_on_profile` / `is_authenticated` resolve normally. `_on_home` marks
+the brand logo with `aria-current="page"` when the viewer is on /home.
 
 The band's lower rows (breadcrumb + toolbar + rule) render only when
 there's app chrome to show — any breadcrumb or toolbar content, or an
@@ -33,7 +34,7 @@ and the constant-boundary rationale (one source of truth).
 #}
 <header class="container page-header">
   <nav aria-label="Primary" id="primary-nav">
-    <a href="/"><strong>Bedlam Connect</strong></a>
+    <a href="/home" {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
     {% if is_authenticated %}
       <details id="nav-menu">
         <summary class="nav-menu-toggle" aria-label="Menu">
@@ -41,9 +42,6 @@ and the constant-boundary rationale (one source of truth).
           <i class="icon-x nav-menu-close-icon"></i>
         </summary>
         <ul>
-          <li>
-            <a href="/home" {% if _on_home %}aria-current="page"{% endif %}>Home</a>
-          </li>
           <li>
             <a href="{{ entity_url('post') }}"
                {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>

@@ -95,7 +95,7 @@ async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncCli
         headers={"HX-Request": "true", "Content-Type": "application/json"},
     )
     assert response.status_code == 200
-    assert response.headers.get("HX-Redirect") == "/users/me"
+    assert response.headers.get("HX-Redirect") == "/home"
     # A session cookie must be set so the redirect lands authenticated.
     assert (
         "fastapiusersauth" in response.cookies
