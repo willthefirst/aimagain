@@ -109,6 +109,28 @@ def test_capability_check_granted_uses_gate_met():
     assert CapabilityCheck(name="x", tree=tree_fail).granted is False
 
 
+def test_capability_check_bypass_defaults_false():
+    assert CapabilityCheck(name="x", tree=_unmet()).bypass is False
+
+
+def test_capability_check_bypass_overrides_unmet_tree():
+    """bypass=True grants access even when every condition is unmet."""
+    check = CapabilityCheck(name="x", tree=_unmet(), bypass=True)
+    assert check.granted is True
+
+
+def test_capability_check_bypass_preserves_tree():
+    """The tree's own met state is unchanged when bypass is set — templates
+    can still render the real requirement state."""
+    check = CapabilityCheck(name="x", tree=_unmet(), bypass=True)
+    assert check.tree.met is False
+
+
+def test_capability_check_bypass_false_still_uses_tree():
+    assert CapabilityCheck(name="x", tree=_met(), bypass=False).granted is True
+    assert CapabilityCheck(name="x", tree=_unmet(), bypass=False).granted is False
+
+
 # ---------- nested tree evaluation ----------------------------------------
 
 

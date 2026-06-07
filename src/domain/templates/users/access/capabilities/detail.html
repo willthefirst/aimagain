@@ -15,4 +15,11 @@
   {% call page_toolbar(heading=check.tree.label_active) %}
   {% endcall %}
 {% endblock %}
-{% block content %}{{ capability_requirements_panel(check.tree, check.granted, check.description) }}{% endblock %}
+{% block content %}
+  {% if check.bypass %}
+    <p>
+      <small>Superuser — access granted regardless of requirements below.</small>
+    </p>
+  {% endif %}
+  {{ capability_requirements_panel(check.tree, check.granted, check.description) }}
+{% endblock %}

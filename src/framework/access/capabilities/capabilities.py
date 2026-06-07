@@ -12,6 +12,7 @@ evaluation logic and the route-mount plumbing.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -67,15 +68,21 @@ class Gate:
 
 @dataclass(frozen=True)
 class CapabilityCheck:
-    """Evaluated capability tree for a specific user."""
+    """Evaluated capability tree for a specific user.
+
+    When `bypass` is True (set by the framework for superusers), `granted`
+    returns True regardless of the tree's met state. The tree itself is
+    preserved so templates can still show the real requirement state.
+    """
 
     name: str
     tree: Any  # Condition | Bundle | Gate
     description: str | None = None
+    bypass: bool = False
 
     @property
     def granted(self) -> bool:
-        return self.tree.met
+        return self.bypass or self.tree.met
 
 
 def mount_capability_routes(
@@ -131,6 +138,11 @@ def mount_capability_routes(
         user: Any = Depends(current_active_user),
     ):
         evaluated = {name: fn(user) for name, fn in checks.items()}
+        if user.is_superuser:
+            evaluated = {
+                name: dataclasses.replace(check, bypass=True)
+                for name, check in evaluated.items()
+            }
         return APIResponse.html_response(
             template_name=capabilities_list_template,
             context={
@@ -152,6 +164,8 @@ def mount_capability_routes(
         if fn is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         check = fn(user)
+        if user.is_superuser:
+            check = dataclasses.replace(check, bypass=True)
         return APIResponse.html_response(
             template_name=detail_template,
             context={

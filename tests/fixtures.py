@@ -174,6 +174,39 @@ async def authenticated_client(
 
 
 @pytest.fixture(scope="function")
+async def superuser_client(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    test_app: FastAPI,
+) -> AsyncGenerator[AsyncClient, None]:
+    from src.auth_config import get_user_manager
+
+    user_data = UserCreate(
+        email="superuser@example.com",
+        password="password123",
+        username="superuser",
+        is_superuser=True,
+    )
+
+    await create_test_user(db_test_session_manager, user_data, get_user_manager)
+
+    login_data = {
+        "username": user_data.email,
+        "password": user_data.password,
+    }
+    res = await test_client.post("/auth/jwt/login", data=login_data)
+
+    cookie = res.headers["Set-Cookie"]
+    access_token = cookie.split(";")[0].split("=")[1]
+
+    test_client.headers["Cookie"] = f"fastapiusersauth={access_token}"
+
+    yield test_client
+
+    del test_client.headers["Cookie"]
+
+
+@pytest.fixture(scope="function")
 async def logged_in_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
