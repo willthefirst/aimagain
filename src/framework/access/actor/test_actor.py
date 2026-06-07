@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import get_type_hints
 
 from src.domain.models import User
-from src.framework.actor import Actor
+from src.framework.access.actor.actor import Actor
 
 
 def test_actor_protocol_fields():
@@ -30,7 +30,7 @@ def test_simplenamespace_actor_works_with_framework_callers():
     """An ad-hoc actor-shaped object is sufficient for every framework
     consumer that reads the protocol — tests don't need a SQLAlchemy
     User instance to exercise framework code."""
-    from src.framework.authz import is_admin, is_owner
+    from src.framework.access.authz.authz import is_admin, is_owner
 
     actor = SimpleNamespace(
         id=uuid.uuid4(),

@@ -11,7 +11,7 @@ the underlying state.
 from fastapi import APIRouter
 
 from src.domain.logic import capabilities
-from src.framework.capabilities import mount_capability_routes
+from src.framework.access.capabilities.capabilities import mount_capability_routes
 
 access_router = APIRouter(prefix="/users/me/access", tags=["access"])
 

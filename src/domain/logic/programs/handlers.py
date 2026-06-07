@@ -30,7 +30,7 @@ from src.domain.models import (
     Program,
     User,
 )
-from src.framework.authz import assert_fk_ownership, list_visible_to
+from src.framework.access.authz.authz import assert_fk_ownership, list_visible_to
 from src.framework.http.exceptions import ForbiddenError, NotFoundError  # noqa: F401
 
 logger = logging.getLogger(__name__)

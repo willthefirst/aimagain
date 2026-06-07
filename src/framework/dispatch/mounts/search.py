@@ -80,7 +80,7 @@ def mount_search(
             )
         )
     if spec.read_user_dep is not None:
-        from src.framework.actor import Actor
+        from src.framework.access.actor.actor import Actor
 
         sig_params.append(
             inspect.Parameter(

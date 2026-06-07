@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from src.framework.actor import Actor
+from src.framework.access.actor.actor import Actor
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
 

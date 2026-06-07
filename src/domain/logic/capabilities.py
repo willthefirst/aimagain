@@ -40,7 +40,7 @@ from uuid import UUID
 # Re-export the framework-layer tree primitives so existing callers
 # (`check_can_read_feed`, tests, templates) keep working without changes.
 # The types themselves are domain-agnostic and live in `src/framework/`.
-from src.framework.capabilities import (  # noqa: F401
+from src.framework.access.capabilities.capabilities import (  # noqa: F401
     Bundle,
     CapabilityCheck,
     Condition,

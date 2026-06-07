@@ -20,8 +20,8 @@ from src.domain.models import (
     Organization,
     User,
 )
+from src.framework.access.authz.authz import assert_fk_ownership, list_visible_to
 from src.framework.audit.repository import AuditRepository
-from src.framework.authz import assert_fk_ownership, list_visible_to
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
     Pager,
@@ -282,8 +282,8 @@ async def handle_set_license_attestation(
     )
     from src.domain.models import ClinicianLicensure
     from src.domain.specs.clinician_licensure import LICENSURE_ENTITY
+    from src.framework.access.authz.authz import is_owner_or_admin
     from src.framework.audit.core import record_audit
-    from src.framework.authz import is_owner_or_admin
 
     clinician = await repo.get_by_model_id(Clinician, clinician_id)
     if clinician is None:

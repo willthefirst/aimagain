@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from src.framework.http.exceptions import ForbiddenError
 
 if TYPE_CHECKING:
-    from src.framework.actor import Actor
+    from src.framework.access.actor.actor import Actor
 
 
 def is_admin(user: Actor | None) -> bool:

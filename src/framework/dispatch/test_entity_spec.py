@@ -11,8 +11,8 @@ import pytest
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from src.auth_config import current_active_user, current_admin_user
+from src.framework.access.authz.authz import assert_owner_or_admin, is_owner_or_admin
 from src.framework.audit.core import AuditAction, AuditedResource, make_snapshotter
-from src.framework.authz import assert_owner_or_admin, is_owner_or_admin
 from src.framework.dispatch.entity_spec import (
     ADMIN_FOR_WRITE,
     AUTHENTICATED,
