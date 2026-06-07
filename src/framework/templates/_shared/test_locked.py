@@ -157,7 +157,7 @@ def test_locked_action_extra_class_appended_to_outline() -> None:
 
 def test_locked_action_no_icon_by_default() -> None:
     """Without icon= the button contains no <i> element."""
-    html = _render_action("REASON_CLAIM_A_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None
     assert button.css_first("i") is None
