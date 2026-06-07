@@ -24,7 +24,9 @@
               {% if check.description %}<p>{{ check.description }}</p>{% endif %}
             </hgroup>
             <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
-              {% if check.granted %}
+              {% if check.bypass %}
+                <i class="icon-check" aria-hidden="true"></i>Available (superuser)
+              {% elif check.granted %}
                 <i class="icon-check" aria-hidden="true"></i>Available
               {% else %}
                 <i class="icon-lock" aria-hidden="true"></i>Not available yet
