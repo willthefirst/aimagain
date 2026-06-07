@@ -110,3 +110,24 @@ async def test_capability_detail_unauthenticated_redirected(test_client: AsyncCl
         follow_redirects=False,
     )
     assert response.status_code != 200
+
+
+async def test_capabilities_index_superuser_shows_bypass_label(
+    superuser_client: AsyncClient,
+):
+    """Superusers see 'Available (superuser)' on the capabilities list."""
+    response = await superuser_client.get("/users/me/access/capabilities")
+    assert response.status_code == 200
+    assert "Available (superuser)" in response.text
+
+
+async def test_capability_detail_superuser_shows_bypass_note(
+    superuser_client: AsyncClient,
+):
+    """Superusers see a bypass note on the capability detail page."""
+    response = await superuser_client.get(
+        "/users/me/access/capabilities/provider-network"
+    )
+    assert response.status_code == 200
+    assert "Superuser" in response.text
+    assert "Available" in response.text
