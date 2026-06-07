@@ -41,10 +41,6 @@ h1 { font-size: 1.5rem; font-weight: 600; }
 h2 { font-size: 1.25rem; font-weight: 500; }
 h3 { font-size: 1.0625rem; font-weight: 500; }
 h4, h5, h6 { font-size: 1rem; font-weight: 500; }
-/* Pico defines --pico-card-box-shadow independently from --pico-box-shadow
-   and may set it via higher-specificity selectors in its theme rules.
-   Belt-and-suspenders: kill the shadow directly on the element. */
-article { box-shadow: none; margin-bottom: 0; }
 /* Entity list — <ul class="entity-list"> wraps every list of entity
    cards. Resets remove browser list chrome while keeping the <ul>/<li>
    in the accessibility tree so screen readers announce "list of N items".
