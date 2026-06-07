@@ -59,8 +59,8 @@ async def test_home_shows_empty_my_posts_section_when_no_active_posts(
 
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    assert "My active posts" in response.text
-    assert "You have no active posts." in response.text
+    assert "My posts" in response.text
+    assert "No posts yet." in response.text
     assert "Create a post" in response.text
 
 
