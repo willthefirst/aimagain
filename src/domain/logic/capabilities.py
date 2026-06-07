@@ -51,11 +51,6 @@ from src.framework.access.capabilities.capabilities import (  # noqa: F401
 # `fix_url_for(...)`. Closed vocab: any new reason must be added here and
 # given a `ReasonMeta` entry in `_REASON_META` below.
 REASON_EMAIL_UNVERIFIED = "email_unverified"
-REASON_CLAIM_A_UNVERIFIED = "claim_a_unverified"
-REASON_CLAIM_B_UNVERIFIED = "claim_b_unverified"
-REASON_CLAIM_A_LAPSED = "claim_a_lapsed"
-REASON_CLAIM_B_LAPSED = "claim_b_lapsed"
-REASON_AFFILIATION_MISSING = "affiliation_missing"
 # Network-access gate: the user hasn't cleared verification, so both
 # read-side details (contact info, identity) and write-side affordances
 # (create post CTA) are locked. Fixed by completing any verification
@@ -98,36 +93,6 @@ _REASON_META = {
         unlock="Verify your email to unlock this.",
         fix_label="Verify email",
         fix_url="/users/me/email/form",
-    ),
-    REASON_CLAIM_A_UNVERIFIED: ReasonMeta(
-        title="Clinician identity",
-        unlock="Add a verified clinician profile to unlock this.",
-        fix_label="Complete clinician setup",
-        fix_url="/users/me",
-    ),
-    REASON_CLAIM_A_LAPSED: ReasonMeta(
-        title="Clinician identity",
-        unlock="Re-attest your license to resume this.",
-        fix_label="Re-verify license",
-        fix_url="/users/me",
-    ),
-    REASON_CLAIM_B_UNVERIFIED: ReasonMeta(
-        title="Organization representation",
-        unlock="Become a verified organization representative to unlock this.",
-        fix_label="Complete organization setup",
-        fix_url="/users/me",
-    ),
-    REASON_CLAIM_B_LAPSED: ReasonMeta(
-        title="Organization representation",
-        unlock="Re-verify your authority to resume this.",
-        fix_label="Re-verify authority",
-        fix_url="/users/me",
-    ),
-    REASON_AFFILIATION_MISSING: ReasonMeta(
-        title="Clinician affiliation",
-        unlock="Add a clinician affiliation to unlock this.",
-        fix_label="Manage affiliations",
-        fix_url="/users/me",
     ),
     REASON_NETWORK_UNVERIFIED: ReasonMeta(
         title="Provider network",

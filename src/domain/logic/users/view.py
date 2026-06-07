@@ -70,7 +70,7 @@ def onboarding_readiness(user: Any) -> OnboardingReadiness:
         next_href = capabilities.fix_url_for(capabilities.REASON_EMAIL_UNVERIFIED)
     elif not can_post:
         next_label = "Verify your identity to start posting"
-        next_href = capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED)
+        next_href = "/users/me"
     else:
         next_label = None
         next_href = None

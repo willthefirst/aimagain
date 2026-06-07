@@ -462,21 +462,9 @@ def test_claim_state_b_set_is_frozenset():
 
 
 def test_fix_url_for_onboarding_reasons_route_to_step_subroutes():
-    # The email reason points at the email form subresource; identity
-    # and additive / lapsed reasons all point at /users/me.
     assert (
         capabilities.fix_url_for(capabilities.REASON_EMAIL_UNVERIFIED)
         == "/users/me/email/form"
-    )
-    assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_A_UNVERIFIED) == "/users/me"
-    )
-    assert capabilities.fix_url_for(capabilities.REASON_CLAIM_A_LAPSED) == "/users/me"
-    assert (
-        capabilities.fix_url_for(capabilities.REASON_CLAIM_B_UNVERIFIED) == "/users/me"
-    )
-    assert (
-        capabilities.fix_url_for(capabilities.REASON_AFFILIATION_MISSING) == "/users/me"
     )
 
 
@@ -512,26 +500,13 @@ def test_reason_meta_known_reason_carries_full_copy():
     """A known reason resolves to a title, non-empty unlock copy, a fix
     label, and the same deep-link `fix_url_for` returns — one source for
     every display string."""
-    meta = capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED)
+    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
     assert meta.title
     assert meta.unlock
     assert meta.fix_label
-    assert meta.fix_url == "/users/me"
     assert meta.fix_url == capabilities.fix_url_for(
-        capabilities.REASON_CLAIM_A_UNVERIFIED
+        capabilities.REASON_NETWORK_UNVERIFIED
     )
-
-
-def test_reason_meta_lapsed_reasons_carry_resume_copy():
-    """Both lapsed reasons (A and the newly-added B) resolve to a section
-    title + a re-verify CTA — the re-verify card reads entirely from this,
-    so a missing B entry would have rendered a raw reason code."""
-    a = capabilities.reason_meta(capabilities.REASON_CLAIM_A_LAPSED)
-    b = capabilities.reason_meta(capabilities.REASON_CLAIM_B_LAPSED)
-    assert a.title == "Clinician identity"
-    assert b.title == "Organization representation"
-    assert a.fix_label == "Re-verify license"
-    assert b.fix_label == "Re-verify authority"
 
 
 def test_reason_meta_network_unverified_points_at_capability_page():
