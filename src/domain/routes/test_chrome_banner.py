@@ -41,6 +41,18 @@ async def test_new_user_sees_no_finish_setup_card_on_home(
     assert tree.css_first("#onboarding-banner") is None
 
 
+async def test_home_shows_network_section_with_empty_state_when_no_recent_posts(
+    authenticated_client: AsyncClient,
+):
+    """The 'Recent in the network' section is always rendered, even when no
+    posts exist in the last 7 days — the header and an empty-state message
+    appear instead of the section being hidden."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    assert "Recent in the network" in response.text
+    assert "No activity in the last 7 days." in response.text
+
+
 async def test_home_shows_empty_my_posts_section_when_no_active_posts(
     authenticated_client: AsyncClient,
     db_test_session_manager,

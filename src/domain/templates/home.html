@@ -44,14 +44,14 @@
         {% endif %}
       {% endif %}
     </section>
-    {% if network_posts %}
-      <section>
-        <header style="display: flex;
-                       justify-content: space-between;
-                       align-items: baseline">
-          <h2>Recent in the network</h2>
-          <a href="{{ entity_url('post') }}">See all</a>
-        </header>
+    <section>
+      <header style="display: flex;
+                     justify-content: space-between;
+                     align-items: baseline">
+        <h2>Recent in the network</h2>
+        <a href="{{ entity_url('post') }}">See all</a>
+      </header>
+      {% if network_posts %}
         <p style="font-size: 0.875rem;
                   color: var(--pico-muted-color);
                   margin-bottom: 1rem">
@@ -67,6 +67,8 @@
            explains verification unlocks the full view — no per-feed
            notice repeats it. #}
         {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
-      </section>
-    {% endif %}
+      {% else %}
+        <p style="color: var(--pico-muted-color)">No activity in the last 7 days.</p>
+      {% endif %}
+    </section>
   {% endblock %}
