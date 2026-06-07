@@ -5,14 +5,12 @@
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
   {# Home title + post actions ride the unified page-header toolbar. The
-     active create links appear for any network-verified user (`can_post`
-     equals `can_access_network` — Claim A or Claim B). An unverified user
-     gets neither: the chrome `#onboarding-banner` (base.html) is their
-     finish-setup nudge. `can_post` is derived once in `base_context()` —
-     don't re-derive here. #}
+     active create links appear for any network-verified user
+     (`can_access_network`). An unverified user gets neither: the chrome
+     `#onboarding-banner` (base.html) is their finish-setup nudge. #}
   {% block toolbar %}
     {% call page_toolbar(heading="Home") %}
-      {% if can_post %}
+      {% if can_access_network %}
         <li>
           <a href="{{ entity_form_url('post') }}?kind=referral"
              role="button"
@@ -27,7 +25,7 @@
     {% endcall %}
   {% endblock %}
   {% block content %}
-    {% if can_post %}
+    {% if can_access_network %}
       <section>
         <header style="display: flex;
                        justify-content: space-between;

@@ -38,22 +38,12 @@ def base_context(user: Actor | None) -> dict:
     (see `src.auth_config.UserManager.on_after_register`) so the
     banner is silent for the seed flow.
 
-    `claims`, `claim_a_lapsed`, `claim_b_lapsed_orgs`, `any_claim_lapsed`
-    power the claim-aware chrome (`_verify_banner.html`, the profile-hub
-    mode header, the `/home` "Finish setup" / "Action needed" sub-states).
-    They flow through `claim_state(...)` in `src.domain.logic.capabilities`
-    so the single-source-of-truth predicate set computes them once per
-    request. The import is lazy to keep this framework module from taking
-    a hard `domain/` import.
-
-    `can_post` is the chrome-level "show a Create Post CTA" gate. It equals
-    `can_access_network` — any verified user (Claim A or Claim B) may post.
-    Templates gate on `can_post` so they all share the same definition
-    without re-deriving it.
+    `can_access_network` is the single chrome gate for both feed access
+    and the Create Post CTA — any network-verified user (clinician or
+    org rep) gets both.
     """
-    from src.domain.logic.capabilities import can_access_network, claim_state
+    from src.domain.logic.capabilities import can_access_network
 
-    state = claim_state(user)
     return {
         "is_authenticated": user is not None,
         "is_admin": is_admin(user),
@@ -63,15 +53,6 @@ def base_context(user: Actor | None) -> dict:
         "current_user_is_verified": (
             True if user is None else bool(getattr(user, "is_verified", True))
         ),
-        "claims": {"a": state.a, "b": list(state.b)},
-        "can_post": can_access_network(user),
-        "claim_a_lapsed": False,
-        "claim_b_lapsed_orgs": [],
-        "any_claim_lapsed": bool(state.lapsed),
-        # `can_access_network` is the chrome-level feed-teaser gate
-        # (handoff §7.1: full feed once verified, retained after lapse
-        # via `ever_verified_at`). Anonymous viewers always see the
-        # teaser (predicate returns False for `user=None`).
         "can_access_network": can_access_network(user),
     }
 
