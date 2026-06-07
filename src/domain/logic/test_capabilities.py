@@ -534,11 +534,11 @@ def test_reason_meta_lapsed_reasons_carry_resume_copy():
     assert b.fix_label == "Re-verify authority"
 
 
-def test_reason_meta_view_unverified_is_the_read_side_gate():
-    """The redaction reason (withheld post-detail contact/identity rows)
+def test_reason_meta_network_unverified_points_at_capability_page():
+    """The network-access reason (withheld post detail + locked create CTA)
     carries verification-oriented copy and points at the capability detail
-    page where the viewer can see exactly what needs to change."""
-    meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED)
+    page where the user can see exactly what needs to change."""
+    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
     assert "Get access" == meta.fix_label
     assert meta.fix_url == "/users/me/access/capabilities/provider-network"
     assert meta.unlock

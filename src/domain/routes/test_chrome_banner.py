@@ -9,7 +9,7 @@ These tests assert:
 1. `/home` shows no per-page finish-setup card for a no-claim user — the
    post-action row is suppressed entirely and the only nudge is the chrome
    `#onboarding-banner`.
-2. Post CTAs on `/home` are gated on `claims.a` being populated.
+2. Post CTAs on `/home` are gated on `can_post` (`can_access_network` — Claim A or Claim B).
 3. The global `#onboarding-banner` is currently disabled (absent on all pages).
 """
 
@@ -69,10 +69,9 @@ async def test_home_renders_post_ctas_when_claim_a_verified(
     db_test_session_manager,
     logged_in_user,
 ):
-    """A verified clinician sees the post CTAs on /home. The chrome's
-    `claims.a` scalar is the gate — same predicate the route's
-    write_authz consults, so visible button and server-side block
-    can't disagree."""
+    """A verified clinician sees the post CTAs on /home. The chrome gates
+    on `can_post` (`can_access_network`), so any network-verified user
+    (Claim A or Claim B) gets the active create links."""
     from tests.helpers import make_clinician_with_org
 
     clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
@@ -101,18 +100,15 @@ async def test_home_renders_post_ctas_when_claim_a_verified(
     assert cta_labels == {"+ Post a referral", "+ Post an opening"}
 
 
-async def test_home_shows_locked_post_actions_for_claim_b_only_org_rep(
+async def test_home_shows_active_post_actions_for_claim_b_org_rep(
     authenticated_client: AsyncClient,
     db_test_session_manager,
     logged_in_user,
 ):
-    """A Claim-B-only org rep (verified org representative, no Claim A)
-    can't post as themselves, but the chrome no longer hides the actions —
-    it renders them DISABLED with the unlock path (`locked_action` →
-    `_shared/_locked.html`). Pins: the buttons render disabled (not as
-    active create links), and the unlock copy comes from
-    `capabilities.reason_meta`, not inline text."""
-    from src.domain.logic import capabilities
+    """A Claim-B org rep (verified org representative, no Claim A) now gets
+    full posting chrome — `can_post` equals `can_access_network`, so Claim B
+    is sufficient. Pins: active create links appear in the toolbar (not
+    disabled buttons), same as a Claim-A user."""
     from src.domain.models.org_representations.org_representation import (
         OrgRepresentation,
     )
@@ -135,26 +131,24 @@ async def test_home_shows_locked_post_actions_for_claim_b_only_org_rep(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    # Claim-B-only → has a claim, so NOT the no-claim finish-setup card.
+    # Claim-B → has network access, so NOT the no-claim finish-setup card.
     assert "Finish setting up" not in response.text
 
-    # Both post actions render as DISABLED buttons, not active create links.
-    disabled_labels = {
-        b.text(strip=True)
+    # Active create links appear in the toolbar — no disabled buttons.
+    assert (
+        tree.css_first("a[href*='kind=referral']") is not None
+    ), "Claim-B org rep must get the active post-a-referral toolbar link"
+    assert (
+        tree.css_first("a[href*='kind=clinician_opening']") is not None
+    ), "Claim-B org rep must get the active post-an-opening toolbar link"
+    disabled_post_buttons = [
+        b
         for b in tree.css("button[disabled]")
         if b.text(strip=True).startswith("+ Post")
-    }
-    assert "+ Post a referral" in disabled_labels
-    assert "+ Post an opening" in disabled_labels
+    ]
     assert (
-        tree.css_first("a[href*='kind=referral']") is None
-    ), "Claim-B-only rep must not get an active post-create link"
-
-    # Unlock copy is the single-source string, not inline-authored here.
-    assert (
-        capabilities.reason_meta(capabilities.REASON_CLAIM_A_UNVERIFIED).unlock
-        in response.text
-    )
+        disabled_post_buttons == []
+    ), "No disabled post buttons expected for a network-verified user"
 
 
 async def test_onboarding_banner_shown_off_profile_for_incomplete_user(

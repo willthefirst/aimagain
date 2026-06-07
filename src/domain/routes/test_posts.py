@@ -584,17 +584,14 @@ async def test_list_shows_create_cta_for_claim_a_user(
     ), "Claim-A user should be offered the toolbar Create CTA"
 
 
-async def test_list_hides_create_cta_for_claim_b_only_org_rep(
+async def test_list_shows_create_cta_for_claim_b_org_rep(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """A Claim-B-only org rep (verified org representative, no Claim A) must NOT
-    see the `/posts` toolbar Create CTA.
-
-    The server's `_assert_post_payload_authz` still authorises org reps to post;
-    the chrome is deliberately narrower. This test pins that invariant so nobody
-    accidentally widens the gate back to `claims.a or claims.b`."""
+    """A Claim-B org rep (verified org representative, no Claim A) must see the
+    `/posts` toolbar Create CTA — `can_post` now equals `can_access_network`
+    (Claim A or Claim B)."""
     org = make_organization_row(owner_id=logged_in_user.id)
     rep = OrgRepresentation(
         user_id=logged_in_user.id,
@@ -612,8 +609,8 @@ async def test_list_hides_create_cta_for_claim_b_only_org_rep(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert (
-        tree.css_first("a[href='/posts/form'][role='button']") is None
-    ), "Claim-B-only org rep must not be offered the toolbar Create CTA"
+        tree.css_first("a[href='/posts/form'][role='button']") is not None
+    ), "Claim-B org rep must be offered the toolbar Create CTA"
 
 
 async def test_detail_hides_email_and_shows_cta_for_unverified(
