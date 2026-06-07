@@ -241,12 +241,13 @@ def _setup_clinician_edit_form_stub(app: FastAPI) -> None:
             # `orgs` context var to render options.
             org_id=org_id,
             org=org,
-            # `first_name`, `last_name`, and `npi` are empty optional
-            # text inputs on the stub. They live in the "Clinician"
-            # fieldset which renders first, so the form serializes them
+            # `first_name` and `last_name` are required (NOT NULL) so
+            # the stub supplies values that will pre-fill the form inputs
+            # and round-trip in the PATCH body. `npi` remains optional.
+            # The "Clinician" fieldset renders first, so these serialize
             # ahead of `org_id` in the encoded body.
-            first_name=None,
-            last_name=None,
+            first_name="Jane",
+            last_name="Doe",
             npi=None,
             location_city="Brooklyn",
             location_state="NY",
