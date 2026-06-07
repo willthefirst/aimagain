@@ -41,10 +41,10 @@ async def test_home_page_shows_post_buttons_when_claim_a_verified(
     logged_in_user,
 ):
     """The home page renders kind-specific CTAs linking to the unified
-    `/posts/form` URL when the user holds Claim A. Per Phase-6
-    rollout the CTAs are gated on `claims.a` from `base_context()` —
-    same predicate the route's `write_authz` consults — so the visible
-    button and the server-side block can't disagree."""
+    `/posts/form` URL when the user is network-verified. CTAs are gated
+    on `can_access_network` from `base_context()` — same
+    predicate the route's `write_authz` consults — so the visible button
+    and the server-side block can't disagree."""
     from tests.helpers import make_clinician_with_org
 
     clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")

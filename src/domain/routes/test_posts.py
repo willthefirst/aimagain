@@ -589,9 +589,8 @@ async def test_list_shows_create_cta_for_claim_b_org_rep(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """A Claim-B org rep (verified org representative, no Claim A) must see the
-    `/posts` toolbar Create CTA — `can_post` now equals `can_access_network`
-    (Claim A or Claim B)."""
+    """A verified org rep (no clinician profile) must see the `/posts` toolbar
+    Create CTA — `can_access_network` is the single gate for posting."""
     org = make_organization_row(owner_id=logged_in_user.id)
     rep = OrgRepresentation(
         user_id=logged_in_user.id,

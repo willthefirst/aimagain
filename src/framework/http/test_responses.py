@@ -28,14 +28,7 @@ def test_base_context_anonymous():
         # Anonymous users don't get the verify nag — default True so
         # the banner stays silent.
         "current_user_is_verified": True,
-        # Claim-aware chrome (claim-based verification rollout) — anon
-        # holds no claims and has no lapsed claims.
-        "claims": {"a": False, "b": []},
-        "claim_a_lapsed": False,
-        "claim_b_lapsed_orgs": [],
-        "any_claim_lapsed": False,
         "can_access_network": False,
-        "can_post": False,
     }
 
 
@@ -51,22 +44,13 @@ def test_base_context_regular_user():
         "current_user_id": user_id,
         "has_clinician_profile": False,
         "current_user_is_verified": True,
-        # No clinicians on this stub → Claim A is False; OrgRepresentation
-        # placeholders keep `b` empty.
-        "claims": {"a": False, "b": []},
-        "claim_a_lapsed": False,
-        "claim_b_lapsed_orgs": [],
-        "any_claim_lapsed": False,
         "can_access_network": False,
-        "can_post": False,
     }
 
 
-def test_base_context_claim_a_verified_user():
-    """A user with a `clinician_verified=True` cache on at least one
-    `Clinician` flips `claims.a` to True. Pins the wiring between
-    `base_context()` and `capabilities.claim_state()` — Phase 5's
-    profile-hub mode dispatcher reads this same shape."""
+def test_base_context_can_access_network_true_for_verified_clinician():
+    """A verified clinician gets `can_access_network` True — gates both the
+    Create Post CTA and full feed access."""
     user = SimpleNamespace(
         id=uuid.uuid4(),
         username="alice",
@@ -81,33 +65,12 @@ def test_base_context_claim_a_verified_user():
         ],
         org_representations=[],
     )
-    ctx = base_context(user)
-    assert ctx["claims"] == {"a": True, "b": []}
-    assert ctx["any_claim_lapsed"] is False
-
-
-def test_base_context_can_access_network_true_for_verified_clinician():
-    """The chrome scalar `can_access_network` powers `home.html`'s
-    network-feed blur — pinned here so a regression in `base_context`
-    can't silently re-blur every authed user's feed."""
-    user = SimpleNamespace(
-        id=uuid.uuid4(),
-        username="bob",
-        is_superuser=False,
-        is_verified=True,
-        clinicians=[
-            SimpleNamespace(
-                npi="1234567890", clinician_verified=True, ever_verified_at=None
-            )
-        ],
-        org_representations=[],
-    )
     assert base_context(user)["can_access_network"] is True
 
 
-def test_base_context_claim_b_coordinator():
-    """A program coordinator (no clinician profile) with a verified
-    OrgRepresentation gets `claims.b` populated with the org id."""
+def test_base_context_can_access_network_true_for_org_rep():
+    """A verified org rep (no clinician profile) gets `can_access_network`
+    True — org reps are network-verified and may post."""
     org_id = uuid.uuid4()
     user = SimpleNamespace(
         id=uuid.uuid4(),
@@ -123,47 +86,7 @@ def test_base_context_claim_b_coordinator():
             )
         ],
     )
-    ctx = base_context(user)
-    assert ctx["claims"]["a"] is False
-    assert ctx["claims"]["b"] == [org_id]
-
-
-def test_base_context_can_post_true_for_claim_a():
-    """`can_post` is True when Claim A is held — Claim A users see the chrome post CTA."""
-    user = SimpleNamespace(
-        id=uuid.uuid4(),
-        username="alice",
-        is_superuser=False,
-        is_verified=True,
-        clinicians=[
-            SimpleNamespace(
-                npi="1234567890", clinician_verified=True, ever_verified_at=None
-            )
-        ],
-        org_representations=[],
-    )
-    assert base_context(user)["can_post"] is True
-
-
-def test_base_context_can_post_true_for_claim_b_only():
-    """`can_post` is True when only Claim B is held — org reps have a chrome post CTA
-    because `can_post` now equals `can_access_network` (Claim A or Claim B)."""
-    org_id = uuid.uuid4()
-    user = SimpleNamespace(
-        id=uuid.uuid4(),
-        username="dana",
-        is_superuser=False,
-        is_verified=True,
-        clinicians=[],
-        org_representations=[
-            SimpleNamespace(
-                org_id=org_id, authority_status="verified", archived_at=None
-            )
-        ],
-    )
-    ctx = base_context(user)
-    assert ctx["can_post"] is True
-    assert ctx["claims"]["b"] == [org_id]
+    assert base_context(user)["can_access_network"] is True
 
 
 def test_base_context_unverified_user_surfaces_for_nag_banner():
