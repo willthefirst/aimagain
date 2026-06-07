@@ -7,7 +7,7 @@
 {% block resource_label %}Posts{% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading="Posts") %}
-    {% if can_post %}
+    {% if can_access_network %}
       <li>
         <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
       </li>
