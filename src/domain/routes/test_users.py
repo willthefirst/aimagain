@@ -24,11 +24,12 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """Authenticated pages render a primary nav with a brand link on the
-    left and a <details>/<summary> collapsible menu containing four
-    destination links: Home, Posts, Profile, and Sign out. The <details>
-    pattern supports a mobile hamburger toggle at narrow widths while
-    keeping all links visible inline on desktop via CSS.
+    """Authenticated pages render a primary nav with a brand link (the
+    logo) on the left that navigates to /home, and a <details>/<summary>
+    collapsible menu containing three destination links: Posts, Profile,
+    and Sign out. The <details> pattern supports a mobile hamburger
+    toggle at narrow widths while keeping all links visible inline on
+    desktop via CSS.
 
     The "Create clinician" chrome CTA was removed in #697 — the
     /users/me detail page is the discoverable entry point."""
@@ -39,17 +40,17 @@ async def test_base_template_renders_primary_nav_when_authenticated(
     # "Create clinician" button no longer lives in the nav (#697).
     cta_items = tree.css("#primary-nav a[href='/clinicians/form']")
     assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
-    # Brand link is a direct child of the nav element.
-    assert tree.css_first('#primary-nav > a[href="/"]') is not None
+    # Brand link is a direct child of the nav element, pointing at /home.
+    assert tree.css_first('#primary-nav > a[href="/home"]') is not None
     # Profile link points at /users/me.
     assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
-    # The four authed-chrome destinations render in this exact order
+    # The three authed-chrome menu destinations render in this exact order
     # inside #nav-menu. Sign-out is the `#` placeholder href on the
-    # `<a hx-post>` that drives the HTMX POST.
+    # `<a hx-post>` that drives the HTMX POST. "Home" is the logo, not a
+    # menu item.
     nav_items = tree.css("#nav-menu ul li a")
     nav_hrefs = [a.attributes.get("href") for a in nav_items]
     assert nav_hrefs == [
-        "/home",
         "/posts",
         "/users/me",
         "#",
@@ -91,8 +92,8 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
     tree = HTMLParser(response.text)
     nav = tree.css_first('nav[aria-label="Primary"]')
     assert nav is not None
-    # Brand link is present.
-    brand = nav.css_first('a[href="/"]')
+    # Brand link is present and points at /home.
+    brand = nav.css_first('a[href="/home"]')
     assert brand is not None
     # No profile link, no Login link, no Login indicator.
     assert tree.css_first('#primary-nav a[href="/users/me"]') is None
