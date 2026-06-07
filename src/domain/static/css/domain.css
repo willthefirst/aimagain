@@ -97,20 +97,13 @@ table.post-rows td:nth-last-child(2) {
    Container is <ul class="post-feed-list">; each item is
    <li><article class="post-feed-row">. The <ul>/<li> reset removes
    browser list chrome without affecting the accessibility tree —
-   screen readers still announce "list of N items". Each row is a
-   vertical flex column: header line, headline link, meta strip. */
+   screen readers still announce "list of N items". */
 ul.post-feed-list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 ul.post-feed-list > li { list-style: none; padding: 0; }
-.post-feed-row {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--pico-muted-border-color);
-}
-.post-feed-list > li:first-child > .post-feed-row { border-top: none; }
 /* Header line — pill · poster · timestamp */
 .post-feed-header {
   display: flex;
