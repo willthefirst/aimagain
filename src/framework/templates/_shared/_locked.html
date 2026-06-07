@@ -26,7 +26,7 @@
   </span>
 {%- endmacro %}
 {% macro locked_name(placeholder, fix_url) -%}
-  {%- set _meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED) -%}
+  {%- set _meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED) -%}
   <span class="locked-field" data-tooltip="{{ _meta.unlock }}">
     <i class="icon-lock" aria-hidden="true"></i>
     <a href="{{ fix_url }}">{{ placeholder }}</a>

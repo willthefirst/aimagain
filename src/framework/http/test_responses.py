@@ -145,10 +145,9 @@ def test_base_context_can_post_true_for_claim_a():
     assert base_context(user)["can_post"] is True
 
 
-def test_base_context_can_post_false_for_claim_b_only():
-    """`can_post` is False when only Claim B is held — org reps have no chrome post CTA.
-    The server (`_assert_post_payload_authz`) still authorizes them; the chrome
-    is deliberately narrower."""
+def test_base_context_can_post_true_for_claim_b_only():
+    """`can_post` is True when only Claim B is held — org reps have a chrome post CTA
+    because `can_post` now equals `can_access_network` (Claim A or Claim B)."""
     org_id = uuid.uuid4()
     user = SimpleNamespace(
         id=uuid.uuid4(),
@@ -163,7 +162,7 @@ def test_base_context_can_post_false_for_claim_b_only():
         ],
     )
     ctx = base_context(user)
-    assert ctx["can_post"] is False
+    assert ctx["can_post"] is True
     assert ctx["claims"]["b"] == [org_id]
 
 

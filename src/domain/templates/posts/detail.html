@@ -35,7 +35,7 @@
              role="button"
              class="secondary outline">Email</a>
         {% else %}
-          {%- set _meta = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED) -%}
+          {%- set _meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED) -%}
           <span data-tooltip="{{ _meta.unlock }}">
             <button type="button" disabled aria-disabled="true" class="secondary outline">
               <i class="icon-lock" aria-hidden="true"></i> Email

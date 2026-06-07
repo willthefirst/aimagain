@@ -41,7 +41,7 @@ under the "Feed rows" section. #}
 <small>{{ view.poster_name }}</small>
 {%- endif -%}
 {%- else -%}
-{%- set _fix_url = capabilities.reason_meta(capabilities.REASON_VIEW_UNVERIFIED).fix_url -%}
+{%- set _fix_url = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED).fix_url -%}
 {%- if post.kind == "program_intake" -%}
 <small>{{ locked_name("Doe Health Group", _fix_url) }}</small>{# title-case-ignore: placeholder org name #}
 {%- else -%}
