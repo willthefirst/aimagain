@@ -15,7 +15,7 @@ from src.auth_config import current_active_user
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
 from src.framework.http.responses import APIResponse
-from src.framework.rendering.route_urls import url_for_spec
+from src.framework.rendering.route_urls import breadcrumb_context_for_spec
 
 user_email_router = APIRouter(prefix="/users/me/email", tags=["users"])
 
@@ -29,9 +29,8 @@ async def get_email_form(
         template_name="users/email_form.html",
         context={
             "target_user": current_user,
-            "resource_url": url_for_spec(USER_ENTITY),
-            "resource_detail_url": url_for_spec(USER_ENTITY, id=current_user.id),
             "edit_heading": "Email",
+            **breadcrumb_context_for_spec(USER_ENTITY, id=current_user.id),
         },
         request=request,
         current_user=current_user,

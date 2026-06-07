@@ -108,6 +108,28 @@ def entity_url(name: str, *, id: Any = None, subresource: str | None = None) -> 
     return base if subresource is None else f"{base}/{subresource}"
 
 
+def breadcrumb_context_for_spec(spec: "EntitySpec", *, id: Any) -> dict[str, str]:
+    """Breadcrumb context keys for bespoke handlers extending ``views/form_edit.html``.
+
+    Returns the two keys the template reads to build the back-affordance:
+
+    * ``resource_url``        → ``/<collection>``        (collection link)
+    * ``resource_detail_url`` → ``/<collection>/<id>``   (item link — the back target)
+
+    Unpack directly into handler context so the handler doesn't have to
+    call ``url_for_spec`` twice manually::
+
+        context={
+            "edit_heading": "Email",
+            **breadcrumb_context_for_spec(USER_ENTITY, id=current_user.id),
+        }
+    """
+    return {
+        "resource_url": url_for_spec(spec),
+        "resource_detail_url": url_for_spec(spec, id=id),
+    }
+
+
 def entity_form_url(name: str, *, id: Any = None) -> str:
     """Form-page URL for the entity ``name``.
 

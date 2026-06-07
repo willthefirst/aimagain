@@ -10,7 +10,11 @@ import uuid
 
 import pytest
 
-from src.framework.rendering.route_urls import entity_form_url, entity_url
+from src.framework.rendering.route_urls import (
+    breadcrumb_context_for_spec,
+    entity_form_url,
+    entity_url,
+)
 
 # --- entity_url --------------------------------------------------------
 
@@ -129,3 +133,19 @@ def test_entity_form_url_edit_form_for_user():
 def test_entity_form_url_unknown_entity_raises():
     with pytest.raises(ValueError):
         entity_form_url("clinician_licensure_typo")
+
+
+# --- breadcrumb_context_for_spec ---------------------------------------
+
+
+def test_breadcrumb_context_for_spec_returns_collection_and_item_urls():
+    """Helper yields both keys that ``views/form_edit.html`` needs to build
+    the breadcrumb back-affordance for a bespoke subresource form handler."""
+    from src.domain.specs.user import USER_ENTITY
+
+    uid = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    ctx = breadcrumb_context_for_spec(USER_ENTITY, id=uid)
+    assert ctx == {
+        "resource_url": "/users",
+        "resource_detail_url": f"/users/{uid}",
+    }

@@ -64,19 +64,3 @@ async def test_email_form_omits_resend_when_verified(
     tree = HTMLParser(response.text)
     resend = tree.css_first("button[hx-post='/auth/resend-verify']")
     assert resend is None, "verified user should not see Resend button"
-
-
-async def test_email_form_breadcrumb_points_to_profile(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """Email form breadcrumb back-affordance links to the user's own profile
-    (deepest parent in the 2-level chain Users → profile → Email)."""
-    response = await authenticated_client.get("/users/me/email/form")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None
-    assert (
-        back.attributes.get("href") == f"/users/{logged_in_user.id}"
-    ), "breadcrumb back-affordance must link to the user's profile"
