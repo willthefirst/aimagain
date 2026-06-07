@@ -56,8 +56,10 @@ cleanup_containers() {
     fi
 }
 
-# Derive the nginx site config name from APP_BASE_URL, falling back to bedlamconnect.com.
-APP_DOMAIN="$(echo "${APP_BASE_URL:-https://bedlamconnect.com}" | sed 's|https\?://||' | sed 's|/.*||')"
+# Derive the bare domain (no www.) from APP_BASE_URL for nginx server_name/cert paths.
+# The template adds www.${APP_DOMAIN} itself, so strip any www. prefix here to avoid
+# producing "www.www.bedlamconnect.com" when APP_BASE_URL includes www.
+APP_DOMAIN="$(echo "${APP_BASE_URL:-https://bedlamconnect.com}" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|^www\.||')"
 
 # Function to update nginx upstream
 update_nginx_upstream() {
