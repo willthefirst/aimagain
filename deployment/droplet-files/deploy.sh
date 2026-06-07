@@ -56,21 +56,24 @@ cleanup_containers() {
     fi
 }
 
+# Derive the nginx site config name from APP_BASE_URL, falling back to bedlamconnect.com.
+APP_DOMAIN="$(echo "${APP_BASE_URL:-https://bedlamconnect.com}" | sed 's|https\?://||' | sed 's|/.*||')"
+
 # Function to update nginx upstream
 update_nginx_upstream() {
     local port=$1
     log "Updating nginx configuration to point to port $port..."
 
-    sudo tee /etc/nginx/sites-available/aimagain.art > /dev/null << EOF
-upstream aimagain_backend {
+    sudo tee /etc/nginx/sites-available/${APP_DOMAIN} > /dev/null << EOF
+upstream app_backend {
     server 127.0.0.1:$port;
 }
 
 server {
-    server_name aimagain.art www.aimagain.art;
+    server_name ${APP_DOMAIN} www.${APP_DOMAIN};
 
     location / {
-        proxy_pass http://aimagain_backend;
+        proxy_pass http://app_backend;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -84,19 +87,19 @@ server {
     }
 
     listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/aimagain.art/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/aimagain.art/privkey.pem; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem; # managed by Certbot
     include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
 }
 
 server {
-    if (\$host = aimagain.art) {
+    if (\$host = ${APP_DOMAIN}) {
         return 301 https://\$host\$request_uri;
     } # managed by Certbot
 
     listen 80;
-    server_name aimagain.art www.aimagain.art;
+    server_name ${APP_DOMAIN} www.${APP_DOMAIN};
     return 404; # managed by Certbot
 }
 EOF
@@ -153,8 +156,8 @@ rollback() {
 }
 
 get_current_port() {
-    if [ -f /etc/nginx/sites-available/aimagain.art ]; then
-        grep "server 127.0.0.1:" /etc/nginx/sites-available/aimagain.art | sed 's/.*127.0.0.1:\([0-9]*\);.*/\1/' || echo "none"
+    if [ -f /etc/nginx/sites-available/${APP_DOMAIN} ]; then
+        grep "server 127.0.0.1:" /etc/nginx/sites-available/${APP_DOMAIN} | sed 's/.*127.0.0.1:\([0-9]*\);.*/\1/' || echo "none"
     else
         echo "none"
     fi
