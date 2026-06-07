@@ -76,22 +76,23 @@ async def test_home_page_no_post_actions_for_no_claim_user(
     assert tree.css_first("#finish-setup-card") is None
     # My posts section always renders
     assert "My posts" in response.text
-    # Empty-state CTA is a disabled button, not a live link
+    # Empty-state CTA is a locked_action button (aria-disabled, not disabled),
+    # not a live link
     assert "No posts yet." in response.text
-    assert tree.css_first("button[disabled]") is not None
+    assert tree.css_first('button[aria-disabled="true"]') is not None
     assert tree.css_first('a[href="/posts/form"]') is None
 
 
 async def test_home_page_empty_my_posts_shows_locked_cta_when_unverified(
     authenticated_client: AsyncClient,
 ):
-    """An unverified user with no posts sees a disabled Create a post button
-    (locked_action pattern) rather than a live link."""
+    """An unverified user with no posts sees a locked_action Create a post button
+    (aria-disabled, clickable for popover) rather than a live link."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert "No posts yet." in response.text
-    btn = tree.css_first("button[disabled]")
+    btn = tree.css_first('button[aria-disabled="true"]')
     assert btn is not None
     assert "Create a post" in btn.text()
 
@@ -116,7 +117,7 @@ async def test_home_page_empty_my_posts_shows_active_cta_when_verified(
     tree = HTMLParser(response.text)
     assert "No posts yet." in response.text
     assert tree.css_first('a[href="/posts/form"]') is not None
-    assert tree.css_first("button[disabled]") is None
+    assert tree.css_first('button[aria-disabled="true"]') is None
 
 
 async def test_home_page_no_blur_element(authenticated_client: AsyncClient):

@@ -20,6 +20,7 @@ it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- from "_shared/_capability_requirements.html" import capability_requirements_panel -%}
+{%- from "_shared/_locked.html" import locked_action, locked_link, locked_name, locked_field -%}
 {% extends "base.html" %}
 {% block head %}
   <style>
@@ -88,6 +89,18 @@ it's dev-only chrome that should never ship to production. #}
   @media (max-width: 640px) {
     .gallery-layout { grid-template-columns: 1fr; }
     .gallery-layout > aside { position: static; }
+  }
+  .gallery-specimen-label {
+    display: block;
+    margin-bottom: calc(var(--pico-spacing) * 0.25);
+    color: var(--pico-muted-color);
+  }
+  .gallery-section-subheading {
+    font-size: var(--pico-font-size);
+    font-weight: 600;
+    color: var(--pico-muted-color);
+    margin-top: var(--pico-spacing);
+    margin-bottom: calc(var(--pico-spacing) * 0.25);
   }
   </style>
 {% endblock %}
@@ -193,6 +206,9 @@ it's dev-only chrome that should never ship to production. #}
               <li>
                 <span class="gallery-nav-subgroup">Access</span>
                 <ul>
+                  <li>
+                    <a href="#locked-affordances">Locked affordances</a>
+                  </li>
                   <li>
                     <a href="#capability-requirements">Capability requirements</a>
                   </li>
@@ -624,6 +640,74 @@ it's dev-only chrome that should never ship to production. #}
       {# ═══════════════════════════════════════════════════════════ #}
       {# DOMAIN: ACCESS                                               #}
       {# ═══════════════════════════════════════════════════════════ #}
+      <section class="gallery-section" id="locked-affordances">
+        <h2>Locked affordances</h2>
+        <p>
+          <small>Four variants for "you can't do/see this yet" UI. Each carries a
+            <code>data-locked-cta="{reason}"</code> attribute. Clicking opens a native
+            <code>&lt;popover&gt;</code> CTA card anchored via CSS anchor positioning
+            (<code>position-try-fallbacks</code> keeps it on-screen near the trigger).
+          Copy and fix-URL come from <code>capabilities.reason_meta(reason)</code>.</small>
+        </p>
+        {# locked_action — disabled-looking button (write affordances) #}
+        <h3 class="gallery-section-subheading">locked_action</h3>
+        <p>
+          <small>Rendered in place of a create/submit button the user doesn't have access to. Looks disabled; clicking opens the CTA popover.</small>
+        </p>
+        <div class="gallery-row">
+          <div>
+            <small class="gallery-specimen-label">Default</small>
+            {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "+ Post a referral") }}
+          </div>
+          <div>
+            <small class="gallery-specimen-label">extra_class="secondary"</small>
+            {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Email", extra_class="secondary") }}
+          </div>
+          <div>
+            <small class="gallery-specimen-label">email reason</small>
+            {{ locked_action(capabilities.REASON_EMAIL_UNVERIFIED, "Submit") }}
+          </div>
+        </div>
+        {# locked_link — disabled-looking inline navigation link #}
+        <h3 class="gallery-section-subheading">locked_link</h3>
+        <p>
+          <small>Rendered in place of an <code>&lt;a&gt;</code> the user can't navigate to yet. Muted, not-allowed cursor, opens CTA popover.</small>
+        </p>
+        <div class="gallery-row">
+          <div>{{ locked_link(capabilities.REASON_NETWORK_UNVERIFIED, "View full profile") }}</div>
+          <div>{{ locked_link(capabilities.REASON_EMAIL_UNVERIFIED, "Continue") }}</div>
+        </div>
+        {# locked_name — withheld identity placeholder #}
+        <h3 class="gallery-section-subheading">locked_name</h3>
+        <p>
+          <small>Rendered where a clinician or org name would appear. The placeholder communicates "a real name exists here." Always uses <code>REASON_NETWORK_UNVERIFIED</code>.</small>
+        </p>
+        <div class="gallery-row">
+          <div>
+            <small class="gallery-specimen-label">clinician</small>
+            <small>{{ locked_name("Dr. J. Doe") }}</small>
+          </div>
+          <div>
+            <small class="gallery-specimen-label">org / program</small>
+            <small>{{ locked_name("Doe Health Group") }}</small>
+          </div>
+        </div>
+        {# locked_field — withheld data value (address, contact) #}
+        <h3 class="gallery-section-subheading">locked_field</h3>
+        <p>
+          <small>Rendered where a withheld data value (full address, phone) would appear. The redacted dots signal content exists; the lock icon signals it's gated.</small>
+        </p>
+        <div class="gallery-row">
+          <div>
+            <small class="gallery-specimen-label">network_unverified</small>
+            {{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}
+          </div>
+          <div>
+            <small class="gallery-specimen-label">email_unverified</small>
+            {{ locked_field(capabilities.REASON_EMAIL_UNVERIFIED) }}
+          </div>
+        </div>
+      </section>
       <section class="gallery-section" id="capability-requirements">
         <h2>Capability requirements</h2>
         <p>

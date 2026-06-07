@@ -45,6 +45,7 @@ def _make_env() -> Environment:
     # Jinja globals registered in production by
     # `src.framework.rendering.templating`. Mirror them here so the
     # chrome renders without needing a full app boot.
+    from src.domain.logic import capabilities
     from src.framework.rendering.labels import (
         entity_create_label,
         entity_filter_label,
@@ -55,6 +56,7 @@ def _make_env() -> Environment:
     env.globals["entity_form_url"] = entity_form_url
     env.globals["entity_create_label"] = entity_create_label
     env.globals["entity_filter_label"] = entity_filter_label
+    env.globals["capabilities"] = capabilities
     return env
 
 
