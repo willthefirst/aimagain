@@ -7,7 +7,12 @@ Only the structural / evaluation logic is covered here. Domain predicates
 
 from __future__ import annotations
 
-from src.framework.capabilities import Bundle, CapabilityCheck, Condition, Gate
+from src.framework.access.capabilities.capabilities import (
+    Bundle,
+    CapabilityCheck,
+    Condition,
+    Gate,
+)
 
 
 def _met(label: str = "met") -> Condition:

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.framework.authz import (
+from src.framework.access.authz.authz import (
     assert_owner_or_admin,
     is_admin,
     is_owner,

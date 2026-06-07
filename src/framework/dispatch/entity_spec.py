@@ -6,13 +6,13 @@ from typing import Any, Callable
 from pydantic import BaseModel, TypeAdapter
 
 from src.auth_config import current_active_user, current_admin_user
+from src.framework.access.authz.authz import assert_owner_or_admin, is_owner_or_admin
 from src.framework.audit.core import (
     AuditAction,
     AuditedResource,
     make_audited_resource,
     make_snapshotter,
 )
-from src.framework.authz import assert_owner_or_admin, is_owner_or_admin
 from src.framework.dispatch.filters import Filter
 from src.framework.dispatch.resource_routes import QueryParam, ResourceSpec
 from src.framework.persistence.polymorphic import DiscriminatorRegistry

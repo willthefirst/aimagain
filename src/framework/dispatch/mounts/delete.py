@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import status
 
-from src.framework.actor import Actor
+from src.framework.access.actor.actor import Actor
 from src.framework.audit.core import mutate
 from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.mounts._common import (

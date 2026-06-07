@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Any
 from fastapi import Response, status
 from fastapi.responses import JSONResponse
 
-from src.framework.authz import is_admin
+from src.framework.access.authz.authz import is_admin
 
 if TYPE_CHECKING:
-    from src.framework.actor import Actor
+    from src.framework.access.actor.actor import Actor
 
 
 def base_context(user: Actor | None) -> dict:
@@ -20,7 +20,7 @@ def base_context(user: Actor | None) -> dict:
     and tests can render the chrome with literals rather than
     constructing a User.
 
-    `is_admin` is computed via `src.framework.authz.is_admin` so the rule
+    `is_admin` is computed via `src.framework.access.authz.authz.is_admin` so the rule
     has a single home; templates never re-derive it.
 
     `has_clinician_profile` is duck-typed off the user's `clinicians`

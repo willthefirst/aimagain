@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from fastapi import Request
 
-from src.framework.actor import Actor
-from src.framework.authz import is_admin
+from src.framework.access.actor.actor import Actor
+from src.framework.access.authz.authz import is_admin
 from src.framework.dispatch.mounts._common import call_handler_with
 from src.framework.dispatch.mounts._spec import QueryParam, ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn

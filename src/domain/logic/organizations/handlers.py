@@ -36,8 +36,8 @@ from src.domain.logic.org_representations.repository import (
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Organization, User
+from src.framework.access.authz.authz import list_visible_to
 from src.framework.audit.repository import AuditRepository
-from src.framework.authz import list_visible_to
 
 logger = logging.getLogger(__name__)
 

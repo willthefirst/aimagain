@@ -51,8 +51,8 @@ from src.domain.logic.verifications.repository import (
     get_verification_repository,
 )
 from src.domain.models import Clinician, Organization, User
+from src.framework.access.authz.authz import is_owner_or_admin
 from src.framework.audit.repository import AuditRepository
-from src.framework.authz import is_owner_or_admin
 from src.framework.http.exceptions import (
     ForbiddenError,
     NotFoundError,

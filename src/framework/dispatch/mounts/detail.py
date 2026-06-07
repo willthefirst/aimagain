@@ -11,8 +11,8 @@ from uuid import UUID
 
 from fastapi import Request
 
-from src.framework.actor import Actor
-from src.framework.authz import is_admin
+from src.framework.access.actor.actor import Actor
+from src.framework.access.authz.authz import is_admin
 from src.framework.dispatch.mounts._common import (
     assert_kind_lock,
     call_handler_with,

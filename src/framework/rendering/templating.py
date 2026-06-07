@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 if TYPE_CHECKING:
-    from src.framework.actor import Actor
+    from src.framework.access.actor.actor import Actor
 
 from src.framework.config import settings
 from src.framework.observability import observability
