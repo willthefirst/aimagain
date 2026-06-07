@@ -117,10 +117,13 @@ jobs:
 
       - name: Run deployment
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USERNAME }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: APP_BASE_URL
           script: |
             cd /opt/bedlam-connect/deployment
             chmod +x deploy.sh cleanup-docker.sh
