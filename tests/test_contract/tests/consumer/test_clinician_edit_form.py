@@ -77,11 +77,11 @@ async def test_consumer_clinician_edit_form_submits(
     # selection so it doesn't appear in the encoded form body. The
     # "Clinician" fieldset holds the person-level fields (first/last
     # name and npi) and renders first, so they serialize ahead of
-    # `org_id`. `first_name`, `last_name`, and `npi` are empty optional
-    # text inputs on the stub.
+    # `org_id`. `first_name` and `last_name` are required fields pre-filled
+    # from the stub clinician; `npi` is optional and empty.
     expected_request_body = (
-        "first_name="
-        "&last_name="
+        "first_name=Jane"
+        "&last_name=Doe"
         "&npi="
         "&org_id=55555555-5555-5555-5555-555555555555"
         "&location_city=Bayside"
