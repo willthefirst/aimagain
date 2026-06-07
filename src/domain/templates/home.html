@@ -2,6 +2,7 @@
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
+{%- from "_shared/_locked.html" import locked_action -%}
 {%- macro _no_poster_row(post) %}{{ post_feed_row(post, show_poster=False) }}{%- endmacro -%}
   {% block title %}Home{% endblock %}
   {# Home title + post actions ride the unified page-header toolbar. The
@@ -25,22 +26,24 @@
     {% endcall %}
   {% endblock %}
   {% block content %}
-    {% if can_access_network %}
-      <section>
-        <header style="display: flex;
-                       justify-content: space-between;
-                       align-items: baseline">
-          <h2>My active posts</h2>
-          <a href="{{ entity_url('post') }}">See all</a>
-        </header>
-        {% if my_posts %}
-          {{ item_list(my_posts, _no_poster_row, "my-posts-list", "post-feed-list") }}
-        {% else %}
-          <p style="color: var(--pico-muted-color)">You have no active posts.</p>
+    <section>
+      <header style="display: flex;
+                     justify-content: space-between;
+                     align-items: baseline">
+        <h2>My posts</h2>
+        {% if can_access_network %}<a href="{{ entity_url('post') }}">See all</a>{% endif %}
+      </header>
+      {% if my_posts %}
+        {{ item_list(my_posts, _no_poster_row, "my-posts-list", "post-feed-list") }}
+      {% else %}
+        <p style="color: var(--pico-muted-color)">No posts yet.</p>
+        {% if can_access_network %}
           <a href="{{ entity_form_url('post') }}" role="button" class="outline">Create a post</a>
+        {% else %}
+          {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Create a post") }}
         {% endif %}
-      </section>
-    {% endif %}
+      {% endif %}
+    </section>
     {% if network_posts %}
       <section>
         <header style="display: flex;
