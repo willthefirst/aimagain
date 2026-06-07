@@ -285,12 +285,16 @@ def can_access_network(user: Any) -> bool:
 
 
 def can_post_referral(user: Any) -> bool:
-    """Posting a referral as oneself requires Claim A (handoff §4.3)."""
+    """Self-path gate: posting a referral as the owning clinician requires
+    Claim A (handoff §4.3). The org-rep authority path in
+    `_assert_post_payload_authz` bypasses this check."""
     return clinician_verified(user)
 
 
 def can_post_opening(user: Any) -> bool:
-    """Posting a clinician opening requires Claim A (handoff §4.3)."""
+    """Self-path gate: posting a clinician opening as the owning clinician
+    requires Claim A (handoff §4.3). The org-rep authority path in
+    `_assert_post_payload_authz` bypasses this check."""
     return clinician_verified(user)
 
 

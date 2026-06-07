@@ -1,35 +1,41 @@
 {# Consistent "you can't do/see this yet" affordances, driven by the
    closed `capabilities.REASON_*` vocab. Three treatments:
 
-   - `locked_action(reason, label)` — for write affordances (buttons,
-     create links). Renders the control DISABLED inside a tooltip wrapper.
+   - `locked_action(reason, label, icon=none, extra_class=none)` — for
+     write affordances (buttons, create links). Renders the control
+     DISABLED inside a tooltip wrapper. `icon` prepends a `<i class="...">`,
+     `extra_class` appends to the button's default `"outline"` class.
      Safe to render: the server re-checks authz on submit.
 
    - `locked_field(reason)` — for withheld DATA values (full address).
      Renders a lock icon + fix link inside a tooltip wrapper. The caller
      never passes the real value — withholding is the VIEW layer's job.
 
-   - `locked_name(placeholder, fix_url)` — for withheld identity names
-     (clinician name, org name). Renders the placeholder as a link inside
-     a tooltip wrapper, so the viewer knows there's a real name and how to
-     unlock it.
+   - `locked_name(placeholder)` — for withheld identity names (clinician
+     name, org name). Always uses `REASON_NETWORK_UNVERIFIED`; derives
+     the fix URL from that reason internally. Renders the placeholder as
+     a link inside a tooltip wrapper.
 
    Tooltip text + fix link come from `capabilities.reason_meta(reason)`.
    `capabilities` is a Jinja global (registered in
    `src/domain/template_globals.py`), so these macros need no `with
    context`. Add or change reason copy in
    `src/domain/logic/capabilities.py` — never inline here. #}
-{% macro locked_action(reason, label) -%}
+{% macro locked_action(reason, label, icon=none, extra_class=none) -%}
   {%- set meta = capabilities.reason_meta(reason) -%}
+  {%- set _cls = "outline " ~ extra_class if extra_class else "outline" -%}
   <span data-tooltip="{{ meta.unlock }}">
-    <button type="button" class="outline" disabled aria-disabled="true">{{ label }}</button>
-  </span>
+    <button type="button" class="{{ _cls }}" disabled aria-disabled="true">
+      {%- if icon %}<i class="{{ icon }}" aria-hidden="true"></i>{% endif %}
+    {{ label }}
+  </button>
+</span>
 {%- endmacro %}
-{% macro locked_name(placeholder, fix_url) -%}
+{% macro locked_name(placeholder) -%}
   {%- set _meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED) -%}
   <span class="locked-field" data-tooltip="{{ _meta.unlock }}">
     <i class="icon-lock" aria-hidden="true"></i>
-    <a href="{{ fix_url }}">{{ placeholder }}</a>
+    <a href="{{ _meta.fix_url }}">{{ placeholder }}</a>
   </span>
 {%- endmacro %}
 {% macro locked_field(reason) -%}
