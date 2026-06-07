@@ -763,6 +763,19 @@ class WorktreeCommands:
         root_env = self.runner.project_root / ".env"
         if root_env.exists():
             shutil.copy(root_env, path / ".env")
+        # Register the parent branch so `git town sync` works non-interactively.
+        town_result = subprocess.run(
+            ["git", "town", "set-parent", "main"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if town_result.returncode != 0:
+            print(
+                "⚠️  git town set-parent main failed (git-town not installed?). "
+                "Run it manually so `git town sync` works."
+            )
         print(f"✅ Worktree ready: {path}")
         print(f"   Branch: {branch}")
         print(f"   App port: {app_port}  →  http://localhost:{app_port}")

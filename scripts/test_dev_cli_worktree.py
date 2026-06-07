@@ -8,9 +8,12 @@ contract we care about — there's nothing useful to mock here.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 from typing import List, Optional
+
+import pytest
 
 from scripts.dev_cli import WorktreeCommands
 
@@ -171,3 +174,23 @@ def test_gc_never_removes_the_main_checkout(tmp_path: Path) -> None:
     assert rc == 0
     assert (repo / ".git").exists()
     assert (repo / "pyproject.toml").exists()
+
+
+@pytest.mark.skipif(
+    shutil.which("git-town") is None,
+    reason="git-town not installed",
+)
+def test_add_sets_git_town_parent(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path)
+    # Give git-town the minimum config it needs to run non-interactively.
+    _git(repo, "config", "git-town.main-branch", "main")
+    cmd = WorktreeCommands(_FakeRunner(repo))
+    assert cmd.add("707", base="origin/main") == 0
+    result = subprocess.run(
+        ["git", "config", "git-town-branch.fix/707.parent"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.stdout.strip() == "main"
