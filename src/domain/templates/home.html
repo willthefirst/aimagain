@@ -43,12 +43,16 @@
       {% endif %}
     </section>
     <section>
-      <header class="home-section-header">
+      <header style="display: flex;
+                     justify-content: space-between;
+                     align-items: baseline">
         <h2>Recent in the network</h2>
         <a href="{{ entity_url('post') }}">See all</a>
       </header>
       {% if network_posts %}
-        <p class="home-network-blurb">
+        <p style="font-size: 0.875rem;
+                  color: var(--pico-muted-color);
+                  margin-bottom: 1rem">
           {# djlint:off #}
         Last 7 days, filtered to your saved searches and practice profile
         {%- if network_filter_chips %} — {{ network_filter_chips | join(" · ") }}{% endif %}.
@@ -62,7 +66,7 @@
            notice repeats it. #}
         {{ item_list(network_posts, post_feed_row, "network-posts-list", "post-feed-list") }}
       {% else %}
-        <p class="home-empty-msg">No activity in the last 7 days.</p>
+        <p style="color: var(--pico-muted-color)">No activity in the last 7 days.</p>
       {% endif %}
     </section>
   {% endblock %}
