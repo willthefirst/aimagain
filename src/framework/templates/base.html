@@ -190,5 +190,33 @@
         <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
       {% endblock %}
     </footer>
+    {# Locked-affordance CTA popovers. One <div popover> per reason, rendered
+       once here so every page has them. The locked-affordance JS below
+       dynamically anchors the active popover to whichever trigger was clicked
+       via CSS anchor positioning (`position-anchor` inline style). #}
+    {%- from "_shared/_locked.html" import locked_popovers -%}
+    {{ locked_popovers() }}
+    {# Locked-affordance JS. Uses event delegation so it works for any
+       [data-locked-cta] element added by the locked_* macros. Per click:
+       1. Assigns a fresh CSS anchor-name to the trigger element.
+       2. Points the corresponding popover's position-anchor at that name.
+       3. Opens the popover (showPopover handles closing any other open one). #}
+    <script>
+    ;(function () {
+      var seq = 0
+      document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('[data-locked-cta]')
+        if (!trigger) return
+        e.preventDefault()
+        var reason = trigger.dataset.lockedCta
+        var popover = document.getElementById('locked-cta-' + reason)
+        if (!popover) return
+        var anchorName = '--locked-' + (++seq)
+        trigger.style.anchorName = anchorName
+        popover.style.positionAnchor = anchorName
+        popover.showPopover()
+      })
+    }())
+    </script>
   </body>
 </html>
