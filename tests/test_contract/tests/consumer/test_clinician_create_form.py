@@ -55,23 +55,24 @@ async def test_consumer_clinician_create_form_submits(
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # `first_name`, `last_name`, `npi`, and `cost` are empty text
-    # inputs — the browser includes empty-valued text inputs in the
-    # form body. The `accepts_out_of_network` checkbox is pre-checked
-    # by the template (`current=true`); `sliding_scale` is not
-    # pre-checked. Both render via `checkbox_field`, which emits a
-    # sibling `<input type="hidden" value="false">` before each
-    # checkbox so default-true booleans round-trip — checked submits
-    # both `false` and `true` (last wins at the parser; see
-    # `src/framework/http/forms.py`), unchecked submits just `false`.
-    # The carrier multi-select is empty. `org_id` carries the
-    # Organization picked from the dropdown (#524); the stub server
-    # seeds one Org. The "Clinician" fieldset holds the person-level
-    # fields and renders first, so `first_name`, `last_name`, `npi`
-    # serialize ahead of `org_id`.
+    # `first_name` and `last_name` are required by `ClinicianCreate` —
+    # the template renders them with the HTML `required` attribute so the
+    # browser won't submit without values. The test fills them explicitly.
+    # `npi` and `cost` remain optional empty text inputs. The
+    # `accepts_out_of_network` checkbox is pre-checked by the template
+    # (`current=true`); `sliding_scale` is not pre-checked. Both render
+    # via `checkbox_field`, which emits a sibling `<input type="hidden"
+    # value="false">` before each checkbox so default-true booleans
+    # round-trip — checked submits both `false` and `true` (last wins at
+    # the parser; see `src/framework/http/forms.py`), unchecked submits
+    # just `false`. The carrier multi-select is empty. `org_id` carries the
+    # Organization picked from the dropdown (#524); the stub server seeds
+    # one Org. The "Clinician" fieldset holds the person-level fields and
+    # renders first, so `first_name`, `last_name`, `npi` serialize ahead
+    # of `org_id`.
     expected_request_body = (
-        "first_name="
-        "&last_name="
+        "first_name=Jane"
+        "&last_name=Doe"
         "&npi="
         "&org_id=66666666-6666-6666-6666-666666666666"
         "&location_city=Brooklyn"
@@ -111,6 +112,8 @@ async def test_consumer_clinician_create_form_submits(
     with pact:
         await page.goto(form_page_url)
         await page.wait_for_selector('select[name="org_id"]')
+        await page.locator('input[name="first_name"]').fill("Jane")
+        await page.locator('input[name="last_name"]').fill("Doe")
         await page.locator('select[name="org_id"]').select_option(
             "66666666-6666-6666-6666-666666666666"
         )

@@ -24,8 +24,8 @@
     {# Person-level fields (name, NPI) — these live on the Clinician row,
      so they follow the person across affiliations. #}
     {% call form_section("Clinician") %}
-      {{ text_field("first_name", "First name", current=clinician.first_name, required=false, maxlength=120) }}
-      {{ text_field("last_name", "Last name", current=clinician.last_name, required=false, maxlength=120) }}
+      {{ text_field("first_name", "First name", current=clinician.first_name, maxlength=120) }}
+      {{ text_field("last_name", "Last name", current=clinician.last_name, maxlength=120) }}
       {{ text_field("npi", "NPI", current=clinician.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
     {% call form_section("Practice location") %}

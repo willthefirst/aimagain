@@ -381,6 +381,10 @@ class MockDataFactory:
             owner_id=UUID("00000000-0000-0000-0000-000000000004"),
             created_at=now,
             updated_at=now,
+            # `first_name` and `last_name` are required (NOT NULL) on
+            # `ClinicianRead` after #1207.
+            first_name="Jane",
+            last_name="Doe",
             # `org_id` + `org_name` replace the former `practice_name`
             # (#524). `ClinicianRead.model_validate` reads `org_name` off
             # this stub via `from_attributes`.

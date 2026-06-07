@@ -83,6 +83,8 @@ async def test_repository_creates_and_fetches_affiliation(session):
     clinician = Clinician(
         owner_id=user_id,
         org_id=org_a_id,
+        first_name="Jane",
+        last_name="Smith",
         location_city="Brooklyn",
         location_state="NY",
         location_zip="11201",
