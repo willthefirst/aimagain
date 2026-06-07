@@ -1,0 +1,19 @@
+{% extends "views/form_edit.html" %}
+{%- from "_shared/sections.html" import fact -%}
+{% block resource_label %}Users{% endblock %}
+{% block current_label %}{{ target_user.username }}{% endblock %}
+{% block form_content %}
+  <section class="entity-facts">
+    <dl>
+      {{ fact('email', 'Email', target_user.email) }}
+    </dl>
+  </section>
+  {% if not target_user.is_verified %}
+    <aside role="alert" id="verify-banner">
+      <p>Your email address has not been verified. Check your inbox for the verification link, or request a new one.</p>
+      <button hx-post="/auth/resend-verify"
+              hx-target="#verify-banner"
+              hx-swap="outerHTML">Resend verification email</button>
+    </aside>
+  {% endif %}
+{% endblock %}
