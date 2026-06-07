@@ -1,47 +1,79 @@
 {# Consistent "you can't do/see this yet" affordances, driven by the
-   closed `capabilities.REASON_*` vocab. Three treatments:
+   closed `capabilities.REASON_*` vocab. Four trigger macros + one
+   popover-renderer:
 
-   - `locked_action(reason, label, icon=none, extra_class=none)` — for
-     write affordances (buttons, create links). Renders the control
-     DISABLED inside a tooltip wrapper. `icon` prepends a `<i class="...">`,
-     `extra_class` appends to the button's default `"outline"` class.
-     Safe to render: the server re-checks authz on submit.
+   Trigger macros (each renders a [data-locked-cta="{reason}"] element
+   that the locked-affordance JS uses to anchor and show the CTA card):
 
-   - `locked_field(reason)` — for withheld DATA values (full address).
-     Renders a lock icon + fix link inside a tooltip wrapper. The caller
-     never passes the real value — withholding is the VIEW layer's job.
+   - `locked_action(reason, label, extra_class=none)` — a write-affordance
+     button that LOOKS disabled (aria-disabled + muted opacity + not-allowed
+     cursor) but is still clickable to open the CTA popover. `extra_class`
+     appends to the default `"outline"` Pico class.
 
-   - `locked_name(placeholder)` — for withheld identity names (clinician
-     name, org name). Always uses `REASON_NETWORK_UNVERIFIED`; derives
-     the fix URL from that reason internally. Renders the placeholder as
-     a link inside a tooltip wrapper.
+   - `locked_link(reason, label)` — an inline navigation link that looks
+     disabled. Use in place of an `<a>` the user doesn't have access to yet.
 
-   Tooltip text + fix link come from `capabilities.reason_meta(reason)`.
-   `capabilities` is a Jinja global (registered in
-   `src/domain/template_globals.py`), so these macros need no `with
-   context`. Add or change reason copy in
-   `src/domain/logic/capabilities.py` — never inline here. #}
-{% macro locked_action(reason, label, icon=none, extra_class=none) -%}
-  {%- set meta = capabilities.reason_meta(reason) -%}
+   - `locked_name(placeholder)` — for withheld identity names (clinician /
+     org). Always uses REASON_NETWORK_UNVERIFIED. Renders as a muted italic
+     ghost button with a lock icon so the viewer knows a real name exists.
+
+   - `locked_field(reason)` — for withheld data values (address, contact).
+     Renders as a muted ghost button with a lock icon and redacted dots.
+
+   Popover macro (render once per page, e.g. in base.html):
+
+   - `locked_popovers()` — renders one <div popover> per known reason.
+     Content (title, unlock copy, fix link) comes from
+     `capabilities.reason_meta(reason)`. The JS in base.html dynamically
+     sets `position-anchor` on the right popover and calls showPopover().
+
+   Copy lives in `src/domain/logic/capabilities.py` — never inline here.
+   CSS lives in `src/framework/static/css/framework.css` under "Locked
+affordances". JS lives inline in `src/framework/templates/base.html`. #}
+{% macro locked_action(reason, label, extra_class=none) -%}
   {%- set _cls = "outline " ~ extra_class if extra_class else "outline" -%}
-  <span data-tooltip="{{ meta.unlock }}">
-    <button type="button" class="{{ _cls }}" disabled aria-disabled="true">
-      {%- if icon %}<i class="{{ icon }}" aria-hidden="true"></i>{% endif %}
+  <button type="button"
+          class="{{ _cls }}"
+          aria-disabled="true"
+          data-locked-cta="{{ reason }}">
+    <i class="icon-lock" aria-hidden="true"></i>
     {{ label }}
   </button>
-</span>
+{%- endmacro %}
+{% macro locked_link(reason, label) -%}
+  <a class="locked-link"
+     aria-disabled="true"
+     tabindex="0"
+     data-locked-cta="{{ reason }}">
+    <i class="icon-lock" aria-hidden="true"></i>
+    {{ label }}
+  </a>
 {%- endmacro %}
 {% macro locked_name(placeholder) -%}
-  {%- set _meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED) -%}
-  <span class="locked-field" data-tooltip="{{ _meta.unlock }}">
-    <i class="icon-lock" aria-hidden="true"></i>
-    <a href="{{ _meta.fix_url }}">{{ placeholder }}</a>
-  </span>
+  <button class="locked-ghost-btn"
+          data-locked-cta="{{ capabilities.REASON_NETWORK_UNVERIFIED }}">
+    <i class="icon-lock" aria-hidden="true"></i>{{ placeholder }}
+  </button>
 {%- endmacro %}
 {% macro locked_field(reason) -%}
-  {%- set meta = capabilities.reason_meta(reason) -%}
-  <span class="locked-field" data-tooltip="{{ meta.unlock }}">
-    <i class="icon-lock" aria-hidden="true"></i>
-    <a href="{{ meta.fix_url }}">{{ meta.fix_label }}</a>
-  </span>
+  <button class="locked-ghost-btn" data-locked-cta="{{ reason }}">
+    <i class="icon-lock" aria-hidden="true"></i><span class="locked-redacted" aria-hidden="true">••••••</span>
+  </button>
+{%- endmacro %}
+{% macro locked_popovers() -%}
+  {%- set _all = [
+    capabilities.REASON_EMAIL_UNVERIFIED,
+    capabilities.REASON_NETWORK_UNVERIFIED,
+    ] -%}
+  {%- for reason in _all -%}
+    {%- set meta = capabilities.reason_meta(reason) -%}
+    <div popover id="locked-cta-{{ reason }}" class="locked-cta">
+      <p>
+        <strong>{{ meta.title }}</strong>
+        <br>
+        <small>{{ meta.unlock }}</small>
+      </p>
+      <a href="{{ meta.fix_url }}" role="button" class="secondary">{{ meta.fix_label }}</a>
+    </div>
+  {%- endfor %}
 {%- endmacro %}

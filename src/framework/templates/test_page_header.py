@@ -46,6 +46,7 @@ def _make_env() -> Environment:
         loader=ChoiceLoader([stub_loader, framework_loader]),
         autoescape=select_autoescape(["html", "xml"]),
     )
+    from src.domain.logic import capabilities
     from src.framework.rendering.labels import (
         entity_create_label,
         entity_filter_label,
@@ -56,6 +57,7 @@ def _make_env() -> Environment:
     env.globals["entity_form_url"] = entity_form_url
     env.globals["entity_create_label"] = entity_create_label
     env.globals["entity_filter_label"] = entity_filter_label
+    env.globals["capabilities"] = capabilities
     return env
 
 
@@ -180,12 +182,11 @@ _BANNER_CTX: dict[str, object] = dict(
 
 
 def test_body_top_level_children_are_header_main_footer_only() -> None:
-    """The body scaffold emits exactly three top-level elements —
-    `<header>`, `<main>`, `<footer>`, the three rows of the body grid — and
-    nothing else. Pinned with the incomplete-profile banner SHOWING, which
-    is the case that would regress: the banner must be a child of `<main>`,
-    never a fourth top-level `<aside>` band. Checked across both generic
-    view types since every full page composes one of them via `base.html`."""
+    """The body scaffold emits `<header>`, `<main>`, `<footer>` as the three
+    layout rows (the body grid), followed by locked-CTA `<div popover>`
+    elements and an init `<script>` from `base.html`.  The banner must be a
+    child of `<main>`, never a fourth top-level band.  The locked-CTA popovers
+    and JS script are utility chrome intentionally placed after `<footer>`."""
     env = _make_env()
     _add_child(env, "liststub.html", _LIST_STUB)
     _add_child(env, "detailstub.html", _DETAIL_STUB)
@@ -194,7 +195,14 @@ def test_body_top_level_children_are_header_main_footer_only() -> None:
         # Banner temporarily disabled — assert absent and structure still holds.
         assert tree.css_first("#onboarding-banner") is None, name
         top_level = [n.tag for n in tree.css("body > *")]
-        assert top_level == ["header", "main", "footer"], f"{name}: {top_level}"
+        # Layout rows must be the first three children and in order.
+        assert top_level[:3] == ["header", "main", "footer"], f"{name}: {top_level}"
+        # Remaining children are only locked-CTA popovers and the init script.
+        assert all(
+            t in ("div", "script") for t in top_level[3:]
+        ), f"{name}: unexpected body tail elements: {top_level[3:]}"
+        for div in tree.css("body > div"):
+            assert "popover" in div.attributes, f"{name}: non-popover div in body"
 
 
 def test_onboarding_banner_is_first_child_of_main() -> None:

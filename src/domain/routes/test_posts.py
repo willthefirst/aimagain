@@ -541,7 +541,13 @@ async def test_list_has_no_inline_verify_notice_for_unverified(
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     assert "posts-verify-notice" not in response.text
-    assert "Get access" not in response.text
+    # No inline locked placeholder in the list body — locked affordances only
+    # appear in the toolbar (locked_action for Create) and globally in the
+    # locked-cta popovers rendered by base.html.
+    tree = HTMLParser(response.text)
+    main = tree.css_first("main")
+    assert main is not None
+    assert main.css_first("button.locked-ghost-btn") is None
 
 
 # --- Toolbar Create CTA gate (posting-capable claim) -------------------------
@@ -692,18 +698,13 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
         dd = tree.css_first(f'div[data-fact="{fact_key}"] dd')
         assert dd is not None, f"{fact_key} row should still render when redacted"
         assert (
-            dd.css_first("span.locked-field") is not None
+            dd.css_first("button.locked-ghost-btn") is not None
         ), f"{fact_key} should render a locked placeholder"
-        assert (
-            dd.css_first("a").attributes.get("href")
-            == "/users/me/access/capabilities/provider-network"
-        )
 
     # ...but the real navigable links + the address value are withheld.
     assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is None
     assert tree.css_first(f"a[href='/organizations/{org_id}']") is None
     assert "Springfield, IL" not in response.text
-    assert "Get access" in response.text
 
 
 async def test_detail_shows_identity_rows_for_verified_viewer(
@@ -735,4 +736,4 @@ async def test_detail_shows_identity_rows_for_verified_viewer(
 
     assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
     assert "Springfield, IL" in response.text
-    assert tree.css_first("span.locked-field") is None
+    assert tree.css_first("button.locked-ghost-btn") is None
