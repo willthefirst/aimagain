@@ -622,28 +622,71 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
 }
-/* Locked affordances rendered by `_shared/_locked.html`. A gated *action*
-   stays visible but disabled, stacked above a muted unlock line; a gated
-   *field* renders a muted italic placeholder where the withheld value
-   would be. Both carry an `icon-lock` glyph and a deep-link to the fix.
-   See the macro header for the action-vs-field contract. */
-.locked-action {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.locked-action button[disabled] {
-  width: auto;
+/* Locked affordances rendered by `_shared/_locked.html`.
+   Four trigger shapes + one CTA popover card:
+
+   locked_action   — button, aria-disabled, not-allowed cursor
+   locked_link     — anchor, aria-disabled, not-allowed cursor
+   locked_name     — ghost button, muted italic inline text + lock icon
+   locked_field    — ghost button, muted lock icon + redacted dots
+
+   The CTA popover (.locked-cta) is a native <div popover> positioned via
+   CSS anchor positioning. JS (base.html) sets `position-anchor` and
+   `anchor-name` dynamically on each click so the card appears near the
+   element that was triggered. position-try-fallbacks keeps it on-screen
+   when the trigger is near an edge. */
+
+/* CTA popover card — anchor positioning is the only non-Pico CSS here.
+   Typography, spacing, and color inherit from Pico via <p>, <small>,
+   <strong>, and <a role="button"> semantics in the popover HTML. */
+.locked-cta[popover] {
+  inset: unset;
   margin: 0;
+  margin-bottom: var(--pico-spacing);
+  position: fixed;
+  position-area: top center;
+  position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  position-visibility: anchors-visible;
+  max-width: 260px;
+  width: max-content;
+  padding: var(--pico-spacing);
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+.locked-cta p { margin-bottom: calc(var(--pico-spacing) * 0.5); }
+.locked-cta a[role="button"] { width: 100%; }
+
+/* Disabled-looking action buttons and links */
+button[aria-disabled="true"],
+a.locked-link[aria-disabled="true"] {
+  opacity: 0.5;
   cursor: not-allowed;
 }
-.locked-reason {
-  color: var(--pico-muted-color);
-  font-size: 0.875rem;
-}
-.locked-field {
+
+/* Ghost button for inline locked names and fields */
+.locked-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
   color: var(--pico-muted-color);
   font-style: italic;
+  cursor: pointer;
+  text-decoration: none;
+}
+.locked-ghost-btn .icon-lock {
+  font-style: normal;
+}
+
+/* Redacted content placeholder (used by locked_field) */
+.locked-redacted {
+  letter-spacing: 0.1em;
 }
 /* Pagination nav — centered horizontally, Lucide chevrons for prev/next.
    Pico renders `nav` as a flex container; `justify-content: center` centers
