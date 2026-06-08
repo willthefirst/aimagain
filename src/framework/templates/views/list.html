@@ -14,21 +14,22 @@ present; templates that need a custom chain override the block as before.
 
 Toolbar row contents (left-to-right):
   - `<h1>` heading (resource_label)
-  - filter link (when `routes.search` is opted in)
+  - filter link (when `routes.search` is opted in and no inline sidebar)
   - action `<menu>` (Create, Export, ...)
+
+Browse layout: when the entity spec declares `filters=(…)`, the
+`handle_list` handler injects a non-empty `filters` tuple into the
+context. `{% block content %}` detects this and wraps `{% block list_body %}`
+in a two-column `.browse-layout` (220px sidebar + flexible results). The
+sidebar embeds the filter form inline so viewers never leave the list to
+filter; the toolbar filter link is suppressed because the sidebar header
+carries that role instead. Entities with no declared filters render
+`list_body` full-width without any sidebar.
 
 Child contract:
 
   Required blocks:
-    resource_label — short string label for the toolbar `<h1>`.
-                     Plain text, no markup. Defaults to
-                     `spec.url_collection.capitalize()` injected by
-                     `handle_list` — most child templates omit this
-                     block entirely. Override when the page label
-                     differs from the collection name (e.g. a custom
-                     subresource heading), or suppress with an empty
-                     block to hide the h1.
-    content        — the list body. Use the `item_list` macro from
+    list_body      — the list body. Use the `item_list` macro from
                      `_shared/_item_list.html` — it wraps items in
                      `<section>/<ul>/<li>`, handles the empty state,
                      and renders pagination. Pass a single-arg row
@@ -37,6 +38,14 @@ Child contract:
                      extra args (see `posts/list.html`).
 
   Optional blocks:
+    resource_label — short string label for the toolbar `<h1>`.
+                     Plain text, no markup. Defaults to
+                     `spec.url_collection.capitalize()` injected by
+                     `handle_list` — most child templates omit this
+                     block entirely. Override when the page label
+                     differs from the collection name (e.g. a custom
+                     subresource heading), or suppress with an empty
+                     block to hide the h1.
     actions        — toolbar action `<menu>` content (Create
                      button, Export link). Each action is a
                      `<li>` because the menu is
@@ -47,10 +56,17 @@ Child contract:
                      a label computed from multiple context variables).
                      Top-level list pages don't need this — they have
                      no `_breadcrumb_items` and the block renders nothing.
+    after_content  — content rendered after the list body (outside the
+                     browse-layout wrapper). Empty by default.
+    content        — override the entire list body area, including the
+                     browse-layout wrapper. Override only when the page
+                     structure departs fundamentally from the two-column
+                     pattern (rare); prefer `list_body` in all normal cases.
 
   Context the framework's `handle_list` injects (children don't set
   these by hand):
-    active_filters, search_url, resource_label, pager.
+    active_filters, search_url, resource_label, pager, filters,
+    filter_values, active_filter_count, filter_heading.
 
   Context the framework's mount helpers inject for subresource pages:
     _breadcrumb_items — list of (label, href|None) tuples; the last
@@ -62,6 +78,7 @@ Child contract:
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/_filter_field.html" import filter_field -%}
 {% block breadcrumb %}
   {%- if _breadcrumb_items is defined %}{{ breadcrumb(_breadcrumb_items) }}{%- endif %}
   {% endblock %}
@@ -73,17 +90,50 @@ Child contract:
       {% block actions %}{% endblock %}
     {% endset -%}
     {%- set has_search = search_url is defined and search_url -%}
+    {%- set _has_filters = filters is defined and filters -%}
     {# `filter_heading` is `entity_filter_label(spec.name)` from `handle_list`
    (set only when `routes.search` is opted in). When absent, the toolbar
-   macro falls back to its default ``"Filters"`` label. #}
+   macro falls back to its default ``"Filters"`` label. Suppress the toolbar
+   filter link when the browse layout is active — the sidebar takes that role. #}
     {% call page_toolbar(
       heading=label | trim,
       active_filters=active_filters|default([]),
-      search_url=search_url if has_search else none,
+      search_url=search_url if (has_search and not _has_filters) else none,
       filter_label=filter_heading or "Filters"
       ) %}
       {{ actions_body }}
     {% endcall %}
   {% endblock %}
-  {% block content %}{% endblock %}
-  {% block after_content %}{% endblock %}
+  {% block content %}
+    {%- set _has_filters = filters is defined and filters -%}
+    {%- if _has_filters %}
+      <div class="browse-layout">
+        <aside class="filter-sidebar">
+          {%- if search_url is defined and search_url %}
+            <hgroup>
+              <a href="{{ search_url }}">{{ filter_heading or "Filters" }}
+                {% if active_filter_count is defined and active_filter_count %}({{ active_filter_count }}){% endif %}
+              </a>
+            </hgroup>
+          {%- endif %}
+          <form method="get" action="{{ request.url.path }}" class="filter-form">
+            {%- for f in filters %}{{ filter_field(f, filter_values.get(f.name) ) }}{%- endfor %}
+              <menu>
+                <li>
+                  <button type="submit">Apply filters</button>
+                </li>
+                <li>
+                  <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear all</a>
+                </li>
+              </menu>
+            </form>
+          </aside>
+          <div class="browse-results">
+          {%- endif %}
+          {% block list_body %}{% endblock %}
+          {%- if _has_filters %}
+          </div>
+        </div>
+      {%- endif %}
+    {% endblock %}
+    {% block after_content %}{% endblock %}

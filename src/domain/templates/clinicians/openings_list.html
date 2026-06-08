@@ -4,7 +4,7 @@
 {# Owner-scoped projection over /posts — this clinician's openings.
    Breadcrumb auto-injected by mount_related_list via CLINICIAN_ENTITY.display_label_fn. #}
 {% block resource_label %}{% endblock %}
-{% block content %}
+{% block list_body %}
   {%- set _empty %}{{ post_feed_empty("No openings posted for this clinician yet.") }}{%- endset %}
     {{ item_list(posts, post_feed_row, "clinician-openings-list", "post-feed-list",
         empty=_empty,

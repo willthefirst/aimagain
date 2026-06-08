@@ -1,0 +1,82 @@
+{# filter_field — renders one declared Filter as an inline form control.
+   Shared by `views/list.html` (browse sidebar) and `views/search.html`
+   (full-page search). Both surfaces drive from the same Filter spec objects
+   so the control shape (checkbox group, select, text input) stays in sync
+   automatically as filter declarations change.
+
+   Args:
+     f     — a Filter instance (ChoiceFilter, TextFilter, FlagFilter)
+     value — the currently-active value for this filter (string, list, or None)
+#}
+{% macro filter_field(f, value) -%}
+  {%- if f.kind == "flag" -%}
+    <label>
+      <input type="checkbox"
+             name="{{ f.name }}"
+             value="1"
+             {% if value %}checked{% endif %} />
+      {{ f.label_checked or f.display_label }}
+    </label>
+  {%- elif f.kind == "text" -%}
+    <label>
+      {{ f.display_label }}
+      <input type="search"
+             name="{{ f.name }}"
+             value="{{ value or '' }}"
+             {% if f.placeholder %}placeholder="{{ f.placeholder }}"{% endif %} />
+    </label>
+  {%- elif f.kind == "choice" -%}
+    {%- if f.multi -%}
+      {%- set selected = value or [] -%}
+      {# Long choice sets (US states, license-type lists) get a multi-column
+     grid on desktop so the form doesn't become absurdly tall. The
+     threshold (>12) keeps short multi-selects — Age groups, Languages —
+     as a single column where each option already reads cleanly. #}
+      {%- set grid_class = " search-checkbox-grid" if f.choices|length > 12 else "" -%}
+      <fieldset class="search-checkbox-fieldset{{ grid_class }}">
+        <legend>{{ f.display_label }}</legend>
+        {%- for v, l in f.choices %}
+          <label>
+            <input type="checkbox"
+                   name="{{ f.name }}"
+                   value="{{ v }}"
+                   {% if v in selected %}checked{% endif %} />
+            {{ l }}
+          </label>
+        {%- endfor %}
+      </fieldset>
+    {%- elif f.radio -%}
+      <fieldset class="toggle-radio">
+        <legend>{{ f.display_label }}</legend>
+        <div role="group">
+          <label>
+            <input type="radio"
+                   name="{{ f.name }}"
+                   value=""
+                   {% if not value %}checked{% endif %} />
+            Any
+          </label>
+          {%- for v, l in f.choices %}
+            <label>
+              <input type="radio"
+                     name="{{ f.name }}"
+                     value="{{ v }}"
+                     {% if value == v %}checked{% endif %} />
+              {{ l }}
+            </label>
+          {%- endfor %}
+        </div>
+      </fieldset>
+    {%- else -%}
+      <label>
+        {{ f.display_label }}
+        <select name="{{ f.name }}">
+          <option value=""{% if not value %} selected{% endif %}>Any</option>
+          {%- for v, l in f.choices %}
+            <option value="{{ v }}"{% if value == v %} selected{% endif %}>{{ l }}</option>
+          {%- endfor %}
+        </select>
+      </label>
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}

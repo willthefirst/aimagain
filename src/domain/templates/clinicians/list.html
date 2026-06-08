@@ -8,7 +8,7 @@
     </li>
   {% endif %}
 {% endblock %}
-{% block content %}
+{% block list_body %}
   {{ item_list(clinicians, clinician_card, "clinicians-list",
     empty_msg="No clinicians found.",
     pager=pager) }}

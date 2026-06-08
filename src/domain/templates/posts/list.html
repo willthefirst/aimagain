@@ -1,45 +1,25 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
-{%- from "posts/_shared/_filter_form.html" import filter_form -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_locked.html" import locked_action -%}
-{% block resource_label %}Posts{% endblock %}
-{% block toolbar %}
-  {% call page_toolbar(heading="Posts") %}
-    {% if can_access_network %}
-      <li>
-        <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
-      </li>
-    {% else %}
-      <li>{{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, entity_create_label("post") ) }}</li>
-    {% endif %}
-  {% endcall %}
+{% block actions %}
+  {% if can_access_network %}
+    <li>
+      <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
+    </li>
+  {% else %}
+    <li>{{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, entity_create_label("post") ) }}</li>
+  {% endif %}
 {% endblock %}
-{% block actions %}{% endblock %}
-{% block content %}
-  {%- set _list_url = entity_url("post") -%}
+{% block list_body %}
+  {#- Poster names / contact are anonymized server-side via
+      `can_access_network`. The chrome `#onboarding-banner` (base.html)
+      is the single place explaining verification unlocks the full view —
+      no per-list notice repeats it. -#}
   {%- set _empty %}{{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
     link_href=entity_url("post") if active_filter_count else none
     ) }}{%- endset %}
-    {# Poster names / contact are anonymized server-side via
-       `can_access_network`. The chrome `#onboarding-banner` (base.html)
-       is the single place explaining verification unlocks the full view —
-       no per-list notice repeats it. #}
-    <div class="posts-browse-layout">
-      <aside class="posts-filter-sidebar">
-        <hgroup>
-          <a href="{{ entity_url("post") }}/search">Filters
-            {% if active_filter_count %}({{ active_filter_count }}){% endif %}
-          </a>
-        </hgroup>
-        <div class="posts-filter-form">{{ filter_form(_list_url, filter_values) }}</div>
-      </aside>
-      <div class="posts-results">
-        {{ item_list(posts, post_feed_row, "posts-list", "post-feed-list",
-                empty=_empty,
-                pager=pager) }}
-      </div>
-    </div>
+    {{ item_list(posts, post_feed_row, "posts-list", "post-feed-list",
+        empty=_empty,
+        pager=pager) }}
   {% endblock %}
-  {% block after_content %}{% endblock %}
