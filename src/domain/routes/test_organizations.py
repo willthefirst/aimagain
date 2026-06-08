@@ -296,48 +296,6 @@ async def test_get_organizations_form_resolves(
     assert response.status_code == 200
 
 
-# --- Type picker (issue #704) -------------------------------------------
-
-
-async def test_get_organizations_form_no_type_shows_picker(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """``GET /organizations/form`` (no ``?type=``) shows the type-picker,
-    not the create form.  Each card links to ``?type=<value>``."""
-    response = await authenticated_client.get("/organizations/form")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    # Picker links: one per org type.
-    hrefs = {a.attributes.get("href") for a in tree.css("a[href*='?type=']")}
-    assert "/organizations/form?type=solo_practice" in hrefs
-    assert "/organizations/form?type=group_practice" in hrefs
-    assert "/organizations/form?type=clinic" in hrefs
-    assert "/organizations/form?type=health_system" in hrefs
-    assert "/organizations/form?type=other" in hrefs
-    # No org create form — the picker should not render it.
-    assert tree.css_first('form[hx-post="/organizations"]') is None
-
-
-async def test_get_organizations_form_with_type_shows_form(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """``GET /organizations/form?type=solo_practice`` skips the picker and
-    renders the create form with the Type field pre-selected."""
-    response = await authenticated_client.get("/organizations/form?type=solo_practice")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    # Form is rendered.
-    assert tree.css_first("form") is not None
-    # Type dropdown pre-selects solo_practice.
-    selected = tree.css_first('select[name="type"] option[selected]')
-    assert selected is not None
-    assert selected.attributes.get("value") == "solo_practice"
-    # Parent-org picker present.
-    assert tree.css_first('select[name="parent_org_id"]') is not None
-
-
 # --- Parent-Org picker (issue #581) --------------------------------------
 
 
@@ -363,8 +321,6 @@ async def test_form_new_renders_parent_org_select_with_root_option(
     name="parent_org_id">`` with a "(no parent)" default option plus
     one ``<option>`` per Org visible to the requesting user.
 
-    ``?type=solo_practice`` is required to bypass the type-picker and
-    render the create form (issue #704).
     """
     mine_a = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine A"
@@ -373,7 +329,7 @@ async def test_form_new_renders_parent_org_select_with_root_option(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine B"
     )
 
-    response = await authenticated_client.get("/organizations/form?type=solo_practice")
+    response = await authenticated_client.get("/organizations/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     select = tree.css_first('select[name="parent_org_id"]')
@@ -400,8 +356,6 @@ async def test_form_new_scopes_to_owned_orgs(
 ):
     """Non-superusers see only Orgs they own in the picker — same scope
     as the Clinician/Program form pickers (see ``_orgs_visible_to``).
-
-    ``?type=solo_practice`` bypasses the type-picker (issue #704).
     """
     mine = await _seed_org(
         db_test_session_manager, owner_id=logged_in_user.id, name="Mine"
@@ -414,7 +368,7 @@ async def test_form_new_scopes_to_owned_orgs(
         db_test_session_manager, owner_id=other.id, name="Other's"
     )
 
-    response = await authenticated_client.get("/organizations/form?type=solo_practice")
+    response = await authenticated_client.get("/organizations/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     values = {

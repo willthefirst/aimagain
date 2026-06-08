@@ -3,9 +3,7 @@
 
    Rendered in two contexts:
 
-   1. Included by `organizations/form_new.html` when the user has
-      passed `?type=<value>` (the type-picker has been resolved to a
-      specific organization type and the form should appear).
+   1. Included by `organizations/form_new.html`.
    2. Standalone by `mount_create._render_form_with_errors` on a
       validation-failure re-render. The path-derivation convention
       (`<dir>/_<name>_fragment.html`) requires this file's name.
