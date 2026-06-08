@@ -242,10 +242,19 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     logged_in_user: User,
 ):
     """User detail uses the consolidated chrome: a back affordance that
-    links to `/users` (the deepest clickable parent) and a toolbar
-    `<h1>` that carries the current user's name. The current item is
-    NOT repeated in the breadcrumb — every visible breadcrumb element
-    is an actionable link (GOV.UK pattern)."""
+    points back at the `/users` collection, and a toolbar `<h1>` that
+    carries the current user's name. The current item is NOT repeated
+    in the breadcrumb — every visible breadcrumb element is an actionable
+    link (GOV.UK pattern).
+
+    `logged_in_user` is email-verified but holds neither a verified
+    clinician profile nor a verified org rep, so they fail the user
+    spec's `read_policy.can_read` (provider-network gate). The back
+    affordance therefore renders as a locked popover-trigger
+    (`data-locked-cta=network_unverified`, no `href`) rather than a
+    plain `<a href="/users">` — clicking it would otherwise land on a
+    403. See `ReadPolicy.lock_reason` and `_shared/_breadcrumb.html`.
+    """
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
     async with db_test_session_manager() as session:
@@ -257,9 +266,12 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     tree = HTMLParser(response.text)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
     assert back is not None
-    assert back.attributes.get("href") == "/users"
     label = back.css_first("span.breadcrumb-back-label")
     assert label is not None and label.text(strip=True) == "Users"
+    # Locked: no href, data-locked-cta wired to the network reason.
+    assert "href" not in back.attributes
+    assert back.attributes.get("aria-disabled") == "true"
+    assert back.attributes.get("data-locked-cta") == "network_unverified"
     # Current item lives in the toolbar <h1>, not the breadcrumb.
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None

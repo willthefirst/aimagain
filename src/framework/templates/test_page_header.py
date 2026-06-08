@@ -51,10 +51,15 @@ def _make_env() -> Environment:
         entity_create_label,
         entity_filter_label,
     )
-    from src.framework.rendering.route_urls import entity_form_url, entity_url
+    from src.framework.rendering.route_urls import (
+        entity_form_url,
+        entity_lock_reason,
+        entity_url,
+    )
 
     env.globals["entity_url"] = entity_url
     env.globals["entity_form_url"] = entity_form_url
+    env.globals["entity_lock_reason"] = entity_lock_reason
     env.globals["entity_create_label"] = entity_create_label
     env.globals["entity_filter_label"] = entity_filter_label
     env.globals["capabilities"] = capabilities

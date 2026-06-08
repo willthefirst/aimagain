@@ -58,7 +58,11 @@ Child contract:
   {%- set collection_label %}
     {% block resource_label %}{% endblock %}
   {% endset -%}
-  {{ breadcrumb([(collection_label | trim, resource_url) ]) }}
+  {# Third tuple element is the REASON_* code (or none). `entity_lock_reason`
+     returns the spec's lock_reason when the viewer fails `read_policy.can_read`,
+     so the back affordance auto-locks for non-network viewers — e.g. the
+     `< Users` link on `/users/me` becomes a popover instead of a 403. #}
+  {{ breadcrumb([(collection_label | trim, resource_url, entity_lock_reason(entity_name) )]) }}
 {% endblock %}
 {% block toolbar %}
   {%- set current %}

@@ -10,7 +10,12 @@ import uuid
 
 import pytest
 
-from src.framework.rendering.route_urls import entity_form_url, entity_url
+from src.domain.logic import capabilities
+from src.framework.rendering.route_urls import (
+    entity_form_url,
+    entity_lock_reason,
+    entity_url,
+)
 
 # --- entity_url --------------------------------------------------------
 
@@ -129,3 +134,59 @@ def test_entity_form_url_edit_form_for_user():
 def test_entity_form_url_unknown_entity_raises():
     with pytest.raises(ValueError):
         entity_form_url("clinician_licensure_typo")
+
+
+# --- entity_lock_reason ------------------------------------------------
+
+
+class _Unverified:
+    """Stand-in viewer that fails `can_access_network` — email unverified
+    short-circuits the predicate, no need to construct a real ORM user."""
+
+    is_verified = False
+    is_superuser = False
+    clinicians = ()
+    org_representations = ()
+
+
+class _Verified:
+    """Stand-in viewer with a verified clinician profile — passes the
+    network gate without constructing a real ORM user."""
+
+    is_verified = True
+    is_superuser = False
+    org_representations = ()
+
+    class _Cln:
+        clinician_verified = True
+
+    clinicians = (_Cln(),)
+
+
+def test_entity_lock_reason_returns_reason_when_viewer_locked_out():
+    """`user`'s spec declares `lock_reason=REASON_NETWORK_UNVERIFIED`;
+    an unverified viewer fails `can_access_network`, so the helper hands
+    back the reason code so `entity_link` can render a popover trigger."""
+    assert (
+        entity_lock_reason("user", _Unverified())
+        == capabilities.REASON_NETWORK_UNVERIFIED
+    )
+
+
+def test_entity_lock_reason_none_when_viewer_passes_gate():
+    """A network-verified viewer passes `can_read` — the helper returns
+    `None` so `entity_link` renders the plain `<a>` branch."""
+    assert entity_lock_reason("user", _Verified()) is None
+
+
+def test_entity_lock_reason_none_for_entity_without_read_policy():
+    """`organization` declares no `read_policy` — listing is open, so
+    there's no lock affordance to render regardless of viewer."""
+    assert entity_lock_reason("organization", _Unverified()) is None
+
+
+def test_entity_lock_reason_unknown_entity_raises():
+    """Same fail-loud contract as `entity_url` — typo in a template
+    name surfaces as a render-time error rather than a silent bypass."""
+    with pytest.raises(ValueError, match="Unknown entity name"):
+        entity_lock_reason("clinician_licensure_typo", _Unverified())

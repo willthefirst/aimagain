@@ -219,3 +219,27 @@ async def test_list_my_favorites_renders_breadcrumb(
     assert back.attributes.get("href") == "/users/me"
     label = back.css_first("span.breadcrumb-back-label")
     assert label is not None and label.text(strip=True) == logged_in_user.username
+
+
+async def test_empty_favorites_browse_clinicians_link_locks_when_no_network_access(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Empty-state copy on `/users/me/favorites` reads "Browse clinicians
+    to add some" and points at `/clinicians`. The clinician spec gates
+    its list via `read_policy.assert_can_access_network`, so for a viewer
+    who lacks network access the link would 403. `entity_link` swaps it
+    for the locked popover trigger instead — same DOM contract as the
+    breadcrumb-back fix on `/users/me`. `logged_in_user` is email-verified
+    but holds no clinician/org-rep claim, so we expect the locked branch."""
+    response = await authenticated_client.get("/users/me/favorites")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    empty = tree.css_first("#favorites-empty")
+    assert empty is not None, "expected empty-state to render for fresh user"
+    # The "Browse clinicians" link is now a locked-link, not a plain `<a>`.
+    locked = empty.css_first("a.locked-link")
+    assert locked is not None, "Browse clinicians must lock for non-network viewer"
+    assert locked.attributes.get("data-locked-cta") == "network_unverified"
+    assert "href" not in locked.attributes
+    assert "Browse clinicians" in locked.text()
