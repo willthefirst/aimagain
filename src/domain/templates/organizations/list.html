@@ -14,17 +14,13 @@
     headline=org.name) -%}
     <section class="entity-facts">
       <dl>
-        {{ fact('type', 'Type', ORGANIZATION_TYPES_LABELS[org.type]) }}
-        {%- if org.parent_org_id %}
-          {%- call fact('parent', 'Parent') %}<a href="{{ entity_url('organization', id=org.parent_org_id) }}">View parent</a>
-        {% endcall %}
-      {%- endif %}
-    </dl>
-  </section>
-{%- endcall %}
-{%- endmacro %}
-{% block list_body %}
-  {{ item_list(organizations, org_card, "organizations-list",
-    empty_msg="No organizations found.",
-    pager=pager) }}
-{% endblock %}
+        {%- if org.npi %}{{ fact('npi', 'NPI', org.npi) }}{%- endif %}
+        </dl>
+      </section>
+    {%- endcall %}
+  {%- endmacro %}
+  {% block list_body %}
+    {{ item_list(organizations, org_card, "organizations-list",
+        empty_msg="No organizations found.",
+        pager=pager) }}
+  {% endblock %}

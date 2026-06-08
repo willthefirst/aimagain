@@ -17,10 +17,6 @@ from src.auth_config import current_active_user, current_admin_user
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.clinicians.schema import ClinicianCreate
 from src.domain.logic.programs.schema import ProgramCreate
-from src.domain.models.enums import (
-    ORGANIZATION_TYPES,
-    ORGANIZATION_TYPES_LABELS,
-)
 from src.domain.routes import auth_pages
 from src.framework import APIResponse
 
@@ -290,10 +286,7 @@ def _setup_clinician_edit_form_stub(app: FastAPI) -> None:
 def _setup_organization_create_form_stub(app: FastAPI) -> None:
     """Mount a stub page that renders the real `organizations/form_new.html`
     template, so the create-form's HTMX submit is exercised without a
-    database. The template reads `ORGANIZATION_TYPES` /
-    `ORGANIZATION_TYPES_LABELS` directly from context (the production
-    path injects them from `ORGANIZATION_ENTITY.static_context`), so the
-    stub does the same."""
+    database. The minimal create form only needs `current_user`."""
 
     class _StubAttrs:
         def __init__(self, **kwargs):
@@ -308,16 +301,7 @@ def _setup_organization_create_form_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="organizations/form_new.html",
-            context={
-                "current_user": current_user,
-                "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
-                "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,
-                # The `?type=` picker bypasses this stub's no-db path;
-                # when `?type=` is set the form branch renders
-                # `parent_org_options`. Empty list = no parent choices,
-                # which is the correct stub default (no db).
-                "parent_org_options": [],
-            },
+            context={"current_user": current_user},
             request=request,
         )
 

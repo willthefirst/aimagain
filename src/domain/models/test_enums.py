@@ -79,13 +79,6 @@ MIGRATED_VALUES = {
         "self_pay",
         "please_contact",
     ),
-    e.OrganizationType: (
-        "solo_practice",
-        "group_practice",
-        "clinic",
-        "health_system",
-        "other",
-    ),
     e.LicenseType: (
         "lcsw",
         "lpc",
@@ -188,8 +181,6 @@ ALIAS_BINDINGS = [
     (e.TREATMENT_MODALITY_LABELS, e.TreatmentModality, "labels"),
     (e.INSURANCE_POSTURES, e.InsurancePosture, "values"),
     (e.INSURANCE_POSTURE_LABELS, e.InsurancePosture, "labels"),
-    (e.ORGANIZATION_TYPES, e.OrganizationType, "values"),
-    (e.ORGANIZATION_TYPES_LABELS, e.OrganizationType, "labels"),
     (e.LICENSE_TYPES, e.LicenseType, "values"),
     (e.LICENSE_TYPES_LABELS, e.LicenseType, "labels"),
     (e.EDUCATION_TYPES, e.EducationType, "values"),

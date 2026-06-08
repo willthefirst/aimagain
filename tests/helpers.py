@@ -247,6 +247,15 @@ _CLINICIAN_DEFAULTS: dict[str, Any] = {
     "cost": None,
 }
 
+# Minimal wire payload — what `POST /clinicians` accepts. Affiliation,
+# location, availability, and insurance fields live on `ClinicianAffiliation`
+# and are added via the affiliation sub-resource after create.
+_CLINICIAN_CREATE_WIRE_DEFAULTS: dict[str, Any] = {
+    "first_name": "Jane",
+    "last_name": "Smith",
+    "npi": "1234567890",
+}
+
 _CLINICIAN_LICENSURE_DEFAULTS: dict[str, Any] = {
     "license_type": "lcsw",
     "license_number": "L-12345",
@@ -277,14 +286,11 @@ def _drop_none(d: dict[str, Any]) -> dict[str, Any]:
 
 
 def clinician_payload(**overrides: Any) -> dict[str, Any]:
-    """Build a wire-valid `POST /clinicians` form-encoded payload.
-    Returns a fresh flat dict each call. Sub-entity arrays are intentionally
-    omitted — credentials are added via the dedicated sub-resource endpoints.
-
-    ``org_id`` is required on the wire. Callers that hit a real DB must
-    pass an existing Organization's id; pure schema-validation tests that
-    don't persist can pass any UUID."""
-    return _drop_none({**_CLINICIAN_DEFAULTS, **overrides})
+    """Build a wire-valid `POST /clinicians` form-encoded payload —
+    first / last / NPI only. Returns a fresh flat dict each call.
+    Affiliation, location, availability, insurance, and credentials are
+    added after create via their dedicated sub-resource endpoints."""
+    return _drop_none({**_CLINICIAN_CREATE_WIRE_DEFAULTS, **overrides})
 
 
 def licensure_payload(**overrides: Any) -> dict[str, Any]:
@@ -333,24 +339,16 @@ def make_organization_row(
     *,
     owner_id: UUID,
     name: str = "Acme Health",
-    type_: str = "solo_practice",
     org_id: UUID | None = None,
 ) -> Organization:
-    """Build a root ``Organization`` ORM row that satisfies the
-    ``root_org_id`` invariant (root: ``root_org_id = id``,
-    ``parent_org_id = NULL``).
-
-    Assigns ``id`` eagerly so callers can pass ``org.id`` straight into
-    a sibling ``make_clinician`` without an intermediate flush — mirrors
-    the eager assignment ``OrganizationRepository.create`` does."""
-    obj = Organization(
+    """Build an ``Organization`` ORM row. Assigns ``id`` eagerly so
+    callers can pass ``org.id`` straight into a sibling
+    ``make_clinician`` without an intermediate flush."""
+    return Organization(
         id=org_id or uuid.uuid4(),
         name=name,
-        type=type_,
         owner_id=owner_id,
     )
-    obj.root_org_id = obj.id
-    return obj
 
 
 def make_clinician_with_org(

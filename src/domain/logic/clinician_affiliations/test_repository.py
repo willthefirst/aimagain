@@ -66,18 +66,12 @@ async def test_repository_creates_and_fetches_affiliation(session):
     org_a = Organization(
         id=org_a_id,
         name="Acme",
-        type="solo_practice",
-        parent_org_id=None,
-        root_org_id=org_a_id,
         owner_id=user_id,
     )
     org_b_id = uuid.uuid4()
     org_b = Organization(
         id=org_b_id,
         name="Beta",
-        type="solo_practice",
-        parent_org_id=None,
-        root_org_id=org_b_id,
         owner_id=user_id,
     )
     clinician = Clinician(

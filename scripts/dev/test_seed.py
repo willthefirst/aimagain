@@ -39,7 +39,6 @@ from scripts.dev.seed import seed_all
 from scripts.dev.seed.check_registry import CHECK_VALUES
 from src.domain.models import (
     ClinicianAffiliation,
-    Organization,
     metadata,
 )
 from tests.fixtures import async_test_sessionmaker, test_engine
@@ -185,19 +184,6 @@ async def test_nullable_columns_have_both_null_and_populated(seeded_db):
             elif populated == 0:
                 misses.append(f"  {table.name}.{column.name}: every row is NULL")
     assert not misses, "Nullable-coverage gaps:\n" + "\n".join(misses)
-
-
-async def test_organization_hierarchy_present(seeded_db):
-    """At least 2 orgs are child rows (parent_org_id IS NOT NULL),
-    exercising the self-referential tree."""
-    async with async_test_sessionmaker() as session:
-        result = await session.execute(
-            select(func.count())
-            .select_from(Organization)
-            .where(Organization.parent_org_id.is_not(None))
-        )
-        child_count = result.scalar_one()
-    assert child_count >= 2, f"Expected ≥2 child organizations, got {child_count}"
 
 
 async def test_multi_affiliation_clinician_present(seeded_db):

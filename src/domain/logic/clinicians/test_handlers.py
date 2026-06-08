@@ -20,10 +20,7 @@ from src.domain.logic.clinicians.handlers import (
 )
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.clinicians.schema import (
-    ClinicianCertificationCreate,
     ClinicianCreate,
-    ClinicianEducationCreate,
-    ClinicianLicensureCreate,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
@@ -31,7 +28,6 @@ from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
     Clinician,
-    ClinicianLicensure,
     User,
 )
 from src.domain.specs.clinician import CLINICIAN_ENTITY
@@ -143,16 +139,13 @@ async def _seed_org(
     return org.id
 
 
-def _clinician_create_payload(*, org_id: uuid.UUID, **overrides) -> ClinicianCreate:
+def _clinician_create_payload(
+    *, org_id: uuid.UUID | None = None, **overrides
+) -> ClinicianCreate:
     base = dict(
-        org_id=org_id,
         first_name="Jane",
         last_name="Smith",
-        location_city="Springfield",
-        location_state="IL",
-        location_zip="62701",
-        in_person_sessions="yes",
-        virtual_sessions="no",
+        npi="1234567890",
     )
     base.update(overrides)
     return ClinicianCreate(**base)
@@ -465,8 +458,7 @@ async def test_create_clinician_persists_row_and_writes_audit(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     user = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
-    payload = _clinician_create_payload(org_id=org_id)
+    payload = _clinician_create_payload()
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
@@ -480,8 +472,9 @@ async def test_create_clinician_persists_row_and_writes_audit(
         )
 
     assert created.owner_id == user.id
-    assert created.org_id == org_id
-    assert created.org.name == "Acme Health"
+    # No affiliation on minimal create — added later via the affiliation
+    # sub-resource on the edit page.
+    assert created.org_id is None
 
     rows = await _audit_rows_for(
         db_test_session_manager,
@@ -492,71 +485,10 @@ async def test_create_clinician_persists_row_and_writes_audit(
     assert rows[0].action == AuditAction.CREATE_CLINICIAN
     assert rows[0].actor_id == user.id
     assert rows[0].before is None
-    # The audit snapshot mirrors `ClinicianRead` — `org_name` is the
-    # practice's display name post-#524.
-    assert rows[0].after["org_name"] == "Acme Health"
-    assert rows[0].after["org_id"] == str(org_id)
-
-
-async def test_create_clinician_with_inline_children_captures_them_in_audit(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
-    payload = _clinician_create_payload(
-        org_id=org_id,
-        licensures=[
-            ClinicianLicensureCreate(
-                license_type="lcsw", license_number="L-1", issuing_state="IL"
-            )
-        ],
-        educations=[
-            ClinicianEducationCreate(education_type="msw", institution="State U")
-        ],
-        certifications=[
-            ClinicianCertificationCreate(
-                certification_type="emdr", certifying_body="EMDRIA"
-            )
-        ],
-    )
-
-    async with db_test_session_manager() as session:
-        repo = ClinicianRepository(session)
-        audit_repo = AuditRepository(session)
-        created = await handle_create(
-            CLINICIAN_ENTITY,
-            payload=payload,
-            repo=repo,
-            audit_repo=audit_repo,
-            requesting_user=user,
-        )
-
-    rows = await _audit_rows_for(
-        db_test_session_manager,
-        resource_type="clinician",
-        resource_id=created.id,
-    )
-    assert len(rows) == 1
-    after = rows[0].after
-    assert len(after["licensures"]) == 1
-    assert after["licensures"][0]["license_number"] == "L-1"
-    assert len(after["educations"]) == 1
-    assert len(after["certifications"]) == 1
-
-    # Sub-rows actually persisted, too.
-    async with db_test_session_manager() as session:
-        licensures = (
-            (
-                await session.execute(
-                    select(ClinicianLicensure).filter(
-                        ClinicianLicensure.clinician_id == created.id
-                    )
-                )
-            )
-            .scalars()
-            .all()
-        )
-        assert len(licensures) == 1
+    # The audit snapshot mirrors `ClinicianRead` — `org_name` is null
+    # when the clinician has no affiliation yet.
+    assert rows[0].after["org_id"] is None
+    assert rows[0].after["org_name"] is None
 
 
 async def test_create_clinician_allows_multiple_per_user(
@@ -568,16 +500,13 @@ async def test_create_clinician_allows_multiple_per_user(
     clinician_first_id, *_ = await _seed_clinician(
         db_test_session_manager, user_id=user.id
     )
-    second_org_id = await _seed_org(
-        db_test_session_manager, owner_id=user.id, name="Second Practice"
-    )
 
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
         audit_repo = AuditRepository(session)
         second = await handle_create(
             CLINICIAN_ENTITY,
-            payload=_clinician_create_payload(org_id=second_org_id),
+            payload=_clinician_create_payload(npi="9999999999"),
             repo=repo,
             audit_repo=audit_repo,
             requesting_user=user,
@@ -585,7 +514,6 @@ async def test_create_clinician_allows_multiple_per_user(
 
     assert second.id != clinician_first_id
     assert second.owner_id == user.id
-    assert second.org.name == "Second Practice"
 
 
 # --- clinician_form_extras (#533) -----------------------------------------

@@ -44,7 +44,7 @@ Usage
        headline=org.name) %}
     <section class="entity-facts">
       <dl>
-        <div><dt>Type</dt><dd>{{ ORGANIZATION_TYPES_LABELS[org.type] }}</dd></div>
+        <div><dt>NPI</dt><dd>{{ org.npi or "—" }}</dd></div>
       </dl>
     </section>
   {% endcall %}

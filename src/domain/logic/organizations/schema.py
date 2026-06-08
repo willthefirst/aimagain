@@ -20,8 +20,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel
 
-from src.domain.logic.clinicians.schema import NpiText
-from src.domain.models.enums import ORGANIZATION_TYPES
+from src.domain.logic.clinicians.schema import NpiText, RequiredNpiText
 from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
     PartialUpdate,
@@ -35,40 +34,35 @@ class OrganizationRead(ReadProjection):
     id: uuid.UUID
     owner_id: uuid.UUID
     name: str
-    type: str
-    parent_org_id: uuid.UUID | None = None
-    root_org_id: uuid.UUID
+    npi: str | None = None
     created_at: datetime
     updated_at: datetime
 
 
 class OrganizationCreate(WirePayload):
-    """Create payload. `owner_id` and `root_org_id` are server-derived
-    and not accepted on the wire."""
+    """Create payload. `owner_id` is server-derived from the requesting
+    user and not accepted on the wire.
+
+    The create form (``organizations/_form_new_fragment.html``) collects
+    just `name` + `npi`. ``is_demo`` stays on the wire schema for
+    superuser API consumers; it's surfaced in the edit form for admins.
+    """
 
     name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
-    type: Literal[*ORGANIZATION_TYPES]
-    # The org's Type-2 NPI (optional). When present, `POST /organizations`
-    # runs the Claim-B NPPES verification inline (see
-    # `after_create_organization_owner_grant`); blank/absent leaves
-    # `org_verified=False`, addable later from the manage view.
-    npi: NpiText = None
-    # Blank HTML form input (`""`) is coerced to `None` at the
-    # `WirePayload` layer — see `_coerce_blank_strings_on_nullable_scalars`.
-    parent_org_id: uuid.UUID | None = None
+    # The org's Type-2 NPI (required). `POST /organizations` runs the
+    # Claim-B NPPES verification inline (see
+    # `after_create_organization_owner_grant`).
+    npi: RequiredNpiText
     # Admin-only: marks this org as a demo environment. See
     # `Organization.is_demo` for the full contract.
     is_demo: bool = False
 
 
 class OrganizationUpdate(PartialUpdate):
-    """Partial update. Touching `parent_org_id` triggers
-    `root_org_id` recomputation in the repository — clients don't
-    set the root directly."""
+    """Partial update of editable Organization fields."""
 
     name: StrippedText | None = None
-    type: Literal[*ORGANIZATION_TYPES] | None = None
-    parent_org_id: uuid.UUID | None = None
+    npi: NpiText = None
     is_demo: bool | None = None
 
 
