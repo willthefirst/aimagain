@@ -457,7 +457,7 @@ async def test_users_me_access_card_links_to_access_page(
     tree = HTMLParser(response.text)
     headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
     assert "Access" in headings, "/users/me is missing the Access card"
-    access_link = tree.css_first("a.picker-option[href$='/users/me/access']")
+    access_link = tree.css_first("article.picker-option a[href$='/users/me/access']")
     assert (
         access_link is not None
     ), "Access card is missing the link to /users/me/access"
@@ -478,7 +478,7 @@ async def test_users_me_email_card_links_to_email_form(
     tree = HTMLParser(response.text)
     headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
     assert "Email" in headings, "/users/me is missing the Email card"
-    email_link = tree.css_first("a.picker-option[href$='/users/me/email/form']")
+    email_link = tree.css_first("article.picker-option a[href$='/users/me/email/form']")
     assert (
         email_link is not None
     ), "Email card is missing the link to /users/me/email/form"
@@ -498,7 +498,7 @@ async def test_users_me_email_card_not_shown_for_other_users(
     response = await authenticated_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    email_link = tree.css_first("a.picker-option[href$='/email/form']")
+    email_link = tree.css_first("article.picker-option a[href$='/email/form']")
     assert email_link is None, "Email card must not appear on another user's profile"
 
 
