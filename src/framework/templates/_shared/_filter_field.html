@@ -33,17 +33,19 @@
      threshold (>12) keeps short multi-selects — Age groups, Languages —
      as a single column where each option already reads cleanly. #}
       {%- set grid_class = " search-checkbox-grid" if f.choices|length > 12 else "" -%}
-      <fieldset class="search-checkbox-fieldset{{ grid_class }}">
+      <fieldset class="search-checkbox-fieldset">
         <legend>{{ f.display_label }}</legend>
-        {%- for v, l in f.choices %}
-          <label>
-            <input type="checkbox"
-                   name="{{ f.name }}"
-                   value="{{ v }}"
-                   {% if v in selected %}checked{% endif %} />
-            {{ l }}
-          </label>
-        {%- endfor %}
+        <div class="search-checkbox-options{{ grid_class }}">
+          {%- for v, l in f.choices %}
+            <label>
+              <input type="checkbox"
+                     name="{{ f.name }}"
+                     value="{{ v }}"
+                     {% if v in selected %}checked{% endif %} />
+              {{ l }}
+            </label>
+          {%- endfor %}
+        </div>
       </fieldset>
     {%- elif f.radio -%}
       <fieldset class="toggle-radio">

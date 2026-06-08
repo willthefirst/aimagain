@@ -389,9 +389,11 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     )
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
-    assert 'name="age_groups"' in response.text
-    age_block_start = response.text.index('name="age_groups"')
-    age_block = response.text[max(0, age_block_start - 200) : age_block_start + 200]
+    # `multi_select_field` renders a `<div role="group" id="age_groups">`
+    # wrapper; the aria-invalid lives on the group, not on each checkbox.
+    assert 'id="age_groups"' in response.text
+    group_start = response.text.index('id="age_groups"')
+    age_block = response.text[max(0, group_start - 200) : group_start + 200]
     assert 'aria-invalid="true"' in age_block, age_block
     # Fragment-only response: the re-render returns just the `<form>`,
     # not the full `new_clinician_opening.html` page (which extends
@@ -422,9 +424,11 @@ async def test_referral_create_form_error_render_is_wired(
     )
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
-    assert 'name="age_groups"' in response.text
-    age_block_start = response.text.index('name="age_groups"')
-    age_block = response.text[max(0, age_block_start - 200) : age_block_start + 200]
+    # `multi_select_field` renders a `<div role="group" id="age_groups">`
+    # wrapper; the aria-invalid lives on the group, not on each checkbox.
+    assert 'id="age_groups"' in response.text
+    group_start = response.text.index('id="age_groups"')
+    age_block = response.text[max(0, group_start - 200) : group_start + 200]
     assert 'aria-invalid="true"' in age_block, age_block
     assert "<!DOCTYPE" not in response.text
     assert "<html" not in response.text
