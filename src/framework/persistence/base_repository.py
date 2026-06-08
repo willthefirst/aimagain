@@ -13,7 +13,7 @@ named per-resource methods are for.
 """
 
 from collections.abc import Sequence
-from typing import Any, TypeVar
+from typing import Any, Callable, TypeVar
 from uuid import UUID
 
 from sqlalchemy import Select, func, select
@@ -26,6 +26,30 @@ M = TypeVar("M")
 class BaseRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
+        # Populated by the guarded-dep wrapper built in EntitySpec.__post_init__
+        # when the entity declares a read_policy. None means no guard (open by
+        # default). _check_read() is a no-op when either is absent so repos used
+        # outside request context (background tasks, tests) are unaffected.
+        self._requesting_user: Any | None = None
+        self._read_guard: Callable[[Any], None] | None = None
+
+    def _check_read(self) -> None:
+        """Enforce the entity's read_policy if one is set.
+
+        Called by `_list` and `_count` before executing bulk reads. Raises the
+        policy's error (typically ForbiddenError) when the requesting user
+        lacks the required capability. Silent no-op when no user or no guard is
+        present (background tasks, tests that create repos without a user).
+
+        Not called from `_get_by_id`: that primitive is used by both display
+        paths (list detail view) AND mutation paths (load-before-mutate in
+        update/delete). Guarding it at the data layer would block owners from
+        editing their own records before their capability claim is verified.
+        Bulk list/search is the exposure surface that warrants the data-layer
+        guard; per-row detail access is protected at the route level.
+        """
+        if self._read_guard is not None and self._requesting_user is not None:
+            self._read_guard(self._requesting_user)
 
     async def _get_by_id(self, model: type[M], obj_id: UUID) -> M | None:
         """Fetch a single row by primary key. Returns `None` if missing.
@@ -56,6 +80,7 @@ class BaseRepository:
         logic stay in the calling method (where the domain-specific shape
         is most expressive).
         """
+        self._check_read()
         if offset is not None:
             stmt = stmt.offset(offset)
         if limit is not None:
@@ -72,6 +97,7 @@ class BaseRepository:
         count reflects exactly the rows `_list` would return ignoring
         pagination.
         """
+        self._check_read()
         count_stmt = select(func.count()).select_from(stmt.subquery())
         result = await self.session.execute(count_stmt)
         return result.scalar_one()

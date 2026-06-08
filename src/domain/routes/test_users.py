@@ -33,7 +33,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
 
     The "Create clinician" chrome CTA was removed in #697 — the
     /users/me detail page is the discoverable entry point."""
-    response = await authenticated_client.get("/users")
+    response = await authenticated_client.get("/users/me")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -105,11 +105,11 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
 
 
 async def test_list_users_empty(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
+    superuser_client: AsyncClient,
+    superuser_logged_in_user: User,
 ):
     """Test GET /users returns HTML with no other users message when only logged in user exists."""
-    response = await authenticated_client.get(f"/users")
+    response = await superuser_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -119,9 +119,9 @@ async def test_list_users_empty(
 
 
 async def test_list_users_multiple_users(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
+    superuser_logged_in_user: User,
 ):
     """Test GET /users returns HTML listing multiple other users."""
     user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}")
@@ -131,7 +131,7 @@ async def test_list_users_multiple_users(
         async with session.begin():
             session.add_all([user1, user2])
 
-    response = await authenticated_client.get(f"/users")
+    response = await superuser_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -148,7 +148,7 @@ async def test_list_users_multiple_users(
         user2.username in u for u in usernames_found
     ), f"{user2.username} not found in list"
     assert all(
-        logged_in_user.username not in u for u in usernames_found
+        superuser_logged_in_user.username not in u for u in usernames_found
     ), "Logged in user should not be listed"
     assert "No users found" not in tree.body.text()
 
@@ -920,12 +920,12 @@ async def _seed_user_clinician(
 
 
 async def test_get_my_clinicians_empty_state(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
+    superuser_client: AsyncClient,
+    superuser_logged_in_user: User,
 ):
     """`GET /users/me/clinicians` renders the empty state when the
     current user owns no clinicians."""
-    response = await authenticated_client.get("/users/me/clinicians")
+    response = await superuser_client.get("/users/me/clinicians")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
@@ -944,24 +944,26 @@ def _create_clinician_action(tree: HTMLParser):
 
 
 async def test_get_my_clinicians_shows_create_action_in_toolbar(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
+    superuser_logged_in_user: User,
 ):
     """Self viewing their own clinician list sees a 'Create clinician'
     toolbar action — present both in the empty state and after the
     user has created one (so they can create additional clinicians)."""
-    empty_response = await authenticated_client.get("/users/me/clinicians")
+    empty_response = await superuser_client.get("/users/me/clinicians")
     empty_tree = HTMLParser(empty_response.text)
     empty_action = _create_clinician_action(empty_tree)
     assert empty_action is not None
     assert empty_action.attributes.get("href") == "/clinicians/form"
 
     await _seed_user_clinician(
-        db_test_session_manager, user_id=logged_in_user.id, practice_name="First"
+        db_test_session_manager,
+        user_id=superuser_logged_in_user.id,
+        practice_name="First",
     )
 
-    with_one_response = await authenticated_client.get("/users/me/clinicians")
+    with_one_response = await superuser_client.get("/users/me/clinicians")
     with_one_tree = HTMLParser(with_one_response.text)
     assert _create_clinician_action(with_one_tree) is not None
 
@@ -1052,19 +1054,22 @@ async def test_get_user_clinicians_404_for_unknown_user(
 
 
 async def test_get_my_clinicians_renders_breadcrumb(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
+    superuser_client: AsyncClient,
+    superuser_logged_in_user: User,
 ):
     """`GET /users/me/clinicians` renders a breadcrumb back-affordance
     pointing at the current user's profile — auto-injected by
     `mount_related_list` via `USER_ENTITY.display_label_fn`."""
-    response = await authenticated_client.get("/users/me/clinicians")
+    response = await superuser_client.get("/users/me/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
     assert (
         back is not None
     ), "user clinicians list must render a breadcrumb back-affordance"
-    assert back.attributes.get("href") == f"/users/{logged_in_user.id}"
+    assert back.attributes.get("href") == f"/users/{superuser_logged_in_user.id}"
     label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == logged_in_user.username
+    assert (
+        label is not None
+        and label.text(strip=True) == superuser_logged_in_user.username
+    )
