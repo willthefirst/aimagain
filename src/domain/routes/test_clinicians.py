@@ -34,8 +34,7 @@ async def _seed_org(
     name: str = "Acme Therapy",
 ) -> uuid.UUID:
     """Insert a root Organization and return its id. Used by tests that
-    POST to ``/clinicians`` — the wire schema requires ``org_id`` (#524)
-    so each create test needs an Org persisted up front."""
+    attach clinicians to orgs via the affiliation sub-resource."""
     org = make_organization_row(owner_id=owner_id, name=name)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -99,17 +98,15 @@ async def test_create_clinician_happy_path(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """POST /clinicians with a form-encoded body returns 201 + id and
-    persists the clinician and an audit row."""
-    org_id = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Acme Therapy"
-    )
+    """POST /clinicians with the minimal form-encoded body (first / last
+    / NPI) returns 201 + id and persists the clinician with no
+    affiliation. Audit row is written."""
     response = await authenticated_client.post(
         "/clinicians",
-        data=clinician_payload(org_id=str(org_id)),
+        data=clinician_payload(),
     )
 
-    assert response.status_code == 201
+    assert response.status_code == 201, response.text
     new_id = uuid.UUID(response.json()["id"])
     assert response.headers["Location"] == f"/clinicians/{new_id}"
     assert response.headers["HX-Redirect"] == f"/clinicians/{new_id}/form"
@@ -119,8 +116,11 @@ async def test_create_clinician_happy_path(
         persisted = result.scalars().first()
         assert persisted is not None
         assert persisted.owner_id == logged_in_user.id
-        assert persisted.org_id == org_id
-        assert persisted.org.name == "Acme Therapy"
+        # No affiliation on minimal create — added later via the
+        # affiliation sub-resource on the edit page.
+        assert persisted.org_id is None
+        assert persisted.org is None
+        assert persisted.npi == "1234567890"
 
     rows = await _audit_rows_for(
         db_test_session_manager,
@@ -132,38 +132,38 @@ async def test_create_clinician_happy_path(
     assert rows[0].actor_id == logged_in_user.id
 
 
+async def test_create_clinician_requires_npi(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """NPI is required on create — submitting blank 422s."""
+    response = await authenticated_client.post(
+        "/clinicians",
+        data={"first_name": "Jane", "last_name": "Smith", "npi": ""},
+    )
+    assert response.status_code == 422
+
+
 async def test_create_clinician_form_error_render_is_wired(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """Integration smoke for `CLINICIAN_ENTITY.form_error_render`.
 
-    HX-Request POST with an invalid `in_person_sessions` value
-    (the field is a Literal over `LOCATION_AVAILABILITY_OPTIONS`)
-    → 422 + HTML fragment with the inline error landed on the
-    `in_person_sessions` input. Same shape as the organizations /
-    programs smokes.
-
-    `first_name` would have been a more obvious trip — but the
-    schema models it as `StrippedOptionalText = None` (matches the
-    rest of the clinician model's tolerant defaults), so an empty
-    string passes. Pin the actual Literal field instead.
+    HX-Request POST with an empty `first_name` (a `StrippedText` field
+    that rejects blank input) → 422 + HTML fragment with the inline
+    error landed on the `first_name` input. Same shape as the
+    organizations / programs smokes.
     """
-    org_id = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Acme"
-    )
-    payload = clinician_payload(org_id=str(org_id))
-    payload["in_person_sessions"] = "not-a-valid-option"
     response = await authenticated_client.post(
         "/clinicians",
-        data=payload,
+        data={"first_name": "", "last_name": "Smith", "npi": "1234567890"},
         headers={"HX-Request": "true"},
     )
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
     body = response.text
-    field_at = body.index('name="in_person_sessions"')
+    field_at = body.index('name="first_name"')
     window = body[max(0, field_at - 200) : field_at + 200]
     assert 'aria-invalid="true"' in window, window
     assert "<!DOCTYPE" not in body
@@ -178,20 +178,16 @@ async def test_create_clinician_allows_multiple_per_user(
 ):
     """A user may own multiple clinicians. Two successive POSTs both
     return 201 and persist as distinct rows owned by the same user."""
-    org_first = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="First"
-    )
-    org_second = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Second"
-    )
     first = await authenticated_client.post(
-        "/clinicians", data=clinician_payload(org_id=str(org_first))
+        "/clinicians",
+        data=clinician_payload(first_name="A", npi="1111111111"),
     )
     assert first.status_code == 201
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
-        "/clinicians", data=clinician_payload(org_id=str(org_second))
+        "/clinicians",
+        data=clinician_payload(first_name="B", npi="2222222222"),
     )
     assert second.status_code == 201
     second_id = uuid.UUID(second.json()["id"])
@@ -204,121 +200,6 @@ async def test_create_clinician_allows_multiple_per_user(
         )
         owned = result.scalars().all()
         assert {p.id for p in owned} == {first_id, second_id}
-        assert {p.org.name for p in owned} == {"First", "Second"}
-
-
-async def test_create_clinician_rejects_org_owned_by_another_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Attaching a Clinician is permissioned by Org ownership (#524). A
-    user POSTing with another user's `org_id` is forbidden — 403 keeps
-    the boundary visible (the dropdown wouldn't have surfaced this Org
-    in the first place; this guard catches curl callers)."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-    other_org_id = await _seed_org(
-        db_test_session_manager, owner_id=other.id, name="Other's Org"
-    )
-
-    response = await authenticated_client.post(
-        "/clinicians", data=clinician_payload(org_id=str(other_org_id))
-    )
-    assert response.status_code == 403
-
-
-async def test_create_clinician_rejects_nonexistent_org(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """A POST with an `org_id` that doesn't exist returns 404 — no
-    leak about other users' Org ids, and avoids the 500 the DB FK
-    would otherwise produce."""
-    bogus = uuid.uuid4()
-    response = await authenticated_client.post(
-        "/clinicians", data=clinician_payload(org_id=str(bogus))
-    )
-    assert response.status_code == 404
-
-
-async def test_create_clinician_allows_superuser_to_attach_to_any_org(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Superusers bypass the Org-ownership check — mirrors the
-    `OWNER_OR_ADMIN` policy on the Org row itself."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-    other_org_id = await _seed_org(
-        db_test_session_manager, owner_id=other.id, name="Other's Org"
-    )
-
-    response = await authenticated_client.post(
-        "/clinicians", data=clinician_payload(org_id=str(other_org_id))
-    )
-    assert response.status_code == 201
-
-
-async def test_create_clinician_solo_practice_auto_creates_org(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """POST /clinicians with solo_practice=true auto-creates a solo-practice
-    Org named after the clinician — no separate /organizations/form step (#699)
-    — and grants the user an immediately-verified owner OrgRepresentation over
-    it, so the canonical create matches the onboarding hub (#1166)."""
-    from src.domain.models import Organization, OrgRepresentation
-
-    response = await authenticated_client.post(
-        "/clinicians",
-        data={
-            "first_name": "Jane",
-            "last_name": "Smith",
-            "solo_practice": "true",
-            "location_city": "Austin",
-            "location_state": "TX",
-            "location_zip": "78701",
-            "in_person_sessions": "yes",
-            "virtual_sessions": "yes",
-        },
-    )
-    assert response.status_code == 201
-    new_id = uuid.UUID(response.json()["id"])
-
-    async with db_test_session_manager() as session:
-        result = await session.execute(select(Clinician).filter(Clinician.id == new_id))
-        persisted = result.scalars().first()
-        assert persisted is not None
-        assert persisted.org_id is not None
-
-        org_result = await session.execute(
-            select(Organization).filter(Organization.id == persisted.org_id)
-        )
-        auto_org = org_result.scalars().first()
-        assert auto_org is not None
-        assert auto_org.name == "Jane Smith"
-        assert auto_org.type == "solo_practice"
-        assert auto_org.owner_id == logged_in_user.id
-
-        rep_result = await session.execute(
-            select(OrgRepresentation).filter(
-                OrgRepresentation.user_id == logged_in_user.id,
-                OrgRepresentation.org_id == auto_org.id,
-            )
-        )
-        owner_rep = rep_result.scalars().first()
-        assert owner_rep is not None
-        assert owner_rep.role == "owner"
-        assert owner_rep.authority_method == "admin_review"
-        assert owner_rep.authority_status == "verified"
 
 
 # --- Clinician reads -------------------------------------------------------
@@ -1387,101 +1268,44 @@ async def test_owner_edit_form_renders_affiliations_section(
 # --- Create form page (GET /clinicians/form) ----------------------
 
 
-async def test_get_clinician_form_renders(
+async def test_get_clinician_form_renders_minimal_fields(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /clinicians/form` renders the create form posting to
-    the JSON API."""
-    # Seed an Org so the Org-picker dropdown has at least one option to render.
-    await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Seeded Org"
-    )
+    """`GET /clinicians/form` renders the minimal create form (first
+    name + last name + NPI) posting to the JSON API. Affiliation,
+    location, availability, and insurance fields are deliberately
+    absent — they live on the edit page once the row exists."""
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # The header uses a link (`<a hx-post>`), not a form; targeting
-    # `main form` is still the right scope for the clinician create form.
     form = tree.css_first("main form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/clinicians"
-    # Org-picker dropdown — replaces the old free-text practice_name input.
-    # Lists the Orgs the requesting user owns (#524).
-    org_select = tree.css_first('select[name="org_id"]')
-    assert org_select is not None
-    org_options = org_select.css("option")
-    assert any(
-        o.text(strip=True) == "Seeded Org" for o in org_options
-    ), "Org dropdown should include every Org the user owns"
-    city = tree.css_first('input[name="location_city"]')
-    assert city is not None
-    assert city.attributes.get("maxlength") == "120"
-    zip_input = tree.css_first('input[name="location_zip"]')
-    assert zip_input is not None
-    assert zip_input.attributes.get("pattern") == r"\d{5}"
-    assert zip_input.attributes.get("maxlength") == "5"
-    # State select with all 51 entries (50 states + DC) plus a placeholder.
-    state_select = tree.css_first('select[name="location_state"]')
-    assert state_select is not None
-    state_options = state_select.css("option")
-    assert len(state_options) == 52  # 51 + placeholder
-    # Availability selects default to "yes" on create (#701); no placeholder.
-    in_person = tree.css_first('select[name="in_person_sessions"]')
-    virtual = tree.css_first('select[name="virtual_sessions"]')
-    assert in_person is not None
-    assert virtual is not None
-    assert len(in_person.css("option")) == 3
-    assert len(virtual.css("option")) == 3
-    # Both session-availability dropdowns default to "yes" (#701).
-    in_person_selected = in_person.css_first("option[selected]")
-    virtual_selected = virtual.css_first("option[selected]")
-    assert (
-        in_person_selected is not None
-    ), "in_person_sessions should have a pre-selected option"
-    assert in_person_selected.attributes.get("value") == "yes"
-    assert (
-        virtual_selected is not None
-    ), "virtual_sessions should have a pre-selected option"
-    assert virtual_selected.attributes.get("value") == "yes"
-    # Insurance & payment fieldset. The carrier multi-select speaks for
-    # the in-network signal (empty = no in-network); OON and sliding-scale
-    # render as feature-flag checkboxes (the visible `<input type="checkbox">`
-    # plus a sibling `<input type="hidden" value="false">` carrying the
-    # default-true round-trip — see `_shared/form_fields.html::checkbox_field`).
-    assert tree.css_first('input[type="checkbox"][name="accepts_in_network"]') is None
-    assert (
-        tree.css_first('input[type="checkbox"][name="accepts_out_of_network"]')
-        is not None
-    )
-    assert tree.css_first('input[type="checkbox"][name="sliding_scale"]') is not None
-    assert tree.css_first('input[name="cost"]') is not None
-    carrier_boxes = tree.css('input[type="checkbox"][name="in_network_carriers"]')
-    assert len(carrier_boxes) == 11
-
-
-async def test_get_clinician_form_scopes_org_dropdown_to_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """The Org dropdown lists only the requesting user's Orgs (#524).
-    Another user's Org must not leak into the picker."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-    await _seed_org(db_test_session_manager, owner_id=logged_in_user.id, name="Mine")
-    await _seed_org(db_test_session_manager, owner_id=other.id, name="Theirs")
-
-    response = await authenticated_client.get("/clinicians/form")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    option_texts = {
-        o.text(strip=True) for o in tree.css('select[name="org_id"] option')
-    }
-    assert "Mine" in option_texts
-    assert "Theirs" not in option_texts
+    # The three required inputs are present.
+    assert tree.css_first('input[name="first_name"]') is not None
+    assert tree.css_first('input[name="last_name"]') is not None
+    npi = tree.css_first('input[name="npi"]')
+    assert npi is not None
+    assert npi.attributes.get("pattern") == r"\d{10}"
+    assert npi.attributes.get("maxlength") == "10"
+    # Fields that moved to the edit flow are NOT on the create form.
+    for absent in (
+        "org_id",
+        "solo_practice",
+        "location_city",
+        "location_state",
+        "location_zip",
+        "in_person_sessions",
+        "virtual_sessions",
+        "accepts_out_of_network",
+        "sliding_scale",
+        "in_network_carriers",
+        "cost",
+    ):
+        assert (
+            tree.css_first(f'[name="{absent}"]') is None
+        ), f"{absent} should not appear on the minimal create form"
 
 
 # --- Edit form page (GET /clinicians/{id}/form) -------------------

@@ -6,11 +6,9 @@ Verifies that the HTMX-decorated form rendered by
 `POST /organizations` form-encoded request with the field names and
 shapes the route's `OrganizationCreate` schema expects.
 
-Pinning the **blank `parent_org_id=`** field in the request body is
-deliberate: it's exactly the wire shape that 422'd in prod (#550, fixed
-by `OptionalUuid` on `OrganizationCreate.parent_org_id`). Keeping it in
-the pact stops a future schema change from regressing the create flow
-without a contract bump.
+The create form is intentionally minimal: just `name` and `npi`.
+Anything else — parent linkage, demo flag, etc. — is added on the edit
+page once the row exists.
 """
 
 import pytest
@@ -41,9 +39,8 @@ from tests.test_contract.tests.shared.helpers import (
 async def test_consumer_organization_create_form_submits(
     origin_with_routes: str, page: Page
 ):
-    """Fill the create form on the stubbed page; assert the intercepted
-    request matches the contracted shape — including a blank
-    `parent_org_id` (the #550 regression)."""
+    """Fill the minimal create form on the stubbed page; assert the
+    intercepted request matches the contracted shape — `name` + `npi`."""
     pact = setup_pact(
         CONSUMER_NAME_ORGANIZATION_CREATE_FORM,
         PROVIDER_NAME_ORGANIZATIONS,
@@ -56,13 +53,7 @@ async def test_consumer_organization_create_form_submits(
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # Browser serializes inputs in DOM order: name, type, npi (optional,
-    # left blank here), parent_org_id. The blank `parent_org_id=` pins the
-    # #550 regression; the blank `npi=` pins that the optional NPI field
-    # serializes empty without 422'ing (#1166).
-    expected_request_body = (
-        "name=Acme+Counseling" "&type=clinic" "&npi=" "&parent_org_id="
-    )
+    expected_request_body = "name=Acme+Counseling&npi=1234567890"
 
     (
         pact.given(PROVIDER_STATE_USER_CAN_CREATE_ORGANIZATION)
@@ -91,8 +82,7 @@ async def test_consumer_organization_create_form_submits(
         await page.goto(form_page_url)
         await page.wait_for_selector('input[name="name"]')
         await page.locator('input[name="name"]').fill("Acme Counseling")
-        await page.locator('select[name="type"]').select_option("clinic")
-        # parent_org_id intentionally left blank — pins #550.
+        await page.locator('input[name="npi"]').fill("1234567890")
         await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 

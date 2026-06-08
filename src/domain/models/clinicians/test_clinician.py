@@ -33,9 +33,6 @@ def _make_org(name: str, owner_id) -> Organization:
     return Organization(
         id=org_id,
         name=name,
-        type="solo_practice",
-        parent_org_id=None,
-        root_org_id=org_id,
         owner_id=owner_id,
     )
 

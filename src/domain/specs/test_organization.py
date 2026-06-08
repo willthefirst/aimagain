@@ -72,15 +72,3 @@ def test_form_extras_path_drives_parent_org_picker():
     assert ORGANIZATION_ENTITY.form_extras_repos == (
         ("organization_repo", OrganizationRepository),
     )
-
-
-def test_static_context_carries_type_vocabulary():
-    from src.domain.models.enums import (
-        ORGANIZATION_TYPES,
-        ORGANIZATION_TYPES_LABELS,
-    )
-
-    assert ORGANIZATION_ENTITY.static_context == {
-        "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
-        "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,
-    }

@@ -3,11 +3,13 @@
 Verifies that the HTMX-decorated form rendered by
 `templates/clinicians/form_new.html` (mounted via the
 `clinician_create_form` stub on the consumer server) issues a
-`POST /clinicians` form-encoded request with the practice and
-availability fields the route's `ClinicianCreate` schema expects.
-The contract surface is the form wiring (method, path, Content-Type,
-field names) — the response on success is a 201 with `HX-Redirect` to
-the new clinician.
+`POST /clinicians` form-encoded request with the field names and
+shapes the route's `ClinicianCreate` schema expects.
+
+The create form is intentionally minimal: just `first_name`,
+`last_name`, and `npi`. Affiliation, location, availability, and
+insurance fields are added later via the affiliation sub-resource on
+the edit page.
 """
 
 import pytest
@@ -38,8 +40,9 @@ from tests.test_contract.tests.shared.helpers import (
 async def test_consumer_clinician_create_form_submits(
     origin_with_routes: str, page: Page
 ):
-    """Fill the create form on the stubbed page; assert the intercepted
-    request matches the contracted shape."""
+    """Fill the minimal create form on the stubbed page; assert the
+    intercepted request matches the contracted shape — `first_name`,
+    `last_name`, `npi` only."""
     pact = setup_pact(
         CONSUMER_NAME_CLINICIAN_CREATE_FORM,
         CLINICIAN_NAME_CLINICIANS,
@@ -49,42 +52,10 @@ async def test_consumer_clinician_create_form_submits(
     form_page_url = f"{origin_with_routes}{CLINICIAN_CREATE_FORM_PAGE_PATH}"
     full_mock_url = f"{mock_server_uri}{CLINICIAN_CREATE_API_PATH}"
 
-    # Browser form submit sets Content-Type to
-    # `application/x-www-form-urlencoded; charset=UTF-8`; pact-ruby's header
-    # matcher does substring match unless the value is wrapped in `Like`.
     expected_request_headers = {
         "Content-Type": Like("application/x-www-form-urlencoded")
     }
-    # `first_name` and `last_name` are required by `ClinicianCreate` —
-    # the template renders them with the HTML `required` attribute so the
-    # browser won't submit without values. The test fills them explicitly.
-    # `npi` and `cost` remain optional empty text inputs. The
-    # `accepts_out_of_network` checkbox is pre-checked by the template
-    # (`current=true`); `sliding_scale` is not pre-checked. Both render
-    # via `checkbox_field`, which emits a sibling `<input type="hidden"
-    # value="false">` before each checkbox so default-true booleans
-    # round-trip — checked submits both `false` and `true` (last wins at
-    # the parser; see `src/framework/http/forms.py`), unchecked submits
-    # just `false`. The carrier multi-select is empty. `org_id` carries the
-    # Organization picked from the dropdown (#524); the stub server seeds
-    # one Org. The "Clinician" fieldset holds the person-level fields and
-    # renders first, so `first_name`, `last_name`, `npi` serialize ahead
-    # of `org_id`.
-    expected_request_body = (
-        "first_name=Jane"
-        "&last_name=Doe"
-        "&npi="
-        "&org_id=66666666-6666-6666-6666-666666666666"
-        "&location_city=Brooklyn"
-        "&location_state=NY"
-        "&location_zip=11201"
-        "&in_person_sessions=yes"
-        "&virtual_sessions=please_contact"
-        "&accepts_out_of_network=false"
-        "&accepts_out_of_network=true"
-        "&sliding_scale=false"
-        "&cost="
-    )
+    expected_request_body = "first_name=Jane&last_name=Doe&npi=1234567890"
 
     (
         pact.given(CLINICIAN_STATE_USER_CAN_CREATE_CLINICIAN)
@@ -111,19 +82,10 @@ async def test_consumer_clinician_create_form_submits(
 
     with pact:
         await page.goto(form_page_url)
-        await page.wait_for_selector('select[name="org_id"]')
+        await page.wait_for_selector('input[name="first_name"]')
         await page.locator('input[name="first_name"]').fill("Jane")
         await page.locator('input[name="last_name"]').fill("Doe")
-        await page.locator('select[name="org_id"]').select_option(
-            "66666666-6666-6666-6666-666666666666"
-        )
-        await page.locator('input[name="location_city"]').fill("Brooklyn")
-        await page.locator('select[name="location_state"]').select_option("NY")
-        await page.locator('input[name="location_zip"]').fill("11201")
-        await page.locator('select[name="in_person_sessions"]').select_option("yes")
-        await page.locator('select[name="virtual_sessions"]').select_option(
-            "please_contact"
-        )
+        await page.locator('input[name="npi"]').fill("1234567890")
         await page.locator("button[type='submit']").click()
         await page.wait_for_timeout(NETWORK_TIMEOUT_MS)
 

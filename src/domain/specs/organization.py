@@ -21,10 +21,6 @@ from src.domain.logic.organizations.schema import (
 from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Organization
-from src.domain.models.enums import (
-    ORGANIZATION_TYPES,
-    ORGANIZATION_TYPES_LABELS,
-)
 from src.framework.audit.core import AuditAction
 from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.entity_spec import (
@@ -105,12 +101,6 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
         ("organization_repo", OrganizationRepository),
         ("verification_audit_repo", AuditRepository),
     ),
-    # Templates pull dropdown labels from the spec — same pattern as
-    # `CLINICIAN_ENTITY.static_context` for credential vocabularies.
-    static_context={
-        "ORGANIZATION_TYPES": ORGANIZATION_TYPES,
-        "ORGANIZATION_TYPES_LABELS": ORGANIZATION_TYPES_LABELS,
-    },
     state_axes=(
         # Admin override of `Organization.npi_match_status`. Mirror of
         # the clinician-side axis (handler/semantics in

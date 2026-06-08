@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 958dad6b8606
+Revision ID: 43c694311395
 Revises:
-Create Date: 2026-05-27 16:06:23.326834
+Create Date: 2026-06-07 21:48:22.309165
 
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "958dad6b8606"
+revision: str = "43c694311395"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -77,8 +77,15 @@ def upgrade() -> None:
         "clinicians",
         sa.Column("owner_id", sa.Uuid(), nullable=True),
         sa.Column("npi", sa.Text(), nullable=True),
-        sa.Column("first_name", sa.Text(), nullable=True),
-        sa.Column("last_name", sa.Text(), nullable=True),
+        sa.Column("first_name", sa.Text(), nullable=False),
+        sa.Column("last_name", sa.Text(), nullable=False),
+        sa.Column("npi_match_status", sa.Text(), server_default="none", nullable=False),
+        sa.Column("npi_verified_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column(
+            "clinician_verified", sa.Boolean(), server_default="0", nullable=False
+        ),
+        sa.Column("verified_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("ever_verified_at", sa.TIMESTAMP(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
             "created_at",
@@ -97,16 +104,23 @@ def upgrade() -> None:
             "npi IS NULL OR (length(npi) = 10 AND npi GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')",
             name="ck_clinicians_npi_format",
         ),
+        sa.CheckConstraint(
+            "npi_match_status IN ('none', 'pending', 'matched', 'mismatch')",
+            name="ck_clinicians_npi_match_status",
+        ),
         sa.ForeignKeyConstraint(["owner_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
         "organizations",
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("type", sa.Text(), nullable=False),
+        sa.Column("npi", sa.Text(), nullable=True),
+        sa.Column("npi_match_status", sa.Text(), server_default="none", nullable=False),
+        sa.Column("org_verified", sa.Boolean(), server_default="0", nullable=False),
+        sa.Column("verified_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("is_demo", sa.Boolean(), server_default="0", nullable=False),
+        sa.Column("authorized_official_name", sa.Text(), nullable=True),
         sa.Column("owner_id", sa.Uuid(), nullable=False),
-        sa.Column("parent_org_id", sa.Uuid(), nullable=True),
-        sa.Column("root_org_id", sa.Uuid(), nullable=False),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
             "created_at",
@@ -122,16 +136,14 @@ def upgrade() -> None:
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
-            "type IN ('solo_practice', 'group_practice', 'clinic', 'health_system', 'other')",
-            name="ck_organizations_type",
+            "npi IS NULL OR (length(npi) = 10 AND npi GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')",
+            name="ck_organizations_npi_format",
+        ),
+        sa.CheckConstraint(
+            "npi_match_status IN ('none', 'pending', 'matched', 'mismatch')",
+            name="ck_organizations_npi_match_status",
         ),
         sa.ForeignKeyConstraint(["owner_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["parent_org_id"], ["organizations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["root_org_id"], ["organizations.id"], ondelete="CASCADE"
-        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
@@ -160,7 +172,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
-        "affiliations",
+        "clinician_affiliations",
         sa.Column("clinician_id", sa.Uuid(), nullable=False),
         sa.Column("org_id", sa.Uuid(), nullable=False),
         sa.Column("in_person_sessions", sa.Text(), nullable=False),
@@ -181,9 +193,9 @@ def upgrade() -> None:
             "sliding_scale", sa.Boolean(), server_default=sa.text("0"), nullable=False
         ),
         sa.Column("cost", sa.Text(), nullable=True),
-        sa.Column("location_city", sa.Text(), nullable=False),
-        sa.Column("location_state", sa.Text(), nullable=False),
-        sa.Column("location_zip", sa.Text(), nullable=False),
+        sa.Column("location_city", sa.Text(), nullable=True),
+        sa.Column("location_state", sa.Text(), nullable=True),
+        sa.Column("location_zip", sa.Text(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
             "created_at",
@@ -200,15 +212,15 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "in_person_sessions IN ('yes', 'no', 'please_contact')",
-            name="ck_affiliations_in_person_sessions",
+            name="ck_clinician_affiliations_in_person_sessions",
         ),
         sa.CheckConstraint(
             "location_state IN ('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')",
-            name="ck_affiliations_location_state",
+            name="ck_clinician_affiliations_location_state",
         ),
         sa.CheckConstraint(
             "virtual_sessions IN ('yes', 'no', 'please_contact')",
-            name="ck_affiliations_virtual_sessions",
+            name="ck_clinician_affiliations_virtual_sessions",
         ),
         sa.ForeignKeyConstraint(
             ["clinician_id"], ["clinicians.id"], ondelete="RESTRICT"
@@ -281,6 +293,9 @@ def upgrade() -> None:
         sa.Column("license_number", sa.Text(), nullable=False),
         sa.Column("issuing_state", sa.Text(), nullable=False),
         sa.Column("expiration_date", sa.Date(), nullable=True),
+        sa.Column("status", sa.Text(), server_default="pending", nullable=False),
+        sa.Column("attested_active", sa.Boolean(), server_default="0", nullable=False),
+        sa.Column("attested_at", sa.TIMESTAMP(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
             "created_at",
@@ -303,42 +318,71 @@ def upgrade() -> None:
             "license_type IN ('lcsw', 'lpc', 'lmft', 'lmhc', 'lcpc', 'psyd', 'phd', 'md', 'do', 'np', 'pmhnp', 'other')",
             name="ck_clinician_licensures_license_type",
         ),
+        sa.CheckConstraint(
+            "status IN ('active', 'expired', 'pending')",
+            name="ck_clinician_licensures_status",
+        ),
         sa.ForeignKeyConstraint(
             ["clinician_id"], ["clinicians.id"], ondelete="CASCADE"
         ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
-        "opening_details",
-        sa.Column("post_id", sa.Uuid(), nullable=False),
-        sa.Column("clinician_id", sa.Uuid(), nullable=False),
+        "org_representations",
+        sa.Column("user_id", sa.Uuid(), nullable=False),
+        sa.Column("org_id", sa.Uuid(), nullable=False),
+        sa.Column("role", sa.Text(), nullable=False),
+        sa.Column("authority_method", sa.Text(), nullable=False),
         sa.Column(
-            "desired_times", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+            "authority_status", sa.Text(), server_default="pending", nullable=False
         ),
-        sa.Column("schedule_text", sa.Text(), nullable=True),
+        sa.Column("approved_by", sa.Uuid(), nullable=True),
+        sa.Column("archived_at", sa.TIMESTAMP(), nullable=True),
+        sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
-            "services", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
-        ),
-        sa.Column(
-            "settings", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
-        ),
-        sa.Column("treatment_modality", sa.Text(), nullable=True),
-        sa.Column(
-            "age_groups", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
         ),
         sa.Column(
-            "languages", sa.JSON(), server_default=sa.text("'[\"en\"]'"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("(CURRENT_TIMESTAMP)"),
+            nullable=False,
         ),
-        sa.Column("genders", sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
-        sa.Column("subject", sa.Text(), nullable=True),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("referral_instructions", sa.Text(), nullable=True),
-        sa.Column("website", sa.Text(), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["clinician_id"], ["clinicians.id"], ondelete="CASCADE"
+        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.CheckConstraint(
+            "authority_method IN ('authorized_official', 'domain_email', 'rep_approval', 'admin_review')",
+            name="ck_org_representations_authority_method",
         ),
-        sa.ForeignKeyConstraint(["post_id"], ["posts.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("post_id"),
+        sa.CheckConstraint(
+            "authority_status IN ('pending', 'verified', 'rejected')",
+            name="ck_org_representations_authority_status",
+        ),
+        sa.CheckConstraint(
+            "role IN ('coordinator', 'admin', 'owner')",
+            name="ck_org_representations_role",
+        ),
+        sa.ForeignKeyConstraint(["approved_by"], ["users.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["org_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "user_id", "org_id", name="uq_org_representations_user_org"
+        ),
+    )
+    op.create_index(
+        op.f("ix_org_representations_org_id"),
+        "org_representations",
+        ["org_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_org_representations_user_id"),
+        "org_representations",
+        ["user_id"],
+        unique=False,
     )
     op.create_table(
         "programs",
@@ -378,69 +422,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
-        "referral_details",
-        sa.Column("post_id", sa.Uuid(), nullable=False),
-        sa.Column("location_in_person", sa.Text(), nullable=False),
-        sa.Column("location_virtual", sa.Text(), nullable=False),
-        sa.Column(
-            "desired_times", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
-        ),
-        sa.Column(
-            "age_groups", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
-        ),
-        sa.Column(
-            "languages", sa.JSON(), server_default=sa.text("'[\"en\"]'"), nullable=False
-        ),
-        sa.Column(
-            "gender",
-            sa.Text(),
-            server_default=sa.text("'prefer_not_to_say'"),
-            nullable=False,
-        ),
-        sa.Column("subject", sa.Text(), nullable=True),
-        sa.Column("description", sa.Text(), nullable=False),
-        sa.Column(
-            "services", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
-        ),
-        sa.Column("treatment_modality", sa.Text(), nullable=True),
-        sa.Column(
-            "network_preference",
-            sa.Text(),
-            server_default=sa.text("'no_preference'"),
-            nullable=False,
-        ),
-        sa.Column("insurance_carrier", sa.Text(), nullable=True),
-        sa.Column("location_city", sa.Text(), nullable=False),
-        sa.Column("location_state", sa.Text(), nullable=False),
-        sa.Column("location_zip", sa.Text(), nullable=False),
-        sa.CheckConstraint(
-            "gender IN ('female', 'male', 'non_binary', 'trans_female', 'trans_male', 'gender_diverse', 'prefer_not_to_say')",
-            name="ck_referral_details_gender",
-        ),
-        sa.CheckConstraint(
-            "insurance_carrier IN ('aetna', 'anthem_bcbs', 'cigna', 'kaiser', 'magellan', 'medicare', 'medicaid', 'optum', 'tricare', 'united_healthcare', 'other')",
-            name="ck_referral_details_insurance_carrier",
-        ),
-        sa.CheckConstraint(
-            "location_in_person IN ('yes', 'no', 'please_contact')",
-            name="ck_referral_details_location_in_person",
-        ),
-        sa.CheckConstraint(
-            "location_state IN ('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')",
-            name="ck_referral_details_location_state",
-        ),
-        sa.CheckConstraint(
-            "location_virtual IN ('yes', 'no', 'please_contact')",
-            name="ck_referral_details_location_virtual",
-        ),
-        sa.CheckConstraint(
-            "network_preference IN ('in_network_required', 'in_network_preferred', 'no_preference')",
-            name="ck_referral_details_network_preference",
-        ),
-        sa.ForeignKeyConstraint(["post_id"], ["posts.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("post_id"),
-    )
-    op.create_table(
         "user_favorites",
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("clinician_id", sa.Uuid(), nullable=False),
@@ -475,10 +456,18 @@ def upgrade() -> None:
     )
     op.create_table(
         "verifications",
-        sa.Column("clinician_id", sa.Uuid(), nullable=False),
+        sa.Column(
+            "subject_type", sa.Text(), server_default="clinician", nullable=False
+        ),
+        sa.Column("clinician_id", sa.Uuid(), nullable=True),
+        sa.Column("org_id", sa.Uuid(), nullable=True),
         sa.Column("status", sa.Text(), nullable=False),
+        sa.Column(
+            "event_type", sa.Text(), server_default="npi_resolved", nullable=False
+        ),
         sa.Column("flags", sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
         sa.Column("nppes_result", sa.JSON(), nullable=True),
+        sa.Column("evidence", sa.JSON(), nullable=True),
         sa.Column(
             "oig_match", sa.Boolean(), server_default=sa.text("0"), nullable=False
         ),
@@ -498,12 +487,25 @@ def upgrade() -> None:
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
+            "(subject_type = 'clinician' AND clinician_id IS NOT NULL AND org_id IS NULL) OR (subject_type = 'organization' AND clinician_id IS NULL AND org_id IS NOT NULL)",
+            name="ck_verifications_subject_shape",
+        ),
+        sa.CheckConstraint(
+            "event_type IN ('npi_submitted', 'npi_resolved', 'license_attested', 'license_expired', 'authority_proven', 'authority_revoked', 'role_set', 'admin_verify', 'admin_suspend', 'email_confirmed')",
+            name="ck_verifications_event_type",
+        ),
+        sa.CheckConstraint(
             "status IN ('verified', 'needs_review', 'failed')",
             name="ck_verifications_status",
+        ),
+        sa.CheckConstraint(
+            "subject_type IN ('clinician', 'organization')",
+            name="ck_verifications_subject_type",
         ),
         sa.ForeignKeyConstraint(
             ["clinician_id"], ["clinicians.id"], ondelete="CASCADE"
         ),
+        sa.ForeignKeyConstraint(["org_id"], ["organizations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -511,6 +513,9 @@ def upgrade() -> None:
         "verifications",
         ["clinician_id"],
         unique=False,
+    )
+    op.create_index(
+        op.f("ix_verifications_org_id"), "verifications", ["org_id"], unique=False
     )
     op.create_table(
         "intake_details",
@@ -528,6 +533,9 @@ def upgrade() -> None:
         ),
         sa.Column("treatment_modality", sa.Text(), nullable=True),
         sa.Column(
+            "modalities", sa.JSON(), server_default=sa.text("'[]'"), nullable=True
+        ),
+        sa.Column(
             "age_groups", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
         ),
         sa.Column(
@@ -542,24 +550,149 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["program_id"], ["programs.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("post_id"),
     )
+    op.create_table(
+        "opening_details",
+        sa.Column("post_id", sa.Uuid(), nullable=False),
+        sa.Column("clinician_id", sa.Uuid(), nullable=False),
+        sa.Column(
+            "desired_times", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column("schedule_text", sa.Text(), nullable=True),
+        sa.Column(
+            "services", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column(
+            "settings", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column("treatment_modality", sa.Text(), nullable=True),
+        sa.Column(
+            "modalities", sa.JSON(), server_default=sa.text("'[]'"), nullable=True
+        ),
+        sa.Column(
+            "age_groups", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column(
+            "languages", sa.JSON(), server_default=sa.text("'[\"en\"]'"), nullable=False
+        ),
+        sa.Column("genders", sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
+        sa.Column("subject", sa.Text(), nullable=True),
+        sa.Column("description", sa.Text(), nullable=True),
+        sa.Column("referral_instructions", sa.Text(), nullable=True),
+        sa.Column("website", sa.Text(), nullable=True),
+        sa.Column("clinician_affiliation_id", sa.Uuid(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["clinician_affiliation_id"],
+            ["clinician_affiliations.id"],
+            ondelete="SET NULL",
+        ),
+        sa.ForeignKeyConstraint(
+            ["clinician_id"], ["clinicians.id"], ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(["post_id"], ["posts.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("post_id"),
+    )
+    op.create_table(
+        "referral_details",
+        sa.Column("post_id", sa.Uuid(), nullable=False),
+        sa.Column("location_in_person", sa.Text(), nullable=False),
+        sa.Column("location_virtual", sa.Text(), nullable=False),
+        sa.Column(
+            "desired_times", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column(
+            "age_groups", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column(
+            "languages", sa.JSON(), server_default=sa.text("'[\"en\"]'"), nullable=False
+        ),
+        sa.Column(
+            "gender",
+            sa.Text(),
+            server_default=sa.text("'prefer_not_to_say'"),
+            nullable=False,
+        ),
+        sa.Column("subject", sa.Text(), nullable=True),
+        sa.Column("description", sa.Text(), nullable=False),
+        sa.Column(
+            "services", sa.JSON(), server_default=sa.text("'[]'"), nullable=False
+        ),
+        sa.Column("treatment_modality", sa.Text(), nullable=True),
+        sa.Column(
+            "modalities", sa.JSON(), server_default=sa.text("'[]'"), nullable=True
+        ),
+        sa.Column(
+            "network_preference",
+            sa.Text(),
+            server_default=sa.text("'no_preference'"),
+            nullable=False,
+        ),
+        sa.Column("insurance_carrier", sa.Text(), nullable=True),
+        sa.Column("referring_clinician_id", sa.Uuid(), nullable=True),
+        sa.Column("clinician_affiliation_id", sa.Uuid(), nullable=True),
+        sa.Column("location_city", sa.Text(), nullable=False),
+        sa.Column("location_state", sa.Text(), nullable=False),
+        sa.Column("location_zip", sa.Text(), nullable=False),
+        sa.CheckConstraint(
+            "gender IN ('female', 'male', 'non_binary', 'trans_female', 'trans_male', 'gender_diverse', 'prefer_not_to_say')",
+            name="ck_referral_details_gender",
+        ),
+        sa.CheckConstraint(
+            "insurance_carrier IN ('aetna', 'anthem_bcbs', 'cigna', 'kaiser', 'magellan', 'medicare', 'medicaid', 'optum', 'tricare', 'united_healthcare', 'other')",
+            name="ck_referral_details_insurance_carrier",
+        ),
+        sa.CheckConstraint(
+            "location_in_person IN ('yes', 'no', 'please_contact')",
+            name="ck_referral_details_location_in_person",
+        ),
+        sa.CheckConstraint(
+            "location_state IN ('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY')",
+            name="ck_referral_details_location_state",
+        ),
+        sa.CheckConstraint(
+            "location_virtual IN ('yes', 'no', 'please_contact')",
+            name="ck_referral_details_location_virtual",
+        ),
+        sa.CheckConstraint(
+            "network_preference IN ('in_network_required', 'in_network_preferred', 'no_preference')",
+            name="ck_referral_details_network_preference",
+        ),
+        sa.ForeignKeyConstraint(
+            ["clinician_affiliation_id"],
+            ["clinician_affiliations.id"],
+            ondelete="SET NULL",
+        ),
+        sa.ForeignKeyConstraint(["post_id"], ["posts.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["referring_clinician_id"], ["clinicians.id"], ondelete="SET NULL"
+        ),
+        sa.PrimaryKeyConstraint("post_id"),
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_table("referral_details")
+    op.drop_table("opening_details")
     op.drop_table("intake_details")
+    op.drop_index(op.f("ix_verifications_org_id"), table_name="verifications")
     op.drop_index(op.f("ix_verifications_clinician_id"), table_name="verifications")
     op.drop_table("verifications")
     op.drop_index("ix_user_favorites_user_id_created_at", table_name="user_favorites")
     op.drop_table("user_favorites")
-    op.drop_table("referral_details")
     op.drop_table("programs")
-    op.drop_table("opening_details")
+    op.drop_index(
+        op.f("ix_org_representations_user_id"), table_name="org_representations"
+    )
+    op.drop_index(
+        op.f("ix_org_representations_org_id"), table_name="org_representations"
+    )
+    op.drop_table("org_representations")
     op.drop_table("clinician_licensures")
     op.drop_table("clinician_educations")
     op.drop_table("clinician_certifications")
-    op.drop_table("affiliations")
+    op.drop_table("clinician_affiliations")
     op.drop_table("posts")
     op.drop_table("organizations")
     op.drop_table("clinicians")
