@@ -219,7 +219,7 @@ async def test_list_kind_filter_narrows_to_one_kind(
     """`/posts?kind=referral` narrows the feed to that kind. Without
     a filter the feed includes every kind in the database."""
     author = create_test_user(username=f"a-{uuid.uuid4()}")
-    org = Organization(owner_id=author.id, name=f"Org {uuid.uuid4()}", type="clinic")
+    org = Organization(owner_id=author.id, name=f"Org {uuid.uuid4()}")
     org.id = uuid.uuid4()
     org.root_org_id = org.id
     referral = _referral_post(owner_id=author.id)

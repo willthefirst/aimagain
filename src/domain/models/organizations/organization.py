@@ -6,7 +6,7 @@ from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import BaseModel
 
-from ..enums import NPI_MATCH_STATUSES, ORGANIZATION_TYPES, named_check_in
+from ..enums import NPI_MATCH_STATUSES, named_check_in
 
 _TABLE = "organizations"
 _ck = partial(named_check_in, _TABLE)
@@ -21,28 +21,20 @@ _NPI_FORMAT_CHECK = CheckConstraint(
 
 
 class Organization(BaseModel):
-    """First-class directory entity for clinics, group practices, health
-    systems, and solo-practice shells. ``Organization.name`` is the
-    source of truth for the practice's display name; every Clinician
-    is linked to one or more Orgs via ClinicianAffiliation and templates
-    read ``clinician.org.name`` directly.
-
-    Hierarchy is modeled as a self-referential tree via ``parent_org_id``
-    (nullable; a root org has ``parent_org_id IS NULL``). ``root_org_id``
-    is denormalized so subtree lookups stay one indexed read instead of
-    a recursive CTE. See ``README.md`` in this directory for the
-    insert-time invariant tying the two columns together.
+    """First-class directory entity for any practice (clinic, group
+    practice, health system, solo-practice shell). ``Organization.name``
+    is the source of truth for the practice's display name; every
+    Clinician is linked to one or more Orgs via ``ClinicianAffiliation``
+    and templates read ``clinician.org.name`` directly.
     """
 
     __tablename__ = _TABLE
     __table_args__ = (
-        _ck("type", ORGANIZATION_TYPES),
         _ck("npi_match_status", NPI_MATCH_STATUSES),
         _NPI_FORMAT_CHECK,
     )
 
     name = Column(Text, nullable=False)
-    type = Column(Text, nullable=False)
 
     # NPPES Type-2 (organizational) NPI. Verified once per Organization;
     # subsequent representatives prove authority against the org through
@@ -73,30 +65,8 @@ class Organization(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    parent_org_id = Column(
-        Uuid(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    root_org_id = Column(
-        Uuid(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-    )
 
     user = relationship("User")
-    # ``lazy="selectin"`` so the detail template can resolve the parent's
-    # *name* without re-issuing IO inside Jinja (async sessions disallow
-    # implicit lazy-loads). Same pattern as ``Clinician.org`` — any
-    # relationship a template dereferences must be eagerly loaded at the
-    # session boundary.
-    parent = relationship(
-        "Organization",
-        remote_side="Organization.id",
-        foreign_keys=[parent_org_id],
-        lazy="selectin",
-        join_depth=1,
-    )
     # FK-side ``RESTRICT`` on Programs — deleting an Org with attached
     # Programs fails loudly rather than silently orphaning. The Org →
     # Clinician path is Org → ClinicianAffiliation (#635 PR B);

@@ -36,7 +36,6 @@ from src.domain.logic.org_representations.repository import (
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Organization, User
-from src.framework.access.authz.authz import list_visible_to
 from src.framework.audit.repository import AuditRepository
 
 logger = logging.getLogger(__name__)
@@ -51,20 +50,12 @@ async def organization_form_extras(
 ) -> dict[str, Any]:
     """Per-viewer form extras for the create + edit Organization forms.
 
-    Drives the parent-Org picker (issue #581). The framework invokes
-    this on both paths:
-
-    * Create (``target=None``): all visible Orgs are picker options;
-      the template's default "(root — no parent)" option is selected.
-    * Edit (``target=<org row>``): the same visible-Org list, minus
-      the row being edited (prevents a self-loop on submit). The
-      template pre-selects the row's current ``parent_org_id`` if it
-      still appears in the options.
+    Returns no extras today — the flat Organization model has no
+    relationship the form needs to pre-populate. Kept as the
+    ``form_extras_path`` target so the spec wiring stays stable for
+    future per-viewer context (e.g. an audit-scoped picker).
     """
-    orgs = await list_visible_to(organization_repo, requesting_user, Organization)
-    if target is not None:
-        orgs = [o for o in orgs if o.id != target.id]
-    return {"parent_org_options": orgs}
+    return {}
 
 
 async def after_create_organization_owner_grant(

@@ -377,21 +377,6 @@ INSURANCE_POSTURES: Final[tuple[str, ...]] = InsurancePosture.values()
 INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = InsurancePosture.labels()
 
 
-# Organization kind. CHECK'd at the table level — empty-tuple growth
-# isn't a concern (the five tokens cover the directory's organization
-# universe today; expanding it means adding one member).
-class OrganizationType(LabeledChoice):
-    solo_practice = "solo_practice", "Solo practice"
-    group_practice = "group_practice", "Group practice"
-    clinic = "clinic", "Clinic"
-    health_system = "health_system", "Health system"
-    other = "other", "Other"
-
-
-ORGANIZATION_TYPES: Final[tuple[str, ...]] = OrganizationType.values()
-ORGANIZATION_TYPES_LABELS: Final[dict[str, str]] = OrganizationType.labels()
-
-
 class LicenseType(LabeledChoice):
     lcsw = "lcsw", "Licensed Clinical Social Worker (LCSW)"
     lpc = "lpc", "Licensed Professional Counselor (LPC)"

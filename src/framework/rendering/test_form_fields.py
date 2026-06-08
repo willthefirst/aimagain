@@ -157,8 +157,10 @@ def test_zip_text_alias_carries_pattern_in_real_schema():
     is the production wiring this prototype targets. If someone removes
     the `HtmlPattern` marker on `ZipText`, the form's client-side
     validation silently drops — catch it here."""
-    from src.domain.logic.clinicians.schema import ClinicianCreate
+    from src.domain.logic.clinician_affiliations.schema import (
+        ClinicianAffiliationCreate,
+    )
 
-    spec = field_spec(ClinicianCreate, "location_zip")
+    spec = field_spec(ClinicianAffiliationCreate, "location_zip")
     assert spec["pattern"] == r"\d{5}"
     assert spec["maxlength"] == 5

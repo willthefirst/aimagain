@@ -145,8 +145,6 @@ def test_recompute_org_claim_matched_flips_true():
         id=uuid4(),
         owner_id=uuid4(),
         name="Acme",
-        type="clinic",
-        root_org_id=uuid4(),
     )
     org.npi_match_status = "matched"
     org.org_verified = False
@@ -161,8 +159,6 @@ def test_recompute_org_claim_pending_keeps_false():
         id=uuid4(),
         owner_id=uuid4(),
         name="Acme",
-        type="clinic",
-        root_org_id=uuid4(),
     )
     org.npi_match_status = "pending"
     org.org_verified = False
@@ -175,8 +171,6 @@ def test_recompute_org_claim_regression_clears_verified():
         id=uuid4(),
         owner_id=uuid4(),
         name="Acme",
-        type="clinic",
-        root_org_id=uuid4(),
     )
     org.npi_match_status = "mismatch"  # admin closed a soft mismatch
     org.org_verified = True

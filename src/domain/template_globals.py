@@ -74,11 +74,6 @@ register_template_globals(
     GENDER_LABELS=enums.GENDER_LABELS,
     INSURANCE_POSTURES=enums.INSURANCE_POSTURES,
     INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
-    # Org types exposed as a Jinja global so the profile-hub setup template
-    # (and any other bespoke template that isn't rendered via an EntitySpec)
-    # can render the org-type select without per-route context injection.
-    ORGANIZATION_TYPES=enums.ORGANIZATION_TYPES,
-    ORGANIZATION_TYPES_LABELS=enums.ORGANIZATION_TYPES_LABELS,
     # LICENSE_TYPES and EDUCATION/CERTIFICATION equivalents are exposed here
     # as globals so bespoke templates (like the profile hub's license step)
     # can reference them without relying on CLINICIAN_ENTITY.static_context,
@@ -152,7 +147,6 @@ register_choice_labels(enums.REFERRAL_SERVICES, enums.REFERRAL_SERVICE_LABELS)
 register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
 register_choice_labels(enums.TREATMENT_MODALITIES, enums.TREATMENT_MODALITY_LABELS)
 register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
-register_choice_labels(enums.ORGANIZATION_TYPES, enums.ORGANIZATION_TYPES_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)

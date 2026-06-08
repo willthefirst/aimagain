@@ -37,7 +37,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, Field, model_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
@@ -81,6 +81,13 @@ def _validate_npi(v: str | None) -> str | None:
     return v
 
 
+def _validate_required_npi(v: str | None) -> str:
+    cleaned = _validate_npi(v)
+    if cleaned is None:
+        raise ValueError("NPI is required")
+    return cleaned
+
+
 # NPI is a National Provider Identifier — 10 ASCII digits. The HTML
 # `pattern` hint mirrors the validator so the form's `<input>` rejects
 # bad values client-side too. Also imported by `OrganizationCreate` (the
@@ -89,6 +96,14 @@ def _validate_npi(v: str | None) -> str | None:
 NpiText = Annotated[
     str | None,
     AfterValidator(_validate_npi),
+    HtmlPattern(pattern=r"\d{10}", maxlength=10),
+]
+
+# Required flavor: blank/None input 422s with "NPI is required". Used by
+# Create schemas where the wire-side gate must reject missing NPIs.
+RequiredNpiText = Annotated[
+    str,
+    AfterValidator(_validate_required_npi),
     HtmlPattern(pattern=r"\d{10}", maxlength=10),
 ]
 
@@ -194,15 +209,17 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     owner_id: uuid.UUID
     created_at: datetime
     updated_at: datetime
-    # `org_name` is the practice's display name, sourced from
-    # ``clinician.org.name`` via the model-validator below — every reader
-    # (templates, audit snapshots, contract tests) reads `org_name` rather
-    # than dereferencing the relationship inline.
-    org_id: uuid.UUID
-    org_name: str
-    # National Provider Identifier; 10 ASCII digits or `None`. Used by the
-    # verification pipeline to look up the clinician in NPPES. No UNIQUE
-    # constraint at the DB layer yet.
+    # Affiliation-derived fields are optional: a newly-created clinician
+    # has no `ClinicianAffiliation` until one is added via the affiliation
+    # sub-resource. Org assignment, location, availability, and insurance
+    # posture all live on `ClinicianAffiliation`; the proxy properties on
+    # `Clinician` return `None` (or `[]` for `in_network_carriers`) when
+    # there's no primary affiliation.
+    org_id: uuid.UUID | None = None
+    org_name: str | None = None
+    # National Provider Identifier; 10 ASCII digits. Required at create
+    # time; the column is `nullable=True` only so legacy rows without NPI
+    # remain readable.
     npi: str | None = None
     # Legal first / last name — required on the model (NOT NULL).
     first_name: str
@@ -215,71 +232,33 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     # so the ``Location`` value object owns the cleaning rules; the
     # ``@model_serializer`` below unrolls it back to flat on dump.
     location: Location | None = None
-    in_person_sessions: str
-    virtual_sessions: str
-    accepts_out_of_network: bool
+    in_person_sessions: str | None = None
+    virtual_sessions: str | None = None
+    accepts_out_of_network: bool | None = None
     in_network_carriers: list[str] = []
-    sliding_scale: bool
+    sliding_scale: bool | None = None
     cost: str | None = None
     licensures: list[ClinicianLicensureRead] = []
     educations: list[ClinicianEducationRead] = []
     certifications: list[ClinicianCertificationRead] = []
 
 
-class ClinicianCreate(FlatLocationSchema, WirePayload):
-    """Create payload for a clinician directory entry. `owner_id` is
-    set by the route from the authenticated user, not accepted on the
-    wire.
+class ClinicianCreate(WirePayload):
+    """Create payload for a clinician directory entry. `owner_id` is set
+    by the route from the authenticated user, not accepted on the wire.
 
-    The ``(city, state, zip)`` location triple is modeled as a single
-    :class:`Location` value object. On the wire it stays flat — form posts
-    and JSON bodies send ``location_city`` / ``location_state`` /
-    ``location_zip`` at the top level — the ``gather_flat_location``
-    pre-validator rolls those keys into a nested ``location`` block, and
-    the ``@model_serializer`` flattens the dump back to flat keys so JSON
-    responses, ORM-hydrating ``model_dump()``, and audit snapshots keep
-    the flat shape.
+    Minimal by design — only the person-level identifiers needed to
+    bring a row into existence. Practice/affiliation fields (org, location,
+    availability, insurance) are added later via the affiliation
+    sub-resource on the edit page; credentials are added via their own
+    endpoints.
     """
 
-    # `solo_practice=True` lets a new user skip the separate Org-create
-    # step: the create handler auto-creates a solo-practice Org and
-    # patches `org_id` before persisting the Clinician (#699). Excluded
-    # from model_dump() so the field never leaks into the ORM constructor.
-    solo_practice: bool = Field(default=False, exclude=True)
-    # Display name for the auto-created solo-practice org. Falls back to
-    # "first last" (then username) when absent. Excluded from model_dump()
-    # — used only by the org-creation step, never written to Clinician.
-    practice_name: StrippedOptionalText = Field(default=None, exclude=True)
-    # Required when `solo_practice=False`; the handler fills it in for
-    # the solo path. The `@model_validator` below enforces the invariant.
-    org_id: uuid.UUID | None = None
-
-    @model_validator(mode="after")
-    def _require_org_or_solo(self) -> "ClinicianCreate":
-        if not self.solo_practice and self.org_id is None:
-            raise ValueError("org_id is required unless solo_practice is True")
-        return self
-
-    # Optional on create; empty input normalizes to `None`.
-    npi: NpiText = None
     # Legal first / last name — required; empty input fails validation.
-    # Forwarded to the linked Clinician via `Clinician.__init__`'s kwarg peeling.
     first_name: StrippedText
     last_name: StrippedText
-    location: Location | None = None
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] = "yes"
-    # Insurance posture. `in_network_carriers` is the set the practice
-    # accepts in-network (empty = no in-network); `accepts_out_of_network`
-    # is independent and defaults `True` (most practices accept OON;
-    # opt-out is the explicit choice). No cross-field invariant.
-    accepts_out_of_network: bool = True
-    in_network_carriers: InNetworkCarriersField = []
-    sliding_scale: bool = False
-    cost: StrippedOptionalText = None
-    licensures: list[ClinicianLicensureCreate] = []
-    educations: list[ClinicianEducationCreate] = []
-    certifications: list[ClinicianCertificationCreate] = []
+    # National Provider Identifier — required at create; blank input 422s.
+    npi: RequiredNpiText
 
 
 class ClinicianUpdate(FlatLocationSchema, PartialUpdate):
