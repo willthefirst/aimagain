@@ -584,7 +584,7 @@ def test_check_network_clinician_verified_granted():
     assert check.granted is True
     gate = check.tree.children[1]
     clin_condition = gate.children[0]
-    assert clin_condition.label_done == "Clinician identity verified"
+    assert clin_condition.label_done == "Clinician verified"
     assert clin_condition.met is True
 
 
@@ -599,7 +599,7 @@ def test_check_network_org_rep_granted():
     assert check.granted is True
     gate = check.tree.children[1]
     org_condition = gate.children[1]
-    assert org_condition.label_done == "Organization rep verified"
+    assert org_condition.label_done == "Organization verified"
     assert org_condition.met is True
 
 

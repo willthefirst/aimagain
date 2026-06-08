@@ -216,24 +216,24 @@ def check_network(user: Any) -> CapabilityCheck:
             label_done="Provider network",
             children=(
                 Condition(
-                    label_active="Verify email",
+                    label_active="Verify your email",
                     label_done="Email verified",
                     met=_email_met,
                     fix_url="/users/me/email/form",
                 ),
                 Gate(
-                    label_active="Verify your status",
-                    label_done="Status verified",
+                    label_active="Verify a clinician or organization",
+                    label_done="Clinician or organization verified",
                     children=(
                         Condition(
-                            label_active="Verify clinician identity",
-                            label_done="Clinician identity verified",
+                            label_active="Verify a clinician",
+                            label_done="Clinician verified",
                             met=_clin_met,
                             fix_url="/clinicians/form",
                         ),
                         Condition(
-                            label_active="Verify organization rep",
-                            label_done="Organization rep verified",
+                            label_active="Verify your organization",
+                            label_done="Organization verified",
                             met=_org_met,
                             fix_url="/organizations/form",
                         ),

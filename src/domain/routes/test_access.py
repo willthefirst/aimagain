@@ -71,14 +71,13 @@ async def test_capability_detail_network_returns_200(
     # Capability label_active appears in the page heading and breadcrumb.
     assert "Provider network" in response.text
     # Tree node labels appear — active form for unmet, done form for met.
-    assert "Verify email" in response.text or "Email verified" in response.text
+    assert "Verify your email" in response.text or "Email verified" in response.text
     assert (
-        "Verify clinician identity" in response.text
-        or "Clinician identity verified" in response.text
+        "Verify a clinician" in response.text or "Clinician verified" in response.text
     )
     assert (
-        "Verify organization rep" in response.text
-        or "Organization rep verified" in response.text
+        "Verify your organization" in response.text
+        or "Organization verified" in response.text
     )
 
 
