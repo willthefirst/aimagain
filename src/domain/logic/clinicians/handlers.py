@@ -28,7 +28,6 @@ from src.framework.dispatch.pagination import (
     parse_page,
 )
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
-from src.framework.rendering.templating import set_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +197,6 @@ async def handle_list_user_clinicians(
     clinicians, page = paginate(
         clinicians_plus_one, page=page_number, per_page=per_page
     )
-    set_viewer(requesting_user)
     return {
         "request": request,
         "target_user": target_user,

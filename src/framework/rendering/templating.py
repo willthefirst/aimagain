@@ -107,13 +107,22 @@ _env.globals["entity_filter_label"] = entity_filter_label
 _env.filters["format_post_date"] = format_post_date
 _env.filters["days_ago"] = days_ago
 
-# Per-request viewer — set by list handlers before rendering so that macros
-# (which can't access template context variables) can call viewer_is_admin().
+# Per-request viewer — pinned by `APIResponse.html_response` immediately
+# before rendering so macros that can't reach template context (e.g.
+# `viewer_is_admin`, `entity_link` via `entity_lock_reason`) consult the
+# same identity the route's `current_user_dep` resolved. Handlers don't
+# call `set_viewer` directly; the central html_response wrapper does.
 _viewer_var: ContextVar[Actor | None] = ContextVar("_viewer", default=None)
 
 
 def set_viewer(user: Actor | None) -> None:
-    """Set the current viewer for the duration of the current async task."""
+    """Pin the per-task viewer for the upcoming render.
+
+    Called by `APIResponse.html_response` before every template render,
+    so macros that can't access template context (`viewer_is_admin`,
+    `entity_link` via `entity_lock_reason`) see the same identity the
+    route resolved. Test fixtures still call this directly to drive
+    `viewer_is_admin` in isolation."""
     _viewer_var.set(user)
 
 
