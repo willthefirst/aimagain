@@ -125,7 +125,7 @@ async def test_form_new_picker_responds_200(
     assert response.status_code == 200
     body = response.text
     for heading in ("Referral", "Clinician", "Organization"):
-        assert f"<h2>{heading}</h2>" in body
+        assert f">{heading}</a>" in body
     for kind in ("referral", "clinician_opening", "program_intake"):
         assert f"?kind={kind}" in body
 
