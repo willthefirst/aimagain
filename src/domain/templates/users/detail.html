@@ -1,5 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/_picker.html" import picker -%}
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
 {% block actions %}
@@ -22,77 +23,54 @@
   {% endif %}
   {% include "users/_admin_actions.html" %}
 {% endblock %}
-{# User detail: identity card (email/active) + Favorites + Access. #}
+{# User detail: identity facts (email/active) + navigational picker
+ (Email, Favorites, Access). The picker species here is a *dispatching
+ picker* — each card points OUT to a self-sub-page where the user
+ actually manages that surface. Headers + descriptions read as a
+ self-explanatory dashboard; whole-card click is the affordance.
+ The identity-facts article above stays plain-data (not a picker
+ option) because it shows the email value rather than navigating. #}
 {% block content %}
-  <section class="entity-card">
-    {# Private rows (email, active) are gated by `can_view_private`,
-     computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
-     The handler also omits these fields from the `target_user`
-     projection for non-authorized viewers, so a forgotten guard here
-     cannot re-leak.
+  {# Private rows (email, active) are gated by `can_view_private`,
+   computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
+   The handler also omits these fields from the `target_user`
+   projection for non-authorized viewers, so a forgotten guard here
+   cannot re-leak.
 
-     The Active row is an admin signal — it makes sense to an admin
-     auditing someone else's account, not to the user themselves (#597).
-     Hide it on the self-view; an admin viewing another user still sees
-     it. Email stays for self since users routinely glance at it to
-     confirm which account they're signed in as.
+   The Active row is an admin signal — it makes sense to an admin
+   auditing someone else's account, not to the user themselves (#597).
+   Hide it on the self-view; an admin viewing another user still sees
+   it. Email stays for self since users routinely glance at it to
+   confirm which account they're signed in as.
 
-     `is_verified` removed in #696 — no verification flow exists and
-     every account is permanently False; showing it was misleading.
-     Verification status and the resend action live at
-     /users/me/email/form (linked in the Email card below). #}
-    {% if can_view_private %}
-      <section class="entity-facts">
-        <dl>
-          {{ fact('email', 'Email', target_user.email) }}
-          {% if not is_self %}{{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}{% endif %}
-        </dl>
-      </section>
-    {% endif %}
-  </section>
-  {# Email — self-only card linking to the email management page where
-   the user can check verification status and resend the verification
-   email. #}
-  {% if is_self %}
-    <section class="entity-card">
-      <header class="entity-header">
-        <strong>Email</strong>
-      </header>
-      <footer class="entity-footer">
-        <a href="{{ entity_url('user', id='me') }}/email/form"
-           role="button"
-           class="outline">Manage email</a>
-      </footer>
-    </section>
+   `is_verified` removed in #696 — no verification flow exists and
+   every account is permanently False; showing it was misleading.
+   Verification status and the resend action live at
+   /users/me/email/form (linked in the Email card below). #}
+  {% if can_view_private %}
+    <article>
+      <dl>
+        {{ fact('email', 'Email', target_user.email) }}
+        {% if not is_self %}{{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}{% endif %}
+      </dl>
+    </article>
   {% endif %}
-  {# Favorites — self-only navigation to the viewer's private favorites
-   list. Lives in the body, not the toolbar: toolbar is reserved for
-   Actions (Sign out, admin Deactivate/Delete), and viewing someone
-   else's profile must not expose their private favorites. #}
+  {# Self-only navigation. Each option dispatches to a sub-page where
+   the user actually manages that surface — Email verification, the
+   private Favorites list, the capability tree. Order is identity →
+   content → access: Email is closest to the identity card above; the
+   capability tree is the most "settings"-flavored and sits last. #}
   {% if is_self %}
-    <section class="entity-card">
-      <header class="entity-header">
-        <strong>Favorites</strong>
-      </header>
-      <footer class="entity-footer">
-        <a href="{{ entity_url('user_favorite') }}"
-           role="button"
-           class="outline">View favorites</a>
-      </footer>
-    </section>
-  {% endif %}
-  {# Access — self-only. Links to the access overview where the user
-   can inspect their capability status. #}
-  {% if is_self %}
-    <section class="entity-card">
-      <header class="entity-header">
-        <strong>Access</strong>
-      </header>
-      <footer class="entity-footer">
-        <a href="{{ entity_url('user', id='me') }}/access"
-           role="button"
-           class="outline">View access</a>
-      </footer>
-    </section>
+    {{ picker([
+        {"href": entity_url('user', id='me') + "/email/form",
+    "heading": "Email",
+    "description": "Manage your email address and verification."},
+    {"href": entity_url('user_favorite'),
+    "heading": "Favorites",
+    "description": "Posts you've saved to revisit."},
+    {"href": entity_url('user', id='me') + "/access",
+    "heading": "Access",
+    "description": "Review your account's capabilities and what's gated."},
+    ]) }}
   {% endif %}
 {% endblock %}
