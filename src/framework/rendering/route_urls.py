@@ -146,6 +146,41 @@ def entity_lock_reason(name: str, user: Any = _SENTINEL) -> str | None:
     return spec.read_policy.lock_reason
 
 
+def breadcrumb_entity_item(
+    name: str,
+    user: Any = _SENTINEL,
+    label: str | None = None,
+) -> tuple[str, str, str | None]:
+    """Return the breadcrumb `(label, href, lock_reason)` tuple for the
+    collection of entity `name`.
+
+    Every view-type template's collection segment (`detail`, `form_new`,
+    `form_edit`, `search`) calls this so the URL, the human label, and
+    the lock-reason lookup live in one place. Adding a new view-type
+    chrome that omits this call would also omit the lock affordance —
+    `scripts/dev/template_route_check.py` enforces that any `<a>`
+    pointing at a gated entity's collection routes through this helper
+    or `entity_link(...)`.
+
+    `label` defaults to the spec's `url_collection.capitalize()`
+    (matches the original inline shape in the view-type templates).
+    Override only when the page wants a different surface label (rare
+    — usually the collection name reads correctly).
+    """
+    spec = _spec_by_name(name)
+    if label is None:
+        label = spec.url_collection.capitalize()
+    return (
+        label,
+        entity_url(name),
+        (
+            entity_lock_reason(name)
+            if user is _SENTINEL
+            else entity_lock_reason(name, user)
+        ),
+    )
+
+
 def entity_form_url(name: str, *, id: Any = None) -> str:
     """Form-page URL for the entity ``name``.
 

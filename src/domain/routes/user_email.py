@@ -29,6 +29,10 @@ async def get_email_form(
         template_name="users/email_form.html",
         context={
             "target_user": current_user,
+            # `entity_name` powers the breadcrumb's `breadcrumb_entity_item`
+            # call in `views/form_edit.html` — bespoke routes that extend a
+            # view-type chrome must inject the same key the generic mounts do.
+            "entity_name": USER_ENTITY.name,
             "resource_url": url_for_spec(USER_ENTITY),
             "resource_detail_url": url_for_spec(USER_ENTITY, id=current_user.id),
             "edit_heading": "Email",

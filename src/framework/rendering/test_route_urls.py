@@ -12,6 +12,7 @@ import pytest
 
 from src.domain.logic import capabilities
 from src.framework.rendering.route_urls import (
+    breadcrumb_entity_item,
     entity_form_url,
     entity_lock_reason,
     entity_url,
@@ -190,3 +191,46 @@ def test_entity_lock_reason_unknown_entity_raises():
     name surfaces as a render-time error rather than a silent bypass."""
     with pytest.raises(ValueError, match="Unknown entity name"):
         entity_lock_reason("clinician_licensure_typo", _Unverified())
+
+
+# --- breadcrumb_entity_item --------------------------------------------
+
+
+def test_breadcrumb_entity_item_returns_three_tuple_with_default_label():
+    """The (label, href, lock_reason) tuple every view-type template
+    consumes. Label defaults to `url_collection.capitalize()`; href
+    flows from `entity_url(name)`; lock_reason is `None` for a viewer
+    who passes the gate."""
+    item = breadcrumb_entity_item("user", _Verified())
+    assert item == ("Users", "/users", None)
+
+
+def test_breadcrumb_entity_item_carries_lock_reason_for_locked_viewer():
+    """A viewer who fails `read_policy.can_read` gets the spec's
+    `lock_reason` in the third slot — the breadcrumb macro renders the
+    back affordance as a locked popover trigger instead of an `<a>`."""
+    item = breadcrumb_entity_item("clinician", _Unverified())
+    assert item == ("Clinicians", "/clinicians", capabilities.REASON_NETWORK_UNVERIFIED)
+
+
+def test_breadcrumb_entity_item_label_override_replaces_default():
+    """Templates that declare `{% block resource_label %}` flow the
+    override label through the `label=` kwarg. Used only when the
+    visible string differs from the spec's `url_collection.capitalize()`."""
+    item = breadcrumb_entity_item("user", _Verified(), label="Profile")
+    assert item == ("Profile", "/users", None)
+
+
+def test_breadcrumb_entity_item_for_entity_without_read_policy():
+    """An ungated entity (no `read_policy` set) always produces
+    `lock_reason=None` — the back link is a plain `<a>` regardless of
+    viewer."""
+    item = breadcrumb_entity_item("organization", _Unverified())
+    assert item == ("Organizations", "/organizations", None)
+
+
+def test_breadcrumb_entity_item_unknown_entity_raises():
+    """Same fail-loud contract as `entity_url` — a typo in a view-type
+    template's `entity_name` surfaces at render time."""
+    with pytest.raises(ValueError, match="Unknown entity name"):
+        breadcrumb_entity_item("nonexistent_entity", _Unverified())
