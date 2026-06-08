@@ -531,7 +531,7 @@ async def test_get_clinician_hides_delete_button_for_non_owner(
 
 
 async def test_list_clinicians_renders_html(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`GET /clinicians` renders an HTML page with one entry per
@@ -552,7 +552,7 @@ async def test_list_clinicians_renders_html(
         db_test_session_manager, user_id=other.id, practice_name="Open House"
     )
 
-    response = await authenticated_client.get("/clinicians")
+    response = await superuser_client.get("/clinicians")
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
@@ -715,7 +715,7 @@ async def test_list_clinicians_row_dedupes_identical_locations(
 
 
 async def test_list_clinicians_shows_licensure_states(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Each list row surfaces the clinician's licensure issuing states in
@@ -751,7 +751,7 @@ async def test_list_clinicians_shows_licensure_states(
                 )
             )
 
-    response = await authenticated_client.get("/clinicians")
+    response = await superuser_client.get("/clinicians")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -763,14 +763,14 @@ async def test_list_clinicians_shows_licensure_states(
 
 
 async def test_list_clinicians_renders_create_toolbar_action(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
 ):
     """`/clinicians` (Directory) carries a 'Create clinician' toolbar
     button — matches the orgs/programs/posts list convention so an
     authenticated user always has a discoverable Create entry point.
     The route's auth is `AUTHENTICATED` (creation is not gated to
     owners/admins), so the button shows to every authenticated viewer."""
-    response = await authenticated_client.get("/clinicians")
+    response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     action = None
@@ -785,13 +785,13 @@ async def test_list_clinicians_renders_create_toolbar_action(
 
 
 async def test_list_clinicians_renders_empty_state(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
 ):
     """With no persisted clinicians, the page renders a friendly empty
     message instead of an empty `<table>`. The list page's toolbar
     links to `/clinicians/search`; the multi-choice filter widgets live
     there, not on the list page."""
-    response = await authenticated_client.get("/clinicians")
+    response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     assert "No clinicians found" in response.text
     tree = HTMLParser(response.text)
@@ -804,7 +804,7 @@ async def test_list_clinicians_renders_empty_state(
     # `ChoiceFilter`s now render as a `<fieldset>` of single-click
     # checkboxes (#583), not the previous native `<select multiple>`
     # listbox. No checkbox is preselected when the filter is inactive.
-    search_response = await authenticated_client.get("/clinicians/search")
+    search_response = await superuser_client.get("/clinicians/search")
     assert search_response.status_code == 200
     search_tree = HTMLParser(search_response.text)
     for filter_name in ("license_type", "issuing_state"):
@@ -820,7 +820,7 @@ async def test_list_clinicians_renders_empty_state(
 
 
 async def test_list_clinicians_filters_by_license_type(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """`?license_type=` keeps only clinicians holding a matching licensure;
@@ -849,7 +849,7 @@ async def test_list_clinicians_filters_by_license_type(
                 make_clinician_licensure(clinician_id=clinician_b, license_type="lcsw")
             )
 
-    response = await authenticated_client.get("/clinicians?license_type=psyd")
+    response = await superuser_client.get("/clinicians?license_type=psyd")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -867,7 +867,7 @@ async def test_list_clinicians_filters_by_license_type(
     # The search page re-renders the form with the active value preselected.
     # Multi-choice filters now render as checkboxes (#583), so the
     # active value surfaces as a `checked` `<input type="checkbox">`.
-    search = await authenticated_client.get("/clinicians/search?license_type=psyd")
+    search = await superuser_client.get("/clinicians/search?license_type=psyd")
     assert search.status_code == 200
     checked = HTMLParser(search.text).css_first(
         'input[type="checkbox"][name="license_type"][value="psyd"]'
@@ -877,7 +877,7 @@ async def test_list_clinicians_filters_by_license_type(
 
 
 async def test_list_clinicians_treats_empty_filter_values_as_absent(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Pressing "Apply" on the filter form with no selection submits
@@ -895,9 +895,7 @@ async def test_list_clinicians_treats_empty_filter_values_as_absent(
         db_test_session_manager, user_id=other.id, practice_name="Filter Test"
     )
 
-    response = await authenticated_client.get(
-        "/clinicians?license_type=&issuing_state="
-    )
+    response = await superuser_client.get("/clinicians?license_type=&issuing_state=")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -909,7 +907,7 @@ async def test_list_clinicians_treats_empty_filter_values_as_absent(
 
 
 async def test_clinicians_list_toolbar_renders_filter_link_and_create_action(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
 ):
     """`/clinicians` toolbar carries both the filter link (left) and a
     'Create clinician' action (right). The Create button matches the
@@ -917,7 +915,7 @@ async def test_clinicians_list_toolbar_renders_filter_link_and_create_action(
     `test_list_clinicians_renders_create_toolbar_action` test above
     pins the action's `href` shape — this one pins the toolbar
     composition (filter ✕ actions both present)."""
-    response = await authenticated_client.get("/clinicians")
+    response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first("a.toolbar-filter-link") is not None

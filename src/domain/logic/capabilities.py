@@ -249,6 +249,20 @@ def can_access_network(user: Any) -> bool:
     return check_network(user).granted
 
 
+def assert_can_access_network(user: Any) -> None:
+    """Raising form of `can_access_network`. Superusers bypass.
+
+    Used as `ReadPolicy.assert_can_read` on entities whose data is
+    restricted to verified network members (e.g. clinicians).
+    """
+    if getattr(user, "is_superuser", False):
+        return
+    if not can_access_network(user):
+        from src.framework.http.exceptions import ForbiddenError
+
+        raise ForbiddenError(detail="Provider network access required.")
+
+
 def can_post_referral(user: Any) -> bool:
     """Self-path gate: posting a referral as the owning clinician requires
     Claim A (handoff §4.3). The org-rep authority path in

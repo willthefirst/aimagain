@@ -207,6 +207,24 @@ async def superuser_client(
 
 
 @pytest.fixture(scope="function")
+async def superuser_logged_in_user(
+    superuser_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+) -> "User":
+    """Provides the User object for the default superuser."""
+    async with db_test_session_manager() as session:
+        from src.domain.logic.users.repository import UserRepository
+
+        user_repo = UserRepository(session)
+        user = await user_repo.get_user_by_email("superuser@example.com")
+        if not user:
+            pytest.fail(
+                "Superuser 'superuser@example.com' not found in DB for superuser_logged_in_user fixture"
+            )
+        return user
+
+
+@pytest.fixture(scope="function")
 async def logged_in_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
