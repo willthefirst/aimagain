@@ -234,6 +234,44 @@ dd { margin: 0; }
 .entity-form-page form .form-field > select,
 .entity-form-page form .form-field > textarea,
 .entity-form-page form .form-field > .form-field-control { margin: 0; min-width: 0; }
+/* Multi-selection rendered as a scrollable checkbox list (replaces the
+   old `<select multiple>` listbox — see `multi_select_field` in
+   `_shared/form_fields.html`). The max-height cap is the whole point:
+   long controlled vocabularies (50 US states, the carrier list) used
+   to grow the form unboundedly; this caps the visual envelope at
+   ~14rem and scrolls the overflow. Short vocabularies (3–4 genders)
+   render shorter than the cap and don't gain a scrollbar.
+
+   The container reads as a single visual control — bordered like an
+   input, padded inside so the option-label text doesn't kiss the
+   scrollbar gutter. Each option is a flex row so the checkbox and the
+   text baseline-align even when the label wraps. */
+.checkbox-list {
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--pico-form-element-border-color);
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-form-element-background-color);
+  padding: 0.375rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.checkbox-list-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  cursor: pointer;
+}
+.checkbox-list-option > input[type="checkbox"] {
+  margin: 0;
+  flex: 0 0 auto;
+}
+.checkbox-list[aria-invalid="true"],
+.form-field[aria-invalid="true"] > .checkbox-list {
+  border-color: var(--pico-form-element-invalid-border-color);
+}
 .entity-form-page form .form-field > small {
   grid-column: 2;
   margin: 0;
@@ -501,17 +539,31 @@ td > menu > li > [role="button"] {
    option per line so short choice sets (Age groups, Languages)
    read top-to-bottom. Long sets opt into `.search-checkbox-grid`
    which lays the options out in 2–3 responsive columns so a
-   50-state list doesn't stretch the form to 50 rows tall. */
+   50-state list doesn't stretch the form to 50 rows tall — and
+   the option list is wrapped in a scrollable container with a
+   max-height cap so even the single-column fallback (narrow
+   viewports) doesn't grow the filter sidebar unboundedly. The
+   legend sits OUTSIDE that scroll viewport so the field label
+   stays pinned while the options scroll. */
 .search-checkbox-fieldset {
   margin-block-start: var(--pico-spacing);
 }
-.search-checkbox-fieldset > label {
+/* `.search-checkbox-options` is the scrollable inner viewport — the
+   legend stays pinned outside it (always visible above the option
+   list) while the options scroll if there are more than fit in the
+   14rem cap. Short choice sets render shorter and don't gain a
+   scrollbar. */
+.search-checkbox-options {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.search-checkbox-options > label {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-block: 0.125rem;
 }
-.search-checkbox-fieldset > label > input[type="checkbox"] {
+.search-checkbox-options > label > input[type="checkbox"] {
   margin: 0;
   flex: 0 0 auto;
 }
@@ -520,9 +572,6 @@ td > menu > li > [role="button"] {
   grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
   column-gap: var(--pico-spacing);
   row-gap: 0.125rem;
-}
-.search-checkbox-grid > legend {
-  grid-column: 1 / -1;
 }
 @media (max-width: 540px) {
   .search-checkbox-grid {

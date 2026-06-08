@@ -1456,9 +1456,8 @@ async def test_get_clinician_form_renders(
     )
     assert tree.css_first('input[type="checkbox"][name="sliding_scale"]') is not None
     assert tree.css_first('input[name="cost"]') is not None
-    carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
-    assert carrier_select is not None
-    assert len(carrier_select.css("option")) == 11
+    carrier_boxes = tree.css('input[type="checkbox"][name="in_network_carriers"]')
+    assert len(carrier_boxes) == 11
 
 
 async def test_get_clinician_form_scopes_org_dropdown_to_user(

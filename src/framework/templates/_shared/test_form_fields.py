@@ -196,17 +196,53 @@ def test_select_field_placeholder_emits_disabled_option_when_no_current() -> Non
 # --- multi_select_field ---------------------------------------------------
 
 
-def test_multi_select_field_with_help_links_each_via_aria() -> None:
-    """`<select multiple>` carries `aria-describedby` on the select
-    itself; the `<small>` lives inside the label after the select."""
+def test_multi_select_field_renders_checkbox_list_with_one_input_per_option() -> None:
+    """Multi-selection renders as a scrollable `.checkbox-list` of
+    `<input type="checkbox">` controls — one per controlled-vocab value,
+    all sharing the field `name` so repeated submissions deserialize as
+    a list. Replaces the old `<select multiple>` listbox."""
+    html = _render(
+        _make_env(),
+        '{{ multi_select_field("tags", "Tags", ("a", "b")) }}',
+    )
+    tree = HTMLParser(html)
+    # No `<select>` anywhere — that's the regression guard.
+    assert tree.css_first("select") is None
+    boxes = tree.css('input[type="checkbox"][name="tags"]')
+    assert [b.attributes.get("value") for b in boxes] == ["a", "b"]
+    # The scrollable container is what caps height for long vocabularies.
+    assert tree.css_first(".checkbox-list") is not None
+
+
+def test_multi_select_field_with_help_links_group_via_aria() -> None:
+    """The wrapping `[role=group]` carries `aria-describedby`; the
+    `<small>` lives inside the group so screen readers announce it as
+    part of the group's accessible description."""
     html = _render(
         _make_env(),
         '{{ multi_select_field("tags", "Tags", ("a", "b"), help="Pick any.") }}',
     )
     tree = HTMLParser(html)
-    sel = tree.css_first('select[name="tags"][multiple]')
-    assert sel.attributes.get("aria-describedby") == "tags-helper"
+    group = tree.css_first('[role="group"][id="tags"]')
+    assert group is not None
+    assert group.attributes.get("aria-describedby") == "tags-helper"
     assert tree.css_first("small#tags-helper") is not None
+
+
+def test_multi_select_field_marks_current_values_checked() -> None:
+    """`current=` is an iterable of selected values; each matching
+    checkbox carries `checked`, the rest don't."""
+    html = _render(
+        _make_env(),
+        '{{ multi_select_field("tags", "Tags", ("a", "b", "c"), current=["a", "c"]) }}',
+    )
+    tree = HTMLParser(html)
+    checked = {
+        b.attributes.get("value")
+        for b in tree.css('input[type="checkbox"][name="tags"]')
+        if "checked" in b.attributes
+    }
+    assert checked == {"a", "c"}
 
 
 # --- entity_select_field --------------------------------------------------
@@ -569,7 +605,7 @@ _INPUT_MACROS = [
     (
         "multi_select_field",
         '{{ multi_select_field("x", "X", ("a", "b"), error="bad") }}',
-        "select",
+        '[role="group"][id="x"]',
     ),
     (
         "entity_select_field",
@@ -756,7 +792,7 @@ _AUTO_RESOLVE_MACROS = [
     (
         "multi_select_field",
         '{{ multi_select_field("x", "X", ("a", "b")) }}',
-        "select",
+        '[role="group"][id="x"]',
     ),
     (
         "entity_select_field",
@@ -858,6 +894,18 @@ def _checkbox_checked_check(expected: bool):
     return check
 
 
+def _checkbox_list_checked_check(values: list[str]):
+    def check(tree: HTMLParser) -> tuple[bool, str]:
+        checked = [
+            b.attributes.get("value")
+            for b in tree.css('input[type="checkbox"][name="x"]')
+            if "checked" in b.attributes
+        ]
+        return checked == values, f"expected checked={values!r}, got {checked!r}"
+
+    return check
+
+
 _AUTO_RESOLVE_VALUE_CASES = [
     ("text_field", '{{ text_field("x", "X") }}', "typed", _input_value_check("typed")),
     (
@@ -876,7 +924,7 @@ _AUTO_RESOLVE_VALUE_CASES = [
         "multi_select_field",
         '{{ multi_select_field("x", "X", ("a", "b")) }}',
         ["a", "b"],
-        _select_selected_check(["a", "b"]),
+        _checkbox_list_checked_check(["a", "b"]),
     ),
     (
         "entity_select_field",
