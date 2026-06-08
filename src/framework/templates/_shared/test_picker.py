@@ -7,8 +7,9 @@ component"). The two species differ *only* in where each card's ``href``
 points — within the resource (discriminator: ``/posts/form?kind=…``) or out
 to another resource's form (dispatching: ``/clinicians/form``). These tests
 pin that the macro is href-agnostic (same markup for both), renders one
-card per option in order, and renders a ``selected`` option as a
-non-clickable marked card rather than a link.
+``<article class="picker-option">`` card per option in order, and renders a
+``selected`` option as a non-clickable card tagged ``aria-current="page"``
+rather than a link.
 """
 
 from __future__ import annotations
@@ -32,10 +33,10 @@ def _render_picker(env: Environment, options: list[dict]) -> str:
     return env.from_string(template).render(options=options)
 
 
-def test_picker_renders_one_link_card_per_option_in_order() -> None:
-    """Each non-selected option becomes an `<a class="picker-option">` card
-    carrying the option's `href`, an `<h2>` heading, and a `<p>`
-    description — in the order supplied."""
+def test_picker_renders_one_article_card_per_option_in_order() -> None:
+    """Each non-selected option becomes an ``<article class="picker-option">``
+    card whose ``<header><h2><a>`` carries the option's ``href`` and heading
+    text, with the description as a plain ``<p>`` — in the order supplied."""
     env = _make_env()
     options = [
         {
@@ -51,16 +52,14 @@ def test_picker_renders_one_link_card_per_option_in_order() -> None:
     ]
     tree = HTMLParser(_render_picker(env, options))
 
-    cards = tree.css("a.picker-option")
+    cards = tree.css("article.picker-option")
     assert len(cards) == 2
-    assert [c.attributes.get("href") for c in cards] == [
+    headings = [c.css_first("header h2 a") for c in cards]
+    assert [h.attributes.get("href") for h in headings] == [
         "/posts/form?kind=referral",
         "/posts/form?kind=clinician_opening",
     ]
-    assert [c.css_first("h2").text(strip=True) for c in cards] == [
-        "Referral",
-        "Clinician",
-    ]
+    assert [h.text(strip=True) for h in headings] == ["Referral", "Clinician"]
     assert cards[0].css_first("p").text(strip=True) == "Place a client."
 
 
@@ -84,23 +83,21 @@ def test_picker_is_href_agnostic_across_both_species() -> None:
     ]
     tree = HTMLParser(_render_picker(env, dispatching))
 
-    cards = tree.css("a.picker-option")
+    cards = tree.css("article.picker-option")
     assert len(cards) == 2
     # Cross-resource hrefs render through unchanged — same card shape as the
     # discriminator species, no special-casing.
-    assert {c.attributes.get("href") for c in cards} == {
-        "/clinicians/form",
-        "/organizations/form",
-    }
+    hrefs = {c.css_first("header h2 a").attributes.get("href") for c in cards}
+    assert hrefs == {"/clinicians/form", "/organizations/form"}
     # No "selected" marker species leaks in for a plain option list.
-    assert tree.css_first(".picker-option--selected") is None
+    assert tree.css_first("article.picker-option[aria-current]") is None
 
 
 def test_picker_selected_option_renders_marked_card_not_a_link() -> None:
-    """A `selected=True` option renders a non-clickable
-    `.picker-option--selected` card (a `<div>`, no `href`) carrying a
-    checkmark glyph — so an active path can't be re-selected. Other options
-    stay as link cards."""
+    """A ``selected=True`` option renders an ``article.picker-option`` tagged
+    ``aria-current="page"`` whose heading is plain text (no nested ``<a>``)
+    and carries a checkmark glyph — so an active path can't be re-selected.
+    Other options stay as link cards."""
     env = _make_env()
     options = [
         {
@@ -113,23 +110,23 @@ def test_picker_selected_option_renders_marked_card_not_a_link() -> None:
     ]
     tree = HTMLParser(_render_picker(env, options))
 
-    selected = tree.css_first("div.picker-option--selected")
+    selected = tree.css_first("article.picker-option[aria-current]")
     assert selected is not None
-    # Selected card is not a link and carries no navigation target.
-    assert selected.tag == "div"
+    assert selected.attributes.get("aria-current") == "page"
+    # Selected card is not a link — its heading is plain text, no nested <a>.
+    assert selected.css_first("header h2 a") is None
     assert selected.css_first("i.icon-check") is not None
-    assert selected.css_first("h2").text(strip=True).endswith("Path A")
+    assert selected.css_first("header h2").text(strip=True).endswith("Path A")
     # The non-selected sibling is still a real link card.
-    links = tree.css("a.picker-option")
+    links = tree.css("article.picker-option:not([aria-current]) header h2 a")
     assert len(links) == 1
     assert links[0].attributes.get("href") == "/x/form?kind=b"
 
 
-def test_picker_empty_options_renders_empty_grid() -> None:
-    """An empty option list renders the `.picker` grid wrapper with no
-    cards — no crash, no stray markup."""
+def test_picker_empty_options_renders_nothing() -> None:
+    """An empty option list renders no cards — the macro stacks vanilla
+    ``<article>`` blocks, so with zero options it emits nothing for the
+    layout engine to render."""
     env = _make_env()
     tree = HTMLParser(_render_picker(env, []))
-    grid = tree.css_first("div.picker")
-    assert grid is not None
-    assert grid.css("a.picker-option") == []
+    assert tree.css("article.picker-option") == []

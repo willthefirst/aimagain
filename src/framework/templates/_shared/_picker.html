@@ -1,4 +1,4 @@
-{# _picker(options) — renders a "choose your path" card grid.
+{# _picker(options) — renders a stack of "choose your path" cards.
 
 Two species, one component (full contract: the picker entry in
 `framework/templates/README.md`, which extends RESOURCE_GRAMMAR.md):
@@ -10,34 +10,40 @@ at OTHER resources' create forms (e.g. an identity picker → `/clinicians/form`
 description} — self- vs cross-resource hrefs are the caller's business.
 Adopted from the `/posts/form` pattern (issue #704).
 
+Each option renders as a vanilla Pico `<article>` (default chrome — border,
+padding, header band); articles are block-level so options stack as rows on
+every viewport. The heading is a vanilla `<h3><a>` link; the description is
+a plain `<p>`. No custom CSS — markup alone carries the look.
+
 Each option is a dict with keys:
   href:        URL to navigate to on click (ignored when selected=true)
   heading:     short label (e.g. "Solo practice")
   description: one-line tagline
-  selected:    (optional bool) when true, renders as a non-link selected
-               card (.picker-option--selected) with a checkmark — use
-               this to show which path is currently active.
+  selected:    (optional bool) when true, renders the heading without a
+               link and tags the card with `aria-current="page"` so the
+               active path can't be re-selected — marked with a checkmark
+               glyph in front of the heading.
 #}
 {%- macro picker(options) -%}
-  <div class="picker">
-    {%- for opt in options %}
-      {%- if opt.selected %}
-        <div class="picker-option picker-option--selected">
-          <hgroup>
-            <h2>
-              <i class="icon-check"></i> {{ opt.heading }}
-            </h2>
-            <p>{{ opt.description }}</p>
-          </hgroup>
-        </div>
-      {%- else %}
-        <a href="{{ opt.href }}" class="picker-option">
-          <hgroup>
-            <h2>{{ opt.heading }}</h2>
-            <p>{{ opt.description }}</p>
-          </hgroup>
-        </a>
-      {%- endif %}
-    {%- endfor %}
-  </div>
+  {%- for opt in options %}
+    {%- if opt.selected %}
+      <article class="picker-option" aria-current="page">
+        <header>
+          <h2>
+            <i class="icon-check"></i> {{ opt.heading }}
+          </h2>
+        </header>
+        <p>{{ opt.description }}</p>
+      </article>
+    {%- else %}
+      <article class="picker-option">
+        <header>
+          <h2>
+            <a href="{{ opt.href }}">{{ opt.heading }}</a>
+          </h2>
+        </header>
+        <p>{{ opt.description }}</p>
+      </article>
+    {%- endif %}
+  {%- endfor %}
 {%- endmacro %}
