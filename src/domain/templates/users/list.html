@@ -30,7 +30,7 @@
     {%- endif %}
   {%- endcall %}
 {%- endmacro %}
-{% block content %}
+{% block list_body %}
   {{ item_list(users, user_card, "user-list",
     empty_msg="No users found.",
     pager=pager) }}

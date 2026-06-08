@@ -134,27 +134,21 @@ async def test_create_clinician_happy_path(
 
 async def test_create_clinician_form_error_render_is_wired(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """Integration smoke for `CLINICIAN_ENTITY.form_error_render`.
 
-    HX-Request POST with an invalid `in_person_sessions` value
-    (the field is a Literal over `LOCATION_AVAILABILITY_OPTIONS`)
-    → 422 + HTML fragment with the inline error landed on the
-    `in_person_sessions` input. Same shape as the organizations /
-    programs smokes.
-
-    `first_name` would have been a more obvious trip — but the
-    schema models it as `StrippedOptionalText = None` (matches the
-    rest of the clinician model's tolerant defaults), so an empty
-    string passes. Pin the actual Literal field instead.
+    HX-Request POST with an invalid `npi` value (not 10 digits)
+    → 422 + HTML fragment with the inline error on the `npi` input.
+    `solo_practice=true` is included so the org-id validator passes
+    (the create form defaults to solo practice).
     """
-    org_id = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Acme"
-    )
-    payload = clinician_payload(org_id=str(org_id))
-    payload["in_person_sessions"] = "not-a-valid-option"
+    payload = {
+        "first_name": "Jane",
+        "last_name": "Smith",
+        "npi": "abc",
+        "solo_practice": "true",
+    }
     response = await authenticated_client.post(
         "/clinicians",
         data=payload,
@@ -163,7 +157,7 @@ async def test_create_clinician_form_error_render_is_wired(
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
     body = response.text
-    field_at = body.index('name="in_person_sessions"')
+    field_at = body.index('name="npi"')
     window = body[max(0, field_at - 200) : field_at + 200]
     assert 'aria-invalid="true"' in window, window
     assert "<!DOCTYPE" not in body
@@ -788,35 +782,33 @@ async def test_list_clinicians_renders_empty_state(
     superuser_client: AsyncClient,
 ):
     """With no persisted clinicians, the page renders a friendly empty
-    message instead of an empty `<table>`. The list page's toolbar
-    links to `/clinicians/search`; the multi-choice filter widgets live
-    there, not on the list page."""
+    message instead of an empty `<table>`. The browse-layout sidebar
+    embeds the filter widgets inline on the list page; the toolbar filter
+    link is suppressed in favour of the sidebar header link to `/clinicians/search`."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     assert "No clinicians found" in response.text
     tree = HTMLParser(response.text)
     assert tree.css_first("#clinicians-list") is None
-    # Filter link goes to the dedicated search page.
-    link = tree.css_first("a.toolbar-filter-link")
-    assert link is not None
-    assert (link.attributes.get("href") or "").startswith("/clinicians/search")
-    # The filter widgets live on the search page — multi-choice
-    # `ChoiceFilter`s now render as a `<fieldset>` of single-click
-    # checkboxes (#583), not the previous native `<select multiple>`
-    # listbox. No checkbox is preselected when the filter is inactive.
-    search_response = await superuser_client.get("/clinicians/search")
-    assert search_response.status_code == 200
-    search_tree = HTMLParser(search_response.text)
+    # Browse layout: sidebar has the filter widgets inline.
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar is not None, "Expected .filter-sidebar on /clinicians"
+    # Toolbar filter link is suppressed — sidebar takes that role.
+    assert tree.css_first("a.toolbar-filter-link") is None
+    # Sidebar links to the full search page.
+    sidebar_link = sidebar.css_first("a[href*='/clinicians/search']")
+    assert sidebar_link is not None, "Expected sidebar link to /clinicians/search"
+    # Multi-choice ChoiceFilters render as search-checkbox-fieldset with
+    # single-click checkboxes (#583). No checkbox is preselected when the
+    # filter is inactive.
     for filter_name in ("license_type", "issuing_state"):
-        boxes = search_tree.css(f'input[type="checkbox"][name="{filter_name}"]')
-        assert boxes, f"{filter_name} should render at least one checkbox"
+        boxes = sidebar.css(f'input[type="checkbox"][name="{filter_name}"]')
+        assert boxes, f"{filter_name} should render at least one checkbox in sidebar"
         assert not any(
             "checked" in b.attributes for b in boxes
         ), f"{filter_name} should have no preselected checkbox when filter is inactive"
-    # The legacy `<select multiple>` listbox should be gone from the
-    # search form — the regression this guards is "checkbox swap
-    # forgot to remove the old control".
-    assert search_tree.css_first("form.search-form select[multiple]") is None
+    # The legacy `<select multiple>` listbox should be gone.
+    assert sidebar.css_first("select[multiple]") is None
 
 
 async def test_list_clinicians_filters_by_license_type(
@@ -859,11 +851,16 @@ async def test_list_clinicians_filters_by_license_type(
     # the row's Practice cell anchors out to Orgs, not to the clinician.
     assert tree.css_first(f'article[data-row-id="{clinician_a_id}"]') is not None
     assert tree.css_first(f'article[data-row-id="{clinician_b_id}"]') is None
-    # The toolbar's filter link summarizes the active filter inline.
-    link = tree.css_first("a.toolbar-filter-link")
-    assert link is not None
-    link_text = link.text()
-    assert "psyd" in link_text.lower() or "PsyD" in link_text
+    # The browse-layout sidebar preselects the active filter value.
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar is not None
+    checked = sidebar.css_first(
+        'input[type="checkbox"][name="license_type"][value="psyd"]'
+    )
+    assert (
+        checked is not None
+    ), "Active license_type filter should be preselected in sidebar"
+    assert "checked" in checked.attributes
     # The search page re-renders the form with the active value preselected.
     # Multi-choice filters now render as checkboxes (#583), so the
     # active value surfaces as a `checked` `<input type="checkbox">`.
@@ -906,22 +903,32 @@ async def test_list_clinicians_treats_empty_filter_values_as_absent(
 # --- Chrome: toolbar + form affordances --------------------------------
 
 
-async def test_clinicians_list_toolbar_renders_filter_link_and_create_action(
+async def test_clinicians_list_has_browse_layout_with_filter_sidebar(
     superuser_client: AsyncClient,
 ):
-    """`/clinicians` toolbar carries both the filter link (left) and a
-    'Create clinician' action (right). The Create button matches the
-    orgs/programs/posts list-page convention; the dedicated
-    `test_list_clinicians_renders_create_toolbar_action` test above
-    pins the action's `href` shape — this one pins the toolbar
-    composition (filter ✕ actions both present)."""
+    """`/clinicians` list uses the framework browse layout: an inline
+    `.filter-sidebar` on the left (driven by the spec's declared filters)
+    and a `.browse-results` column on the right. The Create action lives
+    in the toolbar; the sidebar carries the filter controls and a link to
+    the full `/clinicians/search` page. The toolbar filter link is
+    suppressed when the sidebar is present."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("a.toolbar-filter-link") is not None
+    # Browse layout
+    assert tree.css_first(".browse-layout") is not None, "Missing .browse-layout"
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar is not None, "Missing .filter-sidebar"
+    # Sidebar has filter controls (license_type is a multi-choice filter)
+    fieldsets = sidebar.css("fieldset.search-checkbox-fieldset")
+    assert fieldsets, "No filter fieldsets in .filter-sidebar"
+    # Toolbar carries the Create action but NOT a redundant filter link
     action_menu = tree.css_first("menu.toolbar-right")
     assert action_menu is not None
     assert "Create clinician" in action_menu.text()
+    assert (
+        tree.css_first("a.toolbar-filter-link") is None
+    ), "toolbar-filter-link should be suppressed when browse sidebar is active"
 
 
 async def test_clinician_detail_favorite_toggle_lives_in_toolbar(
@@ -1379,100 +1386,45 @@ async def test_owner_edit_form_renders_affiliations_section(
 
 async def test_get_clinician_form_renders(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
-    """`GET /clinicians/form` renders the create form posting to
-    the JSON API."""
-    # Seed an Org so the Org-picker dropdown has at least one option to render.
-    await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Seeded Org"
-    )
+    """`GET /clinicians/form` renders the simplified create form.
+
+    The create form shows only first_name, last_name, and NPI.
+    Practice, availability, and insurance fields live on the edit form.
+    `solo_practice` is a hidden field so the handler auto-creates a
+    solo-practice Org — the user never has to pre-create one.
+    """
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # The header uses a link (`<a hx-post>`), not a form; targeting
-    # `main form` is still the right scope for the clinician create form.
     form = tree.css_first("main form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/clinicians"
-    # Org-picker dropdown — replaces the old free-text practice_name input.
-    # Lists the Orgs the requesting user owns (#524).
-    org_select = tree.css_first('select[name="org_id"]')
-    assert org_select is not None
-    org_options = org_select.css("option")
-    assert any(
-        o.text(strip=True) == "Seeded Org" for o in org_options
-    ), "Org dropdown should include every Org the user owns"
-    city = tree.css_first('input[name="location_city"]')
-    assert city is not None
-    assert city.attributes.get("maxlength") == "120"
-    zip_input = tree.css_first('input[name="location_zip"]')
-    assert zip_input is not None
-    assert zip_input.attributes.get("pattern") == r"\d{5}"
-    assert zip_input.attributes.get("maxlength") == "5"
-    # State select with all 51 entries (50 states + DC) plus a placeholder.
-    state_select = tree.css_first('select[name="location_state"]')
-    assert state_select is not None
-    state_options = state_select.css("option")
-    assert len(state_options) == 52  # 51 + placeholder
-    # Availability selects default to "yes" on create (#701); no placeholder.
-    in_person = tree.css_first('select[name="in_person_sessions"]')
-    virtual = tree.css_first('select[name="virtual_sessions"]')
-    assert in_person is not None
-    assert virtual is not None
-    assert len(in_person.css("option")) == 3
-    assert len(virtual.css("option")) == 3
-    # Both session-availability dropdowns default to "yes" (#701).
-    in_person_selected = in_person.css_first("option[selected]")
-    virtual_selected = virtual.css_first("option[selected]")
-    assert (
-        in_person_selected is not None
-    ), "in_person_sessions should have a pre-selected option"
-    assert in_person_selected.attributes.get("value") == "yes"
-    assert (
-        virtual_selected is not None
-    ), "virtual_sessions should have a pre-selected option"
-    assert virtual_selected.attributes.get("value") == "yes"
-    # Insurance & payment fieldset. The carrier multi-select speaks for
-    # the in-network signal (empty = no in-network); OON and sliding-scale
-    # render as feature-flag checkboxes (the visible `<input type="checkbox">`
-    # plus a sibling `<input type="hidden" value="false">` carrying the
-    # default-true round-trip — see `_shared/form_fields.html::checkbox_field`).
-    assert tree.css_first('input[type="checkbox"][name="accepts_in_network"]') is None
-    assert (
-        tree.css_first('input[type="checkbox"][name="accepts_out_of_network"]')
-        is not None
-    )
-    assert tree.css_first('input[type="checkbox"][name="sliding_scale"]') is not None
-    assert tree.css_first('input[name="cost"]') is not None
-    carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
-    assert carrier_select is not None
-    assert len(carrier_select.css("option")) == 11
+    # Required fields on create.
+    assert tree.css_first('input[name="first_name"]') is not None
+    assert tree.css_first('input[name="last_name"]') is not None
+    assert tree.css_first('input[name="npi"]') is not None
+    # solo_practice hidden field — defaults create to solo-practice so no
+    # separate Org-create step is needed.
+    solo = tree.css_first('input[type="hidden"][name="solo_practice"]')
+    assert solo is not None
+    assert solo.attributes.get("value") == "true"
+    # Practice / availability / insurance fields are not on the create form.
+    assert tree.css_first('select[name="org_id"]') is None
+    assert tree.css_first('input[name="location_city"]') is None
+    assert tree.css_first('select[name="in_person_sessions"]') is None
+    assert tree.css_first('select[name="in_network_carriers"]') is None
 
 
-async def test_get_clinician_form_scopes_org_dropdown_to_user(
+async def test_get_clinician_form_no_org_dropdown(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
-    """The Org dropdown lists only the requesting user's Orgs (#524).
-    Another user's Org must not leak into the picker."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-    await _seed_org(db_test_session_manager, owner_id=logged_in_user.id, name="Mine")
-    await _seed_org(db_test_session_manager, owner_id=other.id, name="Theirs")
-
+    """The simplified create form has no org_id dropdown — solo_practice
+    is the hidden default so no pre-existing Org is required."""
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    option_texts = {
-        o.text(strip=True) for o in tree.css('select[name="org_id"] option')
-    }
-    assert "Mine" in option_texts
-    assert "Theirs" not in option_texts
+    assert tree.css_first('select[name="org_id"]') is None
 
 
 # --- Edit form page (GET /clinicians/{id}/form) -------------------

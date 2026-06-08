@@ -5,7 +5,7 @@
    this org. Breadcrumb auto-injected by mount_related_list via
    ORGANIZATION_ENTITY.display_label_fn. #}
 {% block resource_label %}{% endblock %}
-{% block content %}
+{% block list_body %}
   {%- set _empty %}{{ post_feed_empty("No program intakes posted for this organization yet.") }}{%- endset %}
     {{ item_list(posts, post_feed_row, "org-intakes-list", "post-feed-list",
         empty=_empty,

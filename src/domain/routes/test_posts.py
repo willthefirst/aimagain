@@ -161,54 +161,51 @@ async def test_search_form_renders_kind_filter(
     assert {"referral", "clinician_opening", "program_intake"} <= values
 
 
-async def test_search_uses_shared_filter_form(
+async def test_search_uses_framework_filter_form(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """`/posts/search` renders the same custom filter form component as the
-    list-page sidebar — `posts-filter-section` fieldsets for Kind, Location,
-    Level of care, Modality, Populations, and Insurance — not the generic
-    framework search form (`search-checkbox-fieldset`)."""
+    """`/posts/search` uses the shared `filter_field` macro from
+    `_shared/_filter_field.html` — the same macro that renders the inline
+    sidebar on `/posts`. Both surfaces are driven by the spec's declared
+    Filter objects, so control shapes and labels stay in sync automatically."""
     response = await authenticated_client.get("/posts/search")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    sections = tree.css("fieldset.posts-filter-section")
+    # The framework macro uses search-checkbox-fieldset for multi-choice filters.
+    sections = tree.css("fieldset.search-checkbox-fieldset")
+    assert (
+        sections
+    ), "/posts/search did not render any search-checkbox-fieldset elements"
     legends = [s.css_first("legend").text(strip=True) for s in sections]
-    assert legends == [
-        "Kind",
-        "Location",
-        "Level of care",
-        "Modality",
-        "Populations",
-        "Insurance",
-    ], f"Unexpected filter sections on /posts/search: {legends}"
-    # Generic framework fieldset class must not appear — the shared macro owns the form.
-    assert not tree.css(
-        "fieldset.search-checkbox-fieldset"
-    ), "/posts/search should not render the generic framework search form"
+    # Multi-choice filters from the spec: kind(Type), state(State), age_group,
+    # language, level_of_care, modality, insurance.
+    assert "Type" in legends, f"Expected 'Type' legend in /posts/search: {legends}"
+    assert (
+        "Level of care" in legends
+    ), f"Expected 'Level of care' in /posts/search: {legends}"
+    assert "Insurance" in legends, f"Expected 'Insurance' in /posts/search: {legends}"
 
 
-async def test_list_sidebar_uses_shared_filter_form(
+async def test_list_has_browse_layout_with_filter_sidebar(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """`/posts` list sidebar renders the same `posts-filter-section` fieldsets
-    as `/posts/search`, confirming both surfaces share the same component."""
+    """`/posts` list renders a `.browse-layout` with a `.filter-sidebar` that
+    embeds the framework filter form inline. The sidebar uses the same
+    `filter_field` macro as `/posts/search` so both surfaces stay in sync."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    sidebar = tree.css_first(".posts-filter-sidebar")
-    assert sidebar, "/posts did not render a .posts-filter-sidebar element"
-    sections = sidebar.css("fieldset.posts-filter-section")
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar, "/posts did not render a .filter-sidebar element"
+    # Framework filter_field macro renders multi-choice filters as
+    # search-checkbox-fieldset fieldsets with plain text legends.
+    sections = sidebar.css("fieldset.search-checkbox-fieldset")
+    assert sections, "/posts sidebar did not render any filter fieldsets"
     legends = [s.css_first("legend").text(strip=True) for s in sections]
-    assert legends == [
-        "Kind",
-        "Location",
-        "Level of care",
-        "Modality",
-        "Populations",
-        "Insurance",
-    ], f"Unexpected filter sections in /posts sidebar: {legends}"
+    assert "Type" in legends, f"Expected 'Type' legend in sidebar: {legends}"
+    assert "Insurance" in legends, f"Expected 'Insurance' legend in sidebar: {legends}"
 
 
 # --- List filter: ?kind= narrows the feed --------------------------------
