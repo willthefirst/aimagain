@@ -1,12 +1,4 @@
-{# Create-organization entry point.
-
-When no `?type=` query param is present the user sees a type-picker — one
-card per organization type, each linking to the same URL with `?type=<value>`
-appended.  Clicking a card (or following a deep link with `?type=` already
-set) skips the picker and renders the full create form with that type
-pre-selected in the Type dropdown.
-
-This mirrors the `/posts/form` picker pattern (issue #704).
+{# Create-organization page.
 
 The actual form lives in `_form_new_fragment.html` so the framework's
 error-rerender path (`mount_create._render_form_with_errors`) can
@@ -15,33 +7,7 @@ the path-derivation convention (`<dir>/_<name>_fragment.html`) requires
 a sibling file with that exact name. The full page below includes it.
 #}
 {% extends "views/form_new.html" %}
-{%- from "_shared/_picker.html" import picker -%}
 {% block resource_label %}Organizations{% endblock %}
 {% block form_content %}
-  {%- set selected_type = request.query_params.get('type', '') -%}
-  {% if not selected_type %}
-    {# Type picker: shown when no ?type= param is present.  Each card links
-   to the same URL with ?type=<value> so the form renders with the Type
-   field pre-filled.  Deep links (?type=solo_practice) skip the picker
-   and land directly on the form. #}
-    {{ picker([
-        {"href": entity_form_url('organization') + "?type=solo_practice",
-    "heading": "Solo practice",
-    "description": "Just you — a single clinician running their own practice."},
-    {"href": entity_form_url('organization') + "?type=group_practice",
-    "heading": "Group practice",
-    "description": "Multiple clinicians under one roof or brand."},
-    {"href": entity_form_url('organization') + "?type=clinic",
-    "heading": "Clinic, IOP, or inpatient program",
-    "description": "A facility offering structured or intensive programming."},
-    {"href": entity_form_url('organization') + "?type=health_system",
-    "heading": "Health system",
-    "description": "A network of clinics or hospitals."},
-    {"href": entity_form_url('organization') + "?type=other",
-    "heading": "Other",
-    "description": "Doesn't fit the above."},
-    ]) }}
-  {% else %}
-    {% include "organizations/_form_new_fragment.html" %}
-  {% endif %}
+  {% include "organizations/_form_new_fragment.html" %}
 {% endblock %}
