@@ -788,35 +788,33 @@ async def test_list_clinicians_renders_empty_state(
     superuser_client: AsyncClient,
 ):
     """With no persisted clinicians, the page renders a friendly empty
-    message instead of an empty `<table>`. The list page's toolbar
-    links to `/clinicians/search`; the multi-choice filter widgets live
-    there, not on the list page."""
+    message instead of an empty `<table>`. The browse-layout sidebar
+    embeds the filter widgets inline on the list page; the toolbar filter
+    link is suppressed in favour of the sidebar header link to `/clinicians/search`."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     assert "No clinicians found" in response.text
     tree = HTMLParser(response.text)
     assert tree.css_first("#clinicians-list") is None
-    # Filter link goes to the dedicated search page.
-    link = tree.css_first("a.toolbar-filter-link")
-    assert link is not None
-    assert (link.attributes.get("href") or "").startswith("/clinicians/search")
-    # The filter widgets live on the search page — multi-choice
-    # `ChoiceFilter`s now render as a `<fieldset>` of single-click
-    # checkboxes (#583), not the previous native `<select multiple>`
-    # listbox. No checkbox is preselected when the filter is inactive.
-    search_response = await superuser_client.get("/clinicians/search")
-    assert search_response.status_code == 200
-    search_tree = HTMLParser(search_response.text)
+    # Browse layout: sidebar has the filter widgets inline.
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar is not None, "Expected .filter-sidebar on /clinicians"
+    # Toolbar filter link is suppressed — sidebar takes that role.
+    assert tree.css_first("a.toolbar-filter-link") is None
+    # Sidebar links to the full search page.
+    sidebar_link = sidebar.css_first("a[href*='/clinicians/search']")
+    assert sidebar_link is not None, "Expected sidebar link to /clinicians/search"
+    # Multi-choice ChoiceFilters render as search-checkbox-fieldset with
+    # single-click checkboxes (#583). No checkbox is preselected when the
+    # filter is inactive.
     for filter_name in ("license_type", "issuing_state"):
-        boxes = search_tree.css(f'input[type="checkbox"][name="{filter_name}"]')
-        assert boxes, f"{filter_name} should render at least one checkbox"
+        boxes = sidebar.css(f'input[type="checkbox"][name="{filter_name}"]')
+        assert boxes, f"{filter_name} should render at least one checkbox in sidebar"
         assert not any(
             "checked" in b.attributes for b in boxes
         ), f"{filter_name} should have no preselected checkbox when filter is inactive"
-    # The legacy `<select multiple>` listbox should be gone from the
-    # search form — the regression this guards is "checkbox swap
-    # forgot to remove the old control".
-    assert search_tree.css_first("form.search-form select[multiple]") is None
+    # The legacy `<select multiple>` listbox should be gone.
+    assert sidebar.css_first("select[multiple]") is None
 
 
 async def test_list_clinicians_filters_by_license_type(
@@ -859,11 +857,16 @@ async def test_list_clinicians_filters_by_license_type(
     # the row's Practice cell anchors out to Orgs, not to the clinician.
     assert tree.css_first(f'article[data-row-id="{clinician_a_id}"]') is not None
     assert tree.css_first(f'article[data-row-id="{clinician_b_id}"]') is None
-    # The toolbar's filter link summarizes the active filter inline.
-    link = tree.css_first("a.toolbar-filter-link")
-    assert link is not None
-    link_text = link.text()
-    assert "psyd" in link_text.lower() or "PsyD" in link_text
+    # The browse-layout sidebar preselects the active filter value.
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar is not None
+    checked = sidebar.css_first(
+        'input[type="checkbox"][name="license_type"][value="psyd"]'
+    )
+    assert (
+        checked is not None
+    ), "Active license_type filter should be preselected in sidebar"
+    assert "checked" in checked.attributes
     # The search page re-renders the form with the active value preselected.
     # Multi-choice filters now render as checkboxes (#583), so the
     # active value surfaces as a `checked` `<input type="checkbox">`.
@@ -906,22 +909,32 @@ async def test_list_clinicians_treats_empty_filter_values_as_absent(
 # --- Chrome: toolbar + form affordances --------------------------------
 
 
-async def test_clinicians_list_toolbar_renders_filter_link_and_create_action(
+async def test_clinicians_list_has_browse_layout_with_filter_sidebar(
     superuser_client: AsyncClient,
 ):
-    """`/clinicians` toolbar carries both the filter link (left) and a
-    'Create clinician' action (right). The Create button matches the
-    orgs/programs/posts list-page convention; the dedicated
-    `test_list_clinicians_renders_create_toolbar_action` test above
-    pins the action's `href` shape — this one pins the toolbar
-    composition (filter ✕ actions both present)."""
+    """`/clinicians` list uses the framework browse layout: an inline
+    `.filter-sidebar` on the left (driven by the spec's declared filters)
+    and a `.browse-results` column on the right. The Create action lives
+    in the toolbar; the sidebar carries the filter controls and a link to
+    the full `/clinicians/search` page. The toolbar filter link is
+    suppressed when the sidebar is present."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first("a.toolbar-filter-link") is not None
+    # Browse layout
+    assert tree.css_first(".browse-layout") is not None, "Missing .browse-layout"
+    sidebar = tree.css_first(".filter-sidebar")
+    assert sidebar is not None, "Missing .filter-sidebar"
+    # Sidebar has filter controls (license_type is a multi-choice filter)
+    fieldsets = sidebar.css("fieldset.search-checkbox-fieldset")
+    assert fieldsets, "No filter fieldsets in .filter-sidebar"
+    # Toolbar carries the Create action but NOT a redundant filter link
     action_menu = tree.css_first("menu.toolbar-right")
     assert action_menu is not None
     assert "Create clinician" in action_menu.text()
+    assert (
+        tree.css_first("a.toolbar-filter-link") is None
+    ), "toolbar-filter-link should be suppressed when browse sidebar is active"
 
 
 async def test_clinician_detail_favorite_toggle_lives_in_toolbar(

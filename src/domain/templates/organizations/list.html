@@ -23,7 +23,7 @@
   </section>
 {%- endcall %}
 {%- endmacro %}
-{% block content %}
+{% block list_body %}
   {{ item_list(organizations, org_card, "organizations-list",
     empty_msg="No organizations found.",
     pager=pager) }}

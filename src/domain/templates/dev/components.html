@@ -591,25 +591,25 @@ it's dev-only chrome that should never ship to production. #}
       <section class="gallery-section" id="browse-layout">
         <h2>Browse layout</h2>
         <p>
-          <small>CSS classes <code>.posts-browse-layout</code> / <code>.posts-filter-sidebar</code> / <code>.posts-results</code>. 220px sidebar + flexible results; stacks on mobile.</small>
+          <small>CSS classes <code>.browse-layout</code> / <code>.filter-sidebar</code> / <code>.browse-results</code>. 220px sidebar + flexible results; stacks on mobile. Rendered automatically by <code>views/list.html</code> for any entity whose spec declares <code>filters=(…)</code> — entity list templates fill only the <code>content</code> block. On narrow viewports the sidebar stacks above results and <code>.filter-form</code> is hidden; the sidebar header link to the full search page remains tappable.</small>
         </p>
-        <div class="posts-browse-layout">
-          <aside class="posts-filter-sidebar">
-            <form class="posts-filter-form">
+        <div class="browse-layout">
+          <aside class="filter-sidebar">
+            <form class="filter-form">
               <fieldset class="search-checkbox-fieldset">
-                {{ icon_legend('filter', 'Kind') }}
+                <legend>Type</legend>
                 {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
                 {{ filter_checkbox('kind', 'clinician_opening', 'Opening') }}
                 {{ filter_checkbox('kind', 'program_intake', 'Intake') }}
               </fieldset>
               <fieldset class="search-checkbox-fieldset">
-                {{ icon_legend('map-pin', 'State') }}
+                <legend>State</legend>
                 {{ filter_checkbox("state", "CA", "California", checked=True) }}
                 {{ filter_checkbox('state', 'NY', 'New York') }}
               </fieldset>
             </form>
           </aside>
-          <div class="posts-results">
+          <div class="browse-results">
             <ul class="post-feed-list">
               <li>
                 <article class="post-feed-row">

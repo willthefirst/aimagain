@@ -165,20 +165,20 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 /* Expressed-interest override */
 .post-feed-row--interest .post-feed-headline-text:visited { color: var(--pico-primary); }
 
-/* ---- Posts browse two-column layout -------------------------------- */
-.posts-browse-layout {
+/* ---- Browse two-column layout (list page with inline filter sidebar) --- */
+.browse-layout {
   display: flex;
   gap: 1.5rem;
   align-items: flex-start;
 }
-.posts-filter-sidebar { flex: 0 0 220px; min-width: 0; }
-.posts-results { flex: 1 1 0; min-width: 0; }
+.filter-sidebar { flex: 0 0 220px; min-width: 0; }
+.browse-results { flex: 1 1 0; min-width: 0; }
 
 /* Narrow: stack sidebar full-width above results; hide inline form */
 @media (max-width: 640px) {
-  .posts-browse-layout { flex-direction: column; }
-  .posts-filter-sidebar { flex: unset; width: 100%; }
-  .posts-filter-form { display: none; }
+  .browse-layout { flex-direction: column; }
+  .filter-sidebar { flex: unset; width: 100%; }
+  .filter-form { display: none; }
 }
 
 /* ── Profile step cards ───────────────────────────────────────
