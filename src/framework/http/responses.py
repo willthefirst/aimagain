@@ -85,8 +85,16 @@ class APIResponse:
         validation) and the htmx response-targets extension still swaps
         the body in place — see `form_rerender` callers.
         """
-        from src.framework.rendering.templating import get_template_context, templates
+        from src.framework.rendering.templating import (
+            get_template_context,
+            set_viewer,
+            templates,
+        )
 
+        # Pin the viewer for this render so macros that can't read
+        # template context (`entity_link`, `viewer_is_admin`) consult the
+        # same identity the route's `current_user_dep` resolved.
+        set_viewer(current_user)
         merged_context = {
             **context,
             **get_template_context(),

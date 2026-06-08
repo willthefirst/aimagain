@@ -33,6 +33,11 @@ from src.framework.dispatch.registry import entity_registry
 if TYPE_CHECKING:
     from src.framework.dispatch.entity_spec import EntitySpec
 
+# Sentinel for `entity_lock_reason(user=...)` — distinguishes
+# "caller passed user=None explicitly (anonymous viewer)" from "caller
+# omitted it and wants the ContextVar lookup."
+_SENTINEL: Any = object()
+
 
 def _spec_by_name(name: str) -> "EntitySpec":
     """Look up an ``EntitySpec`` by its ``name`` (e.g. ``"organization"``).
@@ -106,6 +111,39 @@ def entity_url(name: str, *, id: Any = None, subresource: str | None = None) -> 
         return prefix
     base = f"{prefix}/{id}"
     return base if subresource is None else f"{base}/{subresource}"
+
+
+def entity_lock_reason(name: str, user: Any = _SENTINEL) -> str | None:
+    """Return the `REASON_*` code that locks links pointing at entity `name`
+    for the current viewer, or `None` when the link should render normally.
+
+    Templates use this via the `entity_link` macro
+    (`_shared/_locked.html`) so any `<a>` going to a gated entity's pages
+    can swap itself for a `locked_link(reason, label)` popover when the
+    viewer fails the entity's `read_policy.can_read` predicate. Pure
+    no-op when the spec declares no `read_policy` or no `lock_reason`.
+
+    `user` defaults to the per-request viewer set by `set_viewer(...)`.
+    Pass an explicit user from non-template callers (mount helpers that
+    pre-compute breadcrumb tuples) so they don't depend on ContextVar state.
+
+    `name=None` or a Jinja `Undefined` returns `None` — templates that
+    render the chrome with partial context (chrome tests stubbing
+    `views/detail.html` without injecting `entity_name`) should still
+    render rather than raise.
+    """
+    if name is None or not isinstance(name, str):
+        return None
+    spec = _spec_by_name(name)
+    if spec.read_policy is None or spec.read_policy.lock_reason is None:
+        return None
+    if user is _SENTINEL:
+        from src.framework.rendering.templating import _viewer_var
+
+        user = _viewer_var.get()
+    if spec.read_policy.can_read(user):
+        return None
+    return spec.read_policy.lock_reason
 
 
 def entity_form_url(name: str, *, id: Any = None) -> str:

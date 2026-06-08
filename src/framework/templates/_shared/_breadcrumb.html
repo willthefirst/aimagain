@@ -6,11 +6,20 @@ label. Sits in the `breadcrumb` block slot wired in
 [`../base.html`](../base.html). No band chrome (background, border,
 padding); just inline text with an icon.
 
-Each item is a `(label, href)` tuple. The last item's `href` is
-typically `None` (the current page); the back target is the
-deepest item with a non-None `href` — for two-level chains
+Each item is a `(label, href, lock_reason)` tuple — the third
+element is optional and defaults to `None`. The last item's
+`href` is typically `None` (the current page); the back target is
+the deepest item with a non-None `href` — for two-level chains
 (collection → current) that's the collection link, for nested
 chains (collection → row → edit) that's the row link.
+
+When `lock_reason` is set on the back target (a closed-vocab
+`REASON_*` code — see `_locked.html`), the back affordance
+renders as `locked_link(reason, label)` instead of an `<a>`, so
+the visible link can't disagree with the destination page's
+`read_policy.assert_can_read`. Mount helpers compute the reason via
+`entity_lock_reason(name, user)`; per-template callers (the
+detail-view collection breadcrumb) use the Jinja-global form.
 
 When every item has `href=None` (theoretical edge case — a page
 with no parent), the back affordance falls back to the first
@@ -22,6 +31,7 @@ item's label as plain text so the markup stays valid.
         ("Edit", None),
     ]) }}
 #}
+{%- from "_shared/_locked.html" import locked_link -%}
 {% macro breadcrumb(items) -%}
   {%- if items %}
     {# Deepest clickable parent — the back target. Walk from the end
@@ -30,11 +40,24 @@ item's label as plain text so the markup stays valid.
    pages) the only item carries the href. #}
     {%- set _linkable = items | selectattr(1) | list -%}
     {%- set _back = _linkable[-1] if _linkable else items[0] -%}
+    {%- set _lock = _back[2] if _back|length > 2 else none -%}
     <nav aria-label="breadcrumb">
-      <a class="breadcrumb-back"
-         {% if _back[1] %}href="{{ _back[1] }}"{% endif %}>
-        <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
-      </a>
+      {%- if _lock %}
+        {# Locked back affordance: same locked-cta popover wiring as
+       `locked_link`, but keeps the `.breadcrumb-back` chrome (chevron
+       + label sizing) so the band layout is unchanged. #}
+        <a class="breadcrumb-back locked-link"
+           aria-disabled="true"
+           tabindex="0"
+           data-locked-cta="{{ _lock }}">
+          <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
+        </a>
+      {%- else %}
+        <a class="breadcrumb-back"
+           {% if _back[1] %}href="{{ _back[1] }}"{% endif %}>
+          <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
+        </a>
+      {%- endif %}
     </nav>
   {%- endif %}
 {%- endmacro %}

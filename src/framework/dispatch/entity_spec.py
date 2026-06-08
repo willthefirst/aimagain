@@ -52,10 +52,21 @@ class ReadPolicy:
     Declare on `EntitySpec.read_policy`. `None` means open (default).
     Superuser bypass is the callable's responsibility — neither the
     framework nor `BaseRepository` short-circuits for superusers.
+
+    `lock_reason` is the closed-vocab `REASON_*` code (see
+    `src/domain/logic/capabilities.py`) that templates use to render a
+    locked-link affordance for any `<a>` pointing at this entity's pages
+    when the viewer fails `can_read`. The framework's `entity_link` macro
+    (`_shared/_locked.html`) consults this field via the `entity_lock_reason`
+    Jinja global so the visible breadcrumb/back/picker link can't disagree
+    with the route-level guard. `None` means "no lock affordance" — links
+    render as plain `<a>` even when the predicate fails (the route still
+    enforces, but no popover-anchored CTA is offered).
     """
 
     assert_can_read: Callable[[Any], None]
     can_read: Callable[[Any], bool]
+    lock_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,6 +13,12 @@
    - `locked_link(reason, label)` — an inline navigation link that looks
      disabled. Use in place of an `<a>` the user doesn't have access to yet.
 
+   - `entity_link(name, label, href=none, id=none)` — capability-aware
+     wrapper: renders `<a>` when the viewer passes the target entity's
+     `read_policy.can_read`, or `locked_link(spec.read_policy.lock_reason, label)`
+     when they don't. Prefer this anywhere a template hardcodes `<a href="{{ entity_url('user') }}">` or similar — the macro keeps the visible
+     affordance and the route-level guard in lockstep.
+
    - `locked_name(placeholder)` — for withheld identity names (clinician /
      org). Always uses REASON_NETWORK_UNVERIFIED. Renders as a muted italic
      ghost button with a lock icon so the viewer knows a real name exists.
@@ -48,6 +54,14 @@ affordances". JS lives inline in `src/framework/templates/base.html`. #}
     <i class="icon-lock" aria-hidden="true"></i>
     {{ label }}
   </a>
+{%- endmacro %}
+{% macro entity_link(name, label, href=none, id=none) -%}
+  {%- set _reason = entity_lock_reason(name) -%}
+  {%- if _reason -%}
+    {{ locked_link(_reason, label) }}
+  {%- else -%}
+    <a href="{{ href or entity_url(name, id=id) }}">{{ label }}</a>
+  {%- endif %}
 {%- endmacro %}
 {% macro locked_name(placeholder) -%}
   <button class="locked-ghost-btn"
