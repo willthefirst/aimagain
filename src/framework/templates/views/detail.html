@@ -55,14 +55,17 @@ Child contract:
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {% block breadcrumb %}
-  {%- set collection_label %}
+  {%- set _label_override %}
     {% block resource_label %}{% endblock %}
   {% endset -%}
-  {# Third tuple element is the REASON_* code (or none). `entity_lock_reason`
-     returns the spec's lock_reason when the viewer fails `read_policy.can_read`,
-     so the back affordance auto-locks for non-network viewers — e.g. the
-     `< Users` link on `/users/me` becomes a popover instead of a 403. #}
-  {{ breadcrumb([(collection_label | trim, resource_url, entity_lock_reason(entity_name) )]) }}
+  {# `breadcrumb_entity_item(name)` produces the (label, href, lock_reason)
+     tuple — every view-type template's collection-back goes through it,
+     so the lock-reason third element can't be forgotten. The `{% block
+     resource_label %}` override (if a child template declared one) flows
+     in via `label=`; default is the spec's `url_collection.capitalize()`. #}
+  {{ breadcrumb([
+    breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+  ]) }}
 {% endblock %}
 {% block toolbar %}
   {%- set current %}

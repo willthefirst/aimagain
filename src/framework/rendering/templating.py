@@ -19,6 +19,7 @@ from src.framework.rendering.labels import (
     entity_filter_label,
 )
 from src.framework.rendering.route_urls import (
+    breadcrumb_entity_item,
     entity_form_url,
     entity_lock_reason,
     entity_url,
@@ -96,6 +97,11 @@ _env.globals["entity_form_url"] = entity_form_url
 # entity's read_policy (so a link to it should render as `locked_link`),
 # else `None`. See `_shared/_locked.html` and `route_urls.entity_lock_reason`.
 _env.globals["entity_lock_reason"] = entity_lock_reason
+# `breadcrumb_entity_item(name)` — the (label, href, lock_reason) tuple
+# every view-type template's collection-back segment renders. Centralizes
+# the lock-aware lookup so no view-type template can ship without it.
+# See `_shared/_breadcrumb.html` and `route_urls.breadcrumb_entity_item`.
+_env.globals["breadcrumb_entity_item"] = breadcrumb_entity_item
 # `entity_create_label(name, kind=None)` — the single source of truth for
 # "Create X" strings across CTAs and form-page H1s. See
 # `src/framework/rendering/labels.py`.

@@ -65,7 +65,7 @@ def _render(env: Environment, name: str, **ctx: object) -> str:
 
 _DETAIL_STUB = """
     {% extends "views/detail.html" %}
-    {% set resource_url = "/clinicians" %}
+    {% set entity_name = "clinician" %}
     {% block resource_label %}Clinicians{% endblock %}
     {% block current_label %}Sunrise Therapy{% endblock %}
     {% block content %}<p>body</p>{% endblock %}
