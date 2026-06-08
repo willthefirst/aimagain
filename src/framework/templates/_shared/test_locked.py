@@ -22,20 +22,16 @@ page render would.
 from __future__ import annotations
 
 import textwrap
-from pathlib import Path
 
-from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
+from jinja2 import Environment
 from selectolax.parser import HTMLParser
 
 from src.domain.logic import capabilities
+from src.framework.templates._test_env import make_test_env
 
 
 def _make_env() -> Environment:
-    stub = DictLoader({})
-    framework = FileSystemLoader(str(Path(__file__).resolve().parents[1]))
-    env = Environment(loader=ChoiceLoader([stub, framework]))
-    env.globals["capabilities"] = capabilities
-    return env
+    return make_test_env()
 
 
 def _render(snippet: str) -> str:

@@ -44,8 +44,13 @@ Shared infrastructure:
   `path_segments_under_router`, `parent_path_param_pairs`,
   `walk_parent_chain`, `normalize_filters`, `resolve_dotted_path`,
   `resolve_handler`, `resolve_spec_bound_handler`,
-  `call_handler_with`, `owned_factory_makers`, and the
-  `TOP_LEVEL_AUTO_BIND_VERBS` constant.
+  `call_handler_with`, `owned_factory_makers`, the
+  `TOP_LEVEL_AUTO_BIND_VERBS` constant, and
+  `subresource_breadcrumb_items` — the single producer of the 3-step
+  `_breadcrumb_items` injected by `mount_related_list` and
+  `mount_edge_routes` (collection → parent row → child label, with
+  the collection segment's lock reason sourced from
+  `entity_lock_reason(parent_spec.name, viewer)`).
 
 ## Dependency direction
 

@@ -24,50 +24,19 @@ enforcement that replaces a "keep it inside ``<main>``" comment.
 from __future__ import annotations
 
 import re
-import textwrap
 from pathlib import Path
 
-from jinja2 import (
-    ChoiceLoader,
-    DictLoader,
-    Environment,
-    FileSystemLoader,
-    select_autoescape,
-)
+from jinja2 import Environment
 from selectolax.parser import HTMLParser
+
+from src.framework.templates._test_env import add_child as _add_child
+from src.framework.templates._test_env import make_test_env as _make_env_impl
 
 _CSS_PATH = Path(__file__).parent.parent / "static" / "css" / "framework.css"
 
 
 def _make_env() -> Environment:
-    framework_loader = FileSystemLoader("src/framework/templates")
-    stub_loader = DictLoader({})
-    env = Environment(
-        loader=ChoiceLoader([stub_loader, framework_loader]),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
-    from src.domain.logic import capabilities
-    from src.framework.rendering.labels import (
-        entity_create_label,
-        entity_filter_label,
-    )
-    from src.framework.rendering.route_urls import (
-        entity_form_url,
-        entity_lock_reason,
-        entity_url,
-    )
-
-    env.globals["entity_url"] = entity_url
-    env.globals["entity_form_url"] = entity_form_url
-    env.globals["entity_lock_reason"] = entity_lock_reason
-    env.globals["entity_create_label"] = entity_create_label
-    env.globals["entity_filter_label"] = entity_filter_label
-    env.globals["capabilities"] = capabilities
-    return env
-
-
-def _add_child(env: Environment, name: str, body: str) -> None:
-    env.loader.loaders[0].mapping[name] = textwrap.dedent(body).lstrip()
+    return _make_env_impl()
 
 
 class _RequestStub:

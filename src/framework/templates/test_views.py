@@ -14,59 +14,23 @@ up here even if no domain template has been wired into it yet.
 
 from __future__ import annotations
 
-import textwrap
-
-from jinja2 import DictLoader, Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment
 from selectolax.parser import HTMLParser
+
+from src.framework.templates._test_env import add_child as _add_child
+from src.framework.templates._test_env import make_test_env as _make_env_impl
 
 
 def _make_env() -> Environment:
     """Stand up a Jinja env layered over the framework templates root
     plus an in-memory dict loader for the child stubs each test defines.
 
-    Uses ``ChoiceLoader`` semantics via two ``FileSystemLoader``s? No —
-    Jinja's ``Environment`` only takes one loader. The dict loader for
-    the stubs goes first; framework templates resolve through the
-    fallback ``FileSystemLoader``. This is identical to how the real
-    runtime resolves ``views/...`` from the framework root and
-    ``clinicians/list.html`` from the domain root.
+    Thin wrapper over `_test_env.make_test_env()`: mirrors the prod
+    globals snapshot so a new Jinja global registered in `templating.py`
+    flows here without an extra edit. Test bodies still poke per-test
+    stubs via `_add_child(env, name, body)`.
     """
-    from jinja2 import ChoiceLoader
-
-    framework_loader = FileSystemLoader("src/framework/templates")
-    # Per-test stub child templates go in the DictLoader the caller
-    # populates via ``env.loader.loaders[0].mapping[...]``.
-    stub_loader = DictLoader({})
-    env = Environment(
-        loader=ChoiceLoader([stub_loader, framework_loader]),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
-    # `base.html` references the `entity_url` / `entity_form_url`
-    # Jinja globals registered in production by
-    # `src.framework.rendering.templating`. Mirror them here so the
-    # chrome renders without needing a full app boot.
-    from src.domain.logic import capabilities
-    from src.framework.rendering.labels import (
-        entity_create_label,
-        entity_filter_label,
-    )
-    from src.framework.rendering.route_urls import (
-        entity_form_url,
-        entity_lock_reason,
-        entity_url,
-    )
-
-    env.globals["entity_url"] = entity_url
-    env.globals["entity_form_url"] = entity_form_url
-    env.globals["entity_lock_reason"] = entity_lock_reason
-    env.globals["entity_create_label"] = entity_create_label
-    env.globals["entity_filter_label"] = entity_filter_label
-    env.globals["capabilities"] = capabilities
-    return env
-
-
-def _add_child(env: Environment, name: str, body: str) -> None:
-    env.loader.loaders[0].mapping[name] = textwrap.dedent(body).lstrip()
+    return _make_env_impl()
 
 
 def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:

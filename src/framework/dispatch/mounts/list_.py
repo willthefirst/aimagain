@@ -26,7 +26,6 @@ from src.framework.dispatch.pagination import (
 )
 from src.framework.http.responses import APIResponse
 from src.framework.persistence.base_repository import BaseRepository
-from src.framework.rendering.templating import set_viewer
 
 if TYPE_CHECKING:
     from src.framework.dispatch.entity_spec import EntitySpec
@@ -207,7 +206,6 @@ async def handle_list(
         )
 
     items, page = paginate(items_plus_one, page=page_number, per_page=per_page)
-    set_viewer(requesting_user)
 
     context: dict[str, Any] = {
         "request": request,
