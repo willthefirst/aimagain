@@ -29,10 +29,16 @@ the spec.
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_filter_field.html" import filter_field -%}
 {% block breadcrumb %}
-  {%- set label %}
+  {%- set _label_override %}
     {% block resource_label %}{% endblock %}
   {% endset -%}
-  {{ breadcrumb([(label | trim, list_action) ]) }}
+  {# Collection-back tuple flows through `breadcrumb_entity_item` so the
+     lock_reason third element is always populated — the back link
+     auto-locks when the viewer fails the entity's `read_policy.can_read`.
+     See `route_urls.breadcrumb_entity_item`. #}
+  {{ breadcrumb([
+    breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+  ]) }}
 {% endblock %}
 {% block toolbar %}
   {# `filter_heading` is sourced from `entity_filter_label(spec.name)` in

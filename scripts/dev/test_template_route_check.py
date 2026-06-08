@@ -164,3 +164,91 @@ def test_violations_returns_empty_for_clean_file(tmp_path):
     f = tmp_path / "ok.html"
     f.write_text("<a href=\"{{ entity_url('post') }}\">Posts</a>")
     assert _violations(f, _PATTERN) == []
+
+
+# --- Rule 2: bare anchors to gated entities ----------------------------
+
+from scripts.dev.template_route_check import _bare_anchor_violations
+
+
+def test_bare_anchor_to_gated_collection_is_flagged(tmp_path):
+    """`<a href="{{ entity_url('user') }}">…</a>` is exactly the bug class
+    — the collection list 403s for non-network viewers, so the visible
+    `<a>` must go through `entity_link` instead."""
+    f = tmp_path / "bad.html"
+    f.write_text("<a href=\"{{ entity_url('user') }}\">Users</a>\n")
+    out = _bare_anchor_violations(f, {"user", "clinician"})
+    assert len(out) == 1
+    assert out[0][2] == "user"
+
+
+def test_bare_anchor_to_non_gated_collection_is_not_flagged(tmp_path):
+    """`post` has no `read_policy.lock_reason` — the `/posts` list is
+    public, so a plain anchor is correct. The lint must not over-flag."""
+    f = tmp_path / "ok.html"
+    f.write_text("<a href=\"{{ entity_url('post') }}\">Posts</a>\n")
+    assert _bare_anchor_violations(f, {"user", "clinician"}) == []
+
+
+def test_anchor_with_id_arg_is_not_flagged(tmp_path):
+    """`entity_url('user', id='me')` produces `/users/me` — detail, not
+    list. The read-policy gate only fires on list/count, so detail links
+    don't 403 and don't need the macro."""
+    f = tmp_path / "ok.html"
+    f.write_text("<a href=\"{{ entity_url('user', id='me') }}\">Profile</a>\n")
+    assert _bare_anchor_violations(f, {"user", "clinician"}) == []
+
+
+def test_entity_form_url_is_not_flagged(tmp_path):
+    """`entity_form_url('clinician')` → `/clinicians/form` — create form,
+    not list. Doesn't fire the read-policy gate, so plain anchor is fine."""
+    f = tmp_path / "ok.html"
+    f.write_text("<a href=\"{{ entity_form_url('clinician') }}\">New</a>\n")
+    assert _bare_anchor_violations(f, {"user", "clinician"}) == []
+
+
+def test_multiline_anchor_open_tag_is_caught(tmp_path):
+    """Anchor open tags in templates often wrap onto multiple lines
+    (`<a\\n   href=…\\n   class=…\\n>`). The lint flattens whitespace
+    so the rule still fires regardless of wrapping."""
+    f = tmp_path / "bad.html"
+    f.write_text(
+        '<a\n  href="{{ entity_url(\'clinician\') }}"\n  class="x">Browse</a>\n'
+    )
+    out = _bare_anchor_violations(f, {"user", "clinician"})
+    assert len(out) == 1
+    assert out[0][2] == "clinician"
+
+
+def test_locked_html_macro_file_is_exempt(tmp_path, monkeypatch):
+    """`_shared/_locked.html` defines `entity_link`, which internally
+    renders `<a href="{{ entity_url(...) }}">`. That call is the
+    sanctioned path — exempted by file name so the macro's own
+    implementation doesn't lint-fail."""
+    import scripts.dev.template_route_check as mod
+
+    framework_root = tmp_path / "framework_templates"
+    framework_root.mkdir()
+    locked = framework_root / "_shared"
+    locked.mkdir()
+    f = locked / "_locked.html"
+    f.write_text(
+        "{% macro entity_link(name, label) %}"
+        '<a href="{{ entity_url(name) }}">{{ label }}</a>'
+        "{% endmacro %}"
+    )
+    monkeypatch.setattr(mod, "_TEMPLATE_ROOTS", (framework_root,))
+    out = mod._bare_anchor_violations(f, {"user", "clinician"})
+    assert out == []
+
+
+def test_unrelated_entity_url_outside_anchor_is_not_flagged(tmp_path):
+    """`entity_url` called outside an `<a>` tag (e.g. `hx-post`, `action`,
+    `cancel_url=…`) targets a form-action / mutation, not navigation.
+    Only navigation needs the lock affordance."""
+    f = tmp_path / "ok.html"
+    f.write_text(
+        '<form action="{{ entity_url(\'user\') }}" method="post">x</form>\n'
+        "{% set cancel = entity_url('clinician') %}\n"
+    )
+    assert _bare_anchor_violations(f, {"user", "clinician"}) == []
