@@ -222,11 +222,8 @@ def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:
     css = _CSS_PATH.read_text()
 
     assert re.search(
-        r"\.toolbar-actions[^{]*\{[^}]*flex-wrap:\s*nowrap", css, re.DOTALL
-    ), ".toolbar-actions must declare `flex-wrap: nowrap` so actions don't grow the band"
-    assert re.search(
         r"\.toolbar-right\b[^{]*\{[^}]*flex-wrap:\s*nowrap", css, re.DOTALL
-    ), ".toolbar-right must declare `flex-wrap: nowrap`"
+    ), ".toolbar-right must declare `flex-wrap: nowrap` so actions don't grow the band"
 
     h1_rule = re.search(r"\.toolbar\s+h1\s*\{([^}]*)\}", css, re.DOTALL)
     assert h1_rule is not None, ".toolbar h1 must have a rule"

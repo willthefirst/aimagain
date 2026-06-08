@@ -4,20 +4,12 @@ Every page renders one toolbar strip above its content. The
 single boundary `<hr>` below the toolbar is owned by the
 page-header band (`_shared/_page_header.html`), not this macro —
 the macro emits only the `<div class="toolbar">` row. The row
-carries up to three things, left-to-right:
+carries up to two things, left-to-right:
 
   Heading (`<h1>`) — the page title. Required arg. Lives in the
     same row as the actions so the chrome compacts to a single
     band (the breadcrumb above is plain inline text carrying
     ancestry only; the H1 is here).
-  Filter link (`a.toolbar-filter-link`) — opens the dedicated
-    `/<collection>/search` page. Always reads `Filters` when none
-    are active; switches to a short inline summary
-    (`Type: Seeking, Description: needle, +1 more filter`) when
-    any are. Only rendered when `search_url` is set — list pages
-    opt in via `routes.search`; detail pages leave it unset.
-    Clearing happens on the search page's form (its "Clear"
-    button), not here.
   Action menu (`menu.toolbar-right`) — caller-provided `<li>`
     commands (Create, Edit, Delete, Favorite, ...). `<menu>` is
     HTML's native "list of commands" element. Detail-page and
@@ -25,14 +17,11 @@ carries up to three things, left-to-right:
     cluster is right-aligned by being the second grid cell of
     `.toolbar` (see `base.html`).
 
-The filter link and action menu are wrapped together in a
-`.toolbar-actions` cell so the toolbar grid reflows as a single
-unit: at ≥641px the heading and actions share one row; at ≤640px
-the whole actions cell drops below the heading atomically. The
-cluster never splits mid-toolbar.
-
-Cap on how many filter chips appear inline before collapsing to
-`+N more filters`. Keeps the link readable on narrow viewports.
+Filters never live in the toolbar. List pages whose spec
+declares `filters=(…)` get a sidebar (`views/list.html`'s
+`{% block content %}`); the sidebar header carries the link to
+the dedicated full-page search. Pages with no declared filters
+have no filter UI at all.
 
     Detail page (heading + actions):
 
@@ -41,13 +30,9 @@ Cap on how many filter chips appear inline before collapsing to
           <li>{{ confirm_delete_button(...) }}</li>
         {% endcall %}
 
-    List page (heading + filter link + actions):
+    List page (heading + actions):
 
-        {% call page_toolbar(
-          heading="Openings",
-          active_filters=active_filters,
-          search_url=search_url,
-        ) %}
+        {% call page_toolbar(heading="Openings") %}
           <li><a href="{{ entity_form_url('post') }}" role="button">Create</a></li>
         {% endcall %}
 
@@ -55,7 +40,6 @@ Cap on how many filter chips appear inline before collapsing to
 
         {% call page_toolbar(heading="Edit Will's Org") %}{% endcall %}
 #}
-{% set _ACTIVE_FILTER_INLINE_LIMIT = 2 %}
 {# Render the toolbar.
 
 Args:
@@ -64,25 +48,13 @@ Args:
     page heading (the breadcrumb above carries ancestry only;
     the heading lives in the same row as the page actions so the
     chrome compacts into a single band).
-  active_filters: list of `{name, value, label}` descriptors (one
-    per active value; multi-valued filters fan out). Empty when
-    no filter is applied.
-  search_url: link target for the search page (with active filters
-    forwarded as query params), or `None` to omit the filter link
-    entirely (detail pages, or list pages that didn't opt into
-    `routes.search`).
 #}
-{% macro page_toolbar(
-  heading,
-  active_filters=(),
-  search_url=none,
-  filter_label="Filters"
-  ) -%}
+{% macro page_toolbar(heading) -%}
   {# `caller` is truthy whenever the macro was invoked via `{% call %}`,
    even if the caller body trims to empty (e.g. the list view always
    wraps with `{% call %}` and passes `{{ actions_body }}` which may
    be blank). Render once and check the trimmed string so empty
-   bodies don't emit a stray `<menu>` or a separator. #}
+   bodies don't emit a stray `<menu>`. #}
   {%- set actions_html = caller() if caller else "" -%}
   {%- set has_actions = actions_html | trim -%}
   <div class="toolbar">
@@ -99,33 +71,10 @@ Args:
             tabindex="-1"
             aria-hidden="true"
             class="toolbar-reserve">&nbsp;</button>
-    {%- if search_url or has_actions %}
-      {# Filter + menu live in one grid cell so the actions cluster
-     reflows as a single unit (atomic wrap). See `.toolbar`'s grid
-     in `base.html`. #}
-      <div class="toolbar-actions">
-        {%- if search_url %}
-          <a href="{{ search_url }}" class="toolbar-filter-link">
-            {%- if not active_filters -%}
-              {{ filter_label }}
-            {%- else -%}
-              {%- set shown = active_filters[:_ACTIVE_FILTER_INLINE_LIMIT] -%}
-              {%- set hidden = active_filters | length - shown | length -%}
-              {%- for tag in shown -%}{{ tag.label }}{%- if not loop.last %},
-              {% endif -%}
-            {%- endfor -%}
-            {%- if hidden > 0 %}, +{{ hidden }} more filter
-              {% if hidden != 1 %}s{% endif %}
-            {%- endif -%}
-          {%- endif -%}
-        </a>
-      {%- endif %}
-      {%- if has_actions %}
-        <menu class="toolbar-right">
-          {{ actions_html }}
-        </menu>
-      {%- endif %}
-    </div>
-  {%- endif %}
-</div>
+    {%- if has_actions %}
+      <menu class="toolbar-right">
+        {{ actions_html }}
+      </menu>
+    {%- endif %}
+  </div>
 {%- endmacro %}

@@ -238,9 +238,10 @@ async def handle_list(
     context["active_filters"] = _active_filter_descriptors(declared, filter_values)
     context["active_filter_count"] = len(context["active_filters"])
     # Search-link URL forwards the current query string so the search
-    # page renders its form pre-populated. Only set when the spec opts
-    # into `routes.search`.
-    if spec.routes.search:
+    # page renders its form pre-populated. Set whenever the spec
+    # declares any `Filter` — declaring filters auto-implies the
+    # dedicated `/<collection>/search` page (see `mount_entity`).
+    if declared:
         from urllib.parse import urlencode
 
         from src.framework.rendering.labels import filter_label_for
@@ -258,9 +259,7 @@ async def handle_list(
         base = f"/{spec.url_collection}/search"
         context["search_url"] = f"{base}?{qs}" if qs else base
         # `filter_heading` is the canonical "Filter <plural>" string the
-        # toolbar's filter link reads when no filters are applied, and
-        # the search page's H1 reads on its own. Same helper feeds both
-        # surfaces — see `src/framework/rendering/labels.py`.
+        # sidebar header reads. See `src/framework/rendering/labels.py`.
         context["filter_heading"] = filter_label_for(spec)
     else:
         context["search_url"] = None
