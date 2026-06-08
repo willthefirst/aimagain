@@ -33,8 +33,11 @@ Child contract:
                      a one-click affordance (see project chrome rule in
                      `src/framework/templates/README.md`).
 
-  Required context:
-    resource_url        — URL the collection segment links to.
+  Required context (also enforced at render time by
+  `assert_view_type_context` — see `src/framework/rendering/view_type_contract.py`):
+    entity_name         — spec name of the entity being edited. Drives
+                          the breadcrumb's collection-back lookup via
+                          `breadcrumb_entity_item(entity_name)`.
     resource_detail_url — URL the current-item breadcrumb segment
                           links to (e.g. `"/clinicians/" ~ clinician.id`).
     edit_heading        — full H1 string (e.g. "Edit clinician

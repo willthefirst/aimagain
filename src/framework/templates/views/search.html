@@ -23,6 +23,18 @@ Control selection (read by `_search_field`):
 
 Children supply only `resource_label`; the form body is built from
 the spec.
+
+Required context (also enforced at render time by
+`assert_view_type_context` — see `src/framework/rendering/view_type_contract.py`):
+  entity_name      — spec name driving the breadcrumb's collection-back
+                     lookup via `breadcrumb_entity_item(entity_name)`.
+  list_action      — URL the form GETs to (the list page).
+  filter_heading   — H1 string. Set by `mount_search` via
+                     `filter_label_for(entity)`; same helper feeds the
+                     list-page toolbar's filter link so they can't drift.
+  declared_filters — tuple of `Filter` declarations the form renders.
+  filter_values    — dict of pre-applied filter values for the form's
+                     server-rendered initial state.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}

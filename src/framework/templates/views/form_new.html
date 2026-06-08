@@ -21,9 +21,11 @@ Child contract:
     form_content   — the `<form>` body (rendered inside the
                      `entity-form-page` wrapper).
 
-  Required context:
-    resource_url    — URL the collection segment links to (e.g.
-                      "/clinicians").
+  Required context (also enforced at render time by
+  `assert_view_type_context` — see `src/framework/rendering/view_type_contract.py`):
+    entity_name     — spec name of the entity being created. Drives
+                      the breadcrumb's collection-back lookup via
+                      `breadcrumb_entity_item(entity_name)`.
     create_heading  — full H1 string (e.g. "Create clinician opening").
                       Set by `handle_get_new_form` via
                       `entity_create_label(spec.name, kind=...)` — the

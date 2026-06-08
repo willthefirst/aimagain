@@ -90,6 +90,9 @@ class APIResponse:
             set_viewer,
             templates,
         )
+        from src.framework.rendering.view_type_contract import (
+            assert_view_type_context,
+        )
 
         # Pin the viewer for this render so macros that can't read
         # template context (`entity_link`, `viewer_is_admin`) consult the
@@ -100,6 +103,15 @@ class APIResponse:
             **get_template_context(),
             **base_context(current_user),
         }
+
+        # Render-time enforcement of the view-type chrome contract:
+        # any template that `{% extends "views/X.html" %}` must supply
+        # the keys the chrome reads (`entity_name`, `create_heading`,
+        # etc. — see `view_type_contract.VIEW_TYPE_REQUIREMENTS`).
+        # Forgetting one used to surface as a Jinja `UndefinedError`
+        # deep inside a chrome block; now it raises here with the
+        # missing-key list and a pointer to the table.
+        assert_view_type_context(template_name, merged_context)
 
         return templates.TemplateResponse(
             request, template_name, merged_context, status_code=status_code

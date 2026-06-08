@@ -27,10 +27,13 @@ Child contract:
                      title.
     content        — the resource detail body.
 
-  Required context (set via `{% set %}` after `{% extends %}`):
-    resource_url   — URL the collection segment links to (e.g.
-                     "/clinicians"). The current segment renders as plain
-                     text with `aria-current="page"`.
+  Required context (also enforced at render time by
+  `assert_view_type_context` — see `src/framework/rendering/view_type_contract.py`):
+    entity_name    — spec name of the entity being viewed (e.g.
+                     "clinician"). Drives the breadcrumb's
+                     `breadcrumb_entity_item(entity_name)` call so the
+                     collection back-link's URL + lock_reason both
+                     resolve from one lookup. Injected by `handle_detail`.
 
   Optional blocks:
     subtitle       — one-liner rendered as muted small text directly
