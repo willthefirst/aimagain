@@ -134,21 +134,27 @@ async def test_create_clinician_happy_path(
 
 async def test_create_clinician_form_error_render_is_wired(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """Integration smoke for `CLINICIAN_ENTITY.form_error_render`.
 
-    HX-Request POST with an invalid `npi` value (not 10 digits)
-    → 422 + HTML fragment with the inline error on the `npi` input.
-    `solo_practice=true` is included so the org-id validator passes
-    (the create form defaults to solo practice).
+    HX-Request POST with an invalid `in_person_sessions` value
+    (the field is a Literal over `LOCATION_AVAILABILITY_OPTIONS`)
+    → 422 + HTML fragment with the inline error landed on the
+    `in_person_sessions` input. Same shape as the organizations /
+    programs smokes.
+
+    `first_name` would have been a more obvious trip — but the
+    schema models it as `StrippedOptionalText = None` (matches the
+    rest of the clinician model's tolerant defaults), so an empty
+    string passes. Pin the actual Literal field instead.
     """
-    payload = {
-        "first_name": "Jane",
-        "last_name": "Smith",
-        "npi": "abc",
-        "solo_practice": "true",
-    }
+    org_id = await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Acme"
+    )
+    payload = clinician_payload(org_id=str(org_id))
+    payload["in_person_sessions"] = "not-a-valid-option"
     response = await authenticated_client.post(
         "/clinicians",
         data=payload,
@@ -157,7 +163,7 @@ async def test_create_clinician_form_error_render_is_wired(
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
     body = response.text
-    field_at = body.index('name="npi"')
+    field_at = body.index('name="in_person_sessions"')
     window = body[max(0, field_at - 200) : field_at + 200]
     assert 'aria-invalid="true"' in window, window
     assert "<!DOCTYPE" not in body
@@ -1386,45 +1392,100 @@ async def test_owner_edit_form_renders_affiliations_section(
 
 async def test_get_clinician_form_renders(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
 ):
-    """`GET /clinicians/form` renders the simplified create form.
-
-    The create form shows only first_name, last_name, and NPI.
-    Practice, availability, and insurance fields live on the edit form.
-    `solo_practice` is a hidden field so the handler auto-creates a
-    solo-practice Org — the user never has to pre-create one.
-    """
+    """`GET /clinicians/form` renders the create form posting to
+    the JSON API."""
+    # Seed an Org so the Org-picker dropdown has at least one option to render.
+    await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Seeded Org"
+    )
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
+    # The header uses a link (`<a hx-post>`), not a form; targeting
+    # `main form` is still the right scope for the clinician create form.
     form = tree.css_first("main form")
     assert form is not None
     assert form.attributes.get("hx-post") == "/clinicians"
-    # Required fields on create.
-    assert tree.css_first('input[name="first_name"]') is not None
-    assert tree.css_first('input[name="last_name"]') is not None
-    assert tree.css_first('input[name="npi"]') is not None
-    # solo_practice hidden field — defaults create to solo-practice so no
-    # separate Org-create step is needed.
-    solo = tree.css_first('input[type="hidden"][name="solo_practice"]')
-    assert solo is not None
-    assert solo.attributes.get("value") == "true"
-    # Practice / availability / insurance fields are not on the create form.
-    assert tree.css_first('select[name="org_id"]') is None
-    assert tree.css_first('input[name="location_city"]') is None
-    assert tree.css_first('select[name="in_person_sessions"]') is None
-    assert tree.css_first('select[name="in_network_carriers"]') is None
+    # Org-picker dropdown — replaces the old free-text practice_name input.
+    # Lists the Orgs the requesting user owns (#524).
+    org_select = tree.css_first('select[name="org_id"]')
+    assert org_select is not None
+    org_options = org_select.css("option")
+    assert any(
+        o.text(strip=True) == "Seeded Org" for o in org_options
+    ), "Org dropdown should include every Org the user owns"
+    city = tree.css_first('input[name="location_city"]')
+    assert city is not None
+    assert city.attributes.get("maxlength") == "120"
+    zip_input = tree.css_first('input[name="location_zip"]')
+    assert zip_input is not None
+    assert zip_input.attributes.get("pattern") == r"\d{5}"
+    assert zip_input.attributes.get("maxlength") == "5"
+    # State select with all 51 entries (50 states + DC) plus a placeholder.
+    state_select = tree.css_first('select[name="location_state"]')
+    assert state_select is not None
+    state_options = state_select.css("option")
+    assert len(state_options) == 52  # 51 + placeholder
+    # Availability selects default to "yes" on create (#701); no placeholder.
+    in_person = tree.css_first('select[name="in_person_sessions"]')
+    virtual = tree.css_first('select[name="virtual_sessions"]')
+    assert in_person is not None
+    assert virtual is not None
+    assert len(in_person.css("option")) == 3
+    assert len(virtual.css("option")) == 3
+    # Both session-availability dropdowns default to "yes" (#701).
+    in_person_selected = in_person.css_first("option[selected]")
+    virtual_selected = virtual.css_first("option[selected]")
+    assert (
+        in_person_selected is not None
+    ), "in_person_sessions should have a pre-selected option"
+    assert in_person_selected.attributes.get("value") == "yes"
+    assert (
+        virtual_selected is not None
+    ), "virtual_sessions should have a pre-selected option"
+    assert virtual_selected.attributes.get("value") == "yes"
+    # Insurance & payment fieldset. The carrier multi-select speaks for
+    # the in-network signal (empty = no in-network); OON and sliding-scale
+    # render as feature-flag checkboxes (the visible `<input type="checkbox">`
+    # plus a sibling `<input type="hidden" value="false">` carrying the
+    # default-true round-trip — see `_shared/form_fields.html::checkbox_field`).
+    assert tree.css_first('input[type="checkbox"][name="accepts_in_network"]') is None
+    assert (
+        tree.css_first('input[type="checkbox"][name="accepts_out_of_network"]')
+        is not None
+    )
+    assert tree.css_first('input[type="checkbox"][name="sliding_scale"]') is not None
+    assert tree.css_first('input[name="cost"]') is not None
+    carrier_select = tree.css_first('select[name="in_network_carriers"][multiple]')
+    assert carrier_select is not None
+    assert len(carrier_select.css("option")) == 11
 
 
-async def test_get_clinician_form_no_org_dropdown(
+async def test_get_clinician_form_scopes_org_dropdown_to_user(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
 ):
-    """The simplified create form has no org_id dropdown — solo_practice
-    is the hidden default so no pre-existing Org is required."""
+    """The Org dropdown lists only the requesting user's Orgs (#524).
+    Another user's Org must not leak into the picker."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    await _seed_org(db_test_session_manager, owner_id=logged_in_user.id, name="Mine")
+    await _seed_org(db_test_session_manager, owner_id=other.id, name="Theirs")
+
     response = await authenticated_client.get("/clinicians/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert tree.css_first('select[name="org_id"]') is None
+    option_texts = {
+        o.text(strip=True) for o in tree.css('select[name="org_id"] option')
+    }
+    assert "Mine" in option_texts
+    assert "Theirs" not in option_texts
 
 
 # --- Edit form page (GET /clinicians/{id}/form) -------------------
