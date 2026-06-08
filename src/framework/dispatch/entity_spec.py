@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from fastapi import Depends
 from pydantic import BaseModel, TypeAdapter
 
 from src.auth_config import current_active_user, current_admin_user
@@ -32,6 +33,29 @@ class AuthzPolicy:
 
     write_authz: Callable[..., None]
     can_write: Callable[..., bool]
+
+
+@dataclass(frozen=True, slots=True)
+class ReadPolicy:
+    """Capability gate for read access to an entity's data.
+
+    Distinct from `AuthzPolicy` (which gates per-object mutation) because
+    read gating is per-user and type-scoped — "can this user see this kind
+    of data at all?" — whereas write gating is per-object ("is this user
+    the owner of *this row*?").
+
+    `assert_can_read(user)` is the raising form stored on the repository
+    instance at request time; it fires before every `_get_by_id`, `_list`,
+    and `_count` call. `can_read(user)` is the predicate form available for
+    templates and other non-raising callers.
+
+    Declare on `EntitySpec.read_policy`. `None` means open (default).
+    Superuser bypass is the callable's responsibility — neither the
+    framework nor `BaseRepository` short-circuits for superusers.
+    """
+
+    assert_can_read: Callable[[Any], None]
+    can_read: Callable[[Any], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,6 +273,12 @@ class EntitySpec:
     # matched callables. Mutually exclusive with the hand-wired form.
     can_write: Callable[..., bool] | None = None
     auth_policy: "AuthzPolicy | None" = None
+    # Capability gate for read access — the type-scoped complement to
+    # `auth_policy` (which is per-object mutation). When set, `EntitySpec.__post_init__`
+    # wraps `repo_dep` so the repository carries both the requesting user and
+    # the guard callable into every read primitive (`_get_by_id`, `_list`,
+    # `_count`). See `ReadPolicy` for the full contract.
+    read_policy: "ReadPolicy | None" = None
     # `auth_deps` is the declarative pair for `read_user_dep` /
     # `write_user_dep` (FastAPI auth deps used at the *route* level —
     # distinct from `auth_policy` which is the per-target check inside
@@ -900,6 +930,29 @@ class EntitySpec:
         if self.auth_policy is not None:
             object.__setattr__(self, "write_authz", self.auth_policy.write_authz)
             object.__setattr__(self, "can_write", self.auth_policy.can_write)
+        # `read_policy` wraps `repo_dep` so the guard fires at the data layer.
+        # The wrapped dep receives both the session-backed repo (via the original
+        # dep) and the requesting user (via `current_active_user`), then stamps
+        # both onto the repo instance before returning it. `BaseRepository._check_read`
+        # fires before every `_get_by_id`, `_list`, and `_count` call.
+        if self.read_policy is not None:
+            if self.repo_dep is None:
+                raise ValueError(
+                    f"EntitySpec({self.name!r}) declares read_policy but no "
+                    "repo_dep — the guard has no repository to attach to."
+                )
+            _guard = self.read_policy.assert_can_read
+            _original_dep = self.repo_dep
+
+            def _guarded_dep(
+                repo: Any = Depends(_original_dep),
+                user: Any = Depends(current_active_user),
+            ) -> Any:
+                repo._requesting_user = user
+                repo._read_guard = _guard
+                return repo
+
+            object.__setattr__(self, "repo_dep", _guarded_dep)
         # `auth_deps` mirrors `auth_policy`: the constructor expands the
         # paired declaration into the two slot fields. Mutually exclusive
         # with hand-wired `read_user_dep` / `write_user_dep`.
