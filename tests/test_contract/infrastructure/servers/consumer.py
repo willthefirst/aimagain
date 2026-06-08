@@ -209,11 +209,14 @@ def _setup_clinician_create_form_stub(app: FastAPI) -> None:
             # introspects to derive each control — same key the
             # production `make_new_form_handler` binds from
             # `spec.create_adapter`.
-            # `entity_name` powers the view-type chrome's
-            # `breadcrumb_entity_item(entity_name)` call (#1269).
+            # `entity_name` + `create_heading` are required by the
+            # `views/form_new.html` chrome contract (#1271) — the
+            # production handler injects them via `mount_form`;
+            # bespoke stubs that render the same template must too.
             context={
                 "current_user": current_user,
                 "entity_name": "clinician",
+                "create_heading": "Create clinician",
                 "schema": ClinicianCreate,
                 "orgs": [org],
             },
@@ -281,11 +284,16 @@ def _setup_clinician_edit_form_stub(app: FastAPI) -> None:
             template_name="clinicians/form_edit.html",
             # The framework binds `context[spec.name] = target`; after
             # #642 PR 4 the entity name is "clinician".
-            # `entity_name` powers the view-type chrome's
-            # `breadcrumb_entity_item(entity_name)` call (#1269).
+            # `entity_name` + `edit_heading` + `resource_detail_url` are
+            # required by the `views/form_edit.html` chrome contract
+            # (#1271) — the production handler injects them via
+            # `mount_form`; bespoke stubs that render the same template
+            # must too.
             context={
                 "clinician": clinician,
                 "entity_name": "clinician",
+                "edit_heading": "Edit clinician",
+                "resource_detail_url": f"/clinicians/{clinician_id}",
                 "current_user": current_user,
                 "orgs": [org],
             },
@@ -311,11 +319,12 @@ def _setup_organization_create_form_stub(app: FastAPI) -> None:
         )
         return APIResponse.html_response(
             template_name="organizations/form_new.html",
-            # `entity_name` powers the view-type chrome's
-            # `breadcrumb_entity_item(entity_name)` call (#1269).
+            # `entity_name` + `create_heading` satisfy the
+            # `views/form_new.html` chrome contract (#1271).
             context={
                 "current_user": current_user,
                 "entity_name": "organization",
+                "create_heading": "Create organization",
             },
             request=request,
         )
@@ -343,11 +352,12 @@ def _setup_program_create_form_stub(app: FastAPI) -> None:
         org = _StubAttrs(id=STUB_PROGRAM_FORM_ORG_ID, name="Acme Counseling")
         return APIResponse.html_response(
             template_name="programs/form_new.html",
-            # `entity_name` powers the view-type chrome's
-            # `breadcrumb_entity_item(entity_name)` call (#1269).
+            # `entity_name` + `create_heading` satisfy the
+            # `views/form_new.html` chrome contract (#1271).
             context={
                 "current_user": current_user,
                 "entity_name": "program",
+                "create_heading": "Create program",
                 "schema": ProgramCreate,
                 "organizations": [org],
             },
