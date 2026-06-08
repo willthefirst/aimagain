@@ -107,11 +107,10 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
         delete=True,
         form_new=True,
         form_edit=True,
-        search=True,
     ),
-    # Filters render on the dedicated `/clinicians/search` page; the
-    # list-page toolbar carries only the "Filter · N" link and the
-    # Create button.
+    # Declaring filters auto-mounts `/clinicians/search` (no separate
+    # `routes.search` flag) and turns the list page's content area
+    # into a two-column browse layout — sidebar form + results.
     filters=(
         ChoiceFilter(
             name="license_type",

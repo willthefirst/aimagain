@@ -190,6 +190,52 @@ def test_list_view_renders_toolbar_with_h1_even_without_actions() -> None:
     assert toolbar.css_first("menu.toolbar-right") is None
 
 
+def test_list_view_never_renders_filter_link_in_toolbar() -> None:
+    """Filters live in the sidebar, never in the toolbar — even
+    when `search_url` and active filters are populated in context
+    (i.e. for an entity that declares `filters=(…)`). The toolbar
+    carries only the `<h1>` and the optional action `<menu>`. Pins
+    the structural rule so a future change can't quietly re-add a
+    toolbar filter link by re-introducing `search_url` as a
+    `page_toolbar` arg."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Clinicians{% endblock %}
+        {% block list_body %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        # A spec with filters injects all of these — the toolbar
+        # still must not render a filter link from any of them.
+        filters=({"name": "kind", "label": "Type"},),
+        filter_values={"kind": "x"},
+        active_filters=[{"name": "kind", "value": "x", "label": "Type: X"}],
+        active_filter_count=1,
+        search_url="/clinicians/search?kind=x",
+        filter_heading="Filter clinicians",
+    )
+
+    tree = HTMLParser(html)
+    toolbar = tree.css_first("div.toolbar")
+    assert toolbar is not None
+    assert toolbar.css_first("a.toolbar-filter-link") is None
+    # The sidebar header still carries the search link — that's
+    # where filters live now.
+    sidebar = tree.css_first("aside.filter-sidebar")
+    assert sidebar is not None
+    sidebar_link = sidebar.css_first("hgroup a")
+    assert sidebar_link is not None
+    assert sidebar_link.attributes.get("href") == "/clinicians/search?kind=x"
+
+
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:
     """A child that fills `{% block actions %}` gets its content in the
     toolbar's right zone, which is a `<menu>` of `<li>` commands."""

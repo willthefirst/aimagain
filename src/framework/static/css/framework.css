@@ -318,16 +318,14 @@ dd { margin: 0; }
 /* Page-scoped zone bar. Every page renders one
    `<div class="toolbar">` carrying:
      `<h1>` — the page heading (left cell).
-     `.toolbar-actions` — a single cell wrapping the filter link
-       (`.toolbar-filter-link`) and the action menu
-       (`.toolbar-right`). Wrapping both in one cell is what
-       gives the toolbar atomic reflow: the heading and actions
-       share one row at all viewport widths — the heading cell
-       shrinks via `minmax(0, 1fr)` to accommodate the actions.
-       The cluster never splits mid-toolbar.
-   Pages without actions or filter link render only the H1; the
-   macro omits `.toolbar-actions` entirely so the grid's second
-   column collapses. */
+     `.toolbar-right` — the optional `<menu>` of page actions
+       (Create, Edit, Delete, ...), flowing into the grid's second
+       column. The heading cell shrinks via `minmax(0, 1fr)` to
+       accommodate the actions; the actions cluster never wraps
+       among itself and never shrinks (`flex-wrap: nowrap`).
+   Filters never live in the toolbar — they live in the list
+   view's sidebar (`.filter-sidebar`). Pages without actions
+   render only the H1 and the grid's second column collapses. */
 .toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -368,30 +366,26 @@ dd { margin: 0; }
   visibility: hidden;
   pointer-events: none;
 }
-/* The actions cell never wraps among itself and never shrinks — it keeps
+/* The action menu never wraps among itself and never shrinks — it keeps
    its single row so the band stays one row tall and the boundary rule
    doesn't get pushed down. The H1 (the flexible grid cell) ellipsizes
    instead. The intentional ≤640px stacking (whole actions cell drops
    below the heading, atomically) lives in the grid media query and is
    unaffected. */
-.toolbar-actions {
+.toolbar-right {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  justify-content: flex-end;
   flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
-.toolbar-filter-link { min-width: 0; }
-.toolbar-right { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.5rem; }
-/* Mobile: the toolbar collapses to a single column so the whole actions
-   cell drops below the heading atomically (the heading keeps its own
-   row; the filter link + action menu move to the next row together). The
-   actions never wrap *among themselves* at any width (`nowrap` above);
-   this is the page-level stack, not an intra-cluster wrap. The band's
-   height grows by one row on mobile — that's the intended intrinsic
-   change across screen sizes, and it stays identical across pages at a
-   given size because the heading row is always one (ellipsized) line. */
+/* Mobile: the toolbar collapses to a single column so the action menu
+   drops below the heading atomically. The actions never wrap *among
+   themselves* at any width (`nowrap` above); this is the page-level
+   stack, not an intra-cluster wrap. The band's height grows by one row
+   on mobile — that's the intended intrinsic change across screen sizes,
+   and it stays identical across pages at a given size because the
+   heading row is always one (ellipsized) line. */
 @media (max-width: 640px) {
   .toolbar { grid-template-columns: 1fr; }
 }

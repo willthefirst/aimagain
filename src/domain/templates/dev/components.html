@@ -359,8 +359,8 @@ it's dev-only chrome that should never ship to production. #}
         <p>
           <small>Rendered via <code>_shared/_toolbar.html</code> → <code>page_toolbar()</code>. every list and detail page uses this.</small>
         </p>
-        <h3>List toolbar (heading + filter link + create)</h3>
-        {% call page_toolbar(heading="Clinicians", search_url=entity_url('clinician') ~ '/search', active_filters=(("Kind", "Referral"), ("State", "CA"))) %}
+        <h3>List toolbar (heading + create)</h3>
+        {% call page_toolbar(heading="Clinicians") %}
           <li>
             <a href="{{ entity_form_url('clinician') }}" role="button">Create clinician</a>
           </li>
