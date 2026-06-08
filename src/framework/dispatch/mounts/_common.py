@@ -274,3 +274,44 @@ def assert_kind_lock(spec: EntitySpec, target: Any) -> None:
         ok = target_kind in spec.discriminator_values
     if not ok:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
+
+
+def subresource_breadcrumb_items(
+    *,
+    parent_spec: "EntitySpec",
+    parent_row: Any,
+    parent_path: str,
+    child_label: str,
+    viewer: Any,
+) -> list[tuple[str, str | None, str | None]]:
+    """Build the 3-step `_breadcrumb_items` for a subresource list page.
+
+    Both `mount_related_list` and `mount_edge_routes` emit the same
+    `[collection → parent row → child collection]` chain; this helper
+    is the single producer so the tuple shape, the lock-reason lookup,
+    and the label-fn call live in one place.
+
+    `parent_path` is the parent row's URL — `f"/{collection}/{id}"` for
+    `mount_related_list`, or the singleton-alias path (`/users/me`)
+    when `mount_edge_routes` is rooted at the viewer's own row.
+
+    The first tuple's third element carries the lock reason from
+    `entity_lock_reason(parent_spec.name, viewer)` — so a viewer who
+    fails the parent's `read_policy.can_read` gets a `locked_link`
+    popover trigger on the collection back-link instead of a plain
+    `<a>` that would 403 on click. See `_shared/_breadcrumb.html`.
+    """
+    parent_label_fn = parent_spec.display_label_fn
+    assert parent_label_fn is not None, (
+        "subresource_breadcrumb_items requires a parent_spec with "
+        "display_label_fn — callers gate on that before invoking."
+    )
+    from src.framework.rendering.route_urls import entity_lock_reason
+
+    collection = parent_spec.url_collection
+    parent_lock = entity_lock_reason(parent_spec.name, viewer)
+    return [
+        (collection.capitalize(), f"/{collection}", parent_lock),
+        (parent_label_fn(parent_row), parent_path, None),
+        (child_label, None, None),
+    ]

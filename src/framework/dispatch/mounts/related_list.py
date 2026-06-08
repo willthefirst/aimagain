@@ -4,7 +4,10 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import Request
 
-from src.framework.dispatch.mounts._common import call_handler_with
+from src.framework.dispatch.mounts._common import (
+    call_handler_with,
+    subresource_breadcrumb_items,
+)
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
 from src.framework.http.responses import APIResponse
@@ -85,23 +88,13 @@ def mount_related_list(
             )
             if parent_entity is not None:
                 collection = _parent_entity_spec.url_collection
-                # Third tuple element is the REASON_* lock code (or None) —
-                # `_shared/_breadcrumb.html` renders a `locked_link` instead
-                # of an `<a>` when the back target is the parent's collection
-                # and the viewer fails the parent's `read_policy.can_read`.
-                from src.framework.rendering.route_urls import entity_lock_reason
-
-                viewer = kwargs.get("requesting_user")
-                parent_lock = entity_lock_reason(_parent_entity_spec.name, viewer)
-                context["_breadcrumb_items"] = [
-                    (collection.capitalize(), f"/{collection}", parent_lock),
-                    (
-                        _parent_label_fn(parent_entity),
-                        f"/{collection}/{parent_id}",
-                        None,
-                    ),
-                    (child_spec.collection.capitalize(), None, None),
-                ]
+                context["_breadcrumb_items"] = subresource_breadcrumb_items(
+                    parent_spec=_parent_entity_spec,
+                    parent_row=parent_entity,
+                    parent_path=f"/{collection}/{parent_id}",
+                    child_label=child_spec.collection.capitalize(),
+                    viewer=kwargs.get("requesting_user"),
+                )
         return APIResponse.html_response(
             template_name=template,
             context=context,

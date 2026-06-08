@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import Depends, Request, status
 
+from src.framework.dispatch.mounts._common import subresource_breadcrumb_items
 from src.framework.http.responses import (
     APIResponse,
     created_response,
@@ -100,17 +101,13 @@ def mount_edge_routes(
             parent_path = (
                 f"/{collection}/{alias[0]}" if alias else f"/{collection}/{user.id}"
             )
-            # Third tuple element is the REASON_* lock code (or None) — the
-            # collection back link auto-locks when the viewer fails the
-            # parent entity's `read_policy.can_read`. See `_shared/_breadcrumb.html`.
-            from src.framework.rendering.route_urls import entity_lock_reason
-
-            parent_lock = entity_lock_reason(_from_entity.name, user)
-            context["_breadcrumb_items"] = [
-                (collection.capitalize(), f"/{collection}", parent_lock),
-                (_from_label_fn(user), parent_path, None),
-                (entity.url_collection.capitalize(), None, None),
-            ]
+            context["_breadcrumb_items"] = subresource_breadcrumb_items(
+                parent_spec=_from_entity,
+                parent_row=user,
+                parent_path=parent_path,
+                child_label=entity.url_collection.capitalize(),
+                viewer=user,
+            )
         return APIResponse.html_response(
             template_name=list_template,
             context=context,

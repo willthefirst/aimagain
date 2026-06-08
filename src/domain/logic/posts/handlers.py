@@ -45,7 +45,6 @@ from src.framework.dispatch.pagination import (
     parse_page,
 )
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
-from src.framework.rendering.templating import set_viewer
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +360,6 @@ async def _post_owner_list_context(
         limit=per_page + 1,
     )
     posts, page = paginate(rows_plus_one, page=page_number, per_page=per_page)
-    set_viewer(requesting_user)
     return {
         "request": request,
         owner_key: owner,
