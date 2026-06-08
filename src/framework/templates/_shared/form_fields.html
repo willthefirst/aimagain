@@ -207,19 +207,28 @@ emitted attribute string. #}
     {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
-{# `<select multiple>` driven by a controlled-vocabulary tuple. One
-   option per value; selected ones get `selected`. Multi selections
-   serialize as repeated `name=v` pairs under
-   application/x-www-form-urlencoded; under htmx's `json-enc` the
-   extension emits an array for 2+ selections, scalar for 1, absent for
-   0 — the schema's `_scalar_to_list` `BeforeValidator` re-wraps the
-   scalar back into a list. Used today for create/edit forms; the
-   search-form variant is `.search-checkbox-fieldset` (one checkbox per
-   value), not this macro. #}
-{# Multi-select: `required=False` by default because the canonical
-   semantic is "any subset, including the empty set" (no in-network
-   carriers, no featured services). Callers can pass `required=True`
-   to force at least one selection. #}
+{# Multi-selection rendered as a scrollable list of checkboxes. One
+   `<input type="checkbox" name="<name>">` per controlled-vocab value;
+   the shared `name` makes the browser submit each checked value
+   independently, identical to the wire shape of the old
+   `<select multiple>`: repeated `name=v` pairs under
+   application/x-www-form-urlencoded; under htmx's `json-enc` an array
+   for 2+ checks, scalar for 1, absent for 0 — the schema's
+   `_scalar_to_list` `BeforeValidator` re-wraps the scalar back into a
+   list.
+
+   Markup is a `<div class="form-field" role="group">` (not a `<label>`,
+   because a single `<label>` can't be the accessible label for many
+   inputs — `aria-labelledby` on the wrapping group does the job) with a
+   `<div class="checkbox-list">` holding the options. The list has a CSS
+   `max-height` and `overflow-y: auto`, so a 50-state vocabulary scrolls
+   inside a fixed envelope instead of growing the form unboundedly.
+
+   Required: `required=False` by default ("any subset, including the
+   empty set" is the canonical semantic — no in-network carriers, no
+   featured services). Callers can pass `required=True` to surface the
+   `(optional)` marker is hidden, but HTML can't natively require "at
+   least one of these checkboxes" — server-side validation owns that. #}
 {% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None, error=None) -%}
   {%- set _form_errors = form_errors|default({}, true) -%}
   {%- set _form_values = form_values|default({}, true) -%}
@@ -227,20 +236,26 @@ emitted attribute string. #}
   {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set selected = current or [] -%}
   {%- set aria_invalid = true if error else invalid -%}
-  <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
-    <select id="{{ name }}"
-            name="{{ name }}"
-            multiple
-            size="{{ [options|length, 8]|min }}"
-            {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
-            {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
+  <div class="form-field"
+       role="group"
+       id="{{ name }}"
+       aria-labelledby="{{ name }}-label"
+       {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
+       {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
+    <span class="form-field-label" id="{{ name }}-label">{{ _field_label(label, required) }}</span>
+    <div class="checkbox-list form-field-control">
       {%- for v in options %}
-        <option value="{{ v }}"{% if v in selected %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
+        <label class="checkbox-list-option">
+          <input type="checkbox"
+                 name="{{ name }}"
+                 value="{{ v }}"
+                 {% if v in selected %}checked{% endif %} />
+          <span>{{ labels[v] if labels else v }}</span>
+        </label>
       {%- endfor %}
-    </select>
+    </div>
     {{- _help_small(name, help, error) }}
-  </label>
+  </div>
 {%- endmacro %}
 {# `<select>` populated from a list of entity rows — the canonical
    foreign-key picker (`org_id` on Clinician/Program forms, `parent_org_id`
