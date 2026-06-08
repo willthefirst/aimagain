@@ -1,11 +1,10 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_clinician_card.html" import clinician_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/_locked.html" import entity_link -%}
 {% block list_body %}
   {%- set _empty %}
-    <p id="favorites-empty">
-      No favorites yet. <a href="{{ entity_url('clinician') }}">Browse clinicians</a> to add some.
-    </p>
+    <p id="favorites-empty">No favorites yet. {{ entity_link('clinician', 'Browse clinicians') }} to add some.</p>
   {%- endset %}
   {{ item_list(clinicians, clinician_card, "favorites-list",
     empty=_empty,

@@ -302,3 +302,72 @@ def test_locked_popovers_contain_unlock_copy() -> None:
     ):
         meta = capabilities.reason_meta(reason)
         assert meta.unlock in html
+
+
+# ---------------------------------------------------------------------------
+# entity_link
+# ---------------------------------------------------------------------------
+
+
+def _render_entity_link(
+    name: str, label: str, lock_reason: str | None, **kwargs
+) -> str:
+    """Render the macro with stub `entity_lock_reason` + `entity_url` globals.
+
+    `lock_reason=None` exercises the unlocked branch (plain <a>); a
+    `REASON_*` value exercises the locked branch (`locked_link` chrome).
+    """
+    env = _make_env()
+    env.globals["entity_lock_reason"] = lambda _name: lock_reason
+    env.globals["entity_url"] = lambda _name, id=None: (
+        f"/{_name}s/{id}" if id is not None else f"/{_name}s"
+    )
+    href = kwargs.get("href")
+    href_arg = f", href={href!r}" if href else ""
+    id_arg = f", id={kwargs['id']!r}" if kwargs.get("id") is not None else ""
+    template = (
+        '{%- from "_shared/_locked.html" import entity_link -%}'
+        f"{{{{ entity_link({name!r}, {label!r}{href_arg}{id_arg}) }}}}"
+    )
+    return env.from_string(template).render()
+
+
+def test_entity_link_unlocked_renders_plain_anchor() -> None:
+    """No lock reason → plain `<a>` with `entity_url(name)` as href."""
+    html = _render_entity_link("clinician", "Browse clinicians", None)
+    a = HTMLParser(html).css_first("a")
+    assert a is not None
+    assert a.attributes.get("href") == "/clinicians"
+    assert "Browse clinicians" in a.text()
+    assert "locked-link" not in (a.attributes.get("class") or "")
+    assert "data-locked-cta" not in a.attributes
+
+
+def test_entity_link_locked_renders_locked_link_chrome() -> None:
+    """Lock reason set → `locked_link` chrome (aria-disabled + data-locked-cta)."""
+    html = _render_entity_link(
+        "clinician", "Browse clinicians", capabilities.REASON_NETWORK_UNVERIFIED
+    )
+    a = HTMLParser(html).css_first("a.locked-link")
+    assert a is not None
+    assert a.attributes.get("aria-disabled") == "true"
+    assert a.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+    assert "href" not in a.attributes
+
+
+def test_entity_link_unlocked_explicit_href_overrides_entity_url() -> None:
+    """Pass `href=` to point at a precomputed URL (e.g. subresource)."""
+    html = _render_entity_link("user", "Users", None, href="/users?filter=active")
+    a = HTMLParser(html).css_first("a")
+    assert a is not None
+    assert a.attributes.get("href") == "/users?filter=active"
+
+
+def test_entity_link_locked_ignores_explicit_href() -> None:
+    """When locked, the href is suppressed — popover is the action."""
+    html = _render_entity_link(
+        "user", "Users", capabilities.REASON_NETWORK_UNVERIFIED, href="/users"
+    )
+    a = HTMLParser(html).css_first("a.locked-link")
+    assert a is not None
+    assert "href" not in a.attributes

@@ -17,6 +17,7 @@ Read by:
 from typing import Final
 
 from src.domain.logic.capabilities import (
+    REASON_NETWORK_UNVERIFIED,
     assert_can_access_network,
     can_access_network,
 )
@@ -92,6 +93,7 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     read_policy=ReadPolicy(
         assert_can_read=assert_can_access_network,
         can_read=can_access_network,
+        lock_reason=REASON_NETWORK_UNVERIFIED,
     ),
     create_adapter=ClinicianCreate,
     update_adapter=ClinicianUpdate,

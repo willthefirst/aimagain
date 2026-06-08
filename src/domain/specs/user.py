@@ -20,6 +20,7 @@ from typing import Final
 
 from src.auth_config import current_active_user
 from src.domain.logic.capabilities import (
+    REASON_NETWORK_UNVERIFIED,
     assert_can_access_network,
     can_access_network,
 )
@@ -64,6 +65,7 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     read_policy=ReadPolicy(
         assert_can_read=assert_can_access_network,
         can_read=can_access_network,
+        lock_reason=REASON_NETWORK_UNVERIFIED,
     ),
     audit_snapshot=UserAuditSnapshot,
     private_fields=("email", "is_active"),
