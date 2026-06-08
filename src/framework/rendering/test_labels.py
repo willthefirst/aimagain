@@ -116,7 +116,7 @@ def test_every_searchable_spec_resolves_via_entity_filter_label():
     from src.framework.dispatch.registry import entity_registry
 
     for spec in entity_registry.specs():
-        if not spec.routes.search:
+        if not spec.declared_filters:
             continue
         label = entity_filter_label(spec.name)
         assert label.startswith("Filter ")

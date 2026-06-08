@@ -78,7 +78,6 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
         delete=True,
         form_new=True,
         form_edit=True,
-        search=True,
     ),
     # Whole-supertype face: `kind` filter exposes the full registry of
     # kinds so list/search can narrow to one kind without leaving

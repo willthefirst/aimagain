@@ -789,8 +789,8 @@ async def test_list_clinicians_renders_empty_state(
 ):
     """With no persisted clinicians, the page renders a friendly empty
     message instead of an empty `<table>`. The browse-layout sidebar
-    embeds the filter widgets inline on the list page; the toolbar filter
-    link is suppressed in favour of the sidebar header link to `/clinicians/search`."""
+    embeds the filter widgets inline on the list page; its header carries
+    the link to `/clinicians/search`."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     assert "No clinicians found" in response.text
@@ -799,9 +799,9 @@ async def test_list_clinicians_renders_empty_state(
     # Browse layout: sidebar has the filter widgets inline.
     sidebar = tree.css_first(".filter-sidebar")
     assert sidebar is not None, "Expected .filter-sidebar on /clinicians"
-    # Toolbar filter link is suppressed — sidebar takes that role.
-    assert tree.css_first("a.toolbar-filter-link") is None
-    # Sidebar links to the full search page.
+    # Sidebar links to the full search page. (The toolbar never renders
+    # a filter link — pinned structurally in
+    # framework/templates/test_views.py.)
     sidebar_link = sidebar.css_first("a[href*='/clinicians/search']")
     assert sidebar_link is not None, "Expected sidebar link to /clinicians/search"
     # Multi-choice ChoiceFilters render as search-checkbox-fieldset with
@@ -916,8 +916,7 @@ async def test_clinicians_list_has_browse_layout_with_filter_sidebar(
     `.filter-sidebar` on the left (driven by the spec's declared filters)
     and a `.browse-results` column on the right. The Create action lives
     in the toolbar; the sidebar carries the filter controls and a link to
-    the full `/clinicians/search` page. The toolbar filter link is
-    suppressed when the sidebar is present."""
+    the full `/clinicians/search` page."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -928,13 +927,11 @@ async def test_clinicians_list_has_browse_layout_with_filter_sidebar(
     # Sidebar has filter controls (license_type is a multi-choice filter)
     fieldsets = sidebar.css("fieldset.search-checkbox-fieldset")
     assert fieldsets, "No filter fieldsets in .filter-sidebar"
-    # Toolbar carries the Create action but NOT a redundant filter link
+    # Toolbar carries the Create action; the framework guarantees no
+    # filter link in the toolbar (see test_views.py).
     action_menu = tree.css_first("menu.toolbar-right")
     assert action_menu is not None
     assert "Create clinician" in action_menu.text()
-    assert (
-        tree.css_first("a.toolbar-filter-link") is None
-    ), "toolbar-filter-link should be suppressed when browse sidebar is active"
 
 
 async def test_clinician_detail_favorite_toggle_lives_in_toolbar(

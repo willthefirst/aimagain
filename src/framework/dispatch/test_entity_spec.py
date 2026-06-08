@@ -808,17 +808,6 @@ def test_templates_explicit_value_for_non_opted_in_verb_preserved():
     assert spec.templates.detail is None
 
 
-def test_routes_search_without_filters_raises():
-    """`routes.search=True` only makes sense when there are declared
-    `Filter`s to render on the search page; an empty filter set would
-    leave the page empty."""
-    with pytest.raises(ValueError, match="routes.search=True"):
-        _make_spec(
-            routes=RouteSet(list=True, search=True),
-            list_order_by=object(),
-        )
-
-
 def test_declared_filters_property_returns_only_filter_instances():
     """`declared_filters` is what the search page renders and what
     the active-filter strip iterates."""
@@ -830,14 +819,16 @@ def test_declared_filters_property_returns_only_filter_instances():
     assert spec.declared_filters == (a, b)
 
 
-def test_search_template_default_by_convention():
-    """`routes.search=True` makes `templates.search` default to
-    `<url_collection>/search.html`, the same convention every other
-    opted-in verb uses."""
+def test_search_template_default_when_filters_declared():
+    """Declaring any `Filter` auto-mounts `/<collection>/search` and
+    defaults `templates.search` to `<url_collection>/search.html` —
+    the same convention every other opted-in verb uses. There is no
+    separate `routes.search` flag; the search route follows the
+    declared filters."""
     from src.framework.dispatch.filters import ChoiceFilter, TextFilter
 
     spec = _make_spec(
-        routes=RouteSet(list=True, search=True),
+        routes=RouteSet(list=True),
         list_order_by=object(),
         filters=(
             ChoiceFilter(name="kind", choices=(("x", "X"),)),
@@ -845,6 +836,16 @@ def test_search_template_default_by_convention():
         ),
     )
     assert spec.templates.search == "widgets/search.html"
+
+
+def test_search_template_unset_without_declared_filters():
+    """Without any declared `Filter`, the search page isn't mounted
+    and the template stays `None` — no convention default fires."""
+    spec = _make_spec(
+        routes=RouteSet(list=True),
+        list_order_by=object(),
+    )
+    assert spec.templates.search is None
 
 
 def test_payload_authz_path_without_create_or_update_route_raises():

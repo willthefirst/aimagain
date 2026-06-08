@@ -379,18 +379,13 @@ def mount_entity(
             template=entity.templates.form_edit,
         )
         consumed.add("form_edit")
-    if entity.routes.search:
+    if entity.declared_filters:
         # Literal `/search` registers before the parametric `/{id}` so
         # FastAPI doesn't try to parse "search" as a UUID. The search
         # mount is entity-driven (no handler in the auto-bind set);
         # it just reads `entity.filters` and renders
-        # `entity.templates.search`.
-        if entity.templates.search is None:
-            raise ValueError(
-                f"mount_entity({entity.name!r}): routes.search=True but "
-                "templates.search is unset — convention is "
-                f"`{entity.url_collection}/search.html`."
-            )
+        # `entity.templates.search`. Mounting is implied by declaring
+        # `filters=(…)` — there is no separate `routes.search` flag.
         _rr.mount_search(router, entity, template=entity.templates.search)
     if entity.routes.detail:
         _rr.mount_detail(

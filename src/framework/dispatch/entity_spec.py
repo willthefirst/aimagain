@@ -69,11 +69,6 @@ class RouteSet:
     update: bool = False
     form_new: bool = False
     form_edit: bool = False
-    # `GET /<collection>/search` — the dedicated filter page. The
-    # list page's toolbar links here ("Filter · N"); the form on this
-    # page submits back to the list URL via GET. Read by
-    # `mount_entity` → `mount_search`.
-    search: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -681,16 +676,6 @@ class EntitySpec:
                 f"EntitySpec({self.name!r}) sets delete_forbid_self=True but "
                 "routes.delete is False — the flag would never apply."
             )
-        # `routes.search=True` without any declared `Filter` is dead —
-        # the search page would render an empty form. Catch the misconfig
-        # at import time.
-        if self.routes.search:
-            declared = [f for f in self.filters if isinstance(f, Filter)]
-            if not declared:
-                raise ValueError(
-                    f"EntitySpec({self.name!r}) sets routes.search=True but "
-                    "has no declared Filter — the /search page would be empty."
-                )
         # State-axis names must be unique; route mounting iterates by
         # name, so duplicates would shadow each other silently.
         axis_names = [axis.name for axis in self.state_axes]
@@ -1084,9 +1069,16 @@ class EntitySpec:
             "form_edit": self.templates.form_edit,
             "search": self.templates.search,
         }
-        for verb in resolved:
+        for verb in ("list", "detail", "form_new", "form_edit"):
             if resolved[verb] is None and getattr(self.routes, verb, False):
                 resolved[verb] = f"{self.url_collection}/{verb}.html"
+        # The dedicated `/search` page is mounted whenever any `Filter`
+        # is declared (no separate `routes.search` flag). Default its
+        # template to the same convention so specs don't need to set it.
+        if resolved["search"] is None and any(
+            isinstance(f, Filter) for f in self.filters
+        ):
+            resolved["search"] = f"{self.url_collection}/search.html"
         if any(resolved[v] != getattr(self.templates, v) for v in resolved):
             object.__setattr__(self, "templates", Templates(**resolved))
 
@@ -1100,7 +1092,7 @@ class EntitySpec:
             or r.delete
             or r.form_new
             or r.form_edit
-            or r.search
+            or bool(self.declared_filters)
         )
 
     @property
