@@ -295,23 +295,21 @@ def subresource_breadcrumb_items(
     `mount_related_list`, or the singleton-alias path (`/users/me`)
     when `mount_edge_routes` is rooted at the viewer's own row.
 
-    The first tuple's third element carries the lock reason from
-    `entity_lock_reason(parent_spec.name, viewer)` — so a viewer who
-    fails the parent's `read_policy.can_read` gets a `locked_link`
-    popover trigger on the collection back-link instead of a plain
-    `<a>` that would 403 on click. See `_shared/_breadcrumb.html`.
+    The first tuple is delegated to `breadcrumb_entity_item` — the same
+    helper the view-type templates call — so the collection-back lock
+    affordance is composed from one place across every breadcrumb-emitting
+    site (subresource list pages and the four view-type chrome templates).
+    See `_shared/_breadcrumb.html`.
     """
     parent_label_fn = parent_spec.display_label_fn
     assert parent_label_fn is not None, (
         "subresource_breadcrumb_items requires a parent_spec with "
         "display_label_fn — callers gate on that before invoking."
     )
-    from src.framework.rendering.route_urls import entity_lock_reason
+    from src.framework.rendering.route_urls import breadcrumb_entity_item
 
-    collection = parent_spec.url_collection
-    parent_lock = entity_lock_reason(parent_spec.name, viewer)
     return [
-        (collection.capitalize(), f"/{collection}", parent_lock),
+        breadcrumb_entity_item(parent_spec.name, viewer),
         (parent_label_fn(parent_row), parent_path, None),
         (child_label, None, None),
     ]

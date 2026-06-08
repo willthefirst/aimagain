@@ -47,6 +47,10 @@ def mount_search(
         ctx: dict[str, Any] = {
             "request": request,
             "current_user": kwargs.get("requesting_user"),
+            # `entity_name` powers the breadcrumb's `breadcrumb_entity_item`
+            # call in `views/search.html` — every view-type template needs
+            # it in context to compute the lock-aware collection back link.
+            "entity_name": entity.name,
             "declared_filters": declared,
             "filter_values": values,
             "list_action": list_action,
