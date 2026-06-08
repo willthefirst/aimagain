@@ -33,7 +33,7 @@ async def test_base_template_renders_primary_nav_when_authenticated(
 
     The "Create clinician" chrome CTA was removed in #697 — the
     /users/me detail page is the discoverable entry point."""
-    response = await authenticated_client.get("/users")
+    response = await authenticated_client.get("/users/me")
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -105,11 +105,11 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
 
 
 async def test_list_users_empty(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
+    superuser_client: AsyncClient,
+    superuser_logged_in_user: User,
 ):
     """Test GET /users returns HTML with no other users message when only logged in user exists."""
-    response = await authenticated_client.get(f"/users")
+    response = await superuser_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -119,9 +119,9 @@ async def test_list_users_empty(
 
 
 async def test_list_users_multiple_users(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
+    superuser_logged_in_user: User,
 ):
     """Test GET /users returns HTML listing multiple other users."""
     user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}")
@@ -131,7 +131,7 @@ async def test_list_users_multiple_users(
         async with session.begin():
             session.add_all([user1, user2])
 
-    response = await authenticated_client.get(f"/users")
+    response = await superuser_client.get(f"/users")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -148,7 +148,7 @@ async def test_list_users_multiple_users(
         user2.username in u for u in usernames_found
     ), f"{user2.username} not found in list"
     assert all(
-        logged_in_user.username not in u for u in usernames_found
+        superuser_logged_in_user.username not in u for u in usernames_found
     ), "Logged in user should not be listed"
     assert "No users found" not in tree.body.text()
 
