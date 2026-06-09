@@ -54,7 +54,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 `DESIRED_TIME_SLOT_LABELS`, `REFERRAL_SERVICE_LABELS`,
 `TREATMENT_SETTINGS_LABELS`) are Jinja globals. #}
 {%- from "_shared/sections.html" import fact -%}
-{%- from "_shared/_locked.html" import locked_field, locked_name -%}
+{%- from "_shared/_locked.html" import entity_link, locked_field, locked_name -%}
 {% macro facts_block(view, expanded=False, redacted=False) -%}
   <section class="entity-facts">
     <dl>
@@ -155,7 +155,7 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                         {% if redacted %}
                           {{ locked_name(_name_placeholder) }}{# title-case-ignore: placeholder org name #}
                         {% else %}
-                          <a href="{{ entity_url('organization', id=view.organization_link.id) }}">{{ view.organization_link.name }}</a>
+                          {{ entity_link('organization', view.organization_link.name, id=view.organization_link.id) }}
                         {% endif %}
                       {% endcall %}
                     {%- endif %}

@@ -234,24 +234,24 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
 def test_detail_view_renders_back_affordance_and_actions() -> None:
     """``views/detail.html`` builds the single-segment breadcrumb via
     `breadcrumb_entity_item(entity_name)` and the breadcrumb macro
-    renders it as `<a class="breadcrumb-back" href="/organizations">…</a>`.
+    renders it as `<a class="breadcrumb-back" href="/posts">…</a>`.
     Actions land inside the shared two-zone toolbar — empty left zone
     (no search link), and a `<menu class="toolbar-right">` carrying
     the `<li>` commands. Pins the "detail actions land at the same
     right edge as list-page actions" rule (no per-view-type toolbar
-    shape). Uses `organization` (no `read_policy`) so the back link
-    stays an unlocked `<a>` for the chrome assertion; the locked
-    branch is pinned by `test_breadcrumb.py` / route-level tests."""
+    shape). Uses `post` (no `read_policy`) so the back link stays an
+    unlocked `<a>` for the chrome assertion; the locked branch is
+    pinned by `test_breadcrumb.py` / route-level tests."""
     env = _make_env()
     _add_child(
         env,
         "stub.html",
         """
         {% extends "views/detail.html" %}
-        {% set entity_name = "organization" %}
-        {% block resource_label %}Organizations{% endblock %}
-        {% block current_label %}Sunrise Therapy{% endblock %}
-        {% block actions %}<li><a id="edit" href="/organizations/1/form">Edit</a></li>{% endblock %}
+        {% set entity_name = "post" %}
+        {% block resource_label %}Posts{% endblock %}
+        {% block current_label %}A referral{% endblock %}
+        {% block actions %}<li><a id="edit" href="/posts/1/form">Edit</a></li>{% endblock %}
         {% block content %}body{% endblock %}
         """,
     )
@@ -264,15 +264,15 @@ def test_detail_view_renders_back_affordance_and_actions() -> None:
 
     tree = HTMLParser(html)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None and back.attributes.get("href") == "/organizations"
+    assert back is not None and back.attributes.get("href") == "/posts"
     label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Organizations"
-    assert "Sunrise Therapy" in html
+    assert label is not None and label.text(strip=True) == "Posts"
+    assert "A referral" in html
     assert '<div class="toolbar">' in html
     assert '<menu class="toolbar-right">' in html
     # No search link on detail pages — left zone stays empty.
     assert 'class="toolbar-filter-link"' not in html
-    assert '<li><a id="edit" href="/organizations/1/form">Edit</a></li>' in html
+    assert '<li><a id="edit" href="/posts/1/form">Edit</a></li>' in html
 
 
 def test_form_new_view_renders_create_heading_from_context() -> None:
@@ -280,9 +280,9 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
     handler-supplied context and renders it as the toolbar `<h1>`.
     The handler computes it via `create_label_for(spec, kind=...)`,
     the same helper every "Create X" CTA reads from, so the page
-    title can't drift from the button that opened it. Uses
-    `organization` (no `read_policy`) so the chrome assertion stays
-    a plain unlocked back link — the locked branch is covered by
+    title can't drift from the button that opened it. Uses `post`
+    (no `read_policy`) so the chrome assertion stays a plain unlocked
+    back link — the locked branch is covered by
     `test_breadcrumb.py`."""
     env = _make_env()
     _add_child(
@@ -290,8 +290,8 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
         "stub.html",
         """
         {% extends "views/form_new.html" %}
-        {% set entity_name = "organization" %}
-        {% block resource_label %}Organizations{% endblock %}
+        {% set entity_name = "post" %}
+        {% block resource_label %}Posts{% endblock %}
         {% block content %}<form id="x"></form>{% endblock %}
         """,
     )
@@ -300,15 +300,15 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
         request=_request_stub(),
         is_authenticated=False,
         is_development=False,
-        create_heading="Create organization",
+        create_heading="Create post",
     )
 
     tree = HTMLParser(html)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None and back.attributes.get("href") == "/organizations"
+    assert back is not None and back.attributes.get("href") == "/posts"
     label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Organizations"
-    assert "<h1>Create organization</h1>" in html
+    assert label is not None and label.text(strip=True) == "Posts"
+    assert "<h1>Create post</h1>" in html
     assert '<form id="x"></form>' in html
 
 

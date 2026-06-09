@@ -16,11 +16,7 @@ Read by:
 
 from typing import Final
 
-from src.domain.logic.capabilities import (
-    REASON_NETWORK_UNVERIFIED,
-    assert_can_access_network,
-    can_access_network,
-)
+from src.domain.logic.capabilities import NETWORK_GATED_READ_POLICY
 from src.domain.logic.clinicians.repository import (
     ClinicianRepository,
     get_clinician_repository,
@@ -52,7 +48,6 @@ from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
     EntitySpec,
-    ReadPolicy,
     RelatedListSubresource,
     RouteSet,
     StateAxis,
@@ -90,11 +85,7 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
-    read_policy=ReadPolicy(
-        assert_can_read=assert_can_access_network,
-        can_read=can_access_network,
-        lock_reason=REASON_NETWORK_UNVERIFIED,
-    ),
+    read_policy=NETWORK_GATED_READ_POLICY,
     create_adapter=ClinicianCreate,
     update_adapter=ClinicianUpdate,
     read_schema=ClinicianRead,
