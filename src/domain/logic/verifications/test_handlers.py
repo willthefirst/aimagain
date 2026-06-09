@@ -366,3 +366,53 @@ async def test_run_raises_not_found_for_missing_clinician(
                     http=http,
                     actor_id=None,
                 )
+
+
+async def test_run_with_commit_false_does_not_persist_until_caller_commits(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`commit=False` lets the inline-create hook participate in the
+    outer create transaction: the verification row is queued on the
+    session, but a fresh connection won't see it until the caller
+    commits."""
+    clinician, _ = await _seed_clinician(db_test_session_manager, npi="1234567890")
+    http = _mock_http({"1234567890": _nppes_basic_payload(first="X", last="Y")})
+
+    async with db_test_session_manager() as session:
+        async with http:
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
+                verification_repo=VerificationRepository(session),
+                clinician_repo=ClinicianRepository(session),
+                audit_repo=AuditRepository(session),
+                http=http,
+                actor_id=None,
+                commit=False,
+            )
+        verification_id = verification.id
+        # No `session.commit()` — the `async with` exit rolls back the
+        # still-pending writes.
+
+    async with db_test_session_manager() as fresh:
+        assert await fresh.get(Verification, verification_id) is None
+
+
+async def test_npi_failure_message_per_flag():
+    """Each closed-vocabulary flag maps to a distinct user-facing message,
+    and an unknown / empty flag set falls through to the generic line."""
+    from types import SimpleNamespace
+
+    from src.domain.logic.verifications.handlers import npi_failure_message
+
+    def _v(*flags):
+        return SimpleNamespace(flags=list(flags), status="failed")
+
+    assert "OIG" in npi_failure_message(_v("oig_excluded:npi"))
+    assert "NPPES registry" in npi_failure_message(_v("nppes_npi_not_found"))
+    assert "first / last name" in npi_failure_message(_v("nppes_name_mismatch"))
+    assert "organization name" in npi_failure_message(_v("nppes_org_name_mismatch"))
+    assert "compare against" in npi_failure_message(_v("nppes_org_name_missing"))
+    assert "required" in npi_failure_message(_v("nppes_skipped"))
+    # Empty / unknown flags → the generic fallback.
+    assert "couldn't verify" in npi_failure_message(_v())
+    assert "couldn't verify" in npi_failure_message(_v("unknown_token"))

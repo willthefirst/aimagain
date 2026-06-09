@@ -47,6 +47,50 @@ _NPPES_ORG_NAME_THRESHOLD = 0.80
 _SKIPPED_NPPES = NppesResult(found=False, first_name=None, last_name=None, raw=None)
 
 
+def npi_failure_message(verification: Verification) -> str:
+    """Human-readable explanation of why a Verification didn't reach
+    `status='verified'`. Used by the inline-create hooks to populate the
+    400 banner so the form re-renders with a concrete next step.
+
+    Reads `verification.flags` first (the closed-vocabulary tokens the
+    scorer emits) and falls back to a generic message keyed off
+    `verification.status` when no known flag matches.
+    """
+    flags = list(verification.flags or ())
+    for flag in flags:
+        if flag.startswith("oig_excluded"):
+            return (
+                "This NPI is on the OIG exclusion list and cannot be used "
+                "to register a clinician or organization."
+            )
+        if flag == "nppes_npi_not_found":
+            return (
+                "We couldn't find that NPI in the federal NPPES registry. "
+                "Double-check the 10-digit number and try again."
+            )
+        if flag == "nppes_name_mismatch":
+            return (
+                "The name on that NPI in NPPES doesn't match the first / "
+                "last name you entered. Correct either field and resubmit."
+            )
+        if flag == "nppes_org_name_mismatch":
+            return (
+                "The organization name on that NPI in NPPES doesn't match "
+                "what you entered. Correct either field and resubmit."
+            )
+        if flag == "nppes_org_name_missing":
+            return (
+                "NPPES returned this NPI without an organization name we "
+                "could compare against. Double-check the NPI."
+            )
+        if flag == _NPPES_SKIPPED_FLAG:
+            return "An NPI is required to register a clinician or organization."
+    return (
+        "We couldn't verify that NPI against the NPPES registry. "
+        "Double-check the number and try again."
+    )
+
+
 def _user_is_demo_context(user: User) -> bool:
     """Return True if the user is associated with any demo organization.
 
@@ -91,12 +135,19 @@ async def run_clinician_verification(
     audit_repo: AuditRepository,
     http: httpx.AsyncClient,
     actor_id: UUID | None,
+    commit: bool = True,
 ) -> Verification:
     """Run the full Claim-A verification pipeline for one clinician and
     persist one `Verification` row plus one matching audit row in a
     single transaction. Also writes through the Claim-A denorm cache
     (`Clinician.npi_match_status`, `clinician_verified`, `verified_at`,
     `ever_verified_at`) per handoff §9.
+
+    When `commit=False` the in-flight Verification row + audit row are
+    queued on the session but not committed — the caller owns the
+    transaction. Used by the inline-create hook so a verification
+    failure can raise and roll back the still-uncommitted clinician
+    row in one atomic unit.
     """
     clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
     if clinician is None:
@@ -171,7 +222,8 @@ async def run_clinician_verification(
 
     recompute_clinician_claim(clinician)
 
-    await verification_repo.session.commit()
+    if commit:
+        await verification_repo.session.commit()
     logger.info(
         "verification.clinician: id=%s status=%s flags=%s actor=%s",
         clinician.id,
@@ -238,6 +290,7 @@ async def run_org_verification(
     audit_repo: AuditRepository,
     http: httpx.AsyncClient,
     actor_id: UUID | None,
+    commit: bool = True,
 ) -> Verification:
     """Run the Claim-B Type-2 NPPES verification pipeline for one org.
 
@@ -246,6 +299,10 @@ async def run_org_verification(
     persists a `Verification` row + audit row, and writes through the
     Claim-B denorm cache (`Organization.npi_match_status`,
     `org_verified`, `verified_at`, `authorized_official_name`).
+
+    `commit=False` mirrors the clinician-side switch — the inline org
+    create hook participates in the create transaction so a failed
+    verification rolls back the row.
     """
     org = await org_repo.get_by_model_id(Organization, org_id)
     if org is None:
@@ -303,7 +360,8 @@ async def run_org_verification(
             org.npi_match_status = "none"
     recompute_org_claim(org)
 
-    await verification_repo.session.commit()
+    if commit:
+        await verification_repo.session.commit()
     logger.info(
         "verification.org: id=%s status=%s flags=%s actor=%s",
         org.id,

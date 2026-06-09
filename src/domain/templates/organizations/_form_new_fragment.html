@@ -23,7 +23,7 @@
      are surfaced on the edit page once the row exists. #}
   {% call form_section("Organization") %}
     {{ text_field("name", "Name", maxlength=200) }}
-    {{ text_field("npi", "NPI", pattern="\\d{10}", maxlength=10, help="Your organization's 10-digit Type-2 NPI.") }}
+    {{ text_field("npi", "NPI", pattern="\\d{10}", maxlength=10, help="Your organization's 10-digit Type-2 NPI. We cross-check it against the federal NPPES registry — registration only succeeds if the NPI and organization name match.") }}
   {% endcall %}
   {{ actions(entity_create_label('organization') , cancel_url=entity_url('organization')) }}
 {% endcall %}

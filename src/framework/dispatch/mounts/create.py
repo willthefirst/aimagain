@@ -96,7 +96,32 @@ def mount_create(
                     errors=exc.detail,
                 )
             raise
-        created = await call_handler_with(handler, handler_kwarg_names, kwargs)
+        try:
+            created = await call_handler_with(handler, handler_kwarg_names, kwargs)
+        except HTTPException as exc:
+            # Handler-raised 400s (e.g. the NPPES verification gate in
+            # the clinician/org `after_create` hooks) get the same
+            # in-place HTMX form re-render the 422 path uses, with the
+            # handler's `detail` carried as a single form-level banner.
+            # Non-HTMX clients still see the raw 400 JSON.
+            if (
+                exc.status_code == 400
+                and spec.form_error_render
+                and request.headers.get("HX-Request") == "true"
+            ):
+                banner = (
+                    exc.detail if isinstance(exc.detail, str) else "Could not create."
+                )
+                return await _render_form_with_errors(
+                    spec=spec,
+                    request=request,
+                    requesting_user=kwargs.get("requesting_user"),
+                    payload_dict=payload_dict,
+                    errors=[],
+                    form_banner=banner,
+                    status_code=400,
+                )
+            raise
         path_kwargs = {name: kwargs[name] for name in parent_id_names}
         # Default Location is the canonical resource URL — for a top-level
         # resource that's /<collection>/{id}; for a sub-resource we point
@@ -171,6 +196,8 @@ async def _render_form_with_errors(
     requesting_user: Any,
     payload_dict: dict,
     errors: Any,
+    form_banner: str | None = None,
+    status_code: int = 422,
 ) -> Any:
     """Re-render the spec's form_new template with field-level errors.
 
@@ -248,9 +275,10 @@ async def _render_form_with_errors(
         template_name=fragment_name,
         context=context,
         field_errors=build_form_errors_dict(errors, kind=kind),
+        form_banner=form_banner,
         values=payload_dict,
         current_user=requesting_user,
-        status_code=422,
+        status_code=status_code,
     )
 
 

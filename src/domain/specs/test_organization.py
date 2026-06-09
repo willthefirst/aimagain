@@ -39,10 +39,19 @@ def test_auth_policy_is_owner_or_admin():
     assert ORGANIZATION_ENTITY.auth_policy is OWNER_OR_ADMIN
 
 
-def test_create_and_update_redirect_to_edit_form():
-    target = "/organizations/abc-123/form"
-    assert ORGANIZATION_ENTITY.create_redirect(organization_id="abc-123") == target
-    assert ORGANIZATION_ENTITY.update_redirect(organization_id="abc-123") == target
+def test_create_redirect_goes_to_homepage():
+    """Post-create the user lands on `/` — NPPES verification gates
+    create, so a successful response means the org is already verified.
+    See `_organization_create_redirect` in
+    `src/domain/specs/organization.py`."""
+    assert ORGANIZATION_ENTITY.create_redirect(organization_id="abc-123") == "/"
+
+
+def test_update_redirect_stays_on_edit_form():
+    assert (
+        ORGANIZATION_ENTITY.update_redirect(organization_id="abc-123")
+        == "/organizations/abc-123/form"
+    )
 
 
 def test_delete_redirect_unset():
