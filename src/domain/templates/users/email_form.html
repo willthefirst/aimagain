@@ -11,9 +11,11 @@
   {% if not target_user.is_verified %}
     <aside role="alert" id="verify-banner">
       <p>Your email address has not been verified. Check your inbox for the verification link, or request a new one.</p>
-      <button hx-post="/auth/resend-verify"
-              hx-target="#verify-banner"
-              hx-swap="outerHTML">Resend verification email</button>
+      {# The POST returns `HX-Redirect: /auth/check-email?sent=1` so the
+         user lands on the shared CTA page with a "just sent" status —
+         same surface as the post-registration flow. `hx-swap="none"`
+         lets HTMX handle the redirect without trying to swap a body. #}
+      <button hx-post="/auth/resend-verify" hx-swap="none">Resend verification email</button>
     </aside>
   {% endif %}
 {% endblock %}
