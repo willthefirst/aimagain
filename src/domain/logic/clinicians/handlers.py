@@ -43,28 +43,37 @@ async def after_create_clinician_verification(
     demo_outcome: str | None = None,
 ) -> None:
     """Run the NPI verification pipeline immediately after a clinician row
-    is created. Produces one Verification row + audit row and writes through
-    the Claim-A denorm cache, all within the same request transaction.
+    is created, and **fail the create** if NPPES doesn't return a verified
+    match. Produces one Verification row + audit row and writes through the
+    Claim-A denorm cache.
 
-    `run_clinician_verification` commits internally. After that commit the
-    session expires `row`'s attributes, so a `refresh` follows to keep the
-    object usable for the `mutate` context manager's after-snapshot (which
-    runs synchronously via Pydantic's `model_validate`).
+    Runs inside the framework's `mutate(...)` block on
+    `POST /clinicians` (see `CLINICIAN_ENTITY.after_create_path`). The
+    pipeline runs with `commit=False` so its queued writes participate
+    in the create transaction. On a non-verified outcome a
+    `BadRequestError` is raised — `mutate`'s context manager skips the
+    create-audit row and commit, SQLAlchemy rolls back the still-uncommitted
+    session, and the user sees the form re-rendered with the per-flag
+    explanation produced by `npi_failure_message`. The clinician row is
+    never durable without a verified NPI.
 
     When `demo_outcome` is provided the caller has already verified the
     clinician is in a demo org; NPPES/OIG is skipped and the selected
-    outcome is persisted directly.
+    outcome is persisted directly (still gated identically — only the
+    `verified` demo outcome lets the create proceed).
     """
     import httpx
 
     from src.domain.logic.verifications.handlers import (
         HTTP_TIMEOUT_SECONDS,
+        npi_failure_message,
         run_clinician_demo_verification,
         run_clinician_verification,
     )
+    from src.framework.http.exceptions import BadRequestError
 
     if demo_outcome and demo_outcome in ("verified", "needs_review", "failed"):
-        await run_clinician_demo_verification(
+        verification = await run_clinician_demo_verification(
             clinician_id=row.id,
             demo_outcome=demo_outcome,  # type: ignore[arg-type]
             verification_repo=verification_repo,
@@ -74,15 +83,23 @@ async def after_create_clinician_verification(
         )
     else:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
-            await run_clinician_verification(
+            verification = await run_clinician_verification(
                 clinician_id=row.id,
                 verification_repo=verification_repo,
                 clinician_repo=clinician_repo,
                 audit_repo=verification_audit_repo,
                 http=http,
                 actor_id=requesting_user.id,
+                commit=False,
             )
-    await clinician_repo.session.refresh(row)
+    if verification.status != "verified":
+        raise BadRequestError(detail=npi_failure_message(verification))
+    # NB: no `session.refresh(row)` here. With `commit=False` the
+    # `npi_match_status` / `npi_verified_at` / cache writes from the
+    # pipeline are only in memory — they haven't reached the DB yet, so
+    # `refresh` (which doesn't autoflush) would re-read the row and
+    # silently revert the in-memory changes before the framework's
+    # `mutate(...)` block reads them for the audit after-snapshot.
 
 
 async def after_update_clinician_verification(
@@ -104,17 +121,31 @@ async def after_update_clinician_verification(
     on the *value* changing (not merely being present in the payload), so an
     edit that only touches location/availability doesn't fire a needless
     NPPES lookup. Other edits are a no-op.
+
+    Unlike the create hook, this path does NOT raise on a non-verified
+    outcome — an update to a bad NPI lands the row in
+    `npi_match_status=mismatch`, the documented retry shape. The user
+    can edit the NPI again from the edit page.
     """
     if "npi" not in changed_fields:
         return
-    await after_create_clinician_verification(
-        row=row,
-        payload=payload,
-        requesting_user=requesting_user,
-        verification_repo=verification_repo,
-        clinician_repo=clinician_repo,
-        verification_audit_repo=verification_audit_repo,
+    import httpx
+
+    from src.domain.logic.verifications.handlers import (
+        HTTP_TIMEOUT_SECONDS,
+        run_clinician_verification,
     )
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+        await run_clinician_verification(
+            clinician_id=row.id,
+            verification_repo=verification_repo,
+            clinician_repo=clinician_repo,
+            audit_repo=verification_audit_repo,
+            http=http,
+            actor_id=requesting_user.id,
+        )
+    await clinician_repo.session.refresh(row)
 
 
 async def _assert_clinician_payload_org_ownership(

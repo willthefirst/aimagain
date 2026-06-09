@@ -109,7 +109,12 @@ async def test_create_clinician_happy_path(
     assert response.status_code == 201, response.text
     new_id = uuid.UUID(response.json()["id"])
     assert response.headers["Location"] == f"/clinicians/{new_id}"
-    assert response.headers["HX-Redirect"] == f"/clinicians/{new_id}/form"
+    # Post-create now redirects to the homepage — the NPPES gate runs
+    # before this point, so a successful response means the clinician
+    # is already verified and there's no half-built row to nudge the
+    # user into editing. See `CLINICIAN_ENTITY.create_redirect` in
+    # `src/domain/specs/clinician.py`.
+    assert response.headers["HX-Redirect"] == "/"
 
     async with db_test_session_manager() as session:
         result = await session.execute(select(Clinician).filter(Clinician.id == new_id))
@@ -177,19 +182,24 @@ async def test_create_clinician_allows_multiple_per_user(
     logged_in_user: User,
 ):
     """A user may own multiple clinicians. Two successive POSTs both
-    return 201 and persist as distinct rows owned by the same user."""
+    return 201 and persist as distinct rows owned by the same user.
+
+    Both payloads keep the default Jane / Smith name so the autouse
+    NPPES mock's verified response (see
+    `tests/fixtures.mock_nppes_default_match`) doesn't trip the
+    inline-create name-mismatch gate."""
     first = await authenticated_client.post(
         "/clinicians",
-        data=clinician_payload(first_name="A", npi="1111111111"),
+        data=clinician_payload(npi="1111111111"),
     )
-    assert first.status_code == 201
+    assert first.status_code == 201, first.text
     first_id = uuid.UUID(first.json()["id"])
 
     second = await authenticated_client.post(
         "/clinicians",
-        data=clinician_payload(first_name="B", npi="2222222222"),
+        data=clinician_payload(npi="2222222222"),
     )
-    assert second.status_code == 201
+    assert second.status_code == 201, second.text
     second_id = uuid.UUID(second.json()["id"])
 
     assert first_id != second_id

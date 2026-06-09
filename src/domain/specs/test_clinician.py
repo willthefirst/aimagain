@@ -37,10 +37,20 @@ def test_filters_are_license_type_and_issuing_state():
 # --- Redirects -----------------------------------------------------------
 
 
-def test_create_and_update_redirect_to_edit_form():
-    target = "/clinicians/abc-123/form"
-    assert CLINICIAN_ENTITY.create_redirect(clinician_id="abc-123") == target
-    assert CLINICIAN_ENTITY.update_redirect(clinician_id="abc-123") == target
+def test_create_redirect_goes_to_homepage():
+    """Post-create the user lands on `/`. NPPES verification now gates
+    create, so a successful response means the clinician is already
+    verified and there's no half-built row to nudge them into editing.
+    See the comment on `_clinician_create_redirect` in
+    `src/domain/specs/clinician.py`."""
+    assert CLINICIAN_ENTITY.create_redirect(clinician_id="abc-123") == "/"
+
+
+def test_update_redirect_stays_on_edit_form():
+    assert (
+        CLINICIAN_ENTITY.update_redirect(clinician_id="abc-123")
+        == "/clinicians/abc-123/form"
+    )
 
 
 def test_delete_redirect_unset():

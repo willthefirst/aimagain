@@ -71,26 +71,36 @@ async def after_create_organization_owner_grant(
     """`after_create_path` target for `POST /organizations`.
 
     Two side effects, both previously living only in the onboarding hub's
-    `POST /profile/org` and now run on the canonical create so a
-    self-service org registration via `/organizations/form` behaves the
-    same:
+    `POST /profile/org` and now run on the canonical create:
 
     1. Grant the creating user an immediately-verified owner
        `OrgRepresentation` (shared `grant_owner_representation` — see its
        docstring for why self-create needs no review).
-    2. When the org carries a Type-2 `npi`, run the Claim-B NPPES
-       verification inline (symmetric with the clinician NPI path). No
-       NPI → `org_verified` stays False, addable later.
+    2. Run the Claim-B NPPES verification inline against the org's
+       Type-2 `npi` (now required at the schema layer — see
+       `OrganizationCreate.npi: RequiredNpiText`). The pipeline runs
+       with `commit=False` so its writes participate in the create
+       transaction; if NPPES doesn't return `status='verified'`, a
+       `BadRequestError` is raised and the still-uncommitted org row
+       (plus the owner `OrgRepresentation` granted in step 1) is
+       rolled back by SQLAlchemy when the session exits. An
+       organization is never durable without a verified NPI.
 
-    Runs inside the framework's `mutate(...)` block; `run_org_verification`
-    commits internally, so the row is refreshed afterwards to keep it
-    usable for the audit after-snapshot (mirrors
-    `after_create_clinician_verification`). `payload` is accepted for the
-    framework's hook signature but unused — everything is read off `row`.
+    Runs inside the framework's `mutate(...)` block. `payload` is
+    accepted for the framework's hook signature but unused — everything
+    is read off `row`.
     """
+    import httpx
+
     from src.domain.logic.org_representations.handlers import (
         grant_owner_representation,
     )
+    from src.domain.logic.verifications.handlers import (
+        HTTP_TIMEOUT_SECONDS,
+        npi_failure_message,
+        run_org_verification,
+    )
+    from src.framework.http.exceptions import BadRequestError
 
     await grant_owner_representation(
         user_id=requesting_user.id,
@@ -98,24 +108,23 @@ async def after_create_organization_owner_grant(
         org_rep_repo=org_rep_repo,
     )
 
-    if row.npi:
-        import httpx
-
-        from src.domain.logic.verifications.handlers import (
-            HTTP_TIMEOUT_SECONDS,
-            run_org_verification,
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+        verification = await run_org_verification(
+            org_id=row.id,
+            verification_repo=verification_repo,
+            org_repo=organization_repo,
+            audit_repo=verification_audit_repo,
+            http=http,
+            actor_id=requesting_user.id,
+            commit=False,
         )
-
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
-            await run_org_verification(
-                org_id=row.id,
-                verification_repo=verification_repo,
-                org_repo=organization_repo,
-                audit_repo=verification_audit_repo,
-                http=http,
-                actor_id=requesting_user.id,
-            )
-        await organization_repo.session.refresh(row)
+    if verification.status != "verified":
+        raise BadRequestError(detail=npi_failure_message(verification))
+    # No `session.refresh(row)` — see the same comment in
+    # `after_create_clinician_verification`. `commit=False` leaves the
+    # `npi_match_status` / `verified_at` / `authorized_official_name`
+    # writes in memory, and `refresh` without autoflush would silently
+    # revert them before `mutate(...)` reads the after-snapshot.
 
 
 async def handle_set_org_verification_state(

@@ -46,7 +46,11 @@ async def test_create_organization_happy_path(
     assert response.status_code == 201
     new_id = uuid.UUID(response.json()["id"])
     assert response.headers["Location"] == f"/organizations/{new_id}"
-    assert response.headers["HX-Redirect"] == f"/organizations/{new_id}/form"
+    # Post-create now redirects to the homepage — the NPPES gate runs
+    # before this point, so a successful response means the org is
+    # already verified. See `ORGANIZATION_ENTITY.create_redirect` in
+    # `src/domain/specs/organization.py`.
+    assert response.headers["HX-Redirect"] == "/"
 
     async with db_test_session_manager() as session:
         loaded = (
@@ -128,14 +132,12 @@ async def test_list_organizations_renders(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    create_resp = await authenticated_client.post(
-        "/organizations", data=_org_payload(name="Listable Org")
-    )
+    create_resp = await authenticated_client.post("/organizations", data=_org_payload())
     assert create_resp.status_code == 201
 
     response = await authenticated_client.get("/organizations")
     assert response.status_code == 200
-    assert "Listable Org" in response.text
+    assert "Acme Health" in response.text
 
 
 async def test_detail_renders(
@@ -143,13 +145,11 @@ async def test_detail_renders(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    create_resp = await authenticated_client.post(
-        "/organizations", data=_org_payload(name="Detail-Org")
-    )
+    create_resp = await authenticated_client.post("/organizations", data=_org_payload())
     new_id = uuid.UUID(create_resp.json()["id"])
     detail_resp = await authenticated_client.get(f"/organizations/{new_id}")
     assert detail_resp.status_code == 200
-    assert "Detail-Org" in detail_resp.text
+    assert "Acme Health" in detail_resp.text
     # Regression for #594 — the name appears in the header `<strong>`
     # only; the facts `<dl>` must not include a `<dt>Name</dt>` row
     # that duplicates the same string.
@@ -362,11 +362,9 @@ async def test_list_200_for_verified_viewer(
     `can_access_network` to True — the same user can now list orgs.
     Pins the network-bootstrap path: a brand-new user becomes Claim-B
     by completing the canonical create flow."""
-    create = await authenticated_client.post(
-        "/organizations", data=_org_payload(name="Gateway Org")
-    )
+    create = await authenticated_client.post("/organizations", data=_org_payload())
     assert create.status_code == 201
 
     response = await authenticated_client.get("/organizations")
     assert response.status_code == 200
-    assert "Gateway Org" in response.text
+    assert "Acme Health" in response.text

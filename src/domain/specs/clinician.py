@@ -68,11 +68,19 @@ _clinician_referrals_child = ResourceSpec(
     collection="referrals", id_param="post_id", repo_dep=get_post_repository
 )
 
-# After create or update, redirect to the edit form so the user can
-# keep editing the parent + its credentials. The same callable is reused
-# by the three credential subentities (their parent is this clinician
-# directory entry).
+# Post-update: stay on the edit form so the user can keep iterating on
+# the parent + its credentials. The same callable is reused by the three
+# credential subentities (their parent is this clinician directory entry).
 _clinician_form_redirect = Redirects.to_edit_form("clinicians", "clinician_id")
+
+
+# Post-create: drop the user on the homepage. NPPES verification now
+# gates create (see `after_create_clinician_verification`), so a
+# successful create means the clinician is already verified and ready
+# — sending them into the edit form would push optional fields ahead of
+# whatever they came here to do next.
+def _clinician_create_redirect(**_: object) -> str:
+    return "/"
 
 
 CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
@@ -115,7 +123,7 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
             multi=True,
         ),
     ),
-    create_redirect=_clinician_form_redirect,
+    create_redirect=_clinician_create_redirect,
     update_redirect=_clinician_form_redirect,
     # Opt into the HX-Request re-render-on-validation-failure path —
     # see `EntitySpec.form_error_render`. On a Pydantic 422 the
