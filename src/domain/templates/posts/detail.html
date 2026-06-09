@@ -30,13 +30,9 @@
     {%- if view.referral %}{{ how_to_refer(view) }}{%- endif %}
       <footer>
         {% if can_access_network %}
-          <a href="mailto:{{ post.owner.email }}"
-             target="_blank"
-             rel="noopener noreferrer"
-             role="button"
-             class="secondary outline">Email</a>
+          {% include "posts/_shared/_message_form.html" %}
         {% else %}
-          {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Email", extra_class="secondary") }}
+          {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Message", extra_class="secondary") }}
         {% endif %}
       </footer>
     </section>

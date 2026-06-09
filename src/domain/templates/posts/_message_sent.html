@@ -1,0 +1,8 @@
+{# Returned by `POST /posts/{post_id}/message` and HTMX-swapped over
+   the message form in place. The `id="post-message"` matches the
+   form's wrapper id so a follow-up swap (if the user sends a second
+   message after reloading) targets the same DOM node. #}
+<aside role="status" id="post-message">
+  <strong>Message sent.</strong>
+  The poster will see your email on their reply.
+</aside>

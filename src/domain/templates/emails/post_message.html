@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+{# Self-contained email body — no `{% extends %}`. See README in this dir. #}
+<html>
+  <body style="font-family: -apple-system, system-ui, sans-serif;
+               max-width: 560px;
+               margin: 2rem auto;
+               line-height: 1.5">
+    <p>{{ sender_username }} sent you a message about your post on Bedlam Connect.</p>
+    <blockquote style="border-left: 3px solid #ccc;
+                       margin: 1rem 0;
+                       padding: 0.25rem 0 0.25rem 1rem;
+                       color: #333;
+                       white-space: pre-wrap">
+      {{ body }}
+    </blockquote>
+    <p>
+      Reply directly to this email to respond to {{ sender_username }} at
+      <a href="mailto:{{ sender_email }}">{{ sender_email }}</a>.
+    </p>
+    <p>
+      <a href="{{ post_url }}">View the post</a>
+    </p>
+    <p>— Bedlam Connect</p>
+  </body>
+</html>
