@@ -1,9 +1,15 @@
-"""Tests for clinician read_policy: provider-network capability gate.
+"""Tests for the provider-network capability predicate as it relates to
+the Clinician entity.
 
-The guard fires at the repository layer regardless of whether the route
-handler performs its own capability check. These tests attach the guard
-directly (mirroring what the EntitySpec.read_policy dep wrapper does at
-request time) and verify the data-layer enforcement.
+`CLINICIAN_ENTITY` no longer carries a `read_policy` — the directory is
+reachable for every authenticated viewer, with identifying rows redacted
+per-row at render time when the viewer lacks network access and isn't
+the owner (see `_clinician_card.html` / `clinicians/detail.html`).
+
+The predicate (`assert_can_access_network`) is still exercised here
+because it drives the template-side redaction flag, and the data-layer
+guard mechanism remains a framework feature any future entity may opt
+into.
 """
 
 import pytest
@@ -11,11 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.capabilities import (
     assert_can_access_network,
-    can_access_network,
 )
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.specs.clinician import CLINICIAN_ENTITY
-from src.framework.dispatch.entity_spec import ReadPolicy
 from src.framework.http.exceptions import ForbiddenError
 from tests.helpers import create_test_user, make_clinician_with_org
 
@@ -55,24 +59,33 @@ def test_assert_allows_superuser():
     assert_can_access_network(user)  # must not raise
 
 
-def test_clinician_entity_declares_provider_network_read_policy():
-    """Structural pin: CLINICIAN_ENTITY must carry a ReadPolicy so new routes
-    and route modifications benefit from the data-layer guard automatically."""
-    assert CLINICIAN_ENTITY.read_policy is not None
-    assert isinstance(CLINICIAN_ENTITY.read_policy, ReadPolicy)
-    assert CLINICIAN_ENTITY.read_policy.assert_can_read is assert_can_access_network
-    assert CLINICIAN_ENTITY.read_policy.can_read is can_access_network
+def test_clinician_entity_declares_no_read_policy():
+    """Structural pin: CLINICIAN_ENTITY no longer carries a `read_policy`.
+
+    The provider-network gate moved from a binary data-layer guard to
+    per-row template redaction so the viewer can still see and self-
+    manage their own clinician rows before clearing network
+    verification. Other identifying rows are replaced with
+    `locked_name` / `locked_field` placeholders.
+    """
+    assert CLINICIAN_ENTITY.read_policy is None
 
 
 # --- Repository-layer guard enforcement ---------------------------------------
+# The mechanism (`_read_guard` stamped on a BaseRepository instance) is
+# preserved at the framework level for future entities; pin it here once
+# against ClinicianRepository so any regression in the guard's wiring is
+# caught alongside the clinician-spec changes.
 
 
 @pytest.mark.asyncio
-async def test_clinician_list_blocked_for_unverified_user(
+async def test_repo_guard_blocks_list_for_unverified_user_when_attached(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """When the guard is stamped on the repo (as the dep wrapper does at
-    request time), list_for_user raises ForbiddenError for an unverified user."""
+    """When the guard IS stamped on the repo, `list_for_user` raises for
+    an unverified user. Clinician routes no longer attach this guard, but
+    the mechanism stays intact for any spec that opts in via `read_policy`.
+    """
     owner = create_test_user(username="owner", is_verified=True)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -90,34 +103,7 @@ async def test_clinician_list_blocked_for_unverified_user(
 
 
 @pytest.mark.asyncio
-async def test_clinician_get_by_id_not_blocked_for_unverified_user(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """_get_by_id intentionally bypasses the guard so owners can still
-    load their own profile for update/delete flows before claim verification."""
-    owner = create_test_user(username="owner2", is_verified=True)
-    clin_id = None
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(owner)
-            clin = make_clinician_with_org(owner_id=owner.id)
-            session.add(clin)
-            await session.flush()
-            clin_id = clin.id
-
-    requester = _unverified_user()
-    async with db_test_session_manager() as session:
-        repo = ClinicianRepository(session)
-        repo._requesting_user = requester
-        repo._read_guard = assert_can_access_network
-        from src.domain.models import Clinician
-
-        row = await repo._get_by_id(Clinician, clin_id)
-        assert row is not None
-
-
-@pytest.mark.asyncio
-async def test_clinician_list_allowed_for_superuser(
+async def test_repo_guard_allows_superuser(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """Superusers bypass the guard and receive data normally."""
