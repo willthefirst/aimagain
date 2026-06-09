@@ -1,0 +1,34 @@
+{# Inline "message the poster" form on the post detail page.
+
+   Replaces the prior `mailto:` Email button (which dumped the
+   poster's address into the browser and handed the user off to their
+   mail client). The form posts to `POST /posts/{id}/message`; the
+   server renders the message into a transactional email with the
+   sender's email on `Reply-To` so the poster's reply lands back in
+   the sender's inbox and the conversation continues off-platform.
+
+   The `id="post-message"` wrapper matches the swap target the
+   success fragment (`posts/_message_sent.html`) returns, so the
+   form's `<form>` element is replaced in place on a successful send.
+   Errors target the same node so 4xx rerenders also stay local.
+
+   Gating: rendered only when the viewer clears `can_access_network`
+   (the post detail template applies the gate); the route handler
+   enforces the same predicate server-side. #}
+<form id="post-message"
+      hx-post="{{ entity_url(entity_name, id=post.id, subresource='message') }}"
+      hx-target="this"
+      hx-swap="outerHTML"
+      hx-target-4xx="this"
+      hx-swap-4xx="outerHTML"
+      hx-ext="json-enc">
+  <label>
+    Message to the poster
+    <textarea name="body"
+              rows="5"
+              maxlength="2000"
+              required
+              placeholder="Introduce yourself and ask whatever you'd like — the poster will get your message by email and can reply to you directly."></textarea>
+  </label>
+  <button type="submit">Send message</button>
+</form>

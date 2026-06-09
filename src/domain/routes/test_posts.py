@@ -619,13 +619,16 @@ async def test_list_shows_create_cta_for_claim_b_org_rep(
     ), "Claim-B org rep must be offered the toolbar Create CTA"
 
 
-async def test_detail_hides_email_and_shows_cta_for_unverified(
+async def test_detail_hides_message_form_and_shows_cta_for_unverified(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """Unverified users see a disabled Email button (not a mailto link) on
-    post detail — contact info is not sent to the browser."""
+    """Unverified users see a locked Message CTA (no form, no contact
+    info) on post detail — the inline form is not rendered, and the
+    poster's email address is not sent to the browser. Replaces the
+    prior `mailto:`-button assertion: the same `can_access_network`
+    gate now hides the form instead of disabling a button."""
     author = create_test_user(
         username=f"detail-author-{uuid.uuid4()}",
         email=f"detail-author-{uuid.uuid4()}@example.com",
@@ -638,19 +641,22 @@ async def test_detail_hides_email_and_shows_cta_for_unverified(
 
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
-    assert f"mailto:{author.email}" not in response.text
     assert author.email not in response.text
-    assert "disabled" in response.text
-    assert "Email" in response.text
+    tree = HTMLParser(response.text)
+    assert tree.css_first(f"form[hx-post='/posts/{post.id}/message']") is None
+    assert "Message" in response.text
 
 
-async def test_detail_shows_email_for_verified(
+async def test_detail_shows_message_form_for_verified(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """Verified users (Claim A active) see the poster's email button on the
-    post detail page."""
+    """Verified users (Claim A active) see the inline message form on
+    the post detail page — POSTs to `/posts/{id}/message`, which
+    dispatches the transactional email server-side. The poster's raw
+    email address is never sent to the browser; the form route
+    resolves the recipient from the post row."""
     clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
     clinician.npi_match_status = "matched"
     clinician.clinician_verified = True
@@ -668,7 +674,11 @@ async def test_detail_shows_email_for_verified(
 
     response = await authenticated_client.get(f"/posts/{post.id}")
     assert response.status_code == 200
-    assert f"mailto:{author_email}" in response.text
+    assert author_email not in response.text
+    tree = HTMLParser(response.text)
+    form = tree.css_first(f"form[hx-post='/posts/{post.id}/message']")
+    assert form is not None
+    assert form.css_first("textarea[name='body']") is not None
 
 
 async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverified(
@@ -738,3 +748,131 @@ async def test_detail_shows_identity_rows_for_verified_viewer(
     assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
     assert "Springfield, IL" in response.text
     assert tree.css_first("button.locked-ghost-btn") is None
+
+
+# --- POST /posts/{id}/message (in-app contact form) --------------------------
+
+
+async def test_message_send_unverified_user_is_forbidden(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+    monkeypatch,
+):
+    """A claimless viewer can't see the form (existing visibility gate),
+    so the route must also reject the request server-side. Mirrors the
+    `can_access_network` gate that hid the prior `mailto:` button."""
+    send_mock = pytest.importorskip("unittest.mock").AsyncMock()
+    monkeypatch.setattr("src.domain.routes.posts.send_post_message_email", send_mock)
+
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(owner_id=author.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.post(
+        f"/posts/{post.id}/message", json={"body": "hello"}
+    )
+    assert response.status_code == 403
+    assert send_mock.call_count == 0
+
+
+async def test_message_send_verified_user_dispatches_email(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+    monkeypatch,
+):
+    """Verified-network viewer (`can_access_network=True`) reaches the
+    handler and we hand the post + sender + body to the domain email
+    wrapper. Tests for `Reply-To`, recipient, and link shape live in
+    `src/domain/logic/posts/test_emails.py` — this test only pins the
+    handoff."""
+    from unittest.mock import AsyncMock
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr("src.domain.routes.posts.send_post_message_email", send_mock)
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(owner_id=author.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.post(
+        f"/posts/{post.id}/message",
+        json={"body": "I have a referral that matches"},
+    )
+    assert response.status_code == 200
+    assert "Message sent" in response.text
+    assert send_mock.call_count == 1
+    kwargs = send_mock.call_args.kwargs
+    assert kwargs["post"].id == post.id
+    assert kwargs["sender"].id == logged_in_user.id
+    assert kwargs["body"] == "I have a referral that matches"
+
+
+async def test_message_send_404_when_post_missing(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+    monkeypatch,
+):
+    """Unknown post id returns 404 — even for an authorized sender.
+    The `can_access_network` check fires first, so the user must clear
+    that gate before the missing-post path is reachable."""
+    from unittest.mock import AsyncMock
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr("src.domain.routes.posts.send_post_message_email", send_mock)
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.post(
+        f"/posts/{uuid.uuid4()}/message", json={"body": "hi"}
+    )
+    assert response.status_code == 404
+    assert send_mock.call_count == 0
+
+
+async def test_message_send_rejects_blank_body(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+    monkeypatch,
+):
+    """Empty / whitespace-only bodies are 422 — no point shipping a
+    blank email."""
+    from unittest.mock import AsyncMock
+
+    send_mock = AsyncMock()
+    monkeypatch.setattr("src.domain.routes.posts.send_post_message_email", send_mock)
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(owner_id=author.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.post(
+        f"/posts/{post.id}/message", json={"body": "   "}
+    )
+    assert response.status_code == 422
+    assert send_mock.call_count == 0

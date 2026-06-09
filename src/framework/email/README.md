@@ -31,6 +31,7 @@ await send_email(
     subject="Verify your email",
     html="<p>…</p>",
     text="…",
+    reply_to=None,  # optional; see below
 )
 ```
 
@@ -38,6 +39,14 @@ Both `html` and `text` parts are required — text/plain is what keeps
 the spam score down at deliverability-strict providers. Callers
 render both from the same template pair (see
 `src/domain/templates/emails/`).
+
+`reply_to` is the optional address a recipient's "Reply" goes to
+when it differs from the sending `EMAIL_FROM` address (e.g. an
+in-app message-the-poster flow where the conversation should
+continue between the two real users, not loop back to a no-reply
+mailbox). Omit it (the default `None`) when replies should bounce
+or land in `EMAIL_FROM`'s inbox — the Resend payload simply won't
+carry the key.
 
 ## Why provider-shaped
 
