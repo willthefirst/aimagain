@@ -156,10 +156,15 @@ def _build_app(
     *,
     form_error_render: bool,
     entity_spec: Any = None,
+    handler_raises: Any = None,
 ) -> FastAPI:
     """Synthetic FastAPI app with one `POST /widgets` route mounted via
     `mount_create`. Stub deps return predictable sentinels so handler
     invocation can be observed without a real DB / audit layer.
+
+    `handler_raises`, if set, is raised from the stub handler so tests
+    can exercise the handler-error rerender branch (e.g. a 400 from a
+    post-create gate).
     """
     sentinel_user = SimpleNamespace(id=uuid4(), is_superuser=True)
     spec = ResourceSpec(
@@ -173,6 +178,8 @@ def _build_app(
     )
 
     async def handler(payload, repo, requesting_user, request):  # noqa: ARG001
+        if handler_raises is not None:
+            raise handler_raises
         # Sentinel "created" object; the success path serializes its id.
         return SimpleNamespace(id=uuid4())
 
@@ -303,6 +310,59 @@ def test_mount_create_opted_in_but_missing_entity_spec_falls_back_to_422() -> No
     resp = client.post("/widgets", data={}, headers={"HX-Request": "true"})
 
     assert resp.status_code == 422
+
+
+def test_mount_create_handler_400_with_hx_request_rerenders_with_banner() -> None:
+    """When the create handler raises a 400 (e.g. the NPPES verification
+    gate in the clinician/org `after_create` hooks), an HX-Request
+    client on an opted-in spec gets the form re-rendered with the
+    handler's `detail` as a single form-level banner, status 400, so
+    the htmx `response-targets` extension swaps it in place."""
+    from src.framework.http.exceptions import BadRequestError
+
+    app = _build_app(
+        form_error_render=True,
+        entity_spec=_fake_entity_spec(),
+        handler_raises=BadRequestError(detail="NPI verification failed"),
+    )
+    renderer = _stub_renderer_returning("<form>rendered</form>")
+    with (
+        patch(
+            "src.framework.http.form_rerender.APIResponse.html_response",
+            new=renderer,
+        ),
+        patch(
+            "src.framework.dispatch.mounts.form.handle_get_new_form",
+            new=_fake_handle_get_new_form,
+        ),
+    ):
+        client = TestClient(app)
+        resp = client.post("/widgets", data={"x": "ok"}, headers={"HX-Request": "true"})
+
+    assert resp.status_code == 400
+    assert resp.text == "<form>rendered</form>"
+    ctx = renderer.calls[0]["context"]
+    assert ctx["form_banner_text"] == "NPI verification failed"
+    # The raw submitted values land in `form_values` so the user
+    # doesn't lose what they typed.
+    assert ctx["form_values"] == {"x": "ok"}
+
+
+def test_mount_create_handler_400_without_hx_falls_through_to_json_400() -> None:
+    """Non-HTMX callers still get the raw 400 JSON — the rerender
+    branch is gated on `HX-Request: true`."""
+    from src.framework.http.exceptions import BadRequestError
+
+    app = _build_app(
+        form_error_render=True,
+        entity_spec=_fake_entity_spec(),
+        handler_raises=BadRequestError(detail="NPI verification failed"),
+    )
+    client = TestClient(app)
+    resp = client.post("/widgets", data={"x": "ok"})
+
+    assert resp.status_code == 400
+    assert resp.headers["content-type"].startswith("application/json")
 
 
 def test_mount_create_successful_post_still_returns_201_with_hx_redirect() -> None:

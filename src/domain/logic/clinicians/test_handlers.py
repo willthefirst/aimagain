@@ -854,6 +854,11 @@ async def test_after_create_clinician_verification_creates_verification_row(
                     clinician_repo=repo,
                     verification_audit_repo=audit_repo,
                 )
+            # The hook now runs the verification with `commit=False` so
+            # it can roll back on a failed match; in the verified case,
+            # the test owns the commit so the second session can read
+            # the verification row.
+            await session.commit()
 
         async with db_test_session_manager() as session:
             from src.domain.models import Verification
@@ -883,17 +888,22 @@ async def test_after_create_clinician_verification_creates_verification_row(
         oig_module._reset_cache_for_tests()
 
 
-async def test_after_create_clinician_verification_no_npi_records_skipped(
+async def test_after_create_clinician_verification_raises_when_no_npi(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """A clinician without an NPI still gets a Verification row (status=failed,
-    nppes_skipped flag) and npi_match_status stays 'none'. nppes_lookup is never called.
+    """NPI is required at the schema layer, but the hook itself also
+    enforces verification: a row that somehow reaches the hook without an
+    NPI causes `BadRequestError`, and the still-uncommitted clinician
+    row is rolled back when the session exits. NPPES is never called.
     """
     from pathlib import Path
     from unittest.mock import AsyncMock, patch
 
-    from src.domain.logic.clinicians.handlers import after_create_clinician_verification
+    from src.domain.logic.clinicians.handlers import (
+        after_create_clinician_verification,
+    )
     from src.domain.logic.verifications import oig as oig_module
+    from src.framework.http.exceptions import BadRequestError
 
     leie_fixture = (
         Path(__file__).parent.parent / "verifications" / "test_data" / "leie_sample.csv"
@@ -926,6 +936,7 @@ async def test_after_create_clinician_verification_no_npi_records_skipped(
                 npi=None,
             )
             created = await repo.create(clinician)
+            created_id = created.id
 
             nppes_stub = AsyncMock(
                 side_effect=AssertionError("nppes_lookup called unexpectedly")
@@ -934,36 +945,100 @@ async def test_after_create_clinician_verification_no_npi_records_skipped(
                 "src.domain.logic.verifications.handlers.nppes_lookup",
                 new=nppes_stub,
             ):
-                await after_create_clinician_verification(
-                    row=created,
-                    payload=_clinician_create_payload(org_id=org_id),
-                    requesting_user=user,
-                    verification_repo=verification_repo,
-                    clinician_repo=repo,
-                    verification_audit_repo=audit_repo,
-                )
+                with pytest.raises(BadRequestError):
+                    await after_create_clinician_verification(
+                        row=created,
+                        payload=_clinician_create_payload(org_id=org_id),
+                        requesting_user=user,
+                        verification_repo=verification_repo,
+                        clinician_repo=repo,
+                        verification_audit_repo=audit_repo,
+                    )
             nppes_stub.assert_not_called()
+            # No commit follows the raise — the session rolls back on
+            # exit, so the clinician row is never durable.
 
         async with db_test_session_manager() as session:
-            from src.domain.models import Verification
+            loaded = await session.get(Clinician, created_id)
+            assert loaded is None
+    finally:
+        if old_path is None:
+            os.environ.pop("LEIE_CSV_PATH", None)
+        else:
+            os.environ["LEIE_CSV_PATH"] = old_path
+        oig_module._reset_cache_for_tests()
 
-            rows = (
-                (
-                    await session.execute(
-                        select(Verification).filter(
-                            Verification.clinician_id == created.id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
+
+async def test_after_create_clinician_verification_raises_when_npi_not_found(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """NPPES returned `found=False` → status `failed` → the hook raises
+    BadRequestError and the clinician row is rolled back."""
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from src.domain.logic.clinicians.handlers import (
+        after_create_clinician_verification,
+    )
+    from src.domain.logic.verifications import oig as oig_module
+    from src.domain.logic.verifications.nppes import NppesResult
+    from src.framework.http.exceptions import BadRequestError
+
+    leie_fixture = (
+        Path(__file__).parent.parent / "verifications" / "test_data" / "leie_sample.csv"
+    )
+    oig_module._reset_cache_for_tests()
+    import os
+
+    old_path = os.environ.get("LEIE_CSV_PATH")
+    os.environ["LEIE_CSV_PATH"] = str(leie_fixture)
+    try:
+        user = await _seed_user(db_test_session_manager)
+        org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
+
+        nppes_miss = NppesResult(found=False, first_name=None, last_name=None, raw={})
+
+        async with db_test_session_manager() as session:
+            repo = ClinicianRepository(session)
+            audit_repo = AuditRepository(session)
+            verification_repo = VerificationRepository(session)
+
+            clinician = Clinician(
+                owner_id=user.id,
+                org_id=org_id,
+                first_name="Jane",
+                last_name="Smith",
+                location_city="Springfield",
+                location_state="IL",
+                location_zip="62701",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+                npi="9999999999",
             )
-            assert len(rows) == 1
-            assert rows[0].status == "failed"
-            assert "nppes_skipped" in rows[0].flags
+            created = await repo.create(clinician)
+            created_id = created.id
 
-            loaded = await session.get(Clinician, created.id)
-            assert loaded.npi_match_status == "none"
+            with patch(
+                "src.domain.logic.verifications.handlers.nppes_lookup",
+                new=AsyncMock(return_value=nppes_miss),
+            ):
+                with pytest.raises(BadRequestError) as exc_info:
+                    await after_create_clinician_verification(
+                        row=created,
+                        payload=_clinician_create_payload(org_id=org_id),
+                        requesting_user=user,
+                        verification_repo=verification_repo,
+                        clinician_repo=repo,
+                        verification_audit_repo=audit_repo,
+                    )
+            # The user-facing detail mentions NPPES + the per-flag
+            # explanation that `npi_failure_message` produces for the
+            # `nppes_npi_not_found` flag.
+            assert "NPPES" in str(exc_info.value.detail)
+
+        async with db_test_session_manager() as session:
+            loaded = await session.get(Clinician, created_id)
+            assert loaded is None
     finally:
         if old_path is None:
             os.environ.pop("LEIE_CSV_PATH", None)
@@ -976,21 +1051,26 @@ async def test_after_create_clinician_verification_no_npi_records_skipped(
 
 
 async def test_after_update_reverifies_when_npi_changed(monkeypatch):
-    """When `npi` is among the changed fields, the update hook delegates to
-    the NPI-verification pipeline. (The pipeline mechanics are covered by the
-    after_create DB test; this pins the change-gating + delegation.)"""
+    """When `npi` is among the changed fields, the update hook re-runs
+    the NPI-verification pipeline. (The pipeline mechanics are covered
+    by the after_create DB test; this pins the change-gating + delegation.
+
+    Unlike the create hook, this path does NOT raise on a non-verified
+    outcome — a bad NPI update lands the row in `npi_match_status=mismatch`
+    and the user can edit again from the edit page.)"""
     from types import SimpleNamespace
+    from unittest.mock import AsyncMock
     from uuid import uuid4
 
     from src.domain.logic.clinicians import handlers as h
+    from src.domain.logic.verifications import handlers as verification_handlers
 
-    seen: dict = {}
+    fake_verify = AsyncMock(return_value=SimpleNamespace(status="verified", flags=[]))
+    monkeypatch.setattr(
+        verification_handlers, "run_clinician_verification", fake_verify
+    )
 
-    async def _fake_verify(**kwargs):
-        seen.update(kwargs)
-
-    monkeypatch.setattr(h, "after_create_clinician_verification", _fake_verify)
-
+    fake_session = SimpleNamespace(refresh=AsyncMock())
     row = SimpleNamespace(id=uuid4())
     user = SimpleNamespace(id=uuid4())
     await h.after_update_clinician_verification(
@@ -999,28 +1079,29 @@ async def test_after_update_reverifies_when_npi_changed(monkeypatch):
         requesting_user=user,
         changed_fields={"npi", "first_name"},
         verification_repo="vr",
-        clinician_repo="cr",
+        clinician_repo=SimpleNamespace(session=fake_session),
         verification_audit_repo="ar",
     )
-    assert seen.get("row") is row
-    assert seen.get("clinician_repo") == "cr"
+    fake_verify.assert_awaited_once()
+    kwargs = fake_verify.await_args.kwargs
+    assert kwargs["clinician_id"] == row.id
+    assert kwargs["actor_id"] == user.id
 
 
 async def test_after_update_noop_when_npi_unchanged(monkeypatch):
     """A non-NPI edit (e.g. location only) must NOT re-run NPI verification —
     no needless NPPES lookup."""
     from types import SimpleNamespace
+    from unittest.mock import AsyncMock
     from uuid import uuid4
 
     from src.domain.logic.clinicians import handlers as h
+    from src.domain.logic.verifications import handlers as verification_handlers
 
-    called = False
-
-    async def _fake_verify(**kwargs):
-        nonlocal called
-        called = True
-
-    monkeypatch.setattr(h, "after_create_clinician_verification", _fake_verify)
+    fake_verify = AsyncMock()
+    monkeypatch.setattr(
+        verification_handlers, "run_clinician_verification", fake_verify
+    )
 
     await h.after_update_clinician_verification(
         row=SimpleNamespace(id=uuid4()),
@@ -1031,4 +1112,4 @@ async def test_after_update_noop_when_npi_unchanged(monkeypatch):
         clinician_repo="cr",
         verification_audit_repo="ar",
     )
-    assert called is False
+    fake_verify.assert_not_awaited()

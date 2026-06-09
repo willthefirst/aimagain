@@ -37,6 +37,15 @@ from src.framework.dispatch.redirects import Redirects
 
 _organization_form_redirect = Redirects.to_edit_form("organizations", "organization_id")
 
+
+# Post-create: drop the user on the homepage. NPPES verification now
+# gates create (see `after_create_organization_owner_grant`), so a
+# successful create means the org is already verified — there's no
+# half-built row to nudge them into editing.
+def _organization_create_redirect(**_: object) -> str:
+    return "/"
+
+
 # Owner-scoped read projection over `/posts` (RESOURCE_GRAMMAR pattern
 # #5): the program-intakes whose Program belongs to this org. Renders
 # `Post` rows, so the child spec points at the post repo.
@@ -68,7 +77,7 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
         form_edit=True,
     ),
     list_order_by=Organization.created_at.desc(),
-    create_redirect=_organization_form_redirect,
+    create_redirect=_organization_create_redirect,
     update_redirect=_organization_form_redirect,
     # Opt into the HX-Request re-render-on-validation-failure path —
     # see `EntitySpec.form_error_render`. On a Pydantic 422 the
