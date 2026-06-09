@@ -157,16 +157,21 @@ async def test_remove_favorite_idempotent_when_not_favorited(
 
 
 async def test_list_my_favorites_renders_html(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
+    """Uses `superuser_client` so the viewer clears `can_access_network`
+    via the superuser bypass and the favorited clinician's practice name
+    renders un-redacted. The redaction branch (where a non-network
+    viewer sees their favorite's identifying fields as locked
+    placeholders) is exercised separately by the clinician-card
+    template tests."""
     first_id = await _seed_clinician(
         db_test_session_manager, practice_name="First Favorite"
     )
-    await authenticated_client.post(f"/users/me/favorites/{first_id}")
+    await superuser_client.post(f"/users/me/favorites/{first_id}")
 
-    response = await authenticated_client.get("/users/me/favorites")
+    response = await superuser_client.get("/users/me/favorites")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     parser = HTMLParser(response.text)
@@ -221,25 +226,25 @@ async def test_list_my_favorites_renders_breadcrumb(
     assert label is not None and label.text(strip=True) == logged_in_user.username
 
 
-async def test_empty_favorites_browse_clinicians_link_locks_when_no_network_access(
+async def test_empty_favorites_browse_clinicians_link_is_plain_anchor(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """Empty-state copy on `/users/me/favorites` reads "Browse clinicians
-    to add some" and points at `/clinicians`. The clinician spec gates
-    its list via `read_policy.assert_can_access_network`, so for a viewer
-    who lacks network access the link would 403. `entity_link` swaps it
-    for the locked popover trigger instead — same DOM contract as the
-    breadcrumb-back fix on `/users/me`. `logged_in_user` is email-verified
-    but holds no clinician/org-rep claim, so we expect the locked branch."""
+    to add some" and points at `/clinicians`. The clinician spec no
+    longer carries a `read_policy` — `/clinicians` is reachable for
+    every authenticated viewer (identifying rows redact per-row at
+    render time), so the link is a plain `<a href="/clinicians">`
+    regardless of the viewer's network-access state. `entity_link`'s
+    locked-popover branch only fires when the target spec declares a
+    `read_policy` with `lock_reason`; no live spec does today."""
     response = await authenticated_client.get("/users/me/favorites")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     empty = tree.css_first("#favorites-empty")
     assert empty is not None, "expected empty-state to render for fresh user"
-    # The "Browse clinicians" link is now a locked-link, not a plain `<a>`.
-    locked = empty.css_first("a.locked-link")
-    assert locked is not None, "Browse clinicians must lock for non-network viewer"
-    assert locked.attributes.get("data-locked-cta") == "network_unverified"
-    assert "href" not in locked.attributes
-    assert "Browse clinicians" in locked.text()
+    plain = empty.css_first("a:not(.locked-link)")
+    assert plain is not None, "Browse clinicians must render as a plain <a>"
+    assert plain.attributes.get("href") == "/clinicians"
+    assert "Browse clinicians" in plain.text()
+    assert empty.css_first("a.locked-link") is None

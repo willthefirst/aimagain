@@ -16,7 +16,6 @@ Read by:
 
 from typing import Final
 
-from src.domain.logic.capabilities import NETWORK_GATED_READ_POLICY
 from src.domain.logic.clinicians.repository import (
     ClinicianRepository,
     get_clinician_repository,
@@ -93,7 +92,10 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     repo_dep=get_clinician_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
-    read_policy=NETWORK_GATED_READ_POLICY,
+    # No `read_policy`: the directory is reachable by every authenticated
+    # viewer. Identifying fields are redacted per-row at render time when
+    # the viewer lacks provider-network access AND isn't the owner — same
+    # `redacted=` pattern posts use (see `posts/_shared/_facts_block.html`).
     create_adapter=ClinicianCreate,
     update_adapter=ClinicianUpdate,
     read_schema=ClinicianRead,

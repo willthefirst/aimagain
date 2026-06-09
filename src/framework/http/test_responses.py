@@ -29,6 +29,8 @@ def test_base_context_anonymous():
         # the banner stays silent.
         "current_user_is_verified": True,
         "can_access_network": False,
+        # No org-rep affiliations.
+        "viewer_rep_org_ids": frozenset(),
     }
 
 
@@ -45,6 +47,7 @@ def test_base_context_regular_user():
         "has_clinician_profile": False,
         "current_user_is_verified": True,
         "can_access_network": False,
+        "viewer_rep_org_ids": frozenset(),
     }
 
 

@@ -2,19 +2,33 @@
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
 {%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/_locked.html" import locked_name, locked_field -%}
 {% block actions %}
   <li>
     <a href="{{ entity_form_url('organization') }}" role="button">{{ entity_create_label("organization") }}</a>
   </li>
 {% endblock %}
+{# `_redacted` mirrors the clinician card: viewer lacks provider-network
+   access AND isn't the owner AND doesn't hold a verified, non-archived
+   `OrgRepresentation` for the row. `viewer_rep_org_ids` is the
+   chrome-context set computed once by `base_context` from `claim_state`. #}
 {%- macro org_card(org) %}
+  {%- set _redacted = not can_access_network
+    and org.owner_id != current_user_id
+    and org.id not in viewer_rep_org_ids -%}
   {%- call card(
     id=org.id,
-    headline_url=entity_url('organization', id=org.id),
-    headline=org.name) -%}
+    headline_url=None if _redacted else entity_url('organization', id=org.id),
+    headline=locked_name("Doe Health Group") if _redacted else org.name) -%}{# title-case-ignore: placeholder org name #}
     <section class="entity-facts">
       <dl>
-        {%- if org.npi %}{{ fact('npi', 'NPI', org.npi) }}{%- endif %}
+        {%- if org.npi %}
+          {% if _redacted %}
+            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}{%- endcall %}
+            {% else %}
+              {{ fact('npi', 'NPI', org.npi) }}
+            {% endif %}
+          {%- endif %}
         </dl>
       </section>
     {%- endcall %}

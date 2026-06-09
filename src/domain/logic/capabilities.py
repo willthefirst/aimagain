@@ -280,9 +280,14 @@ def assert_can_access_network(user: Any) -> None:
 # Pre-built `ReadPolicy` for the network gate. Specs that want
 # "verified-clinician-or-org-rep can read; everyone else 403s and sees a
 # locked-link popover" set `read_policy=NETWORK_GATED_READ_POLICY` rather
-# than re-declaring the same three-field `ReadPolicy(...)` block. Today's
-# members: USER_ENTITY, CLINICIAN_ENTITY, ORGANIZATION_ENTITY (every
-# directory entity whose rows reveal a real person / practice / org).
+# than re-declaring the same three-field `ReadPolicy(...)` block. No
+# entity currently binds this — `USER_ENTITY`, `CLINICIAN_ENTITY`, and
+# `ORGANIZATION_ENTITY` switched to per-row redaction (`_redacted=`
+# template flag) so a viewer without network access can still browse
+# the directories and see their own rows un-redacted. The constant is
+# kept for any future entity whose entire surface should remain a
+# binary gate (and so the predicates / reason code stay re-exportable
+# under one name).
 #
 # Why a constant here and not a `network_gated()` factory or a flag on
 # `EntitySpec`: ReadPolicy is structurally a tuple of (raiser, predicate,

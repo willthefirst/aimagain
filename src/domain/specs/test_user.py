@@ -20,6 +20,16 @@ from src.framework.dispatch.entity_spec import ADMIN_FOR_WRITE, RelatedListSubre
 # --- Auth deps (security-visible) ----------------------------------------
 
 
+def test_no_read_policy_user_directory_reachable_for_every_viewer():
+    """`USER_ENTITY` no longer declares `read_policy`. `/users` is
+    reachable for every authenticated viewer; the username on non-self
+    rows is replaced by `locked_name(...)` at render time when the
+    viewer lacks provider-network access (see `users/list.html` and
+    `users/detail.html`). Private fields (email, is_active) stay gated
+    by `private_field_predicate=is_self_or_admin`."""
+    assert USER_ENTITY.read_policy is None
+
+
 def test_auth_deps_is_admin_for_write():
     """Pinned identity — `ADMIN_FOR_WRITE` is the only sentinel where
     writes require admin. A future spec accidentally setting

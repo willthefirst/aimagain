@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Organization, OrgRepresentation, User
 from src.framework.audit.repository import AuditRepository
-from tests.helpers import make_organization_row
+from tests.helpers import create_test_user, make_organization_row
 
 pytestmark = pytest.mark.asyncio
 
@@ -335,33 +335,46 @@ async def test_get_org_intakes_404_for_missing_org(
     assert response.status_code == 404
 
 
-# --- Network gate (read_policy) ---------------------------------------------
+# --- Network-aware redaction -------------------------------------------------
 
 
-async def test_list_403_for_unverified_viewer(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`/organizations` is gated behind `can_access_network` via the
-    spec's `read_policy`. A claimless viewer (no verified clinician,
-    no verified org rep) gets 403 — symmetric with the clinician
-    list. The list-mount calls `_check_read` before issuing the
-    underlying SQL, so this fires at the repo layer rather than in
-    the template."""
-    response = await authenticated_client.get("/organizations")
-    assert response.status_code == 403
-
-
-async def test_list_200_for_verified_viewer(
+async def test_list_200_for_unverified_viewer_redacts_others(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Self-registering an organization grants the creator a verified
-    `OrgRepresentation` (`authority_status='verified'`), which flips
-    `can_access_network` to True — the same user can now list orgs.
-    Pins the network-bootstrap path: a brand-new user becomes Claim-B
-    by completing the canonical create flow."""
+    """`/organizations` is reachable for every authenticated viewer; a
+    viewer without provider-network access sees rows they don't own or
+    rep with the identifying fields (name, NPI) replaced by `locked_name`
+    / `locked_field` placeholders. The viewer is `logged_in_user` and
+    `other_owner` owns the row, so the redaction must fire."""
+    other_owner = create_test_user(username=f"other-{uuid.uuid4()}")
+    org_name = f"Stranger Health {uuid.uuid4()}"
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other_owner)
+            session.add(make_organization_row(owner_id=other_owner.id, name=org_name))
+
+    response = await authenticated_client.get("/organizations")
+    assert response.status_code == 200
+    assert org_name not in response.text
+    # `locked_name` renders a button containing the placeholder; the page
+    # therefore signals "row exists, identity withheld".
+    assert "Doe Health Group" in response.text
+
+
+async def test_list_200_for_owner_renders_own_row_unredacted(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The viewer's own org renders un-redacted on `/organizations` even
+    when they lack `can_access_network` — owners must be able to manage
+    what they've created before clearing network verification.
+
+    Self-registering an organization also grants the creator a verified
+    `OrgRepresentation`, which flips `can_access_network` to True; the
+    test pins the post-create state where the row is visible by name."""
     create = await authenticated_client.post("/organizations", data=_org_payload())
     assert create.status_code == 201
 

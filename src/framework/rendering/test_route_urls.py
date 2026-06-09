@@ -10,7 +10,6 @@ import uuid
 
 import pytest
 
-from src.domain.logic import capabilities
 from src.framework.rendering.route_urls import (
     breadcrumb_entity_item,
     entity_form_url,
@@ -164,27 +163,18 @@ class _Verified:
     clinicians = (_Cln(),)
 
 
-def test_entity_lock_reason_returns_reason_when_viewer_locked_out():
-    """`user`'s spec declares `lock_reason=REASON_NETWORK_UNVERIFIED`;
-    an unverified viewer fails `can_access_network`, so the helper hands
-    back the reason code so `entity_link` can render a popover trigger."""
-    assert (
-        entity_lock_reason("user", _Unverified())
-        == capabilities.REASON_NETWORK_UNVERIFIED
-    )
-
-
-def test_entity_lock_reason_none_when_viewer_passes_gate():
-    """A network-verified viewer passes `can_read` — the helper returns
-    `None` so `entity_link` renders the plain `<a>` branch."""
-    assert entity_lock_reason("user", _Verified()) is None
-
-
-def test_entity_lock_reason_none_for_entity_without_read_policy():
-    """`post` declares no `read_policy` — posting is intentionally open
-    so the feed teaser can render to unverified viewers, and there's
-    no lock affordance to surface regardless of viewer."""
-    assert entity_lock_reason("post", _Unverified()) is None
+def test_entity_lock_reason_none_for_user_post_clinician_organization():
+    """No live spec carries `read_policy` today — every directory is
+    reachable for every authenticated viewer, with per-row redaction
+    handling identity privacy at render time. `entity_lock_reason`
+    therefore always returns `None`; assertion below covers every entity
+    that used to carry the network gate, plus `post` (intentionally open
+    from day one)."""
+    viewer = _Unverified()
+    assert entity_lock_reason("user", viewer) is None
+    assert entity_lock_reason("clinician", viewer) is None
+    assert entity_lock_reason("organization", viewer) is None
+    assert entity_lock_reason("post", viewer) is None
 
 
 def test_entity_lock_reason_unknown_entity_raises():
@@ -206,12 +196,13 @@ def test_breadcrumb_entity_item_returns_three_tuple_with_default_label():
     assert item == ("Users", "/users", None)
 
 
-def test_breadcrumb_entity_item_carries_lock_reason_for_locked_viewer():
-    """A viewer who fails `read_policy.can_read` gets the spec's
-    `lock_reason` in the third slot — the breadcrumb macro renders the
-    back affordance as a locked popover trigger instead of an `<a>`."""
+def test_breadcrumb_entity_item_third_slot_none_for_open_specs():
+    """Every live spec is open (no `read_policy`), so the third tuple
+    slot is `None` for every viewer regardless of network access. The
+    `lock_reason` plumbing (`entity_lock_reason` → `breadcrumb_entity_item`)
+    stays in the framework for any future entity that opts back in."""
     item = breadcrumb_entity_item("clinician", _Unverified())
-    assert item == ("Clinicians", "/clinicians", capabilities.REASON_NETWORK_UNVERIFIED)
+    assert item == ("Clinicians", "/clinicians", None)
 
 
 def test_breadcrumb_entity_item_label_override_replaces_default():
