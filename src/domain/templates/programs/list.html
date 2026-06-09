@@ -2,6 +2,7 @@
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
 {%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/_locked.html" import entity_link -%}
 {% block actions %}
   <li>
     <a href="{{ entity_form_url('program') }}" role="button">{{ entity_create_label("program") }}</a>
@@ -19,11 +20,11 @@
     subtitle=subtitle) -%}
     <section class="entity-facts">
       <dl>
-        {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>
-      {% endcall %}
-    </dl>
-  </section>
-{%- endcall %}
+        {%- call fact('organization', 'Organization') %}{{ entity_link('organization', program.organization.name, id=program.org_id) }}
+        {% endcall %}
+      </dl>
+    </section>
+  {%- endcall %}
 {%- endmacro %}
 {% block list_body %}
   {%- set _empty %}

@@ -333,3 +333,40 @@ async def test_get_org_intakes_404_for_missing_org(
 ):
     response = await authenticated_client.get(f"/organizations/{uuid.uuid4()}/intakes")
     assert response.status_code == 404
+
+
+# --- Network gate (read_policy) ---------------------------------------------
+
+
+async def test_list_403_for_unverified_viewer(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`/organizations` is gated behind `can_access_network` via the
+    spec's `read_policy`. A claimless viewer (no verified clinician,
+    no verified org rep) gets 403 — symmetric with the clinician
+    list. The list-mount calls `_check_read` before issuing the
+    underlying SQL, so this fires at the repo layer rather than in
+    the template."""
+    response = await authenticated_client.get("/organizations")
+    assert response.status_code == 403
+
+
+async def test_list_200_for_verified_viewer(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Self-registering an organization grants the creator a verified
+    `OrgRepresentation` (`authority_status='verified'`), which flips
+    `can_access_network` to True — the same user can now list orgs.
+    Pins the network-bootstrap path: a brand-new user becomes Claim-B
+    by completing the canonical create flow."""
+    create = await authenticated_client.post(
+        "/organizations", data=_org_payload(name="Gateway Org")
+    )
+    assert create.status_code == 201
+
+    response = await authenticated_client.get("/organizations")
+    assert response.status_code == 200
+    assert "Gateway Org" in response.text
