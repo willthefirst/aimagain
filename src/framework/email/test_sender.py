@@ -154,6 +154,118 @@ async def test_resend_backend_calls_resend_sdk(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_console_backend_includes_reply_to_when_set(capsys, monkeypatch):
+    """`reply_to` is the conversation-routing knob for sender-to-poster
+    flows (post messages) — the recipient's "Reply" should land in the
+    sender's inbox, not the `EMAIL_FROM` no-reply mailbox. The console
+    backend surfaces it as a `Reply-To:` line so dev sends visibly carry
+    the header."""
+    monkeypatch.setattr("src.framework.email.sender.settings.EMAIL_BACKEND", "console")
+    monkeypatch.setattr(
+        "src.framework.email.sender.settings.EMAIL_FROM", "no-reply@example.com"
+    )
+
+    await send_email(
+        to="alice@example.com",
+        subject="Hello",
+        html="<p>Hi</p>",
+        text="Hi",
+        reply_to="bob@example.com",
+    )
+
+    err = capsys.readouterr().err
+    assert "Reply-To: bob@example.com" in err
+
+
+@pytest.mark.asyncio
+async def test_file_backend_includes_reply_to_when_set(tmp_path, monkeypatch):
+    """The `.eml`-shaped file emits a `Reply-To:` header — same rule
+    as the console backend, but on disk so the dev can inspect the
+    saved headers."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("src.framework.email.sender.settings.EMAIL_BACKEND", "file")
+    monkeypatch.setattr(
+        "src.framework.email.sender.settings.EMAIL_FROM", "no-reply@example.com"
+    )
+
+    await send_email(
+        to="poster@example.com",
+        subject="New message",
+        html="<p>HTML</p>",
+        text="Plain",
+        reply_to="sender@example.com",
+    )
+
+    files = list(Path(".mail").glob("*.eml"))
+    assert len(files) == 1
+    body = files[0].read_text(encoding="utf-8")
+    assert "Reply-To: sender@example.com" in body
+
+
+@pytest.mark.asyncio
+async def test_resend_backend_forwards_reply_to(monkeypatch):
+    """When set, `reply_to` lands in the Resend payload as a single
+    string (Resend accepts string-or-list; we pass a string to match
+    the public surface's single-address shape)."""
+    monkeypatch.setattr("src.framework.email.sender.settings.EMAIL_BACKEND", "resend")
+    monkeypatch.setattr(
+        "src.framework.email.sender.settings.RESEND_API_KEY", "test-key"
+    )
+    monkeypatch.setattr(
+        "src.framework.email.sender.settings.EMAIL_FROM", "no-reply@example.com"
+    )
+
+    fake_resend = type(sys)("resend")
+    fake_resend.api_key = None
+    fake_resend.Emails = type(sys)("Emails")
+    from unittest.mock import Mock
+
+    send_mock = Mock(return_value={"id": "msg_123"})
+    fake_resend.Emails.send = send_mock
+
+    with patch.dict(sys.modules, {"resend": fake_resend}):
+        await send_email(
+            to="poster@example.com",
+            subject="New message",
+            html="<p>m</p>",
+            text="m",
+            reply_to="sender@example.com",
+        )
+
+    payload = send_mock.call_args[0][0]
+    assert payload["reply_to"] == "sender@example.com"
+
+
+@pytest.mark.asyncio
+async def test_resend_backend_omits_reply_to_when_unset(monkeypatch):
+    """The default-None case must NOT add a `reply_to` key to the
+    Resend payload — pinning this prevents an `{"reply_to": None}`
+    regression that some SDK versions would forward as a literal
+    `null` header."""
+    monkeypatch.setattr("src.framework.email.sender.settings.EMAIL_BACKEND", "resend")
+    monkeypatch.setattr(
+        "src.framework.email.sender.settings.RESEND_API_KEY", "test-key"
+    )
+    monkeypatch.setattr(
+        "src.framework.email.sender.settings.EMAIL_FROM", "no-reply@example.com"
+    )
+
+    fake_resend = type(sys)("resend")
+    fake_resend.api_key = None
+    fake_resend.Emails = type(sys)("Emails")
+    from unittest.mock import Mock
+
+    send_mock = Mock(return_value={"id": "msg_123"})
+    fake_resend.Emails.send = send_mock
+
+    with patch.dict(sys.modules, {"resend": fake_resend}):
+        await send_email(to="x@example.com", subject="s", html="h", text="t")
+
+    payload = send_mock.call_args[0][0]
+    assert "reply_to" not in payload
+
+
+@pytest.mark.asyncio
 async def test_unknown_backend_raises(monkeypatch):
     """An unknown `EMAIL_BACKEND` value is a config typo — better to
     fail fast at first send than swallow it and lose mail."""
