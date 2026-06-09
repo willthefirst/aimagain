@@ -106,11 +106,12 @@ async def register_request_handler(
     )
 
     if request.headers.get("HX-Request") == "true":
-        # HTMX submit: auto-login and redirect instead of returning raw JSON.
-        # Mirrors the pattern in src/domain/routes/dev_auth.py.
+        # HTMX submit: auto-login and redirect to the "check your email"
+        # CTA so the user is nudged to open their inbox and click the
+        # verify link. Mirrors the pattern in src/domain/routes/dev_auth.py.
         login_response = await auth_backend.login(get_strategy(), created_user)
         login_response.status_code = 200
-        login_response.headers["HX-Redirect"] = "/home"
+        login_response.headers["HX-Redirect"] = "/auth/check-email"
         return login_response
 
     return created_user
