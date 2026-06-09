@@ -1,6 +1,7 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/_locked.html" import entity_link -%}
 {% block resource_label %}Programs{% endblock %}
 {% block current_label %}{{ program.name }}{% endblock %}
 {% block actions %}
@@ -24,13 +25,13 @@
     {%- if program.description %}<p class="entity-description">{{ program.description }}</p>{%- endif %}
     <section class="entity-facts">
       <dl>
-        {%- call fact('organization', 'Organization') %}<a href="{{ entity_url('organization', id=program.org_id) }}">{{ program.organization.name }}</a>
-      {% endcall %}
-      {%- if program.state_preference %}{{ fact('state_served', 'State served', program.state_preference) }}{%- endif %}
-        {%- if program.start_date %}{{ fact('start_date', 'Start date', program.start_date) }}{%- endif %}
-          {%- if program.end_date %}{{ fact('end_date', 'End date', program.end_date) }}{%- endif %}
-            {{ fact('accepting_referrals', 'Accepting referrals', "Yes" if program.accepting_referrals else "No") }}
-          </dl>
+        {%- call fact('organization', 'Organization') %}{{ entity_link('organization', program.organization.name, id=program.org_id) }}
+        {% endcall %}
+        {%- if program.state_preference %}{{ fact('state_served', 'State served', program.state_preference) }}{%- endif %}
+          {%- if program.start_date %}{{ fact('start_date', 'Start date', program.start_date) }}{%- endif %}
+            {%- if program.end_date %}{{ fact('end_date', 'End date', program.end_date) }}{%- endif %}
+              {{ fact('accepting_referrals', 'Accepting referrals', "Yes" if program.accepting_referrals else "No") }}
+            </dl>
+          </section>
         </section>
-      </section>
-    {% endblock %}
+      {% endblock %}

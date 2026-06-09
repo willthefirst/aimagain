@@ -23,6 +23,7 @@
 #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/_locked.html" import entity_link -%}
 {% macro clinician_card(clinician) -%}
   {%- set view = clinician_card_view(clinician) -%}
   {%- set affiliations = clinician.clinician_affiliations | list -%}
@@ -61,7 +62,7 @@
         {%- call fact('practice', 'Practice', dd_class='meta') -%}
           {%- if affiliations -%}
             {%- for aff in affiliations -%}
-              <a href="{{ entity_url('organization', id=aff.org_id) }}">{{ aff.org.name }}</a>
+              {{ entity_link('organization', aff.org.name, id=aff.org_id) }}
             {%- endfor -%}
           {%- else -%}
             &mdash;

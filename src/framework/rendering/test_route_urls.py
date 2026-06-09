@@ -181,9 +181,10 @@ def test_entity_lock_reason_none_when_viewer_passes_gate():
 
 
 def test_entity_lock_reason_none_for_entity_without_read_policy():
-    """`organization` declares no `read_policy` — listing is open, so
-    there's no lock affordance to render regardless of viewer."""
-    assert entity_lock_reason("organization", _Unverified()) is None
+    """`post` declares no `read_policy` — posting is intentionally open
+    so the feed teaser can render to unverified viewers, and there's
+    no lock affordance to surface regardless of viewer."""
+    assert entity_lock_reason("post", _Unverified()) is None
 
 
 def test_entity_lock_reason_unknown_entity_raises():
@@ -224,9 +225,10 @@ def test_breadcrumb_entity_item_label_override_replaces_default():
 def test_breadcrumb_entity_item_for_entity_without_read_policy():
     """An ungated entity (no `read_policy` set) always produces
     `lock_reason=None` — the back link is a plain `<a>` regardless of
-    viewer."""
-    item = breadcrumb_entity_item("organization", _Unverified())
-    assert item == ("Organizations", "/organizations", None)
+    viewer. `post` is the canonical open example: posting is public
+    so the feed teaser can render to unverified viewers."""
+    item = breadcrumb_entity_item("post", _Unverified())
+    assert item == ("Posts", "/posts", None)
 
 
 def test_breadcrumb_entity_item_unknown_entity_raises():
