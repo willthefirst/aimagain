@@ -31,47 +31,6 @@ def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
     cursor.close()
 
 
-@pytest.fixture
-def mock_nppes_default_match(monkeypatch):
-    """Patch NPPES to return a verified-match response by default,
-    aligned with the wire defaults used by `tests.helpers.clinician_payload()`
-    (Jane / Smith) and the org-create tests (Acme Health). Route-level
-    tests use this so the inline-create hook (which now raises
-    `BadRequestError` on any non-verified NPPES outcome — see
-    `src/domain/logic/clinicians/handlers.py` and the verifications
-    README) doesn't block the happy path. Tests that need a failure-mode
-    lookup re-patch the two symbols locally.
-
-    Wired in as an autouse fixture only for the route-test directories
-    via `src/domain/routes/conftest.py` so the verification-cluster
-    tests — which exercise the real `nppes_lookup` against a mocked
-    HTTP transport — aren't affected.
-    """
-    from unittest.mock import AsyncMock
-
-    from src.domain.logic.verifications.nppes import NppesOrgResult, NppesResult
-
-    monkeypatch.setattr(
-        "src.domain.logic.verifications.handlers.nppes_lookup",
-        AsyncMock(
-            return_value=NppesResult(
-                found=True, first_name="Jane", last_name="Smith", raw={}
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        "src.domain.logic.verifications.handlers.nppes_lookup_type2",
-        AsyncMock(
-            return_value=NppesOrgResult(
-                found=True,
-                org_name="Acme Health",
-                authorized_official_name=None,
-                raw={},
-            )
-        ),
-    )
-
-
 @pytest.fixture(scope="session", autouse=True)
 async def _db_schema() -> AsyncGenerator[None, None]:
     """Create the schema once per pytest session — every
