@@ -20,10 +20,19 @@
      - Location ("City, ST" chips, deduped on identical strings).
      - Licensed in (issuing-state code list).
      - Insurance (rendered via `clinician_card_view`).
+
+   Redaction — when the viewer lacks provider-network access AND
+   isn't the clinician's owner, the identifying rows (name,
+   practice, location) render `locked_name`/`locked_field`
+   placeholders instead of the real values. Mirrors the
+   `posts/_shared/_facts_block.html` `redacted=` pattern. The
+   viewer's own clinician rows always render un-redacted, so users
+   can manage what they've created even before clearing network
+   verification.
 #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact -%}
-{%- from "_shared/_locked.html" import entity_link -%}
+{%- from "_shared/_locked.html" import entity_link, locked_name, locked_field -%}
 {% macro clinician_card(clinician) -%}
   {%- set view = clinician_card_view(clinician) -%}
   {%- set affiliations = clinician.clinician_affiliations | list -%}
@@ -53,14 +62,17 @@
     {%- else %}Unnamed clinician
     {%- endif %}
   {%- endset -%}
+  {%- set _redacted = not can_access_network and clinician.owner_id != current_user_id -%}
   {% call card(
     id=clinician.id,
-    headline_url=entity_url('clinician', id=clinician.id),
-    headline=name | trim) -%}
+    headline_url=None if _redacted else entity_url('clinician', id=clinician.id),
+    headline=locked_name("Dr. J. Doe") if _redacted else name | trim) -%}
     <section class="entity-facts">
       <dl>
         {%- call fact('practice', 'Practice', dd_class='meta') -%}
-          {%- if affiliations -%}
+          {%- if _redacted -%}
+            {{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}
+          {%- elif affiliations -%}
             {%- for aff in affiliations -%}
               {{ entity_link('organization', aff.org.name, id=aff.org_id) }}
             {%- endfor -%}
@@ -69,7 +81,9 @@
           {%- endif -%}
         {%- endcall %}
         {%- call fact('location', 'Location', dd_class='meta') -%}
-          {%- if locations -%}
+          {%- if _redacted -%}
+            {{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}
+          {%- elif locations -%}
             {%- for loc in locations -%}<span>{{ loc }}</span>{%- endfor -%}
           {%- else -%}
             &mdash;

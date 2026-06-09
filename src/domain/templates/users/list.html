@@ -1,7 +1,12 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/_locked.html" import locked_name -%}
 {%- macro user_card(user) %}
+  {# Redact the username (the only identifying field surfaced in the
+     card chrome) when the viewer lacks network access and isn't this
+     user themselves. The viewer's own row always renders un-redacted. #}
+  {%- set _redacted = not can_access_network and user.id != current_user_id -%}
   {%- set status_subtitle %}
     <span>
       {% if user.is_active %}
@@ -13,8 +18,8 @@
   {%- endset %}
   {%- call card(
     id=user.id,
-    headline_url=entity_url('user', id=user.id),
-    headline=user.username,
+    headline_url=None if _redacted else entity_url('user', id=user.id),
+    headline=locked_name("J. Doe") if _redacted else user.username,
     subtitle=status_subtitle) -%}
     {# Admin actions live in the card footer. viewer_is_admin() reads the
        request-scoped viewer set by handle_list, so user_card stays a

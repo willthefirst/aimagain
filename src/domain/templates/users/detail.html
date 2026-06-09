@@ -1,8 +1,20 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/sections.html" import fact -%}
 {%- from "_shared/_picker.html" import picker -%}
+{%- from "_shared/_locked.html" import locked_name -%}
 {% block resource_label %}Users{% endblock %}
-{% block current_label %}{{ target_user.username }}{% endblock %}
+{# Redact the username H1 when the viewer lacks provider-network access
+   and isn't this user themselves. `is_self` is computed by
+   `handle_get_user_detail`; the self view always renders un-redacted so
+   the viewer can self-manage even before clearing network verification. #}
+{%- set _redacted = not can_access_network and not is_self -%}
+{% block current_label %}
+  {% if _redacted %}
+    {{ locked_name("J. Doe") }}
+  {% else %}
+    {{ target_user.username }}
+  {% endif %}
+{% endblock %}
 {% block actions %}
   {# Toolbar is reserved for Actions (Sign out, admin Deactivate/Delete).
    Favorites is navigation and lives in the body content below. #}
@@ -24,12 +36,19 @@
   {% include "users/_admin_actions.html" %}
 {% endblock %}
 {# User detail: identity facts (email/active) + navigational picker
- (Email, Favorites, Access). The picker species here is a *dispatching
- picker* — each card points OUT to a self-sub-page where the user
- actually manages that surface. Headers + descriptions read as a
- self-explanatory dashboard; whole-card click is the affordance.
- The identity-facts article above stays plain-data (not a picker
- option) because it shows the email value rather than navigating. #}
+ (Email, Clinicians, Organizations, Favorites, Access). The picker
+ species here is a *dispatching picker* — each card points OUT to a
+ self-sub-page or directory where the user actually manages that
+ surface. Headers + descriptions read as a self-explanatory dashboard;
+ whole-card click is the affordance. The identity-facts article above
+ stays plain-data (not a picker option) because it shows the email
+ value rather than navigating.
+
+ Clinicians + Organizations dispatch to the global `/clinicians` and
+ `/organizations` directories. Those collections are no longer
+ read-policy-gated; non-network viewers see them redacted with the
+ viewer's own rows un-redacted (see `_clinician_card.html` and the
+ organizations list/detail templates). #}
 {% block content %}
   {# Private rows (email, active) are gated by `can_view_private`,
    computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
@@ -55,16 +74,22 @@
       </dl>
     </article>
   {% endif %}
-  {# Self-only navigation. Each option dispatches to a sub-page where
-   the user actually manages that surface — Email verification, the
-   private Favorites list, the capability tree. Order is identity →
-   content → access: Email is closest to the identity card above; the
-   capability tree is the most "settings"-flavored and sits last. #}
+  {# Self-only navigation. Each option dispatches to a sub-page or
+   directory where the user actually manages that surface — Email
+   verification, their clinicians, their organizations, the private
+   Favorites list, the capability tree. Order is identity → content →
+   roles → access. #}
   {% if is_self %}
     {{ picker([
         {"href": entity_url('user', id='me') + "/email/form",
     "heading": "Email",
     "description": "Manage your email address and verification."},
+    {"href": entity_url('clinician'),
+    "heading": "Clinicians",
+    "description": "Clinician entries you own."},
+    {"href": entity_url('organization'),
+    "heading": "Organizations",
+    "description": "Organizations you own or represent."},
     {"href": entity_url('user_favorite'),
     "heading": "Favorites",
     "description": "Posts you've saved to revisit."},

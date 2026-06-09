@@ -52,13 +52,20 @@ Usage
 For a card that needs a footer, emit `<footer>...</footer>` inside the
 caller body — Pico will tint it automatically.
 #}
+{# `headline_url=None` renders the headline as plain text rather than an
+   `<a>` — used by redacted list cards where the H3 carries a
+   `locked_name(...)` button instead of a navigable link. #}
 {% macro card(id, headline_url, headline, subtitle=None, data_kind=None) -%}
   <article class="entity-card"
            data-row-id="{{ id }}"
            {% if data_kind %}data-kind="{{ data_kind }}"{% endif %}>
     <header>
       <h3>
-        <a href="{{ headline_url }}">{{ headline }}</a>
+        {%- if headline_url -%}
+          <a href="{{ headline_url }}">{{ headline }}</a>
+        {%- else -%}
+          {{ headline }}
+        {%- endif -%}
       </h3>
       {%- if subtitle %}<small class="meta">{{ subtitle }}</small>{%- endif %}
     </header>

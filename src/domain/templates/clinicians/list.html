@@ -1,5 +1,5 @@
 {% extends "views/list.html" %}
-{%- from "_shared/_clinician_card.html" import clinician_card -%}
+{%- from "_shared/_clinician_card.html" import clinician_card with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {% block actions %}
   {% if is_authenticated %}

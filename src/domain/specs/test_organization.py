@@ -69,6 +69,16 @@ def test_schemas_wired_correctly():
     assert ORGANIZATION_ENTITY.read_schema is OrganizationRead
 
 
+def test_no_read_policy_directory_reachable_for_every_viewer():
+    """`ORGANIZATION_ENTITY` no longer declares `read_policy`. The
+    provider-network gate moved to per-row template redaction (see
+    `organizations/list.html` + `organizations/detail.html`), so
+    `/organizations` is reachable for every authenticated viewer and
+    identifying rows redact at render time when the viewer is neither
+    the owner nor a verified rep."""
+    assert ORGANIZATION_ENTITY.read_policy is None
+
+
 def test_form_extras_path_drives_parent_org_picker():
     """Issue #581: the parent-Org picker is populated via the framework's
     ``form_extras_path`` hook — same shape as Clinician/Program."""

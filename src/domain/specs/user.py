@@ -19,7 +19,6 @@ A1 documented (`api/common -> api/routes`) is resolved.
 from typing import Final
 
 from src.auth_config import current_active_user
-from src.domain.logic.capabilities import NETWORK_GATED_READ_POLICY
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.users.repository import get_user_repository
 from src.domain.logic.users.schema import (
@@ -57,7 +56,10 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     display_label_fn=lambda u: u.username,
     repo_dep=get_user_repository,
     auth_deps=ADMIN_FOR_WRITE,
-    read_policy=NETWORK_GATED_READ_POLICY,
+    # No `read_policy`: directory reachable by any authenticated viewer.
+    # The viewer's own row renders un-redacted; others have identifying
+    # rows replaced with locked placeholders at render time when the
+    # viewer lacks provider-network access.
     audit_snapshot=UserAuditSnapshot,
     private_fields=("email", "is_active"),
     private_field_predicate=is_self_or_admin,

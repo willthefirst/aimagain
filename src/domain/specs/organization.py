@@ -4,7 +4,6 @@ practices, health systems, and solo-practice shells.
 
 from typing import Final
 
-from src.domain.logic.capabilities import NETWORK_GATED_READ_POLICY
 from src.domain.logic.org_representations.repository import (
     OrgRepresentationRepository,
 )
@@ -63,7 +62,9 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
     repo_dep=get_organization_repository,
     auth_deps=AUTHENTICATED,
     auth_policy=OWNER_OR_ADMIN,
-    read_policy=NETWORK_GATED_READ_POLICY,
+    # No `read_policy`: directory reachable by any authenticated viewer;
+    # identifying fields are redacted per-row at render time when the
+    # viewer is neither the owner nor a verified rep.
     create_adapter=OrganizationCreate,
     update_adapter=OrganizationUpdate,
     read_schema=OrganizationRead,

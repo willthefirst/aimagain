@@ -1,31 +1,39 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/_locked.html" import locked_name, locked_field -%}
 {%- from "clinicians/_credential_list.html" import credential_list -%}
 {%- from "clinicians/_credential_row.html" import credential_row -%}
 {%- set view = clinician_card_view(clinician) -%}
+{# When the viewer lacks provider-network access and isn't the owner,
+   redact identifying fields per the `_clinician_card.html` /
+   `posts/_shared/_facts_block.html` pattern. The viewer's own
+   clinicians always render un-redacted so they can self-manage. #}
+{%- set _redacted = not can_access_network and clinician.owner_id != current_user_id -%}
 {% block resource_label %}Clinicians{% endblock %}
-{# H1 is the clinician's name when set; falls back to the primary
-   affiliation's organization name for legacy rows without name data.
-   The stacked affiliation cards below already list every org the
-   clinician practices at, so the org-as-H1 fallback only matters
-   while the name backfill is in progress. #}
+{# H1 — clinician's name when set; falls back to the primary affiliation's
+   organization name for legacy rows without name data. Redacted viewers
+   see a locked-name placeholder rather than the underlying identity. #}
 {% block current_label %}
-  {% if clinician.first_name and clinician.last_name %}
+  {% if _redacted %}
+    {{ locked_name("Dr. J. Doe") }}
+  {% elif clinician.first_name and clinician.last_name %}
     {{ clinician.first_name }} {{ clinician.last_name }}
   {% else %}
     {{ clinician.org.name }}
   {% endif %}
 {% endblock %}
 {% block subtitle %}
-  {% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
-  {%- if verification_status == "verified" %}
-    <small><i class="icon-shield-check"></i>Verified</small>
-  {%- elif verification_status == "needs_review" %}
-    <small><i class="icon-shield-alert"></i>Needs review</small>
-  {%- elif verification_status == "failed" %}
-    <small><i class="icon-shield-x"></i>Verification failed</small>
-  {%- endif %}
+  {% if not _redacted %}
+    {% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
+    {%- if verification_status == "verified" %}
+      <small><i class="icon-shield-check"></i>Verified</small>
+    {%- elif verification_status == "needs_review" %}
+      <small><i class="icon-shield-alert"></i>Needs review</small>
+    {%- elif verification_status == "failed" %}
+      <small><i class="icon-shield-x"></i>Verification failed</small>
+    {%- endif %}
+  {% endif %}
 {% endblock %}
 {% block actions %}
   {# Primary resource actions (Favorite toggle, Edit, Delete) live in
@@ -85,12 +93,22 @@
              data-testid="affiliation-card"
              data-affiliation-org-id="{{ aff.org_id }}">
       <header class="entity-header">
-        <strong>At <a href="{{ aff.org_url }}">{{ aff.org_name }}</a></strong>
-        {%- if aff.full_address %}<small>{{ aff.full_address }}</small>{%- endif %}
+        {% if _redacted %}
+          <strong>At {{ locked_name("Doe Health Group") }}</strong>{# title-case-ignore: placeholder org name #}
+        {% else %}
+          <strong>At <a href="{{ aff.org_url }}">{{ aff.org_name }}</a></strong>
+          {%- if aff.full_address %}<small>{{ aff.full_address }}</small>{%- endif %}
+        {% endif %}
       </header>
       <section class="entity-facts">
         <dl>
-          {%- if aff.full_address %}{{ fact('address', 'Address', aff.full_address) }}{%- endif %}
+          {%- if aff.full_address %}
+            {% if _redacted %}
+              {%- call fact('address', 'Address') %}{{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}{%- endcall %}
+              {% else %}
+                {{ fact('address', 'Address', aff.full_address) }}
+              {% endif %}
+            {%- endif %}
             {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
             {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
             {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
@@ -104,7 +122,10 @@
    PR A) — they belong to the person, not to any single affiliation,
    so they render once below the stacked affiliation cards. The
    list-per-section grammar is the same the old single-card layout
-   used; only the parent card changed. #}
+   used; only the parent card changed. Credentials stay visible under
+   redaction — they describe the role (degree type, license type,
+   certification) rather than the identity (name, address), matching
+   the post-card's "redact identity, keep substantive content" line. #}
       <section class="entity-card">
         <section>
           <h4>Licensures</h4>

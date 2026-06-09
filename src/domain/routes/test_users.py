@@ -219,18 +219,23 @@ async def test_list_shows_reactivate_for_deactivated_user(
 
 
 async def test_get_user_detail_renders(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
-    """GET /users/{id} renders the detail page for an existing user."""
+    """GET /users/{id} renders the detail page for an existing user.
+
+    Uses `superuser_client` so the viewer clears `can_access_network`
+    via the superuser bypass — the username renders un-redacted in the
+    toolbar H1. The non-superuser non-self path (where the H1 carries
+    the `locked_name` placeholder) is pinned separately in
+    `test_get_user_detail_renders_breadcrumb_and_heading`."""
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}")
+    response = await superuser_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert target_username in tree.body.text()
@@ -247,13 +252,12 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     in the breadcrumb — every visible breadcrumb element is an actionable
     link (GOV.UK pattern).
 
-    `logged_in_user` is email-verified but holds neither a verified
-    clinician profile nor a verified org rep, so they fail the user
-    spec's `read_policy.can_read` (provider-network gate). The back
-    affordance therefore renders as a locked popover-trigger
-    (`data-locked-cta=network_unverified`, no `href`) rather than a
-    plain `<a href="/users">` — clicking it would otherwise land on a
-    403. See `ReadPolicy.lock_reason` and `_shared/_breadcrumb.html`.
+    `USER_ENTITY` no longer carries a `read_policy`, so `/users` is
+    reachable for every authenticated viewer and the back affordance
+    is a plain `<a href="/users">` rather than a locked popover.
+    Non-self rows render with `locked_name` in place of the username
+    when the viewer lacks provider-network access — assertion below
+    checks the H1 carries the placeholder, not the real username.
     """
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
@@ -268,14 +272,16 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     assert back is not None
     label = back.css_first("span.breadcrumb-back-label")
     assert label is not None and label.text(strip=True) == "Users"
-    # Locked: no href, data-locked-cta wired to the network reason.
-    assert "href" not in back.attributes
-    assert back.attributes.get("aria-disabled") == "true"
-    assert back.attributes.get("data-locked-cta") == "network_unverified"
-    # Current item lives in the toolbar <h1>, not the breadcrumb.
+    # Reachable: plain href, no locked-popover wiring.
+    assert back.attributes.get("href") == "/users"
+    assert "data-locked-cta" not in back.attributes
+    # Current item lives in the toolbar <h1>, redacted to the placeholder
+    # because `logged_in_user` lacks `can_access_network` and isn't the
+    # target.
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None
-    assert h1.text(strip=True) == target_username
+    assert target_username not in h1.text(strip=True)
+    assert "J. Doe" in h1.text(strip=True)
 
 
 async def test_detail_hides_private_fields_from_strangers(
@@ -443,19 +449,26 @@ async def test_detail_hides_admin_actions_for_non_admin(
     assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is None
 
 
-async def test_detail_no_inline_clinicians_section(
+async def test_detail_picker_includes_clinicians_and_organizations(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The inline Clinicians section was removed from the user detail page —
-    clinicians are accessible via /users/me/clinicians instead."""
+    """`/users/me`'s self-only picker dispatches to the global Clinician
+    and Organization directories — both collections are now open to
+    every authenticated viewer (identity rows redact per-row at render
+    time), so the picker links straight at `/clinicians` and
+    `/organizations` rather than at a `/users/me/<sub>` subresource."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert "Clinicians" not in headings
-    return None
+    assert "Clinicians" in headings
+    assert "Organizations" in headings
+    clinicians_link = tree.css_first("article.picker-option a[href$='/clinicians']")
+    assert clinicians_link is not None
+    orgs_link = tree.css_first("article.picker-option a[href$='/organizations']")
+    assert orgs_link is not None
 
 
 async def test_users_me_access_card_links_to_access_page(

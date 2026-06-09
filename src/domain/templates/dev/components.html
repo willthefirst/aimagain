@@ -16,7 +16,7 @@ it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/icon_list.html" import icon_list -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
-{%- from "_shared/_clinician_card.html" import clinician_card -%}
+{%- from "_shared/_clinician_card.html" import clinician_card with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- from "_shared/_capability_requirements.html" import capability_requirements_panel -%}
