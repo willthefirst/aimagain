@@ -16,8 +16,16 @@
       {% endif %}
     </header>
     <footer>
+      {# On success, route the user into the clinician-create flow — the
+         intended next step after confirming email. The two other states
+         (already-verified / link-failed) still bounce to /users/me, where
+         the user can resend or self-manage. #}
       <p>
-        <a href="{{ entity_url('user', id='me') }}" role="button">Go to your profile</a>
+        {% if status == "success" %}
+          <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label("clinician") }}</a>
+        {% else %}
+          <a href="{{ entity_url('user', id='me') }}" role="button">Go to your profile</a>
+        {% endif %}
       </p>
     </footer>
   </section>
