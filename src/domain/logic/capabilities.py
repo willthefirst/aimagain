@@ -27,6 +27,14 @@ non-ORM Actor-like object) keep working without constructing real
 SQLAlchemy rows. Templates and routes both call into the same surface,
 so a visible affordance and its server-side gate can't disagree.
 
+Capability trees compose from a small vocabulary of reusable leaves
+(`_email_leaf`, `_clinician_verified_leaf`, `_org_rep_any_leaf`) — each
+the single source of truth for that leaf's `(label_active, label_done,
+fix_url)` triple. New `check_*` functions should build their tree from
+existing leaf factories rather than re-declaring inline `Condition`
+nodes, so the locked-affordance copy and deep-link for a given fact
+stay identical across every capability that references it.
+
 Fix URLs (`fix_url_for`, `reason_meta`) point at `/users/me` and its
 subresource paths — the profile hub at `/profile` has been removed.
 """
@@ -197,6 +205,49 @@ def any_org_rep_verified(user: Any) -> bool:
     return bool(_verified_active_reps(user))
 
 
+# ── Leaf factories ────────────────────────────────────────────────────────
+#
+# Each capability tree composes the same small vocabulary of boolean
+# leaves: "email verified", "Claim A holder", "Claim B holder for some
+# org". The factories below are the single source of truth for each
+# leaf's `(label_active, label_done, fix_url)` triple — so when a
+# second capability check reuses a leaf, the locked-affordance copy
+# and the deep-link can't drift between them.
+#
+# Naming convention: `_<predicate>_leaf(user) -> Condition`. They are
+# module-private; the public surface stays the top-level predicates
+# (`email_verified` / `clinician_verified` / `any_org_rep_verified`)
+# and the `check_*` functions that compose leaves into trees.
+
+
+def _email_leaf(user: Any) -> Condition:
+    return Condition(
+        label_active="Verify your email",
+        label_done="Email verified",
+        met=email_verified(user),
+        fix_url="/users/me/email/form",
+    )
+
+
+def _clinician_verified_leaf(user: Any) -> Condition:
+    clinicians = getattr(user, "clinicians", None) or ()
+    return Condition(
+        label_active="Verify a clinician",
+        label_done="Clinician verified",
+        met=any(getattr(c, "clinician_verified", False) for c in clinicians),
+        fix_url="/clinicians/form",
+    )
+
+
+def _org_rep_any_leaf(user: Any) -> Condition:
+    return Condition(
+        label_active="Verify your organization",
+        label_done="Organization verified",
+        met=bool(_verified_active_reps(user)),
+        fix_url="/organizations/form",
+    )
+
+
 def check_network(user: Any) -> CapabilityCheck:
     """Structured capability check for full-feed read access.
 
@@ -204,11 +255,6 @@ def check_network(user: Any) -> CapabilityCheck:
     `ever_verified_at` retention is intentionally excluded — access
     reverts immediately when the underlying claim lapses.
     """
-    _email_met = email_verified(user)
-    clinicians = getattr(user, "clinicians", None) or ()
-    _clin_met = any(getattr(c, "clinician_verified", False) for c in clinicians)
-    _org_met = bool(_verified_active_reps(user))
-
     return CapabilityCheck(
         name="provider-network",
         description="See full provider details and reach out directly.",
@@ -216,28 +262,13 @@ def check_network(user: Any) -> CapabilityCheck:
             label_active="Provider network",
             label_done="Provider network",
             children=(
-                Condition(
-                    label_active="Verify your email",
-                    label_done="Email verified",
-                    met=_email_met,
-                    fix_url="/users/me/email/form",
-                ),
+                _email_leaf(user),
                 Gate(
                     label_active="Verify a clinician or organization",
                     label_done="Clinician or organization verified",
                     children=(
-                        Condition(
-                            label_active="Verify a clinician",
-                            label_done="Clinician verified",
-                            met=_clin_met,
-                            fix_url="/clinicians/form",
-                        ),
-                        Condition(
-                            label_active="Verify your organization",
-                            label_done="Organization verified",
-                            met=_org_met,
-                            fix_url="/organizations/form",
-                        ),
+                        _clinician_verified_leaf(user),
+                        _org_rep_any_leaf(user),
                     ),
                 ),
             ),
