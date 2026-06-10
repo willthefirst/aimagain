@@ -38,7 +38,6 @@ from src.domain.models.enums import (
     INSURANCE_CARRIER_LABELS,
     INSURANCE_CARRIERS,
     LICENSE_TYPES,
-    LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
 
@@ -114,11 +113,14 @@ def test_update_requires_at_least_one_field(model_cls):
         model_cls()
 
 
-def test_clinician_update_accepts_single_field():
-    new_org = uuid.uuid4()
-    upd = ClinicianUpdate(org_id=new_org)
-    assert upd.org_id == new_org
-    assert upd.location is None
+def test_clinician_update_accepts_first_name_only():
+    """Person-level partial patch — the canonical "rename the clinician"
+    PATCH that the edit form sends after #1308 dropped per-affiliation
+    fields from this schema."""
+    upd = ClinicianUpdate(first_name="Janet")
+    assert upd.first_name == "Janet"
+    assert upd.last_name is None
+    assert upd.npi is None
 
 
 def test_clinician_update_accepts_npi_patch():
@@ -131,14 +133,23 @@ def test_clinician_update_rejects_malformed_npi():
         ClinicianUpdate(npi="abc")
 
 
-def test_clinician_update_accepts_carrier_list_patch():
-    p = ClinicianUpdate(in_network_carriers=["aetna"])
-    assert p.in_network_carriers == ["aetna"]
-
-
-def test_clinician_update_accepts_empty_carrier_list_patch():
-    p = ClinicianUpdate(in_network_carriers=[])
-    assert p.in_network_carriers == []
+def test_clinician_update_rejects_per_affiliation_fields():
+    """Per-affiliation posture (location, availability, insurance,
+    cost, org_id) is edited on `ClinicianAffiliation`, not on the
+    person — extra="forbid" rejects them here so a stale client
+    fails loudly instead of having its writes silently dropped."""
+    for stray_kwarg in (
+        {"org_id": uuid.uuid4()},
+        {"location_city": "Brooklyn"},
+        {"in_person_sessions": "yes"},
+        {"virtual_sessions": "no"},
+        {"in_network_carriers": ["aetna"]},
+        {"accepts_out_of_network": True},
+        {"sliding_scale": True},
+        {"cost": "$150"},
+    ):
+        with pytest.raises(ValidationError):
+            ClinicianUpdate(first_name="Janet", **stray_kwarg)
 
 
 # --- ClinicianRead ------------------------------------------------------
@@ -342,7 +353,6 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         (ClinicianLicensureUpdate, "issuing_state", US_STATES),
         (ClinicianEducationUpdate, "education_type", EDUCATION_TYPES),
         (ClinicianCertificationUpdate, "certification_type", CERTIFICATION_TYPES),
-        (ClinicianUpdate, "in_person_sessions", LOCATION_AVAILABILITY_OPTIONS),
     ],
 )
 def test_schema_literals_match_model_tuples(model_cls, field, expected):
