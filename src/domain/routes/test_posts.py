@@ -31,6 +31,7 @@ from src.domain.models import Clinician, Organization, Post, Program
 from src.domain.models.org_representations.org_representation import OrgRepresentation
 from tests.helpers import (
     create_test_user,
+    make_clinician,
     make_clinician_with_org,
     make_intake_detail,
     make_opening_detail,
@@ -525,6 +526,82 @@ async def test_create_form_preselects_first_clinician(
     assert str(affiliation_id) in (
         options[0].attributes.get("value") or ""
     ), "selected option value should be the first affiliation's id"
+
+
+@pytest.mark.parametrize("kind", ["referral", "clinician_opening"])
+async def test_create_form_picker_labels_person_first_with_org(
+    kind: str,
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The practice picker labels each affiliation **person first, org as
+    disambiguator** — `"<First Last> · <Org Name>"` when the affiliation
+    points at an organization. The label was just `<Org Name>` before
+    #1308 — that erased the person entirely when one user owned multiple
+    clinicians, and broke entirely once solo clinicians (whose
+    affiliation has `org_id` NULL) became a first-class state."""
+    clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id,
+        practice_name="Brooklyn Therapy",
+        first_name="Jane",
+        last_name="Smith",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+    affiliation_id = clinician.clinician_affiliations[0].id
+
+    response = await authenticated_client.get(f"/posts/form?kind={kind}")
+    assert response.status_code == 200
+
+    tree = HTMLParser(response.text)
+    select = tree.css_first(f'select[name="{_CLINICIAN_FIELD[kind]}"]')
+    assert select is not None
+    option = next(
+        o
+        for o in select.css("option")
+        if o.attributes.get("value") == str(affiliation_id)
+    )
+    assert option.text(strip=True) == "Jane Smith · Brooklyn Therapy"
+
+
+@pytest.mark.parametrize("kind", ["referral", "clinician_opening"])
+async def test_create_form_picker_labels_solo_with_name_only(
+    kind: str,
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Solo clinician: the affiliation row has `org_id` NULL — the label
+    is just the clinician's name (no `" · …"` suffix), because there is
+    no organizational entity to disclose."""
+    from src.domain.models import ClinicianAffiliation
+
+    clinician = make_clinician(
+        owner_id=logged_in_user.id,
+        first_name="Janet",
+        last_name="Solo",
+    )
+    # Force a stub affiliation with no org — mirrors the PR 2 stub shape.
+    clinician.clinician_affiliations = [ClinicianAffiliation(clinician=clinician)]
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+    affiliation_id = clinician.clinician_affiliations[0].id
+
+    response = await authenticated_client.get(f"/posts/form?kind={kind}")
+    assert response.status_code == 200
+
+    tree = HTMLParser(response.text)
+    select = tree.css_first(f'select[name="{_CLINICIAN_FIELD[kind]}"]')
+    assert select is not None
+    option = next(
+        o
+        for o in select.css("option")
+        if o.attributes.get("value") == str(affiliation_id)
+    )
+    assert option.text(strip=True) == "Janet Solo"
 
 
 # --- Anonymization gate (can_access_network) ---------------------------------

@@ -49,18 +49,22 @@ Field order:
   <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
     <input type="hidden" name="kind" value="clinician_opening" />
     {# Practice picker. A Clinician may carry multiple Affiliations
-     (clinician × org practice-role rows); the dropdown labels each
-     option by the affiliation's org name so a clinician who works at
-     two practices sees both. Each option's value is the *affiliation*
-     id — the server derives the opening's `clinician_id` from it
-     (`_resolve_affiliation_context`), so a two-affiliation clinician's
-     options no longer collapse onto one value. Uses
-     `composite_select_field` because the label is sourced from a nested
-     `affiliations` loop — mirrors `_form_referral.html`'s picker. #}
+     (clinician × org practice-role rows). The label is **person first,
+     org as disambiguator when present** — "Jane Smith" for a solo
+     clinician whose affiliation has `org_id` NULL, "Jane Smith · Acme
+     Counseling" when the affiliation points at an org. Each option's
+     value is the *affiliation* id — the server derives the opening's
+     `clinician_id` from it (`_resolve_affiliation_context`), so a
+     two-affiliation clinician's options no longer collapse onto one
+     value. Uses `composite_select_field` because the label is sourced
+     from a nested `affiliations` loop — mirrors `_form_referral.html`'s
+     picker. #}
     {%- set _practices = namespace(opts=[]) -%}
     {%- for c in current_user.clinicians -%}
+      {%- set _name = (c.first_name ~ " " ~ c.last_name)|trim -%}
       {%- for aff in c.clinician_affiliations -%}
-        {%- set _practices.opts = _practices.opts + [(aff.id, aff.org.name)] -%}
+        {%- set _label = (_name ~ " · " ~ aff.org.name) if aff.org else _name -%}
+        {%- set _practices.opts = _practices.opts + [(aff.id, _label)] -%}
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Which practice?", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
