@@ -1780,6 +1780,114 @@ async def test_get_clinician_openings_404_for_missing_clinician(
     assert response.status_code == 404
 
 
+# --- Sub-resource list pages (#1336) ------------------------------------
+
+
+@pytest.mark.parametrize(
+    "collection",
+    ["clinician_affiliations", "licensures", "educations", "certifications"],
+)
+async def test_get_clinician_subresource_list_responds_200(
+    collection: str,
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each clinician sub-resource has its own `GET /clinicians/{id}/<sub>`
+    page (`mount_related_list` from #1336). The pages render the existing
+    inline add-form + per-row delete affordances for that sub-resource —
+    same data the PR 2 picker on `/clinicians/{id}` deep-links into."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/{collection}"
+    )
+    assert response.status_code == 200, response.text
+
+
+async def test_get_clinician_licensures_renders_existing_rows(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """An existing licensure on the clinician renders as a `.credential-row`
+    on the dedicated list page, with a delete button pointing at the
+    standard `DELETE /clinicians/{id}/licensures/{lic_id}` URL."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+    licensure = make_clinician_licensure(
+        clinician_id=clinician_id, license_type="lcsw", license_number="L-9999"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
+        await session.refresh(licensure)
+    lic_id = licensure.id
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}/licensures")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    delete = tree.css_first(
+        f'button[hx-delete="/clinicians/{clinician_id}/licensures/{lic_id}"]'
+    )
+    assert delete is not None
+    # Inline add-form posts to the same collection URL.
+    add_form = tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/licensures"]')
+    assert add_form is not None
+    assert add_form.css_first('select[name="license_type"]') is not None
+
+
+async def test_get_clinician_affiliations_carries_org_picker(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The affiliations list's inline add-practice form needs an Org
+    `<select>` populated with the viewer's owned Orgs. The handler pulls
+    `orgs` into context the same way the clinician edit page's
+    `form_extras` does."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    await _seed_org(
+        db_test_session_manager, owner_id=logged_in_user.id, name="My Practice LLC"
+    )
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/clinician_affiliations"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    add_form = tree.css_first(
+        f'form[hx-post="/clinicians/{clinician_id}/clinician_affiliations"]'
+    )
+    assert add_form is not None
+    org_select = add_form.css_first('select[name="org_id"]')
+    assert org_select is not None
+    option_labels = [o.text(strip=True) for o in org_select.css("option")]
+    assert any("My Practice LLC" in lbl for lbl in option_labels)
+
+
+@pytest.mark.parametrize(
+    "collection",
+    ["clinician_affiliations", "licensures", "educations", "certifications"],
+)
+async def test_get_clinician_subresource_list_404_for_missing_clinician(
+    collection: str,
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """A nonexistent clinician id 404s for every sub-resource list page,
+    same shape as the existing openings list (mount_related_list runs
+    the parent lookup before the handler)."""
+    response = await authenticated_client.get(
+        f"/clinicians/{uuid.uuid4()}/{collection}"
+    )
+    assert response.status_code == 404
+
+
 async def test_patch_clinician_npi_change_reruns_verification(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

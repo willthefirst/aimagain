@@ -1,0 +1,30 @@
+{# Sub-resource list page — clinician's ClinicianEducation rows.
+
+Reached via `GET /clinicians/{clinician_id}/educations`. Breadcrumb is
+auto-injected by `mount_related_list` because
+`CLINICIAN_ENTITY.display_label_fn` is set.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/form_fields.html" import text_field, select_field -%}
+{%- from "_shared/forms.html" import inline_add_form -%}
+{%- from "clinicians/_credential_list.html" import credential_list -%}
+{%- from "clinicians/_credential_row.html" import credential_row -%}
+{% block resource_label %}Education{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(edu) credential_list(rows, "No education entries yet.") %}
+      {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
+            [edu.institution, edu.month_completed],
+            delete_url=entity_url('clinician', id=clinician.id) ~ "/educations/" ~ edu.id|string,
+      delete_confirm="Remove this education entry?",
+      ) }}
+    {% endcall %}
+  </section>
+  <section>
+    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/educations", "Add education", "Add education") %}
+      {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
+      {{ text_field("institution", "Institution", maxlength=200) }}
+      {{ text_field("month_completed", "Month completed", required=false, type="month") }}
+    {% endcall %}
+  </section>
+{% endblock %}

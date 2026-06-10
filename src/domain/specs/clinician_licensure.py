@@ -26,6 +26,7 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.models import ClinicianLicensure
 from src.domain.specs._credential import make_clinician_credential_entity
+from src.domain.specs.clinician import _clinician_licensures_list_redirect
 from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import EntitySpec, StateAxis
 
@@ -59,6 +60,7 @@ LICENSURE_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     read_schema=ClinicianLicensureRead,
     create_adapter=ClinicianLicensureCreate,
     update_adapter=ClinicianLicensureUpdate,
+    mutation_redirect=_clinician_licensures_list_redirect,
     state_axes=(
         StateAxis(
             name="attestation",
