@@ -20,16 +20,19 @@ from src.domain.logic import capabilities
 def _user(
     *,
     is_verified: bool = False,
+    is_superuser: bool = False,
     clinicians: list | None = None,
     org_representations: list | None = None,
+    programs: list | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
-        is_superuser=False,
+        is_superuser=is_superuser,
         username="test",
         is_verified=is_verified,
         clinicians=clinicians or [],
         org_representations=org_representations or [],
+        programs=programs or [],
     )
 
 
@@ -594,6 +597,19 @@ def test_org_rep_any_leaf_met_with_verified_rep():
     assert capabilities._org_rep_any_leaf(user).met is True
 
 
+def test_owns_program_leaf_canonical_shape():
+    leaf = capabilities._owns_program_leaf(_user(is_verified=True))
+    assert leaf.label_active == "Add a program"
+    assert leaf.label_done == "Program added"
+    assert leaf.fix_url == "/programs/form"
+    assert leaf.met is False
+
+
+def test_owns_program_leaf_met_with_any_program():
+    user = _user(is_verified=True, programs=[SimpleNamespace(id=uuid4())])
+    assert capabilities._owns_program_leaf(user).met is True
+
+
 # ---------- check_network -------------------------------------------
 
 
@@ -685,6 +701,90 @@ def test_check_network_label_and_description():
     check = capabilities.check_network(_user())
     assert check.tree.label_active == "Provider network"
     assert check.description == "See full provider details and reach out directly."
+
+
+# ---------- check_program_intake ------------------------------------------
+
+
+def _intake_ready_user():
+    """A user who passes every leaf of `check_program_intake`."""
+    org = _org(org_verified=True)
+    return _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+        programs=[SimpleNamespace(id=uuid4(), org_id=org.id)],
+    )
+
+
+def test_check_program_intake_anon_denied():
+    check = capabilities.check_program_intake(None)
+    assert check.granted is False
+    assert check.name == "program-intake"
+
+
+def test_check_program_intake_tree_is_flat_and_three_leaves():
+    """Tree is a Bundle of three Condition leaves (email AND org-rep AND
+    program). No nested Gate — the picker uses the structure to render
+    a one-step-per-row checklist."""
+    check = capabilities.check_program_intake(_user())
+    assert check.tree.__class__.__name__ == "Bundle"
+    assert len(check.tree.children) == 3
+    assert all(c.__class__.__name__ == "Condition" for c in check.tree.children)
+
+
+def test_check_program_intake_email_unverified_blocks():
+    """Email is the floor — even with org rep + program, an unverified
+    email keeps the tile locked. The first leaf is the email Condition."""
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=False,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+        programs=[SimpleNamespace(id=uuid4())],
+    )
+    check = capabilities.check_program_intake(user)
+    assert check.granted is False
+    assert check.tree.children[0].label_done == "Email verified"
+    assert check.tree.children[0].met is False
+
+
+def test_check_program_intake_missing_org_rep_blocks():
+    """Email + program but no verified org rep → middle leaf unmet."""
+    user = _user(is_verified=True, programs=[SimpleNamespace(id=uuid4())])
+    check = capabilities.check_program_intake(user)
+    assert check.granted is False
+    assert check.tree.children[1].met is False
+
+
+def test_check_program_intake_missing_program_blocks():
+    """Email + verified org rep but no program → trailing leaf unmet,
+    and its fix URL points at the create-program form."""
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    check = capabilities.check_program_intake(user)
+    assert check.granted is False
+    program_leaf = check.tree.children[2]
+    assert program_leaf.met is False
+    assert program_leaf.fix_url == "/programs/form"
+
+
+def test_check_program_intake_all_three_leaves_grants():
+    check = capabilities.check_program_intake(_intake_ready_user())
+    assert check.granted is True
+
+
+def test_can_post_program_intake_picker_superuser_bypass():
+    """Symmetric with `can_access_network` — admins post any kind even
+    without the underlying leaves."""
+    admin = _user(is_verified=False, is_superuser=True)
+    assert capabilities.can_post_program_intake_picker(admin) is True
+
+
+def test_can_post_program_intake_picker_tracks_check():
+    assert capabilities.can_post_program_intake_picker(None) is False
+    assert capabilities.can_post_program_intake_picker(_intake_ready_user()) is True
 
 
 # ---------- UUID type sanity for claim_state.b ----------------------------

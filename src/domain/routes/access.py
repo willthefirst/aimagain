@@ -17,6 +17,7 @@ access_router = APIRouter(prefix="/users/me/access", tags=["access"])
 
 _CHECKS = {
     "provider-network": capabilities.check_network,
+    "program-intake": capabilities.check_program_intake,
 }
 
 mount_capability_routes(access_router, _CHECKS)
