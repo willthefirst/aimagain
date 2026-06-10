@@ -87,8 +87,13 @@ def _affiliation_kwargs(rng: SeededRandom, index: int) -> dict:
             else state
         ),  # placeholder; the runner override below uses CITIES_BY_STATE
         "location_zip": _zip_for_state(rng, state),
-        "in_person_sessions": in_person,
-        "virtual_sessions": virtual,
+        # `in_person_sessions` / `virtual_sessions` are nullable: a stub
+        # affiliation created at NPI verify time hasn't been asked yet.
+        # ~20% NULL each so the nullable-coverage test (and any consumer
+        # that reads through `clinician.in_person_sessions`) hits both
+        # branches.
+        "in_person_sessions": None if rng.bool(0.2) else in_person,
+        "virtual_sessions": None if rng.bool(0.2) else virtual,
         "accepts_out_of_network": rng.bool(0.5),
         "in_network_carriers": rng.nullable_subset(
             INSURANCE_CARRIERS, min_size=0, max_size=6, p_empty=0.25
