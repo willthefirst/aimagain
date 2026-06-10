@@ -73,8 +73,8 @@ class Clinician(BaseModel):
 
     # Denormalized cache of Claim A. Recomputed by
     # `recompute_clinician_claim(...)` on every transition that changes
-    # `npi_match_status` or any `ClinicianLicensure.status`. Lets the
-    # capabilities predicate run without joining licensures every read.
+    # `npi_match_status`. Lets the capabilities predicate run without
+    # re-reading the column on every check.
     clinician_verified = Column(
         Boolean, nullable=False, server_default="0", default=False
     )
