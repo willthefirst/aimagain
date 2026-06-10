@@ -22,21 +22,24 @@
    `entity_form_url('organization')` first. #}
   <form hx-patch="{{ entity_url('clinician', id=clinician.id) }}">
     {# Person-level fields (name, NPI) — these live on the Clinician row,
-     so they follow the person across affiliations. #}
+     so they follow the person across affiliations. First name, last
+     name, and NPI are the only required fields on a Clinician; every
+     per-affiliation field below is optional so a solo practitioner can
+     leave the practice/availability/insurance sections empty. #}
     {% call form_section("Clinician") %}
       {{ text_field("first_name", "First name", current=clinician.first_name, maxlength=120) }}
       {{ text_field("last_name", "Last name", current=clinician.last_name, maxlength=120) }}
-      {{ text_field("npi", "NPI", current=clinician.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
+      {{ text_field("npi", "NPI", current=clinician.npi, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
     {% call form_section("Practice location") %}
-      {{ entity_select_field("org_id", "Organization", orgs, current=clinician.org_id, help=org_picker_help() ) }}
-      {{ text_field("location_city", "City", current=clinician.location_city, maxlength=120) }}
-      {{ select_field("location_state", "State", US_STATES, current=clinician.location_state) }}
-      {{ text_field("location_zip", "ZIP", current=clinician.location_zip, pattern="\\d{5}", maxlength=5) }}
+      {{ entity_select_field("org_id", "Organization", orgs, current=clinician.org_id, required=false, blank_label="(no organization)", help=org_picker_help() ) }}
+      {{ text_field("location_city", "City", current=clinician.location_city, required=false, maxlength=120) }}
+      {{ select_field("location_state", "State", US_STATES, current=clinician.location_state, required=false, placeholder=true) }}
+      {{ text_field("location_zip", "ZIP", current=clinician.location_zip, required=false, pattern="\\d{5}", maxlength=5) }}
     {% endcall %}
     {% call form_section("Session availability") %}
-      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=clinician.in_person_sessions) }}
-      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=clinician.virtual_sessions) }}
+      {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=clinician.in_person_sessions, required=false, placeholder=true) }}
+      {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=clinician.virtual_sessions, required=false, placeholder=true) }}
     {% endcall %}
     {# Insurance & payment. Empty carrier list = no in-network. #}
     {% call form_section("Insurance & payment") %}
