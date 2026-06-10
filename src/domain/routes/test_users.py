@@ -315,21 +315,21 @@ async def test_detail_hides_private_fields_from_strangers(
     assert "<dt>Verified</dt>" not in body
 
 
-async def test_detail_shows_email_but_hides_admin_fields_for_self(
+async def test_detail_hides_identity_facts_for_self(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
     """The user viewing their own profile (via /users/me or
-    /users/<own-id>) sees their email but NOT the Active or Verified
-    rows — those are admin signals (#597). Admins viewing someone
-    else still see all three (see
+    /users/<own-id>) sees no top-level identity facts. Email lives in
+    the Email card (which links to /users/me/email/form); Active and
+    Verified are admin signals not shown on the self-view (#597).
+    Admins viewing someone else still see Email + Active (see
     ``test_detail_shows_private_fields_to_admin``)."""
     response = await authenticated_client.get("/users/me")
 
     assert response.status_code == 200
     body = response.text
-    assert logged_in_user.email in body
-    assert "<dt>Email</dt>" in body
+    assert "<dt>Email</dt>" not in body
     assert "<dt>Active</dt>" not in body
     assert "<dt>Verified</dt>" not in body
 
