@@ -38,10 +38,23 @@
       </header>
       {% if provider_url %}
         <p>
+          {# `target="_blank"` opens a new tab so the user doesn't lose
+             this page (and the Resend fallback below) when they pop
+             out to their inbox. On iOS, mobile Safari won't reliably
+             hand off `https://mail.google.com/...` to the Gmail app
+             when target="_blank" triggers window.open() — so when the
+             provider publishes a native URL scheme (`provider_ios_url`,
+             set by `email_provider_search_url`), an inline `onclick`
+             swaps the href to that scheme on iPhone/iPad UAs. Loses
+             the inbox search filter, but the verification email is
+             the most recent so it sits at the top anyway. #}
           <a href="{{ provider_url }}"
              target="_blank"
              rel="noopener"
-             role="button">Open {{ provider_label }}</a>
+             role="button"
+             {%- if provider_ios_url %}
+             onclick="if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){this.href='{{ provider_ios_url }}';}"
+             {%- endif %}>Open {{ provider_label }}</a>
         </p>
         <p>
           <small>We'll search your inbox for messages from <strong>{{ from_address }}</strong>.</small>
