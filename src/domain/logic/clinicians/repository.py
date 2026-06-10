@@ -51,34 +51,48 @@ class ClinicianRepository(BaseRepository):
         Never-verified clinicians are filtered out so the directory
         stays a curated index of verified providers — the chrome's
         capability gates already prevent them from posting, and listing
-        them would surface noise.
+        them would surface noise. **Exception:** the viewer's *own*
+        clinician rows are always included regardless of verification
+        state. A brand-new user's in-flight clinician (sitting in the
+        NPPES queue, not yet ``clinician_verified``) must remain
+        visible to its creator so they can find and edit it, even on
+        the unfiltered `/clinicians` page. The redaction layer keeps
+        other viewers from leaking the identity — the universe never
+        narrows for the owner.
 
         ``owner="me"`` scopes results to the viewer's own rows
-        (``Clinician.owner_id == self._requesting_user.id``) and
-        bypasses the verified-only directory filter so a brand-new
-        viewer can see the row they just created before its NPPES
-        verification settles. The viewer is the same id
+        (``Clinician.owner_id == self._requesting_user.id``) and drops
+        the verified-only filter entirely — useful when the picker
+        deep-links here. The viewer is the same id
         ``BaseRepository._requesting_user`` carries — stamped by
         ``handle_list`` so every list mount can resolve viewer-relative
         filters. Any other ``owner`` value is silently ignored (the
         only supported sentinel today).
         """
-        owner_self = (
-            owner == "me"
-            and self._requesting_user is not None
+        viewer_id = (
+            self._requesting_user.id
+            if self._requesting_user is not None
             and getattr(self._requesting_user, "id", None) is not None
+            else None
         )
+        owner_self = owner == "me" and viewer_id is not None
         if owner_self:
-            stmt = select(Clinician).filter(
-                Clinician.owner_id == self._requesting_user.id
-            )
+            stmt = select(Clinician).filter(Clinician.owner_id == viewer_id)
         else:
-            stmt = select(Clinician).filter(
-                sa.or_(
-                    Clinician.clinician_verified.is_(True),
-                    Clinician.ever_verified_at.is_not(None),
-                )
+            # Default directory: verified-only. The viewer's own rows
+            # bypass the gate so brand-new in-flight clinicians stay
+            # visible to their creator while NPPES verification is in
+            # progress.
+            verified_or_own = sa.or_(
+                Clinician.clinician_verified.is_(True),
+                Clinician.ever_verified_at.is_not(None),
             )
+            if viewer_id is not None:
+                verified_or_own = sa.or_(
+                    verified_or_own,
+                    Clinician.owner_id == viewer_id,
+                )
+            stmt = select(Clinician).filter(verified_or_own)
         if license_type or issuing_state:
             stmt = stmt.join(
                 ClinicianLicensure,
