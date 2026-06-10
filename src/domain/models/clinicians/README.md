@@ -28,3 +28,9 @@ This `Clinician` class is the **directory entry**: the row that `/clinicians/...
 ## Why a separate cluster
 
 A `Clinician` is *the person*; an `ClinicianAffiliation` is *the person's role at one practice*. Separating them lets credentials live with the person (so adding a second affiliation doesn't fragment a license list) and lets per-(clinician × org) attributes vary independently across affiliations.
+
+## Per-affiliation proxy setters require a primary affiliation
+
+`Clinician` exposes proxy `@property`/setter pairs for the per-affiliation columns (`org_id`, `location_city`/`_state`/`_zip`, `in_person_sessions`, `virtual_sessions`, `accepts_out_of_network`, `in_network_carriers`, `sliding_scale`, `cost` — the `_PER_ROLE_ATTRS` tuple). They proxy reads from / writes to `primary_clinician_affiliation` (`clinician_affiliations[0]`). When no affiliation exists the **setters raise `ValueError`** rather than silently dropping the write — this catches the prod regression where an unaffiliated clinician's edit form returned 200 but persisted nothing. The readers still return `None` for backwards compatibility with templates that may render an unaffiliated row.
+
+Auto-creation of a primary affiliation for solo clinicians lives in the verification handler (see `src/domain/logic/clinicians/handlers.py`), not in the setter — silently materializing rows from inside a setattr would re-introduce the same kind of invisible behavior we're trying to surface.
