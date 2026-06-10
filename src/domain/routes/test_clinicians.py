@@ -928,23 +928,21 @@ async def test_patch_clinician_updates_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """PATCH /clinicians/{id} can reassign the Clinician to a different Org
-    (``org_id``) or change other practice fields like location. Editing
-    the practice's *name* now happens on the Organization itself (#524)."""
+    """``PATCH /clinicians/{id}`` rewrites the person-level fields
+    (`first_name`, `last_name`, `npi`). Practice posture (location,
+    availability, insurance, cost, org) lives on `ClinicianAffiliation`
+    and is patched via its own endpoint after #1308."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Old Name"
-    )
-    new_org_id = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="New Org"
     )
 
     response = await authenticated_client.patch(
         f"/clinicians/{clinician_id}",
-        data={"org_id": str(new_org_id)},
+        data={"first_name": "Janet"},
     )
 
     assert response.status_code == 200
-    assert response.json()["org_id"] == str(new_org_id)
+    assert response.json()["first_name"] == "Janet"
     assert response.headers["HX-Redirect"] == f"/clinicians/{clinician_id}/form"
 
     async with db_test_session_manager() as session:
@@ -957,7 +955,7 @@ async def test_patch_clinician_updates_fields(
             .scalars()
             .first()
         )
-        assert refreshed.org_id == new_org_id
+        assert refreshed.first_name == "Janet"
 
 
 async def test_patch_clinician_returns_403_if_not_owner(
@@ -968,40 +966,33 @@ async def test_patch_clinician_returns_403_if_not_owner(
     _, other_clinician_id = await _seed_other_user_with_clinician(
         db_test_session_manager
     )
-    new_org_id = await _seed_org(
-        db_test_session_manager, owner_id=logged_in_user.id, name="Hijack Org"
-    )
 
     response = await authenticated_client.patch(
         f"/clinicians/{other_clinician_id}",
-        data={"org_id": str(new_org_id)},
+        data={"first_name": "Hijacked"},
     )
     assert response.status_code == 403
 
 
-async def test_patch_clinician_rejects_reassign_to_unowned_org(
+async def test_patch_clinician_rejects_per_affiliation_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A PATCH that swaps ``org_id`` to another user's Org is forbidden
-    — same boundary as create (#524)."""
-    other = create_test_user(username=f"other-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-    other_org_id = await _seed_org(
-        db_test_session_manager, owner_id=other.id, name="Not Mine"
-    )
+    """`ClinicianUpdate` is extra="forbid"; per-affiliation fields
+    (`org_id`, location, sessions, insurance, cost) are no longer
+    accepted on `PATCH /clinicians/{id}` — they belong on the
+    affiliation's own PATCH. A stale client that sends them gets a
+    422, not a silent drop."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
 
     response = await authenticated_client.patch(
         f"/clinicians/{clinician_id}",
-        data={"org_id": str(other_org_id)},
+        data={"first_name": "Janet", "in_person_sessions": "yes"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 # --- Clinician delete ------------------------------------------------------
@@ -1359,8 +1350,11 @@ async def test_owner_can_open_edit_form(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Owner sees the edit form pre-filled with clinician fields and any
-    existing credential sub-rows."""
+    """Owner sees the edit form pre-filled with the person-level
+    Clinician fields (first/last/npi) plus the credential and
+    affiliation sub-rows. Practice posture moved off this form in
+    #1308 — `org_id` / location / sessions / insurance now live on
+    each affiliation's own row."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
         user_id=logged_in_user.id,
@@ -1377,13 +1371,18 @@ async def test_owner_can_open_edit_form(
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    org_select = tree.css_first('select[name="org_id"]')
-    assert org_select is not None
-    selected = org_select.css_first("option[selected]")
-    assert selected is not None
-    assert selected.text(strip=True) == "Acme Counseling"
     practice_form = tree.css_first(f'form[hx-patch="/clinicians/{clinician_id}"]')
     assert practice_form is not None
+    # Person-level inputs are present on the clinician PATCH form.
+    assert practice_form.css_first('input[name="first_name"]') is not None
+    assert practice_form.css_first('input[name="last_name"]') is not None
+    assert practice_form.css_first('input[name="npi"]') is not None
+    # Per-affiliation posture inputs (`org_id`, `location_city`,
+    # `in_person_sessions`, etc.) are NOT on the clinician form — they
+    # belong to each affiliation's own row below.
+    assert practice_form.css_first('select[name="org_id"]') is None
+    assert practice_form.css_first('input[name="location_city"]') is None
+    assert practice_form.css_first('select[name="in_person_sessions"]') is None
     # The seeded licensure should be rendered in the licensures list.
     assert "L-12345" in response.text
     # Sub-section add forms target the right URLs.
