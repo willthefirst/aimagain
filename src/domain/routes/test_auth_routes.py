@@ -2,6 +2,7 @@ import pytest
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import AsyncClient
 from pydantic import BaseModel
+from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -680,8 +681,10 @@ async def test_get_verify_page_with_valid_token_verifies_user(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A valid verification token flips `is_verified` to True and the
-    landing page renders the success state."""
+    """A valid verification token flips `is_verified` to True, the
+    landing page renders the success state, and the footer CTA points
+    into the clinician-create flow (the intended next step after
+    confirming email — pins the template's success-path link)."""
     from src.auth_config import get_user_manager
     from src.db import get_user_db
 
@@ -726,6 +729,13 @@ async def test_get_verify_page_with_valid_token_verifies_user(
     response = await test_client.get(f"/auth/verify?token={token}")
     assert response.status_code == 200
     assert "verified" in response.text.lower()
+    # Footer CTA on the success state routes into the clinician-create
+    # flow, not /users/me. The failure / already-verified states still
+    # land on the profile (see the template).
+    tree = HTMLParser(response.text)
+    cta = tree.css_first("section.auth-page footer a[role='button']")
+    assert cta is not None, "verify-success page is missing the footer CTA"
+    assert cta.attributes.get("href") == "/clinicians/form"
 
     # Confirm the DB column actually flipped.
     async with db_test_session_manager() as session:
