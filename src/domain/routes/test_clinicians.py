@@ -1349,6 +1349,16 @@ async def test_owner_edit_form_renders_affiliations_section(
     )
     assert delete_button is not None
 
+    # The inline add-practice form's Organization dropdown carries the
+    # shared `org_picker_help()` affordance so the "Don't see your
+    # organization? Create one." escape hatch is one click away —
+    # mirrors the program create/edit forms. The same `<small>` slot
+    # carries the link to the org create form.
+    helper = add_form.css_first('select[name="org_id"] ~ small')
+    assert helper is not None
+    assert "Don't see your organization" in helper.text()
+    assert helper.css_first('a[href="/organizations/form"]') is not None
+
 
 # --- Education / certification happy paths ------------------------------
 
