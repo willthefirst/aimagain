@@ -32,3 +32,24 @@ class Redirects:
             return f"/{collection}/{kwargs[id_param]}"
 
         return _redirect
+
+    @staticmethod
+    def to_related_list(
+        parent_collection: str,
+        parent_id_param: str,
+        child_collection: str,
+    ) -> Callable[..., str]:
+        """Build a redirect callable producing
+        ``/<parent_collection>/{parent_id}/<child_collection>``.
+
+        Used by parent-owned subentities whose post-mutation UX is "stay
+        on the related-list page the user came from" rather than the
+        whole-parent edit form. The clinician sub-resources (affiliations,
+        licensures, educations, certifications) all use this after #1336
+        promoted each into its own list page.
+        """
+
+        def _redirect(**kwargs: Any) -> str:
+            return f"/{parent_collection}/{kwargs[parent_id_param]}/{child_collection}"
+
+        return _redirect

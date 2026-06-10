@@ -7,6 +7,9 @@ from uuid import UUID
 from fastapi import Request
 from pydantic import BaseModel
 
+from src.domain.logic.clinician_affiliations.repository import (
+    ClinicianAffiliationRepository,
+)
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.repository import UserFavoriteRepository
 from src.domain.logic.organizations.repository import OrganizationRepository
@@ -437,3 +440,107 @@ async def handle_set_clinician_verification_state(
         requesting_user.id,
     )
     return clinician
+
+
+# --- Sub-resource list handlers ------------------------------------------
+#
+# `GET /clinicians/{clinician_id}/<sub>` — one dedicated list page per
+# clinician sub-resource (practices, licensures, educations, certifications).
+# The sub-resources are already eager-loaded on the clinician via
+# `relationship(lazy="selectin")`, so each handler just loads the parent
+# and returns its rows. The framework's `mount_related_list` auto-injects
+# the breadcrumb chain because `CLINICIAN_ENTITY.display_label_fn` is set.
+# The repo arg is the child's repo (per `RelatedListSubresource`
+# convention); the credentials all use `ClinicianRepository`, and
+# affiliations use `ClinicianAffiliationRepository` — neither is queried
+# here since the data is already on the parent, but the synth layer
+# requires the param to satisfy the spec contract.
+
+
+async def _list_clinician_subresource_context(
+    *,
+    request: Request,
+    clinician_id: UUID,
+    clinician_repo: ClinicianRepository,
+    attr: str,
+) -> dict[str, Any]:
+    """Shared list-handler body for clinician sub-resources. Loads the
+    parent clinician (404 on miss) and returns its eager-loaded
+    sub-resource list under ``rows``."""
+    clinician = await clinician_repo.get_by_model_id(Clinician, clinician_id)
+    if clinician is None:
+        raise NotFoundError(detail=f"Clinician {clinician_id} not found")
+    return {
+        "request": request,
+        "clinician": clinician,
+        "rows": getattr(clinician, attr),
+    }
+
+
+async def handle_list_clinician_affiliations(
+    request: Request,
+    clinician_id: UUID,
+    repo: ClinicianAffiliationRepository,
+    clinician_repo: ClinicianRepository,
+    organization_repo: OrganizationRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    """List the clinician's `ClinicianAffiliation` rows. The inline
+    add-practice form on this page renders an Org `<select>`, so the
+    handler also pulls the requesting user's visible Orgs into context
+    (same source as the clinician edit page's `form_extras`)."""
+    context = await _list_clinician_subresource_context(
+        request=request,
+        clinician_id=clinician_id,
+        clinician_repo=clinician_repo,
+        attr="clinician_affiliations",
+    )
+    context["orgs"] = await list_visible_to(
+        organization_repo, requesting_user, Organization
+    )
+    return context
+
+
+async def handle_list_clinician_licensures(
+    request: Request,
+    clinician_id: UUID,
+    repo: ClinicianRepository,
+    clinician_repo: ClinicianRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    return await _list_clinician_subresource_context(
+        request=request,
+        clinician_id=clinician_id,
+        clinician_repo=clinician_repo,
+        attr="licensures",
+    )
+
+
+async def handle_list_clinician_educations(
+    request: Request,
+    clinician_id: UUID,
+    repo: ClinicianRepository,
+    clinician_repo: ClinicianRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    return await _list_clinician_subresource_context(
+        request=request,
+        clinician_id=clinician_id,
+        clinician_repo=clinician_repo,
+        attr="educations",
+    )
+
+
+async def handle_list_clinician_certifications(
+    request: Request,
+    clinician_id: UUID,
+    repo: ClinicianRepository,
+    clinician_repo: ClinicianRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    return await _list_clinician_subresource_context(
+        request=request,
+        clinician_id=clinician_id,
+        clinician_repo=clinician_repo,
+        attr="certifications",
+    )

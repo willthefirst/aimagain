@@ -41,11 +41,13 @@ def test_parent_is_clinician_entity(entity, _stem):
 
 
 @pytest.mark.parametrize("entity,_stem", CREDENTIALS)
-def test_redirects_target_parent_form(entity, _stem):
-    """Sub-row mutations send HTMX clients back to the parent edit form
-    — the user keeps editing the parent clinician entry after each
-    credential write."""
-    target = "/clinicians/abc-123/form"
+def test_redirects_target_sub_resource_list(entity, _stem):
+    """Sub-row mutations send HTMX clients back to the sub-resource's
+    own list page — the page the user is already on after #1336 promoted
+    each credential into its own dedicated /clinicians/{id}/<sub> route.
+    The list page is the canonical "stay where you were" target now that
+    the clinician edit form is person-level only."""
+    target = f"/clinicians/abc-123/{entity.url_collection}"
     assert entity.create_redirect(clinician_id="abc-123") == target
     assert entity.update_redirect(clinician_id="abc-123") == target
     assert entity.delete_redirect(clinician_id="abc-123") == target

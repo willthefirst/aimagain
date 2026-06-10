@@ -25,7 +25,10 @@ from src.domain.logic.clinician_affiliations.schema import (
     ClinicianAffiliationUpdate,
 )
 from src.domain.models import ClinicianAffiliation
-from src.domain.specs.clinician import CLINICIAN_ENTITY, _clinician_form_redirect
+from src.domain.specs.clinician import (
+    CLINICIAN_ENTITY,
+    _clinician_affiliations_list_redirect,
+)
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -49,12 +52,13 @@ CLINICIAN_AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
     create_adapter=ClinicianAffiliationCreate,
     update_adapter=ClinicianAffiliationUpdate,
     read_schema=ClinicianAffiliationRead,
-    # Sub-row CRUD only — affiliations are managed inline on the
-    # parent clinician's edit page; no independent list/detail surface.
+    # Sub-row CRUD only — list/detail/form pages are owned by the
+    # parent's `RelatedListSubresource` (`/clinicians/{id}/clinician_affiliations`,
+    # #1336) which renders the inline add + per-row delete affordances.
     routes=RouteSet(create=True, update=True, delete=True),
-    # Sub-row mutations redirect HTMX clients back to the parent
-    # clinician's edit form so the user keeps editing in place.
-    create_redirect=_clinician_form_redirect,
-    update_redirect=_clinician_form_redirect,
-    delete_redirect=_clinician_form_redirect,
+    # Sub-row mutations redirect HTMX clients back to the sub-resource's
+    # own list page — the page the user is already on after #1336.
+    create_redirect=_clinician_affiliations_list_redirect,
+    update_redirect=_clinician_affiliations_list_redirect,
+    delete_redirect=_clinician_affiliations_list_redirect,
 )
