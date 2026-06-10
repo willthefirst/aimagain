@@ -1,9 +1,7 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
-{%- from "_shared/sections.html" import fact -%}
-{%- from "_shared/_locked.html" import locked_name, locked_field -%}
-{%- from "clinicians/_credential_list.html" import credential_list -%}
-{%- from "clinicians/_credential_row.html" import credential_row -%}
+{%- from "_shared/_locked.html" import locked_name -%}
+{%- from "_shared/_picker.html" import picker -%}
 {%- set view = clinician_card_view(clinician) -%}
 {# When the viewer lacks provider-network access and isn't the owner,
    redact identifying fields per the `_clinician_card.html` /
@@ -74,85 +72,28 @@
     ) }}
   {% endif %}
 {% endblock %}
-{# Detail page uses stacked sections:
-   1. ClinicianAffiliation cards — one per row in `view.clinician_affiliations`.
-   2. Credentials (licensures, educations, certifications) — person-level,
-      shared across every affiliation, rendered once.
-   `clinician_card_view` / `affiliation_card_view` collapse field references
-   so templates don't carry display logic. #}
-{% block content %}
-  {# Identity card collapsed: the toolbar H1 carries `view.practice_name`
-   and the `subtitle` block above carries NPI. The page starts straight
-   into the affiliation cards.
+{# The detail page is a *dispatching picker* (#704 / #1330 pattern):
+   each card deep-links into a dedicated sub-resource list page (#1335)
+   where the user can manage that surface in isolation. Person-level
+   identity reads from the H1 + subtitle band above; this body carries
+   navigation only.
 
-   Stacked affiliation cards — one per row in `clinician.clinician_affiliations`.
-   Reads as "At <Org A>: ... · At <Org B>: ...". Each card links its
-   heading to the owning Organization so the cross-resource navigation
-   the old (single-card) layout exposed via the "Organization" facts
-   row still works. The directory listing (`list.html`) is unchanged
-   — it continues to read `view.practice_name` / the flat per-role
-   keys off the primary affiliation; #642 PR 3 rolls it up. #}
-  {% for aff in view.clinician_affiliations %}
-    <article class="entity-card"
-             data-testid="affiliation-card"
-             data-affiliation-org-id="{{ aff.org_id }}">
-      <header class="entity-header">
-        {% if _redacted %}
-          <strong>At {{ locked_name("Doe Health Group") }}</strong>{# title-case-ignore: placeholder org name #}
-        {% else %}
-          <strong>At <a href="{{ aff.org_url }}">{{ aff.org_name }}</a></strong>
-          {%- if aff.full_address %}<small>{{ aff.full_address }}</small>{%- endif %}
-        {% endif %}
-      </header>
-      <section class="entity-facts">
-        <dl>
-          {%- if aff.full_address %}
-            {% if _redacted %}
-              {%- call fact('address', 'Address') %}{{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}{%- endcall %}
-              {% else %}
-                {{ fact('address', 'Address', aff.full_address) }}
-              {% endif %}
-            {%- endif %}
-            {{ fact('in_person_sessions', 'In-person sessions', aff.in_person_label) }}
-            {{ fact('virtual_sessions', 'Virtual sessions', aff.virtual_label) }}
-            {{ fact('insurance', 'Insurance', aff.insurance_summary) }}
-            {{ fact('sliding_scale', 'Sliding scale', aff.sliding_scale_label) }}
-            {%- if aff.cost %}{{ fact('cost', 'Cost', aff.cost) }}{%- endif %}
-            </dl>
-          </section>
-        </article>
-      {% endfor %}
-      {# Credentials are clinician-level (FK to `clinicians.id` after #635
-   PR A) — they belong to the person, not to any single affiliation,
-   so they render once below the stacked affiliation cards. The
-   list-per-section grammar is the same the old single-card layout
-   used; only the parent card changed. Credentials stay visible under
-   redaction — they describe the role (degree type, license type,
-   certification) rather than the identity (name, address), matching
-   the post-card's "redact identity, keep substantive content" line. #}
-      <section class="entity-card">
-        <section>
-          <h4>Licensures</h4>
-          {% call(lic) credential_list(view.licensures, "No licensures listed.") %}
-            {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-                        ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None],
-            ) }}
-          {% endcall %}
-        </section>
-        <section>
-          <h4>Education</h4>
-          {% call(edu) credential_list(view.educations, "No education entries listed.") %}
-            {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
-                        [edu.institution, edu.month_completed],) }}
-          {% endcall %}
-        </section>
-        <section>
-          <h4>Certifications</h4>
-          {% call(cert) credential_list(view.certifications, "No certifications listed.") %}
-            {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
-                        [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
-            ) }}
-          {% endcall %}
-        </section>
-      </section>
-    {% endblock %}
+   Picker cards are rendered for every viewer — non-network viewers
+   land on the sub-resource list pages and see those pages' own
+   redaction rules. #}
+{% block content %}
+  {{ picker([
+    {"href": entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations",
+  "heading": "Practices",
+  "description": "Where this clinician sees clients — location, availability, in-network insurance, and rates."},
+  {"href": entity_url('clinician', id=clinician.id) ~ "/licensures",
+  "heading": "Licensures",
+  "description": "Professional licenses on file with their issuing states."},
+  {"href": entity_url('clinician', id=clinician.id) ~ "/educations",
+  "heading": "Education",
+  "description": "Degrees, programs, and where they were completed."},
+  {"href": entity_url('clinician', id=clinician.id) ~ "/certifications",
+  "heading": "Certifications",
+  "description": "Specialized credentials and their certifying bodies."},
+  ]) }}
+{% endblock %}
