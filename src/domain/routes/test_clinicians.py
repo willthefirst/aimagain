@@ -1141,6 +1141,59 @@ async def test_post_affiliation_creates_additional_row(
     assert extra.cost == "$220/session"
 
 
+async def test_post_solo_affiliation_with_no_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`POST /clinicians/{id}/clinician_affiliations` with no `org_id`
+    creates a solo practice row (`org_id` NULL, sessions / location
+    NULL). The user picks the "(Solo practice — no organization)"
+    option in the inline add-practice form; the form posts an empty
+    `org_id` value, which `WirePayload` coerces to None."""
+    from src.domain.models import ClinicianAffiliation
+
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+
+    response = await authenticated_client.post(
+        f"/clinicians/{clinician_id}/clinician_affiliations",
+        # Mirrors what the inline add-practice form posts when the user
+        # picks "(Solo practice)" and leaves the optional fields blank.
+        data={
+            "org_id": "",
+            "location_city": "",
+            "location_state": "",
+            "location_zip": "",
+            "in_person_sessions": "",
+            "virtual_sessions": "",
+            "accepts_out_of_network": "true",
+            "sliding_scale": "false",
+            "cost": "",
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+
+    async with db_test_session_manager() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(ClinicianAffiliation).where(
+                        ClinicianAffiliation.clinician_id == clinician_id
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert len(rows) == 2
+    solo = next(a for a in rows if a.org_id is None)
+    assert solo.location_city is None
+    assert solo.in_person_sessions is None
+    assert solo.virtual_sessions is None
+
+
 async def test_patch_affiliation_updates_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],

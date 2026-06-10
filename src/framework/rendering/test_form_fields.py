@@ -156,7 +156,10 @@ def test_zip_text_alias_carries_pattern_in_real_schema():
     """End-to-end: the `ZipText` alias in `src/framework/schema_validators.py`
     is the production wiring this prototype targets. If someone removes
     the `HtmlPattern` marker on `ZipText`, the form's client-side
-    validation silently drops — catch it here."""
+    validation silently drops — catch it here. Targets
+    `ClinicianAffiliationCreate` which routes through
+    `LocationPartial.zip: ZipText | None` (#1320), so this test also
+    pins the field_spec fix for surfacing markers through Optional."""
     from src.domain.logic.clinician_affiliations.schema import (
         ClinicianAffiliationCreate,
     )
@@ -164,3 +167,27 @@ def test_zip_text_alias_carries_pattern_in_real_schema():
     spec = field_spec(ClinicianAffiliationCreate, "location_zip")
     assert spec["pattern"] == r"\d{5}"
     assert spec["maxlength"] == 5
+
+
+def test_html_pattern_marker_surfaces_through_optional_annotated():
+    """Pydantic only surfaces `Annotated[T, M1, M2]` metadata on
+    `FieldInfo.metadata` when the field annotation is the bare
+    Annotated form. Once you wrap it in `Optional[...]` (e.g.
+    `ZipText | None` on `LocationPartial`), the markers stop appearing
+    on FieldInfo.metadata directly — but `field_spec` should still see
+    them by walking the inner annotation's `__metadata__`. Tight unit
+    pin against the framework fix so a future regression there doesn't
+    silently drop client-side pattern enforcement on every optional
+    Annotated field."""
+    from typing import Annotated, Optional
+
+    from pydantic import BaseModel
+
+    Phone = Annotated[str, HtmlPattern(pattern=r"\d{10}", maxlength=10)]
+
+    class S(BaseModel):
+        phone: Optional[Phone] = None
+
+    spec = field_spec(S, "phone")
+    assert spec["pattern"] == r"\d{10}"
+    assert spec["maxlength"] == 10

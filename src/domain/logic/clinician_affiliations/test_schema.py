@@ -60,6 +60,43 @@ def test_create_rejects_unknown_session_value():
         ClinicianAffiliationCreate(**_wire_create(in_person_sessions="maybe"))
 
 
+def test_create_accepts_solo_practice_with_no_org():
+    """Solo practice (#1311): `org_id` blank → coerced to None →
+    affiliation row created with no organizational entity. Location and
+    sessions can also be omitted (user fills them in later via the
+    row's own PATCH). The minimum body is empty."""
+    payload = ClinicianAffiliationCreate()
+    assert payload.org_id is None
+    assert payload.location is None
+    assert payload.in_person_sessions is None
+    assert payload.virtual_sessions is None
+    # NOT NULL columns get their default values so the row inserts
+    # cleanly even on an empty body.
+    assert payload.accepts_out_of_network is True
+    assert payload.in_network_carriers == []
+    assert payload.sliding_scale is False
+
+
+def test_create_accepts_partial_location():
+    """`location` is now a `LocationPartial` — a single subfield can be
+    set without the others. Mirrors how the inline add-practice form
+    behaves when the user only fills in the city."""
+    payload = ClinicianAffiliationCreate(location_city="Brooklyn")
+    assert payload.location is not None
+    assert payload.location.city == "Brooklyn"
+    assert payload.location.state is None
+    assert payload.location.zip is None
+
+
+def test_create_coerces_blank_org_id_to_none():
+    """The form posts `org_id=` (empty string) when the user picks the
+    "(Solo practice)" option. `WirePayload`'s blank-string coercion
+    turns that into `None` before per-field validation, so the wire
+    edge is honest about the solo case."""
+    payload = ClinicianAffiliationCreate(org_id="")
+    assert payload.org_id is None
+
+
 def test_create_coerces_scalar_carrier_to_list():
     """A single-checkbox-checked group arrives as a scalar; the schema
     wraps it in a one-element list so the `Literal[*INSURANCE_CARRIERS]`
