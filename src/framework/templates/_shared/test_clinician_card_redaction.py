@@ -113,6 +113,43 @@ def test_un_redacted_when_viewer_owns_the_row() -> None:
     assert "Jane Doe" in html
 
 
+def test_solo_affiliation_renders_as_plain_practice_chip() -> None:
+    """Solo clinician path: an affiliation with `org_id` NULL / `org`
+    None (the shape #1311 introduced) renders the Practice fact as a
+    plain "Solo practice" chip without trying to deref `aff.org.name`.
+    Pre-fix this branch was an `AttributeError: 'NoneType' object has
+    no attribute 'name'` waiting to fire the first time a solo clinician
+    surfaced in `/clinicians` / favorites / a user's clinician list."""
+    env = _make_env()
+    viewer_id = uuid.uuid4()
+    solo_aff = SimpleNamespace(
+        org=None,
+        org_id=None,
+        location_city="Brooklyn",
+        location_state="NY",
+    )
+    solo = SimpleNamespace(
+        id=uuid.uuid4(),
+        owner_id=viewer_id,
+        clinician_affiliations=[solo_aff],
+        licensures=[],
+        first_name="Janet",
+        last_name="Solo",
+    )
+    html = _render_card(
+        env,
+        clinician=solo,
+        can_access_network=True,
+        current_user_id=viewer_id,
+    )
+    tree = HTMLParser(html)
+    practice = tree.css_first('div[data-fact="practice"] dd')
+    assert practice is not None
+    assert "Solo practice" in practice.text()
+    # No org link rendered — `entity_link` is bypassed entirely.
+    assert practice.css_first("a") is None
+
+
 def test_redacted_when_viewer_not_owner_and_not_network() -> None:
     """The redaction branch: a non-network viewer looking at another
     user's row sees the headline name replaced by `locked_name`'s
