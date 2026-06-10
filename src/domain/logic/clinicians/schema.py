@@ -15,10 +15,14 @@ This module therefore declares no `*AuditSnapshot` symbols; posts and
 users genuinely diverge (kind-discriminated flatten / omitted id) and
 keep distinct classes — see those modules.
 
-`ClinicianRead` embeds the sub-entity Read lists. `ClinicianUpdate` does
-**not** include nested lists — sub-entities are PATCHed via their own
-routes (added later), so a clinician-level PATCH only touches the
-practice/availability fields.
+`ClinicianRead` embeds the sub-entity Read lists. `ClinicianUpdate` is
+**person-level only** (`first_name`, `last_name`, `npi`): practice
+posture (location, availability, insurance, cost, `org_id`) lives on
+`ClinicianAffiliation` — same person can hold different posture per
+practice context — so it is patched via that entity's own endpoint
+(`PATCH /clinicians/{id}/clinician_affiliations/{aff_id}`). Sub-entity
+lists (licensures, educations, certifications) similarly manage
+themselves under their own URLs.
 
 Controlled-vocabulary fields (state, license type, etc.) are typed as
 `Literal[*TUPLE]` against the tuples in `src/domain/models/enums.py` so
@@ -37,29 +41,24 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator
+from pydantic import AfterValidator, BaseModel
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
     Location,
-    LocationPartial,
 )
 from src.domain.models.enums import (
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
-    INSURANCE_CARRIERS,
     LICENSE_TYPES,
-    LOCATION_AVAILABILITY_OPTIONS,
     US_STATES,
 )
 from src.framework.rendering.form_fields import HtmlPattern
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
-    StrippedOptionalText,
     StrippedText,
     WirePayload,
-    scalar_to_list,
 )
 
 _NPI_RE = re.compile(r"^[0-9]{10}$")
@@ -105,13 +104,6 @@ RequiredNpiText = Annotated[
     str,
     AfterValidator(_validate_required_npi),
     HtmlPattern(pattern=r"\d{10}", maxlength=10),
-]
-
-
-# `in_network_carriers` is a multi-checkbox group; scalar→singleton coercion
-# matches the pattern shared with PA/CR multi-select fields.
-InNetworkCarriersField = Annotated[
-    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(scalar_to_list)
 ]
 
 
@@ -261,38 +253,24 @@ class ClinicianCreate(WirePayload):
     npi: RequiredNpiText
 
 
-class ClinicianUpdate(FlatLocationSchema, PartialUpdate):
-    """Partial update of practice/availability fields only. Sub-entity
-    lists (licensures, educations, certifications) are managed via
-    their own endpoints, so this schema does not accept them.
+class ClinicianUpdate(PartialUpdate):
+    """Partial update of the **person-level** fields on a Clinician —
+    name and NPI. Practice posture (location, availability, insurance,
+    cost, org) lives on :class:`ClinicianAffiliation` because the same
+    person can hold different posture per practice context, so it is
+    edited via the affiliation's own ``PATCH /clinicians/{id}/clinician_affiliations/{aff_id}``
+    endpoint, not here. Sub-entity lists (licensures, educations,
+    certifications) similarly manage themselves under their own URLs.
 
-    Like :class:`ClinicianCreate`, the location triple is embedded as a
-    :class:`LocationPartial` value object — patches can touch one
-    subfield independently (e.g. just ``location_city``) and the
-    flatten-on-dump serializer keeps ``payload.model_dump(exclude_unset=True)``
-    producing the same flat ``location_city`` shape the dispatch
-    handler's ``repo.patch(target, **fields)`` call expects.
+    Empty input on ``first_name`` / ``last_name`` raises a 422 (cannot
+    clear to NULL); absent fields pass through ``exclude_unset=True``
+    and don't touch the persisted value. ``npi`` accepts a 10-digit
+    string or blank → ``None`` (clears).
     """
 
-    # Patch the Clinician's Organization by pointing `org_id` at a
-    # different row in `organizations`. `org.name` changes by editing
-    # the Organization itself, not via this schema.
-    org_id: uuid.UUID | None = None
-    # Patch the NPI by writing a 10-digit string or empty (→ `None`,
-    # clearing the field). Same validator as :class:`ClinicianCreate`.
     npi: NpiText = None
-    # Patch the linked Clinician's first / last name. Empty input raises
-    # a 422 (cannot clear to NULL); absent fields pass through
-    # `exclude_unset=True` and don't touch the persisted value.
     first_name: StrippedText | None = None
     last_name: StrippedText | None = None
-    location: LocationPartial | None = None
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    accepts_out_of_network: bool | None = None
-    in_network_carriers: InNetworkCarriersField | None = None
-    sliding_scale: bool | None = None
-    cost: StrippedOptionalText = None
 
 
 # --- Admin verification-state axis ---------------------------------------
