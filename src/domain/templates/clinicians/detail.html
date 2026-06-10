@@ -13,14 +13,18 @@
 {% block resource_label %}Clinicians{% endblock %}
 {# H1 — clinician's name when set; falls back to the primary affiliation's
    organization name for legacy rows without name data. Redacted viewers
-   see a locked-name placeholder rather than the underlying identity. #}
+   see a locked-name placeholder rather than the underlying identity. The
+   `org` fallback branch must guard on `clinician.org` because a solo
+   primary affiliation has no Organization (#1311). #}
 {% block current_label %}
   {% if _redacted %}
     {{ locked_name("Dr. J. Doe") }}
   {% elif clinician.first_name and clinician.last_name %}
     {{ clinician.first_name }} {{ clinician.last_name }}
-  {% else %}
+  {% elif clinician.org %}
     {{ clinician.org.name }}
+  {% else %}
+    Clinician
   {% endif %}
 {% endblock %}
 {% block subtitle %}
