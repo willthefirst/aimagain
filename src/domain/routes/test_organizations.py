@@ -381,3 +381,39 @@ async def test_list_200_for_owner_renders_own_row_unredacted(
     response = await authenticated_client.get("/organizations")
     assert response.status_code == 200
     assert "Acme Health" in response.text
+
+
+# --- ?owner=me filter --------------------------------------------------------
+
+
+async def test_list_owner_me_scopes_to_viewer_owned_orgs(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """``?owner=me`` filters the directory to orgs the viewer is
+    affiliated with (owned OR holds a verified rep for). Seed one
+    stranger-owned org + one viewer-owned org directly via the DB
+    (bypassing the NPPES create gate, which is exercised separately);
+    the filtered response must include the viewer's own row and
+    exclude the stranger's."""
+    other_owner = create_test_user(username=f"other-{uuid.uuid4()}")
+    stranger_name = f"Stranger Health {uuid.uuid4()}"
+    own_name = f"My Health {uuid.uuid4()}"
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other_owner)
+            session.add(
+                make_organization_row(owner_id=other_owner.id, name=stranger_name)
+            )
+            session.add(
+                make_organization_row(owner_id=logged_in_user.id, name=own_name)
+            )
+
+    response = await authenticated_client.get("/organizations?owner=me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#organizations-list article.entity-card")
+    assert len(rows) == 1, "?owner=me must return only the viewer's own row"
+    assert own_name in response.text
+    assert stranger_name not in response.text

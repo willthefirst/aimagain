@@ -112,6 +112,21 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
     # `routes.search` flag) and turns the list page's content area
     # into a two-column browse layout — sidebar form + results.
     filters=(
+        # `?owner=me` scopes the list to clinicians the viewer owns,
+        # bypassing the directory's verified-only gate so unverified
+        # in-flight rows still surface to their creator. Rendered as
+        # a single-toggle radio (Pico-style) above the license
+        # filters; the viewer-id resolution happens in
+        # `ClinicianRepository.list_clinicians` via the
+        # `_requesting_user` field that `handle_list` stamps on the
+        # repo.
+        ChoiceFilter(
+            name="owner",
+            label="Owner",
+            choices=(("me", "Mine only"),),
+            multi=False,
+            radio=True,
+        ),
         ChoiceFilter(
             name="license_type",
             label="License type",
