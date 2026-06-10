@@ -1,0 +1,64 @@
+{# Sub-resource list page — clinician's ClinicianAffiliation rows.
+
+Reached via `GET /clinicians/{clinician_id}/clinician_affiliations`. The DB
+model calls them affiliations because that's what the (clinician × org)
+join is; the UI calls them "practices" because that's what they are
+to the user. A row with `org_id` NULL is a solo practice — see the
+affiliations cluster README for the model.
+
+Breadcrumb is auto-injected by `mount_related_list` because
+`CLINICIAN_ENTITY.display_label_fn` is set.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field, multi_select_field, entity_select_field -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
+{%- from "_shared/forms.html" import inline_add_form -%}
+{%- from "clinicians/_credential_list.html" import credential_list -%}
+{%- from "clinicians/_credential_row.html" import credential_row -%}
+{% block resource_label %}Practices{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(aff) credential_list(rows, "No practices yet.") %}
+      {%- set meta_parts = [
+            aff.location_city,
+            aff.location_state,
+            aff.location_zip,
+            ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
+            ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
+            ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
+            "Out-of-network OK" if aff.accepts_out_of_network else None,
+            "Sliding scale" if aff.sliding_scale else None,
+            aff.cost,
+            ] -%}
+      {{ credential_row((aff.org.name if aff.org else "Solo practice") ,
+      meta_parts,
+      delete_url=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string,
+      delete_confirm="Remove this practice?",
+      ) }}
+    {% endcall %}
+  </section>
+  <section>
+    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations", "Add another practice", "Add another practice") %}
+      {# Every field is optional. Org = "(Solo practice)" → `org_id`
+         posts blank → schema coerces to None → solo affiliation row.
+         Location / sessions left blank → NULLs on the new row; the
+         user fills them in via the row's own PATCH later. #}
+      {{ entity_select_field("org_id", "Organization", orgs, required=false, blank_label="(Solo practice — no organization)", help=org_picker_help() ) }}
+      <div class="grid">
+        {{ text_field("location_city", "City", required=false, maxlength=120) }}
+        {{ select_field("location_state", "State", US_STATES, required=false, placeholder=true) }}
+        {{ text_field("location_zip", "ZIP", required=false, pattern="\\d{5}", maxlength=5) }}
+      </div>
+      <div class="grid">
+        {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, required=false, placeholder=true) }}
+        {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, required=false, placeholder=true) }}
+      </div>
+      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
+      <div class="grid">
+        {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network patients", current=true) }}
+        {{ checkbox_field('sliding_scale', 'Offers sliding scale') }}
+      </div>
+      {{ text_field("cost", "Cost", required=false) }}
+    {% endcall %}
+  </section>
+{% endblock %}

@@ -11,10 +11,12 @@ shared shape; the three spec modules pass the per-credential pieces
 through it.
 """
 
+from typing import Callable
+
 from pydantic import BaseModel, TypeAdapter
 
 from src.domain.logic.clinicians.repository import get_clinician_repository
-from src.domain.specs.clinician import CLINICIAN_ENTITY, _clinician_form_redirect
+from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.framework.dispatch.entity_spec import (
     AUTHENTICATED,
     OWNER_OR_ADMIN,
@@ -34,6 +36,7 @@ def make_clinician_credential_entity(
     read_schema: type[BaseModel],
     create_adapter: type[BaseModel] | TypeAdapter,
     update_adapter: type[BaseModel] | TypeAdapter,
+    mutation_redirect: Callable[..., str],
     state_axes: tuple[StateAxis, ...] = (),
 ) -> EntitySpec:
     """Build a credential-subentity `EntitySpec` from its varying pieces.
@@ -47,6 +50,11 @@ def make_clinician_credential_entity(
     constructor synthesizes `read_to_dict` from it and defaults
     `audit_snapshot` to it as well (credential audit snapshots are
     byte-identical to their read projection).
+
+    `mutation_redirect` is the post-create/update/delete redirect
+    callable. After #1336 each credential redirects to its own
+    list page (`/clinicians/{id}/licensures` etc.) rather than the
+    parent's edit form.
 
     `state_axes` is the per-credential state-axis tuple. Only
     `LICENSURE_ENTITY` uses it today (the `attestation` axis); the
@@ -70,13 +78,14 @@ def make_clinician_credential_entity(
         create_adapter=create_adapter,
         update_adapter=update_adapter,
         read_schema=read_schema,
-        # Subrow CRUD only — sub-rows aren't independently listed or
-        # detailed (they only appear in the parent clinician's pages).
+        # Subrow CRUD only. The parent CLINICIAN_ENTITY now owns a
+        # `RelatedListSubresource` per credential type (#1336) — the
+        # list page is mounted there, not here.
         routes=RouteSet(create=True, update=True, delete=True),
-        # Sub-row mutations send HTMX clients back to the parent edit
-        # form so the user can keep editing.
-        create_redirect=_clinician_form_redirect,
-        update_redirect=_clinician_form_redirect,
-        delete_redirect=_clinician_form_redirect,
+        # Sub-row mutations send HTMX clients back to the sub-resource's
+        # own list page so the user keeps managing in place.
+        create_redirect=mutation_redirect,
+        update_redirect=mutation_redirect,
+        delete_redirect=mutation_redirect,
         state_axes=state_axes,
     )

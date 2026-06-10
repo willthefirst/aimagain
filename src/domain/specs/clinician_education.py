@@ -13,6 +13,7 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.models import ClinicianEducation
 from src.domain.specs._credential import make_clinician_credential_entity
+from src.domain.specs.clinician import _clinician_educations_list_redirect
 from src.framework.dispatch.entity_spec import EntitySpec
 
 EDUCATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
@@ -24,4 +25,5 @@ EDUCATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     read_schema=ClinicianEducationRead,
     create_adapter=ClinicianEducationCreate,
     update_adapter=ClinicianEducationUpdate,
+    mutation_redirect=_clinician_educations_list_redirect,
 )

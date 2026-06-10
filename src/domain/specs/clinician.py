@@ -16,6 +16,9 @@ Read by:
 
 from typing import Final
 
+from src.domain.logic.clinician_affiliations.repository import (
+    get_clinician_affiliation_repository,
+)
 from src.domain.logic.clinicians.repository import (
     ClinicianRepository,
     get_clinician_repository,
@@ -67,10 +70,54 @@ _clinician_referrals_child = ResourceSpec(
     collection="referrals", id_param="post_id", repo_dep=get_post_repository
 )
 
-# Post-update: stay on the edit form so the user can keep iterating on
-# the parent + its credentials. The same callable is reused by the three
-# credential subentities (their parent is this clinician directory entry).
+# The four canonical clinician sub-resources — `GET /clinicians/{id}/<sub>`
+# pages. Hand-rolled inline child specs (matching the openings/referrals
+# pattern above) avoid the import cycle that would result from pulling
+# in `<SUB>_ENTITY.to_resource_spec()` here (each sub-entity spec
+# imports `CLINICIAN_ENTITY`). The credential trio shares
+# `get_clinician_repository` because credentials are loaded as relations
+# on the parent clinician; affiliations have their own repo.
+_clinician_affiliations_child = ResourceSpec(
+    collection="clinician_affiliations",
+    id_param="clinician_affiliation_id",
+    repo_dep=get_clinician_affiliation_repository,
+)
+_clinician_licensures_child = ResourceSpec(
+    collection="licensures",
+    id_param="licensure_id",
+    repo_dep=get_clinician_repository,
+)
+_clinician_educations_child = ResourceSpec(
+    collection="educations",
+    id_param="education_id",
+    repo_dep=get_clinician_repository,
+)
+_clinician_certifications_child = ResourceSpec(
+    collection="certifications",
+    id_param="certification_id",
+    repo_dep=get_clinician_repository,
+)
+
+# Post-update for the clinician itself: stay on the edit form so the
+# user can keep iterating on the person-level fields.
 _clinician_form_redirect = Redirects.to_edit_form("clinicians", "clinician_id")
+
+# Post-mutation redirects for the four clinician sub-resources — after
+# add/delete on any of them, send HTMX clients back to the sub-resource's
+# own list page (the page the user is already on, post-#1336). Each
+# child spec imports its own redirect from below.
+_clinician_affiliations_list_redirect = Redirects.to_related_list(
+    "clinicians", "clinician_id", "clinician_affiliations"
+)
+_clinician_licensures_list_redirect = Redirects.to_related_list(
+    "clinicians", "clinician_id", "licensures"
+)
+_clinician_educations_list_redirect = Redirects.to_related_list(
+    "clinicians", "clinician_id", "educations"
+)
+_clinician_certifications_list_redirect = Redirects.to_related_list(
+    "clinicians", "clinician_id", "certifications"
+)
 
 
 # Post-create: drop the user on the homepage. NPPES verification now
@@ -243,6 +290,43 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
             template="clinicians/referrals_list.html",
             handler_path=(
                 "src.domain.logic.posts.handlers.handle_list_clinician_referrals"
+            ),
+        ),
+        # Four sub-resource list pages — the picker landing on
+        # `/clinicians/{id}` (PR-2) deep-links into each of these. Each
+        # page renders the existing inline add-form + per-row delete
+        # affordances for that sub-resource, surfaced from the
+        # clinician edit page (which moves to person-level-only in PR-2).
+        RelatedListSubresource(
+            child_spec=_clinician_affiliations_child,
+            template="clinicians/clinician_affiliations_list.html",
+            handler_path=(
+                "src.domain.logic.clinicians.handlers."
+                "handle_list_clinician_affiliations"
+            ),
+        ),
+        RelatedListSubresource(
+            child_spec=_clinician_licensures_child,
+            template="clinicians/licensures_list.html",
+            handler_path=(
+                "src.domain.logic.clinicians.handlers."
+                "handle_list_clinician_licensures"
+            ),
+        ),
+        RelatedListSubresource(
+            child_spec=_clinician_educations_child,
+            template="clinicians/educations_list.html",
+            handler_path=(
+                "src.domain.logic.clinicians.handlers."
+                "handle_list_clinician_educations"
+            ),
+        ),
+        RelatedListSubresource(
+            child_spec=_clinician_certifications_child,
+            template="clinicians/certifications_list.html",
+            handler_path=(
+                "src.domain.logic.clinicians.handlers."
+                "handle_list_clinician_certifications"
             ),
         ),
     ),

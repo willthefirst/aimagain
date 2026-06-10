@@ -1,0 +1,32 @@
+{# Sub-resource list page — clinician's ClinicianLicensure rows.
+
+Reached via `GET /clinicians/{clinician_id}/licensures`. Breadcrumb is
+auto-injected by `mount_related_list` because
+`CLINICIAN_ENTITY.display_label_fn` is set.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/form_fields.html" import text_field, select_field -%}
+{%- from "_shared/forms.html" import inline_add_form -%}
+{%- from "clinicians/_credential_list.html" import credential_list -%}
+{%- from "clinicians/_credential_row.html" import credential_row -%}
+{% block resource_label %}Licensures{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(lic) credential_list(rows, "No licensures yet.") %}
+      {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
+            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None, lic.status | title],
+      delete_url=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string,
+      delete_confirm="Remove this licensure?",
+      attest_url=(entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/attestation") if not lic.attested_active else None,
+      ) }}
+    {% endcall %}
+  </section>
+  <section>
+    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/licensures", "Add licensure", "Add licensure") %}
+      {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
+      {{ text_field("license_number", "License number", maxlength=120) }}
+      {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
+      {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
+    {% endcall %}
+  </section>
+{% endblock %}
