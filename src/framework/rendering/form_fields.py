@@ -159,7 +159,17 @@ def field_spec(schema_cls: type[BaseModel], name: str) -> dict[str, Any]:
     maxlength: int | None = None
     is_textarea = False
     is_url = False
-    for marker in field.metadata:
+    # Pydantic only surfaces `Annotated[T, M1, M2]` metadata on
+    # `FieldInfo.metadata` when the field annotation is the bare
+    # Annotated form. Once you wrap it in `Optional[...]` (e.g.
+    # `ZipText | None` on `LocationPartial`), the inner Annotated's
+    # markers stop appearing on FieldInfo.metadata. Walk the inner
+    # annotation's `__metadata__` too so the form-rendering markers
+    # (`HtmlPattern`, `HtmlTextarea`, `HtmlUrl`) carry through to
+    # optional partial-update fields the same way they do for
+    # required Create fields.
+    inner_metadata = tuple(getattr(inner, "__metadata__", ()) or ())
+    for marker in tuple(field.metadata) + inner_metadata:
         if isinstance(marker, HtmlPattern):
             if marker.pattern is not None:
                 pattern = marker.pattern
