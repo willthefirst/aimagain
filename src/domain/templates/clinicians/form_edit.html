@@ -6,13 +6,19 @@
 {%- from "clinicians/_credential_list.html" import credential_list -%}
 {%- from "clinicians/_credential_row.html" import credential_row -%}
 {% block resource_label %}Clinicians{% endblock %}
-{# Same H1-fallback shape as the detail page — name when set, primary
-   affiliation's org name otherwise. #}
+{# H1-fallback: name when set, else primary affiliation's org name when
+   present, else "Clinician". ClinicianCreate requires first_name +
+   last_name (#1207), so the fallback branches should be unreachable in
+   practice — but `clinician.org` is None for solo affiliations (#1311),
+   so the fallback is explicit about it instead of crashing. Detail page
+   shares the same shape. #}
 {% block current_label %}
   {% if clinician.first_name and clinician.last_name %}
     {{ clinician.first_name }} {{ clinician.last_name }}
-  {% else %}
+  {% elif clinician.org %}
     {{ clinician.org.name }}
+  {% else %}
+    Clinician
   {% endif %}
 {% endblock %}
 {% block form_content %}
