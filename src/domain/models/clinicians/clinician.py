@@ -139,6 +139,28 @@ class Clinician(BaseModel):
     def primary_clinician_affiliation(self):
         return self.clinician_affiliations[0] if self.clinician_affiliations else None
 
+    def _require_primary_affiliation(self, attr_name: str):
+        """Setter guard for every per-affiliation proxy below.
+
+        Per-affiliation fields (location, availability, insurance posture,
+        cost, org_id) live on :class:`ClinicianAffiliation`, not on this
+        row. Writing through the proxy when no affiliation exists used to
+        silently no-op — :class:`Clinician` accepted the write and dropped
+        it, which surfaced in production as "the edit form returned 200
+        but nothing saved" once create-time affiliation became optional.
+        The cure is to refuse the write loudly: callers must give the
+        clinician an affiliation first (PR-2 auto-creates a stub for solo
+        clinicians) or write directly to the target affiliation.
+        """
+        aff = self.primary_clinician_affiliation
+        if aff is None:
+            raise ValueError(
+                f"cannot set {attr_name!r} on a Clinician with no "
+                "ClinicianAffiliation; per-affiliation fields require a "
+                "primary affiliation"
+            )
+        return aff
+
     @property
     def org_id(self):
         aff = self.primary_clinician_affiliation
@@ -146,8 +168,7 @@ class Clinician(BaseModel):
 
     @org_id.setter
     def org_id(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.org_id = value
+        self._require_primary_affiliation("org_id").org_id = value
 
     @property
     def org(self):
@@ -156,8 +177,7 @@ class Clinician(BaseModel):
 
     @org.setter
     def org(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.org = value
+        self._require_primary_affiliation("org").org = value
 
     @property
     def org_name(self) -> str | None:
@@ -171,8 +191,7 @@ class Clinician(BaseModel):
 
     @location_city.setter
     def location_city(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.location_city = value
+        self._require_primary_affiliation("location_city").location_city = value
 
     @property
     def location_state(self) -> str | None:
@@ -181,8 +200,7 @@ class Clinician(BaseModel):
 
     @location_state.setter
     def location_state(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.location_state = value
+        self._require_primary_affiliation("location_state").location_state = value
 
     @property
     def location_zip(self) -> str | None:
@@ -191,8 +209,7 @@ class Clinician(BaseModel):
 
     @location_zip.setter
     def location_zip(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.location_zip = value
+        self._require_primary_affiliation("location_zip").location_zip = value
 
     @property
     def in_person_sessions(self) -> str | None:
@@ -201,8 +218,9 @@ class Clinician(BaseModel):
 
     @in_person_sessions.setter
     def in_person_sessions(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.in_person_sessions = value
+        self._require_primary_affiliation("in_person_sessions").in_person_sessions = (
+            value
+        )
 
     @property
     def virtual_sessions(self) -> str | None:
@@ -211,8 +229,7 @@ class Clinician(BaseModel):
 
     @virtual_sessions.setter
     def virtual_sessions(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.virtual_sessions = value
+        self._require_primary_affiliation("virtual_sessions").virtual_sessions = value
 
     @property
     def accepts_out_of_network(self) -> bool | None:
@@ -221,8 +238,9 @@ class Clinician(BaseModel):
 
     @accepts_out_of_network.setter
     def accepts_out_of_network(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.accepts_out_of_network = value
+        self._require_primary_affiliation(
+            "accepts_out_of_network"
+        ).accepts_out_of_network = value
 
     @property
     def in_network_carriers(self) -> list:
@@ -233,8 +251,9 @@ class Clinician(BaseModel):
 
     @in_network_carriers.setter
     def in_network_carriers(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.in_network_carriers = value
+        self._require_primary_affiliation("in_network_carriers").in_network_carriers = (
+            value
+        )
 
     @property
     def sliding_scale(self) -> bool | None:
@@ -243,8 +262,7 @@ class Clinician(BaseModel):
 
     @sliding_scale.setter
     def sliding_scale(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.sliding_scale = value
+        self._require_primary_affiliation("sliding_scale").sliding_scale = value
 
     @property
     def cost(self) -> str | None:
@@ -253,5 +271,4 @@ class Clinician(BaseModel):
 
     @cost.setter
     def cost(self, value) -> None:
-        if self.primary_clinician_affiliation is not None:
-            self.primary_clinician_affiliation.cost = value
+        self._require_primary_affiliation("cost").cost = value
