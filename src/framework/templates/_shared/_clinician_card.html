@@ -73,8 +73,17 @@
           {%- if _redacted -%}
             {{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}
           {%- elif affiliations -%}
+            {# Solo affiliations (`ClinicianAffiliation` with `org_id`
+               NULL — the row carries practice posture without an
+               organizational entity to point at) render as a plain
+               "Solo practice" chip; org-affiliated rows link to the
+               org page. A clinician with one of each shows both. #}
             {%- for aff in affiliations -%}
-              {{ entity_link('organization', aff.org.name, id=aff.org_id) }}
+              {%- if aff.org -%}
+                {{ entity_link('organization', aff.org.name, id=aff.org_id) }}
+              {%- else -%}
+                <span>Solo practice</span>
+              {%- endif -%}
             {%- endfor -%}
           {%- else -%}
             &mdash;
