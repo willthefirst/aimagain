@@ -404,6 +404,52 @@ async def test_list_clinicians_filters_out_never_verified(
         assert len(clinicians) == 1
 
 
+async def test_list_clinicians_includes_viewers_own_never_verified_row(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Without ``?owner=me``, the unfiltered directory normally hides
+    never-verified rows (``test_list_clinicians_filters_out_never_verified``).
+    The viewer's own in-flight clinician is the documented exception:
+    a brand-new user who just submitted their clinician — and is
+    waiting on NPPES — must still see their row on ``/clinicians``
+    even before ``clinician_verified`` flips. Pinning the SQL-level
+    behavior so the bypass survives any future repo refactor.
+    """
+    viewer = await _seed_user(db_test_session_manager)
+    stranger = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            # Stranger's never-verified row — must stay hidden.
+            stranger_cln = make_clinician_with_org(
+                owner_id=stranger.id,
+                practice_name="Stranger Clinic",
+                clinician_verified=False,
+                npi_match_status="none",
+            )
+            session.add(stranger_cln)
+            # Viewer's own never-verified row — must surface.
+            own_cln = make_clinician_with_org(
+                owner_id=viewer.id,
+                practice_name="My Clinic",
+                clinician_verified=False,
+                npi_match_status="none",
+            )
+            session.add(own_cln)
+
+    async with db_test_session_manager() as session:
+        repo = ClinicianRepository(session)
+        repo._requesting_user = viewer
+        clinicians = await repo.list_clinicians()
+
+    owner_ids = {c.owner_id for c in clinicians}
+    assert (
+        viewer.id in owner_ids
+    ), "viewer's own unverified row must show on /clinicians"
+    assert (
+        stranger.id not in owner_ids
+    ), "stranger's unverified row must stay hidden on /clinicians"
+
+
 async def test_list_clinicians_includes_once_verified_clinicians(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
