@@ -190,6 +190,14 @@ async def handle_list(
         list_kwargs["exclude_self"] = requesting_user
     list_kwargs["offset"] = offset_for(page_number, per_page)
     list_kwargs["limit"] = per_page + 1
+    # Stamp the viewer onto the repo so bespoke ``list_<collection>``
+    # methods can resolve viewer-relative filters (e.g. ``?owner=me`` →
+    # ``self._requesting_user.id``) without re-resolving the dep. This is
+    # the same field ``ReadPolicy``'s dep wrapper sets; setting it
+    # unconditionally here is a no-op when ``_read_guard`` is also
+    # ``None`` (the only consumer of the pair is ``_check_read``).
+    if requesting_user is not None:
+        repo._requesting_user = requesting_user
     list_method = getattr(repo, f"list_{spec.url_collection}", None)
     if list_method is not None:
         items_plus_one = await list_method(**list_kwargs)

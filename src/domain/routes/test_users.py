@@ -455,19 +455,24 @@ async def test_detail_picker_includes_clinicians_and_organizations(
     logged_in_user: User,
 ):
     """`/users/me`'s self-only picker dispatches to the global Clinician
-    and Organization directories — both collections are now open to
+    and Organization directories with `?owner=me` pre-applied so the
+    viewer lands on their own rows. Both directories are reachable for
     every authenticated viewer (identity rows redact per-row at render
-    time), so the picker links straight at `/clinicians` and
-    `/organizations` rather than at a `/users/me/<sub>` subresource."""
+    time); the URL filter narrows the result set to what the viewer
+    can manage."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
     assert "Clinicians" in headings
     assert "Organizations" in headings
-    clinicians_link = tree.css_first("article.picker-option a[href$='/clinicians']")
+    clinicians_link = tree.css_first(
+        "article.picker-option a[href$='/clinicians?owner=me']"
+    )
     assert clinicians_link is not None
-    orgs_link = tree.css_first("article.picker-option a[href$='/organizations']")
+    orgs_link = tree.css_first(
+        "article.picker-option a[href$='/organizations?owner=me']"
+    )
     assert orgs_link is not None
 
 

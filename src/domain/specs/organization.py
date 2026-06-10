@@ -31,6 +31,7 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
     StateAxis,
 )
+from src.framework.dispatch.filters import ChoiceFilter
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.redirects import Redirects
 
@@ -78,6 +79,22 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
         form_edit=True,
     ),
     list_order_by=Organization.created_at.desc(),
+    # `?owner=me` scopes the list to orgs the viewer is affiliated with
+    # — owned OR holds a verified rep (see
+    # `OrganizationRepository.list_organizations`). Declaring `filters`
+    # auto-mounts `/organizations/search` and turns the list page's
+    # content area into a two-column browse layout — sidebar form +
+    # results. The picker on `/users/me` links here with `?owner=me`
+    # pre-applied so users land on their own orgs.
+    filters=(
+        ChoiceFilter(
+            name="owner",
+            label="Owner",
+            choices=(("me", "Mine only"),),
+            multi=False,
+            radio=True,
+        ),
+    ),
     create_redirect=_organization_create_redirect,
     update_redirect=_organization_form_redirect,
     # Opt into the HX-Request re-render-on-validation-failure path —

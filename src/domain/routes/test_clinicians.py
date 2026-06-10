@@ -653,6 +653,39 @@ async def test_list_clinicians_shows_licensure_states(
     assert licensed_in_cell.text(strip=True) == "CA, CT"
 
 
+async def test_list_owner_me_scopes_to_viewer_owned_clinicians(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """``?owner=me`` filters the directory to clinicians the viewer
+    owns. Unlike the default directory listing, the verified-only
+    filter is bypassed when ``owner=me`` so the viewer's in-flight,
+    unverified row still surfaces — owners need to see what they've
+    created before NPPES verification lands."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    await _seed_clinician_for(
+        db_test_session_manager, user_id=other.id, practice_name="Stranger Clinic"
+    )
+    own_id = await _seed_clinician_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="My Clinic",
+    )
+
+    response = await authenticated_client.get("/clinicians?owner=me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#clinicians-list article.entity-card")
+    assert len(rows) == 1, "?owner=me must return only the viewer's own clinician"
+    assert rows[0].attributes.get("data-row-id") == str(own_id)
+    assert "My Clinic" in response.text
+    assert "Stranger Clinic" not in response.text
+
+
 async def test_list_clinicians_renders_create_toolbar_action(
     superuser_client: AsyncClient,
 ):
