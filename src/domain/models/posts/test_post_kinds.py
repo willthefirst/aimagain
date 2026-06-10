@@ -91,7 +91,8 @@ def test_explicit_template_paths_override_convention():
         detail_model=ReferralDetail,
         detail_relationship="weird_detail",
         detail_fields=(),
-        list_label="weird",
+        noun="Weird",
+        picker_description="A weird kind for tests.",
         create_template="posts/custom_create.html",
     )
     # Override sticks; the unset edit_template still defaults.

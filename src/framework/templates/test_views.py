@@ -362,9 +362,9 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
     an edit view) above an `<h1>"Edit <noun>"` sourced from
     `edit_heading`. The back link's label is the row's identity
     (`current_label`) — "back to Sunrise Therapy" is the natural verb.
-    The H1 reads the resource noun ("clinician", "clinician opening",
-    "client referral") rather than the row's identity, mirroring the
-    create-page contract where `create_heading` sources the H1."""
+    The H1 reads the resource noun ("clinician", "Opening", "Referral")
+    rather than the row's identity, mirroring the create-page contract
+    where `create_heading` sources the H1."""
     env = _make_env()
     _add_child(
         env,

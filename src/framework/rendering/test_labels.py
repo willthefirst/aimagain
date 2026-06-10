@@ -8,7 +8,7 @@ The helpers are the single source of truth for every "Create X" /
      `src.domain.specs.ALL_ENTITY_SPECS` resolves to a non-empty
      label via the helpers. If a future spec lands without a
      `singular_label` or without a `discriminator`-backed
-     `list_label`, this test fails at import time of the suite.
+     `noun`, this test fails at import time of the suite.
 """
 
 from __future__ import annotations
@@ -31,19 +31,18 @@ def test_create_label_uses_singular_label_for_non_polymorphic_spec():
     assert create_label_for(ORGANIZATION_ENTITY) == "Create organization"
 
 
-def test_create_label_uses_per_kind_list_label_when_kind_supplied():
+def test_create_label_uses_per_kind_noun_when_kind_supplied():
     """Whole-supertype face (`/posts`) renders the per-kind noun when
     `kind=` is passed — what the picker option labels and the
-    kind-specific form pages both call."""
+    kind-specific form pages both call. Nouns are capital-case
+    (`POST_KINDS[k].noun`); the picker, sidebar filter, and "Create X"
+    headline all share that SOT."""
     from src.domain.specs.posts import POST_ENTITY
 
-    assert create_label_for(POST_ENTITY, kind="referral") == "Create client referral"
+    assert create_label_for(POST_ENTITY, kind="referral") == "Create Referral"
+    assert create_label_for(POST_ENTITY, kind="clinician_opening") == "Create Opening"
     assert (
-        create_label_for(POST_ENTITY, kind="clinician_opening")
-        == "Create clinician opening"
-    )
-    assert (
-        create_label_for(POST_ENTITY, kind="program_intake") == "Create program intake"
+        create_label_for(POST_ENTITY, kind="program_intake") == "Create Program intake"
     )
 
 
@@ -62,19 +61,16 @@ def test_edit_label_uses_singular_label_for_non_polymorphic_spec():
     assert edit_label_for(ORGANIZATION_ENTITY) == "Edit organization"
 
 
-def test_edit_label_uses_per_kind_list_label_when_kind_supplied():
+def test_edit_label_uses_per_kind_noun_when_kind_supplied():
     """The edit page for a whole-supertype face's row reads the row's
     stored kind off the loaded target — `handle_get_edit_form` derives
     this and passes it as `kind=`. Same per-kind noun the create page
     uses for the matching form."""
     from src.domain.specs.posts import POST_ENTITY
 
-    assert edit_label_for(POST_ENTITY, kind="referral") == "Edit client referral"
-    assert (
-        edit_label_for(POST_ENTITY, kind="clinician_opening")
-        == "Edit clinician opening"
-    )
-    assert edit_label_for(POST_ENTITY, kind="program_intake") == "Edit program intake"
+    assert edit_label_for(POST_ENTITY, kind="referral") == "Edit Referral"
+    assert edit_label_for(POST_ENTITY, kind="clinician_opening") == "Edit Opening"
+    assert edit_label_for(POST_ENTITY, kind="program_intake") == "Edit Program intake"
 
 
 def test_filter_label_uses_url_collection():

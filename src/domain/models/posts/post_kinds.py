@@ -20,13 +20,25 @@ class PostKindSpec:
     convention; today none does. The convention plus the directory listing
     under `src/domain/templates/posts/` is the single source of truth for what
     templates a kind ships.
+
+    ``noun`` is the **canonical capital-case noun** for the kind — the
+    SOT every user-facing reference to "what is this kind called" reads
+    from: the /posts/form kind picker, the /posts sidebar `kind` filter
+    options, and the Create / Edit / Filter page headlines (e.g.
+    ``"Create Referral"`` / ``"Edit Opening"`` /
+    ``"Create Program intake"``). Adding a kind or renaming one is a
+    one-place change here.
+
+    ``picker_description`` is the one-line tagline shown under the noun
+    on /posts/form — written for the mental-health-provider audience.
     """
 
     name: str
     detail_model: type
     detail_relationship: str
     detail_fields: tuple[str, ...]
-    list_label: str
+    noun: str
+    picker_description: str
     create_template: str | None = None
     edit_template: str | None = None
 
@@ -61,21 +73,29 @@ POST_KINDS: Final[DiscriminatorRegistry[PostKindSpec]] = DiscriminatorRegistry(
             detail_model=ReferralDetail,
             detail_relationship="referral_detail",
             detail_fields=_detail_fields(ReferralDetail),
-            list_label="client referral",
+            noun="Referral",
+            picker_description="Refer a client to another provider.",
         ),
         "clinician_opening": PostKindSpec(
             name="clinician_opening",
             detail_model=OpeningDetail,
             detail_relationship="opening_detail",
             detail_fields=_detail_fields(OpeningDetail),
-            list_label="clinician opening",
+            noun="Opening",
+            picker_description=(
+                "List an opening on your caseload and the kind of client "
+                "you're looking to fill it with."
+            ),
         ),
         "program_intake": PostKindSpec(
             name="program_intake",
             detail_model=IntakeDetail,
             detail_relationship="intake_detail",
             detail_fields=_detail_fields(IntakeDetail),
-            list_label="program intake",
+            noun="Program intake",
+            picker_description=(
+                "Announce open intake slots at a program your organization runs."
+            ),
         ),
     },
 )

@@ -81,12 +81,14 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     ),
     # Whole-supertype face: `kind` filter exposes the full registry of
     # kinds so list/search can narrow to one kind without leaving
-    # ``/posts``. Each kind's display label comes from `POST_KINDS[k].list_label`.
+    # ``/posts``. Each kind's display label comes from `POST_KINDS[k].noun`
+    # — the same SOT the /posts/form picker headings and the H1 / CTA
+    # chain read from.
     filters=(
         ChoiceFilter(
             name="kind",
             label="Type",
-            choices=tuple((k, POST_KINDS[k].list_label) for k in POST_KINDS.names),
+            choices=tuple((k, POST_KINDS[k].noun) for k in POST_KINDS.names),
             multi=True,
         ),
         TextFilter(name="q", label="Description", placeholder="Search descriptions…"),

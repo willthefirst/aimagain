@@ -121,14 +121,18 @@ async def test_form_new_picker_responds_200(
     """`/posts/form` (no `?kind=`) renders the kind-picker page so the
     user can pick which kind to create. Rendered via the shared
     `_picker.html` macro — one card per kind, each deep-linking to
-    `?kind=<value>`."""
+    `?kind=<value>`. Headings come from `POST_KINDS[k].noun` (the SOT
+    after #1330); descriptions come from `POST_KINDS[k].picker_description`."""
     response = await authenticated_client.get("/posts/form")
     assert response.status_code == 200
     body = response.text
-    for heading in ("Referral", "Clinician", "Organization"):
+    for heading in ("Referral", "Opening", "Program intake"):
         assert f">{heading}</a>" in body
     for kind in ("referral", "clinician_opening", "program_intake"):
         assert f"?kind={kind}" in body
+    # The picker no longer wraps its heading in a `<header>` band
+    # (#1330 — the cards render flatter via Pico's default chrome).
+    assert "<header>" not in body
 
 
 @pytest.mark.parametrize("kind", ["referral", "clinician_opening", "program_intake"])
@@ -152,7 +156,10 @@ async def test_search_form_renders_kind_filter(
 ):
     """The whole-supertype face exposes a `kind` filter on its search
     form so the viewer can narrow the unified feed to one kind. The
-    filter is a multi-select with every registered kind as a choice."""
+    filter is a multi-select with every registered kind as a choice.
+    The visible labels come from `POST_KINDS[k].noun` — the same SOT
+    the /posts/form picker headings read from (#1330), so the sidebar
+    and the picker can't drift."""
     response = await authenticated_client.get("/posts/search")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
@@ -160,6 +167,16 @@ async def test_search_form_renders_kind_filter(
     assert kind_inputs, "/posts/search did not render a `kind` input"
     values = {inp.attributes.get("value") for inp in kind_inputs}
     assert {"referral", "clinician_opening", "program_intake"} <= values
+    # Visible labels match the canonical nouns (capital-case). Scope
+    # to the `kind` fieldset's <label>s to avoid catching other
+    # checkbox labels on the page.
+    fieldset = next(
+        fs
+        for fs in tree.css("fieldset.search-checkbox-fieldset")
+        if fs.css_first("legend") and fs.css_first("legend").text(strip=True) == "Type"
+    )
+    visible = {lbl.text(strip=True) for lbl in fieldset.css("label")}
+    assert {"Referral", "Opening", "Program intake"} <= visible
 
 
 async def test_search_uses_framework_filter_form(
