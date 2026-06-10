@@ -202,6 +202,59 @@ async def test_setting_clinician_names_persists(session):
     assert clinician.last_name == "Hart"
 
 
+# --- Per-affiliation proxy setters ---------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_setting_per_affiliation_field_with_no_affiliation_raises():
+    """Per-affiliation fields (location, availability, insurance posture,
+    cost, org_id) live on :class:`ClinicianAffiliation`. Writing through
+    the proxy when no affiliation exists used to silently drop the write
+    — the canonical "edit form returned 200 but nothing saved" prod bug
+    once create-time affiliation became optional. The setter must now
+    refuse the write loudly so the failure is visible."""
+    user = _make_user("solo")
+    clinician = Clinician(
+        owner_id=user.id,
+        first_name="Solo",
+        last_name="Practitioner",
+        npi="1234567890",
+    )
+    assert clinician.primary_clinician_affiliation is None
+    for attr, value in (
+        ("org_id", uuid.uuid4()),
+        ("location_city", "Brooklyn"),
+        ("location_state", "NY"),
+        ("location_zip", "11201"),
+        ("in_person_sessions", "yes"),
+        ("virtual_sessions", "please_contact"),
+        ("accepts_out_of_network", True),
+        ("in_network_carriers", []),
+        ("sliding_scale", False),
+        ("cost", "$150"),
+    ):
+        with pytest.raises(ValueError, match=f"cannot set '{attr}'"):
+            setattr(clinician, attr, value)
+
+
+@pytest.mark.asyncio
+async def test_setting_per_affiliation_field_with_affiliation_writes_through():
+    """When a primary affiliation exists the proxy setter writes through
+    to it — the path the clinician edit form takes for any clinician
+    that has one."""
+    user = _make_user("affd")
+    org = _make_org("Acme", user.id)
+    clinician = _make_clinician(owner=user, org=org)
+    assert clinician.primary_clinician_affiliation is not None
+
+    clinician.location_city = "Queens"
+    clinician.in_person_sessions = "no"
+    clinician.cost = "$200"
+    assert clinician.primary_clinician_affiliation.location_city == "Queens"
+    assert clinician.primary_clinician_affiliation.in_person_sessions == "no"
+    assert clinician.primary_clinician_affiliation.cost == "$200"
+
+
 # --- Claim A verification columns -----------------------------------------
 
 
