@@ -20,7 +20,7 @@
    insurance, cost, org) lives on `ClinicianAffiliation` because the
    same person can have different posture at different practice contexts
    (telehealth solo + in-person group, etc.) — those edits happen on the
-   Affiliations list below, not on this form. See the affiliations cluster
+   Practices list below, not on this form. See the affiliations cluster
    README for the "affiliation is the practice-posture container" model. #}
   <form hx-patch="{{ entity_url('clinician', id=clinician.id) }}">
     {% call form_section("Clinician") %}
@@ -35,9 +35,15 @@
    own self-contained mini-form; the section headings group them
    visually but they're not part of the clinician's edit grid. #}
   <section>
-    {# Affiliations — clinician's practice-role rows. #}
-    <h2>Affiliations</h2>
-    {% call(aff) credential_list(clinician.clinician_affiliations, "No affiliations yet.") %}
+    {# Practices — clinician's `ClinicianAffiliation` rows. The DB model
+       calls them affiliations because that's what the (clinician × org)
+       join is; in the UI we just call them practices because that's
+       what they are to the user. A row with `org_id` NULL is a solo
+       practice — the affiliation owns the posture, with no
+       organizational entity to point at. See the affiliations cluster
+       README. #}
+    <h2>Practices</h2>
+    {% call(aff) credential_list(clinician.clinician_affiliations, "No practices yet.") %}
       {%- set meta_parts = [
             aff.location_city,
             aff.location_state,
@@ -49,13 +55,13 @@
             "Sliding scale" if aff.sliding_scale else None,
             aff.cost,
             ] -%}
-      {{ credential_row(aff.org.name,
-            meta_parts,
-            delete_url=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string,
-      delete_confirm="Remove this affiliation?",
+      {{ credential_row((aff.org.name if aff.org else "Solo practice") ,
+      meta_parts,
+      delete_url=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string,
+      delete_confirm="Remove this practice?",
       ) }}
     {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations", "Add affiliation", "Add affiliation") %}
+    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations", "Add another practice", "Add another practice") %}
       <label for="aff_org_id">
         Organization
         <select id="aff_org_id" name="org_id" required>
