@@ -33,7 +33,9 @@ async def get_email_form(
     request: Request,
     current_user: User = Depends(current_active_user),
 ):
-    label, url = email_provider_search_url(current_user.email, settings.EMAIL_FROM)
+    label, url, ios_url = email_provider_search_url(
+        current_user.email, settings.EMAIL_FROM
+    )
     return APIResponse.html_response(
         template_name="users/email_form.html",
         context={
@@ -49,6 +51,7 @@ async def get_email_form(
             # viewer is unverified; harmless to compute either way.
             "provider_label": label,
             "provider_url": url,
+            "provider_ios_url": ios_url,
             "from_address": settings.EMAIL_FROM,
             "just_sent": request.query_params.get("sent") == "1",
         },

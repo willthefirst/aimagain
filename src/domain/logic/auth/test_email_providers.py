@@ -16,41 +16,50 @@ ENCODED_QUERY = "from%3Ano-reply%40bedlamconnect.com"
 
 
 @pytest.mark.parametrize(
-    "email,expected_label,expected_url",
+    "email,expected_label,expected_url,expected_ios_url",
     [
         (
             "alice@gmail.com",
             "Gmail",
             f"https://mail.google.com/mail/u/0/#search/{ENCODED_QUERY}",
+            "googlegmail://",
         ),
         (
             "ALICE@GMAIL.COM",
             "Gmail",
             f"https://mail.google.com/mail/u/0/#search/{ENCODED_QUERY}",
+            "googlegmail://",
         ),
         (
             "bob@googlemail.com",
             "Gmail",
             f"https://mail.google.com/mail/u/0/#search/{ENCODED_QUERY}",
+            "googlegmail://",
         ),
         (
             "carol@yahoo.com",
             "Yahoo Mail",
             f"https://mail.yahoo.com/d/search/keyword={ENCODED_QUERY}",
+            None,
         ),
         (
             "dave@yahoo.co.uk",
             "Yahoo Mail",
             f"https://mail.yahoo.com/d/search/keyword={ENCODED_QUERY}",
+            None,
         ),
     ],
 )
 def test_known_provider_returns_label_and_search_url(
-    email: str, expected_label: str, expected_url: str
+    email: str,
+    expected_label: str,
+    expected_url: str,
+    expected_ios_url: str | None,
 ):
-    label, url = email_provider_search_url(email, FROM)
+    label, url, ios_url = email_provider_search_url(email, FROM)
     assert label == expected_label
     assert url == expected_url
+    assert ios_url == expected_ios_url
 
 
 @pytest.mark.parametrize(
@@ -69,22 +78,24 @@ def test_known_provider_returns_label_and_search_url(
     ],
 )
 def test_unknown_provider_returns_none(email: str):
-    label, url = email_provider_search_url(email, FROM)
+    label, url, ios_url = email_provider_search_url(email, FROM)
     assert label is None
     assert url is None
+    assert ios_url is None
 
 
 @pytest.mark.parametrize("malformed", ["", "noatsign", "alice@", "@gmail.com"])
 def test_malformed_email_returns_none(malformed: str):
-    label, url = email_provider_search_url(malformed, FROM)
+    label, url, ios_url = email_provider_search_url(malformed, FROM)
     assert label is None
     assert url is None
+    assert ios_url is None
 
 
 def test_from_address_is_url_encoded():
     """A from address with characters that need encoding (`+`, spaces)
     must still produce a valid URL fragment."""
-    label, url = email_provider_search_url(
+    label, url, ios_url = email_provider_search_url(
         "alice@gmail.com", "no-reply+verify@bedlamconnect.com"
     )
     assert label == "Gmail"
@@ -92,3 +103,6 @@ def test_from_address_is_url_encoded():
     # operator-ish in some clients; safer to encode).
     assert "%2B" in url
     assert "no-reply%2Bverify%40bedlamconnect.com" in url
+    # iOS URL scheme is independent of the from address (the scheme
+    # opens Gmail's default inbox view, not a search).
+    assert ios_url == "googlegmail://"
