@@ -17,13 +17,21 @@ The heading is a vanilla `<h2><a>` link; the description is a plain `<p>`.
 No custom CSS — markup alone carries the look.
 
 Each option is a dict with keys:
-  href:        URL to navigate to on click (ignored when selected=true)
-  heading:     short label (e.g. "Solo practice")
-  description: one-line tagline
-  selected:    (optional bool) when true, renders the heading without a
-               link and tags the card with `aria-current="page"` so the
-               active path can't be re-selected — marked with a checkmark
-               glyph in front of the heading.
+  href:          URL to navigate to on click (ignored when selected=true
+                 or locked_reason is set)
+  heading:       short label (e.g. "Solo practice")
+  description:   one-line tagline
+  selected:      (optional bool) when true, renders the heading without a
+                 link and tags the card with `aria-current="page"` so the
+                 active path can't be re-selected — marked with a checkmark
+                 glyph in front of the heading.
+  locked_reason: (optional `REASON_*` code) when set, the heading renders
+                 as a `data-locked-cta` anchor with a lock glyph instead
+                 of a real link — clicking opens the popover whose copy
+                 comes from `capabilities.reason_meta(reason)`. Mutually
+                 exclusive with `selected`. Used when a tile points at a
+                 capability the viewer doesn't yet hold (e.g.
+                 program-intake on /posts/form for a non-org-rep user).
 #}
 {%- macro picker(options) -%}
   {%- for opt in options %}
@@ -31,6 +39,18 @@ Each option is a dict with keys:
       <article class="picker-option" aria-current="page">
         <h2>
           <i class="icon-check"></i> {{ opt.heading }}
+        </h2>
+        <p>{{ opt.description }}</p>
+      </article>
+    {%- elif opt.locked_reason %}
+      <article class="picker-option">
+        <h2>
+          <a class="locked-link"
+             aria-disabled="true"
+             tabindex="0"
+             data-locked-cta="{{ opt.locked_reason }}">
+            <i class="icon-lock" aria-hidden="true"></i> {{ opt.heading }}
+          </a>
         </h2>
         <p>{{ opt.description }}</p>
       </article>

@@ -78,6 +78,7 @@ affordances". JS lives inline in `src/framework/templates/base.html`. #}
   {%- set _all = [
     capabilities.REASON_EMAIL_UNVERIFIED,
     capabilities.REASON_NETWORK_UNVERIFIED,
+    capabilities.REASON_PROGRAM_INTAKE_LOCKED,
     ] -%}
   {%- for reason in _all -%}
     {%- set meta = capabilities.reason_meta(reason) -%}
