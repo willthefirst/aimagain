@@ -65,6 +65,11 @@ REASON_EMAIL_UNVERIFIED = "email_unverified"
 # (create post CTA) are locked. Fixed by completing any verification
 # path (Claim A or Claim B).
 REASON_NETWORK_UNVERIFIED = "network_unverified"
+# Program-intake gate: the user can't currently publish a program-intake
+# post on /posts/form. Three sub-conditions feed it (email + verified
+# org rep + an owned program); the capability detail page renders the
+# tree so the user can see exactly which step is open.
+REASON_PROGRAM_INTAKE_LOCKED = "program_intake_locked"
 
 
 @dataclass(frozen=True)
@@ -108,6 +113,12 @@ _REASON_META = {
         unlock="Get provider network access to unlock this.",
         fix_label="Get access",
         fix_url="/users/me/access/capabilities/provider-network",
+    ),
+    REASON_PROGRAM_INTAKE_LOCKED: ReasonMeta(
+        title="Program intake",
+        unlock="Verify your organization and add a program to unlock this.",
+        fix_label="Get access",
+        fix_url="/users/me/access/capabilities/program-intake",
     ),
 }
 
@@ -248,6 +259,23 @@ def _org_rep_any_leaf(user: Any) -> Condition:
     )
 
 
+def _owns_program_leaf(user: Any) -> Condition:
+    """Does the user own at least one `Program`? The `User.programs`
+    relationship (selectin) is the source of truth; the create flow at
+    `/programs/form` is what changes it. Note this leaf doesn't filter
+    by the program's org being verified — the per-row write gate in
+    `_assert_post_payload_capability` re-checks `org_rep_verified` for
+    the specific program's org at create time, so the picker only needs
+    the "has any program" shape here."""
+    programs = getattr(user, "programs", None) or ()
+    return Condition(
+        label_active="Add a program",
+        label_done="Program added",
+        met=bool(programs),
+        fix_url="/programs/form",
+    )
+
+
 def check_network(user: Any) -> CapabilityCheck:
     """Structured capability check for full-feed read access.
 
@@ -274,6 +302,51 @@ def check_network(user: Any) -> CapabilityCheck:
             ),
         ),
     )
+
+
+def check_program_intake(user: Any) -> CapabilityCheck:
+    """Structured capability check for publishing a program-intake post.
+
+    Tree: email_verified AND any_org_rep_verified AND owns_a_program.
+    Each conjunct corresponds to one Condition leaf with its own
+    `fix_url`, so the user can see exactly which step is open and click
+    straight into it.
+
+    Per-row Claim B for the specific program's org is *not* enforced
+    here — `_assert_post_payload_capability` (Phase 5) does that at
+    create time against the chosen program. This check is the per-user
+    "should the picker tile be lit" gate; the post payload hook is the
+    per-row write gate.
+    """
+    return CapabilityCheck(
+        name="program-intake",
+        description="Publish a program intake on /posts/form.",
+        tree=Bundle(
+            label_active="Program intake",
+            label_done="Program intake",
+            children=(
+                _email_leaf(user),
+                _org_rep_any_leaf(user),
+                _owns_program_leaf(user),
+            ),
+        ),
+    )
+
+
+def can_post_program_intake_picker(user: Any) -> bool:
+    """Picker-tile gate: superuser bypass, otherwise the structured
+    check.
+
+    Symmetric with `can_access_network` — both are the boolean form of
+    the matching `check_*` for surfaces that only need granted/not
+    (the picker tile, the locked-CTA branch). Per-row authorization on
+    the post create payload stays with
+    `can_post_program_intake(user, org)` and its caller in
+    `_assert_post_payload_capability`.
+    """
+    if getattr(user, "is_superuser", False):
+        return True
+    return check_program_intake(user).granted
 
 
 def can_access_network(user: Any) -> bool:

@@ -124,6 +124,46 @@ def test_picker_selected_option_renders_marked_card_not_a_link() -> None:
     assert links[0].attributes.get("href") == "/x/form?kind=b"
 
 
+def test_picker_locked_option_renders_locked_link_with_reason() -> None:
+    """A ``locked_reason`` option renders the heading as a `data-locked-cta`
+    anchor (no `href`) with the lock glyph, so the locked-affordance JS
+    in base.html can anchor its popover. Other options stay as normal
+    link cards — the locked branch is per-option, not per-picker."""
+    env = _make_env()
+    options = [
+        {
+            "href": "/posts/form?kind=referral",
+            "heading": "Referral",
+            "description": "Place a client.",
+        },
+        {
+            "href": "/posts/form?kind=program_intake",
+            "heading": "Program intake",
+            "description": "Announce open slots.",
+            "locked_reason": "program_intake_locked",
+        },
+    ]
+    tree = HTMLParser(_render_picker(env, options))
+
+    cards = tree.css("article.picker-option")
+    assert len(cards) == 2
+    # First tile is a normal link card.
+    first_link = cards[0].css_first("h2 a")
+    assert first_link.attributes.get("href") == "/posts/form?kind=referral"
+    assert first_link.attributes.get("data-locked-cta") is None
+    # Locked tile renders a locked-link anchor with the reason code and no
+    # navigable href — clicking opens the popover instead of landing on
+    # the form.
+    locked = cards[1].css_first("h2 a")
+    assert locked.attributes.get("data-locked-cta") == "program_intake_locked"
+    assert locked.attributes.get("href") is None
+    assert locked.attributes.get("aria-disabled") == "true"
+    assert "locked-link" in locked.attributes.get("class", "")
+    assert cards[1].css_first("h2 i.icon-lock") is not None
+    # The description still renders so the user sees what the tile is for.
+    assert cards[1].css_first("p").text(strip=True) == "Announce open slots."
+
+
 def test_picker_empty_options_renders_nothing() -> None:
     """An empty option list renders no cards — the macro stacks vanilla
     ``<article>`` blocks, so with zero options it emits nothing for the

@@ -11,6 +11,13 @@ an existing one is a one-place change in
 `src/domain/models/posts/post_kinds.py`; this picker, the /posts
 sidebar `kind` filter, and every "Create X" / "Edit X" headline all
 read from the same field.
+
+Per-kind locking: a tile renders as a locked-CTA (lock icon + popover)
+when the viewer doesn't yet hold the capability that kind requires.
+`program_intake` is gated on `capabilities.check_program_intake` —
+email + verified org rep + an owned program; the other kinds carry no
+per-tile lock here (their per-row authz lives at create time in
+`_assert_post_payload_capability`).
 #}
 {% extends "views/form_new.html" %}
 {%- from "_shared/_picker.html" import picker -%}
@@ -18,10 +25,16 @@ read from the same field.
 {% block form_content %}
   {%- set _opts = namespace(items=[]) -%}
   {%- for kind in POST_KINDS.values() -%}
+    {%- set _locked_reason = none -%}
+    {%- if kind.name == "program_intake"
+      and not capabilities.can_post_program_intake_picker(current_user) -%}
+      {%- set _locked_reason = capabilities.REASON_PROGRAM_INTAKE_LOCKED -%}
+    {%- endif -%}
     {%- set _opts.items = _opts.items + [
         {"href": entity_form_url("post") + "?kind=" + kind.name,
         "heading": kind.noun,
-        "description": kind.picker_description}
+        "description": kind.picker_description,
+        "locked_reason": _locked_reason}
         ] -%}
   {%- endfor -%}
   {{ picker(_opts.items) }}

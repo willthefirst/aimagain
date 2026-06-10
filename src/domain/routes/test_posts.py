@@ -120,16 +120,25 @@ async def test_form_new_picker_responds_200(
 ):
     """`/posts/form` (no `?kind=`) renders the kind-picker page so the
     user can pick which kind to create. Rendered via the shared
-    `_picker.html` macro — one card per kind, each deep-linking to
-    `?kind=<value>`. Headings come from `POST_KINDS[k].noun` (the SOT
-    after #1330); descriptions come from `POST_KINDS[k].picker_description`."""
+    `_picker.html` macro — one card per kind. Headings come from
+    `POST_KINDS[k].noun` (the SOT after #1330); descriptions come from
+    `POST_KINDS[k].picker_description`. Tiles for kinds whose
+    capability the viewer doesn't hold render as a locked-CTA instead
+    of a navigable `?kind=` link — `program_intake` is gated on
+    `capabilities.check_program_intake` and is locked for the default
+    test user (no verified org rep, no owned program)."""
     response = await authenticated_client.get("/posts/form")
     assert response.status_code == 200
     body = response.text
     for heading in ("Referral", "Opening", "Program intake"):
-        assert f">{heading}</a>" in body
-    for kind in ("referral", "clinician_opening", "program_intake"):
+        assert heading in body
+    # Unlocked tiles deep-link via `?kind=<value>`.
+    for kind in ("referral", "clinician_opening"):
         assert f"?kind={kind}" in body
+    # The program-intake tile is locked for the default test user, so its
+    # heading is a `data-locked-cta` anchor with no navigable href.
+    assert "?kind=program_intake" not in body
+    assert 'data-locked-cta="program_intake_locked"' in body
     # The picker no longer wraps its heading in a `<header>` band
     # (#1330 — the cards render flatter via Pico's default chrome).
     assert "<header>" not in body
