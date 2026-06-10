@@ -15,6 +15,7 @@ from src.framework.audit.repository import AuditRepository
 from tests.helpers import (
     clinician_payload,
     create_test_user,
+    make_clinician,
     make_clinician_licensure,
     make_clinician_with_org,
     make_organization_row,
@@ -1254,11 +1255,11 @@ async def test_owner_edit_form_renders_affiliations_section(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The clinician edit page surfaces every ClinicianAffiliation row in a
-    dedicated "Affiliations" section with inline add and per-row
-    delete — #642 PR 1's UI. The Clinician's initial ClinicianAffiliation
-    (built by `Clinician.__init__` from the create payload) appears
-    prefilled."""
+    """The clinician edit page surfaces every `ClinicianAffiliation` row
+    in a dedicated section. The DB model calls them affiliations
+    (clinician × org); the UI surfaces them as "Practices" because
+    that's what they are to the user — including the solo case where
+    `org_id` is NULL. Inline add + per-row delete are present."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -1268,7 +1269,7 @@ async def test_owner_edit_form_renders_affiliations_section(
     tree = HTMLParser(response.text)
 
     headings = [h.text(strip=True) for h in tree.css("h2")]
-    assert "Affiliations" in headings
+    assert "Practices" in headings
 
     # The inline add form posts to /clinicians/{id}/clinician_affiliations.
     add_form = tree.css_first(
@@ -1450,6 +1451,55 @@ async def test_owner_edit_form_renders_credentials_as_rows(
     assert meta is not None
     assert "L-12345" in meta.text()
     assert "CA" in meta.text()
+
+
+async def test_owner_edit_form_renders_solo_affiliation_without_crashing(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Solo clinician path: a `ClinicianAffiliation` with `org_id` NULL
+    (the shape #1311 introduced for solo practitioners) renders without
+    dereferencing `aff.org.name`. The row label falls back to
+    "Solo practice" and the section heading reads "Practices" — the UI
+    drops the "affiliation" word in the solo case, matching how the
+    user thinks about it."""
+    from src.domain.models import Clinician, ClinicianAffiliation
+
+    clinician = make_clinician(
+        owner_id=logged_in_user.id,
+        first_name="Janet",
+        last_name="Solo",
+    )
+    clinician.clinician_affiliations = [ClinicianAffiliation(clinician=clinician)]
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+        await session.refresh(clinician)
+    clinician_id = clinician.id
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # Section heading is "Practices", not "Affiliations".
+    headings = [h.text(strip=True) for h in tree.css("h2")]
+    assert "Practices" in headings
+    assert "Affiliations" not in headings
+    # The solo affiliation row's label falls back to "Solo practice".
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Clinician, clinician_id)
+        aff_id = loaded.clinician_affiliations[0].id
+    delete = tree.css_first(
+        f'button[hx-delete="/clinicians/{clinician_id}/clinician_affiliations/{aff_id}"]'
+    )
+    assert delete is not None
+    row = delete.parent
+    while row is not None and "credential-row" not in (
+        row.attributes.get("class") or ""
+    ):
+        row = row.parent
+    assert row is not None
+    assert row.css_first("strong").text(strip=True) == "Solo practice"
 
 
 async def test_admin_can_open_edit_form_for_any_clinician(
