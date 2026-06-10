@@ -14,28 +14,24 @@
   {% endcall %}
 {% endblock %}
 {% block content %}
-  <ul class="capability-list">
-    {% for name, check in checks.items() %}
-      <li>
-        <article>
-          <header>
-            <hgroup>
-              <h3>{{ check.tree.label_active }}</h3>
-              {% if check.description %}<p>{{ check.description }}</p>{% endif %}
-            </hgroup>
-            <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
-              {% if check.bypass %}
-                <i class="icon-check" aria-hidden="true"></i>Available (superuser)
-              {% elif check.granted %}
-                <i class="icon-check" aria-hidden="true"></i>Available
-              {% else %}
-                <i class="icon-lock" aria-hidden="true"></i>Not available yet
-              {% endif %}
-            </small>
-          </header>
-          <a href="{{ capability_base_url }}/{{ name }}">View requirements →</a>
-        </article>
-      </li>
-    {% endfor %}
-  </ul>
+  {% for name, check in checks.items() %}
+    <article>
+      <header>
+        <hgroup>
+          <h3>{{ check.tree.label_active }}</h3>
+          {% if check.description %}<p>{{ check.description }}</p>{% endif %}
+        </hgroup>
+        <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
+          {% if check.bypass %}
+            <i class="icon-check" aria-hidden="true"></i>Available (superuser)
+          {% elif check.granted %}
+            <i class="icon-check" aria-hidden="true"></i>Available
+          {% else %}
+            <i class="icon-lock" aria-hidden="true"></i>Not available yet
+          {% endif %}
+        </small>
+      </header>
+      <a href="{{ capability_base_url }}/{{ name }}">View requirements →</a>
+    </article>
+  {% endfor %}
 {% endblock %}
