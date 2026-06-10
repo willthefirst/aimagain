@@ -415,26 +415,43 @@ it's dev-only chrome that should never ship to production. #}
         ]) }}
       </section>
       <section class="gallery-section" id="checkboxes">
-        <h2>Search checkboxes</h2>
+        <h2>
+          Checkbox list (<code>.checkbox-list</code>)
+        </h2>
         <p>
-          <small>Rendered via <code>_shared/forms.html</code> → <code>filter_checkbox()</code>. used in filter sidebars and search pages.</small>
+          <small>Shared scrollable list-of-checkboxes primitive. Base class caps height + scrolls; modifiers layer on chrome (<code>.checkbox-list-bordered</code>) or layout (<code>.checkbox-list-grid</code>). Used by search/list filter sidebars (<code>_shared/_filter_field.html</code>) and by <code>multi_select_field</code> in entity forms.</small>
         </p>
-        <h3>Single-column (default)</h3>
+        <h3>Single-column (default — filter sidebar)</h3>
         <fieldset class="search-checkbox-fieldset">
           {{ icon_legend('filter', 'Kind') }}
-          {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
-          {{ filter_checkbox("kind", "clinician_opening", "Opening", checked=False) }}
-          {{ filter_checkbox("kind", "program_intake", "Intake", checked=False) }}
+          <div class="checkbox-list">
+            {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
+            {{ filter_checkbox("kind", "clinician_opening", "Opening", checked=False) }}
+            {{ filter_checkbox("kind", "program_intake", "Intake", checked=False) }}
+          </div>
         </fieldset>
         <h3>
-          Grid layout (<code>.search-checkbox-grid</code>)
+          Grid layout (<code>.checkbox-list-grid</code>) — long filter lists
         </h3>
-        <fieldset class="search-checkbox-fieldset search-checkbox-grid">
+        <fieldset class="search-checkbox-fieldset">
           {{ icon_legend('map-pin', 'State') }}
-          {% for abbr, label in [("CA", "California"), ("NY", "New York"), ("TX", "Texas"), ("FL", "Florida"), ("WA", "Washington"), ("OR", "Oregon")] %}
-            {{ filter_checkbox("state", abbr, label, checked=(abbr == "CA") ) }}
-          {% endfor %}
+          <div class="checkbox-list checkbox-list-grid">
+            {% for abbr, label in [("CA", "California"), ("NY", "New York"), ("TX", "Texas"), ("FL", "Florida"), ("WA", "Washington"), ("OR", "Oregon")] %}
+              {{ filter_checkbox("state", abbr, label, checked=(abbr == "CA") ) }}
+            {% endfor %}
+          </div>
         </fieldset>
+        <h3>
+          Bordered (<code>.checkbox-list-bordered</code>) — form input
+        </h3>
+        <p>
+          <small>Used by <code>multi_select_field</code>. Adds input-control chrome (border / radius / bg) so the list visually pairs with sibling text inputs and selects.</small>
+        </p>
+        <div class="checkbox-list checkbox-list-bordered">
+          {{ filter_checkbox("services", "opt1", "Option 1", checked=True) }}
+          {{ filter_checkbox("services", "opt2", "Option 2", checked=False) }}
+          {{ filter_checkbox("services", "opt3", "Option 3", checked=True) }}
+        </div>
       </section>
       <section class="gallery-section" id="forms">
         <h2>Form fields</h2>
