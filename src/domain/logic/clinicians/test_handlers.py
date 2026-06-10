@@ -1047,6 +1047,178 @@ async def test_after_create_clinician_verification_raises_when_npi_not_found(
         oig_module._reset_cache_for_tests()
 
 
+async def test_after_create_clinician_verification_auto_creates_stub_affiliation(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Solo clinician path: a verified clinician that hits the hook with
+    zero affiliations gets a stub `ClinicianAffiliation` (`org_id` NULL,
+    sessions NULL) so the proxy setters on `Clinician` no longer raise
+    when the user edits practice posture on the edit form.
+    """
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from src.domain.logic.clinicians.handlers import after_create_clinician_verification
+    from src.domain.logic.verifications import oig as oig_module
+    from src.domain.logic.verifications.nppes import NppesResult
+    from src.domain.models import ClinicianAffiliation
+
+    leie_fixture = (
+        Path(__file__).parent.parent / "verifications" / "test_data" / "leie_sample.csv"
+    )
+    oig_module._reset_cache_for_tests()
+
+    import os
+
+    old_path = os.environ.get("LEIE_CSV_PATH")
+    os.environ["LEIE_CSV_PATH"] = str(leie_fixture)
+    try:
+        user = await _seed_user(db_test_session_manager)
+
+        nppes_match = NppesResult(
+            found=True, first_name="Solo", last_name="Practitioner", raw={}
+        )
+
+        async with db_test_session_manager() as session:
+            repo = ClinicianRepository(session)
+            audit_repo = AuditRepository(session)
+            verification_repo = VerificationRepository(session)
+
+            # No per-affiliation kwargs → no auto-create in `Clinician.__init__`
+            # → this clinician lands in the DB with `clinician_affiliations=[]`,
+            # the exact prod-bug shape after #1296.
+            clinician = Clinician(
+                owner_id=user.id,
+                first_name="Solo",
+                last_name="Practitioner",
+                npi="9999999999",
+            )
+            created = await repo.create(clinician)
+            assert created.clinician_affiliations == []
+
+            with patch(
+                "src.domain.logic.verifications.handlers.nppes_lookup",
+                new=AsyncMock(return_value=nppes_match),
+            ):
+                await after_create_clinician_verification(
+                    row=created,
+                    payload=_clinician_create_payload(),
+                    requesting_user=user,
+                    verification_repo=verification_repo,
+                    clinician_repo=repo,
+                    verification_audit_repo=audit_repo,
+                )
+            await session.commit()
+
+        async with db_test_session_manager() as session:
+            affs = (
+                (
+                    await session.execute(
+                        select(ClinicianAffiliation).filter(
+                            ClinicianAffiliation.clinician_id == created.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(affs) == 1
+            stub = affs[0]
+            assert stub.org_id is None
+            assert stub.in_person_sessions is None
+            assert stub.virtual_sessions is None
+    finally:
+        if old_path is None:
+            os.environ.pop("LEIE_CSV_PATH", None)
+        else:
+            os.environ["LEIE_CSV_PATH"] = old_path
+        oig_module._reset_cache_for_tests()
+
+
+async def test_after_create_clinician_verification_skips_stub_when_affiliation_exists(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """When the clinician already has an affiliation (e.g. created with
+    per-affiliation kwargs that drove `Clinician.__init__`'s auto-create),
+    the hook must NOT add a second one. Idempotency is the invariant.
+    """
+    from pathlib import Path
+    from unittest.mock import AsyncMock, patch
+
+    from src.domain.logic.clinicians.handlers import after_create_clinician_verification
+    from src.domain.logic.verifications import oig as oig_module
+    from src.domain.logic.verifications.nppes import NppesResult
+    from src.domain.models import ClinicianAffiliation
+
+    leie_fixture = (
+        Path(__file__).parent.parent / "verifications" / "test_data" / "leie_sample.csv"
+    )
+    oig_module._reset_cache_for_tests()
+
+    import os
+
+    old_path = os.environ.get("LEIE_CSV_PATH")
+    os.environ["LEIE_CSV_PATH"] = str(leie_fixture)
+    try:
+        user = await _seed_user(db_test_session_manager)
+        org_id = await _seed_org(db_test_session_manager, owner_id=user.id)
+
+        nppes_match = NppesResult(
+            found=True, first_name="Jane", last_name="Smith", raw={}
+        )
+
+        async with db_test_session_manager() as session:
+            repo = ClinicianRepository(session)
+            audit_repo = AuditRepository(session)
+            verification_repo = VerificationRepository(session)
+
+            clinician = Clinician(
+                owner_id=user.id,
+                org_id=org_id,
+                first_name="Jane",
+                last_name="Smith",
+                npi="9999999999",
+                in_person_sessions="yes",
+                virtual_sessions="no",
+            )
+            created = await repo.create(clinician)
+            assert len(created.clinician_affiliations) == 1
+
+            with patch(
+                "src.domain.logic.verifications.handlers.nppes_lookup",
+                new=AsyncMock(return_value=nppes_match),
+            ):
+                await after_create_clinician_verification(
+                    row=created,
+                    payload=_clinician_create_payload(org_id=org_id),
+                    requesting_user=user,
+                    verification_repo=verification_repo,
+                    clinician_repo=repo,
+                    verification_audit_repo=audit_repo,
+                )
+            await session.commit()
+
+        async with db_test_session_manager() as session:
+            affs = (
+                (
+                    await session.execute(
+                        select(ClinicianAffiliation).filter(
+                            ClinicianAffiliation.clinician_id == created.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(affs) == 1
+    finally:
+        if old_path is None:
+            os.environ.pop("LEIE_CSV_PATH", None)
+        else:
+            os.environ["LEIE_CSV_PATH"] = old_path
+        oig_module._reset_cache_for_tests()
+
+
 # --- after_update_clinician_verification (re-verify on npi change) -------
 
 

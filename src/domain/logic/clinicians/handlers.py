@@ -101,6 +101,17 @@ async def after_create_clinician_verification(
     # silently revert the in-memory changes before the framework's
     # `mutate(...)` block reads them for the audit after-snapshot.
 
+    # Restore the "every clinician has ≥1 ClinicianAffiliation"
+    # invariant for solo clinicians who hit the create path without
+    # supplying any per-affiliation field — practice posture lives on
+    # the affiliation, and the proxy setters on `Clinician` raise when
+    # none exists. The stub starts with `org_id` NULL and unset session
+    # availability (NULL); the user fills those in from the edit form.
+    if not row.clinician_affiliations:
+        from src.domain.models import ClinicianAffiliation
+
+        row.clinician_affiliations = [ClinicianAffiliation(clinician=row)]
+
 
 async def after_update_clinician_verification(
     *,
