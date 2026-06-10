@@ -1,10 +1,7 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import form_section, text_field, select_field, checkbox_field, multi_select_field, entity_select_field -%}
-{%- from "_shared/form_copy.html" import npi_help, org_picker_help -%}
-{%- from "_shared/forms.html" import inline_add_form -%}
+{%- from "_shared/form_fields.html" import form_section, text_field -%}
+{%- from "_shared/form_copy.html" import npi_help -%}
 {%- from "_shared/actions.html" import actions -%}
-{%- from "clinicians/_credential_list.html" import credential_list -%}
-{%- from "clinicians/_credential_row.html" import credential_row -%}
 {% block resource_label %}Clinicians{% endblock %}
 {# H1-fallback: name when set, else primary affiliation's org name when
    present, else "Clinician". ClinicianCreate requires first_name +
@@ -25,9 +22,12 @@
   {# Person-level fields only. Practice posture (location, availability,
    insurance, cost, org) lives on `ClinicianAffiliation` because the
    same person can have different posture at different practice contexts
-   (telehealth solo + in-person group, etc.) — those edits happen on the
-   Practices list below, not on this form. See the affiliations cluster
-   README for the "affiliation is the practice-posture container" model. #}
+   (telehealth solo + in-person group, etc.). Each of the four
+   clinician sub-resources (practices, licensures, educations,
+   certifications) has its own dedicated list page under
+   `/clinicians/{id}/<sub>` (#1335); the detail page at
+   `/clinicians/{id}` is a picker that links into them. This edit form
+   is the one place name + NPI get patched. #}
   <form hx-patch="{{ entity_url('clinician', id=clinician.id) }}">
     {% call form_section("Clinician") %}
       {{ text_field("first_name", "First name", current=clinician.first_name, maxlength=120) }}
@@ -36,106 +36,4 @@
     {% endcall %}
     {{ actions("Save changes", cancel_url=entity_url('clinician', id=clinician.id) ) }}
   </form>
-  {# Sub-resource lists below the main entity form. These render outside
-   `.entity-form-page form`'s grid because each `inline_add_form` is its
-   own self-contained mini-form; the section headings group them
-   visually but they're not part of the clinician's edit grid. #}
-  <section>
-    {# Practices — clinician's `ClinicianAffiliation` rows. The DB model
-       calls them affiliations because that's what the (clinician × org)
-       join is; in the UI we just call them practices because that's
-       what they are to the user. A row with `org_id` NULL is a solo
-       practice — the affiliation owns the posture, with no
-       organizational entity to point at. See the affiliations cluster
-       README. #}
-    <h2>Practices</h2>
-    {% call(aff) credential_list(clinician.clinician_affiliations, "No practices yet.") %}
-      {%- set meta_parts = [
-            aff.location_city,
-            aff.location_state,
-            aff.location_zip,
-            ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
-            ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
-            ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
-            "Out-of-network OK" if aff.accepts_out_of_network else None,
-            "Sliding scale" if aff.sliding_scale else None,
-            aff.cost,
-            ] -%}
-      {{ credential_row((aff.org.name if aff.org else "Solo practice") ,
-      meta_parts,
-      delete_url=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string,
-      delete_confirm="Remove this practice?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations", "Add another practice", "Add another practice") %}
-      {# Every field is optional. Org = "(Solo practice)" → `org_id`
-         posts blank → schema coerces to None → solo affiliation row.
-         Location / sessions left blank → NULLs on the new row; the
-         user fills them in via the row's own PATCH later. #}
-      {{ entity_select_field("org_id", "Organization", orgs, required=false, blank_label="(Solo practice — no organization)", help=org_picker_help() ) }}
-      <div class="grid">
-        {{ text_field("location_city", "City", required=false, maxlength=120) }}
-        {{ select_field("location_state", "State", US_STATES, required=false, placeholder=true) }}
-        {{ text_field("location_zip", "ZIP", required=false, pattern="\\d{5}", maxlength=5) }}
-      </div>
-      <div class="grid">
-        {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, required=false, placeholder=true) }}
-        {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, required=false, placeholder=true) }}
-      </div>
-      {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
-      <div class="grid">
-        {{ checkbox_field("accepts_out_of_network", "Accepts out-of-network patients", current=true) }}
-        {{ checkbox_field('sliding_scale', 'Offers sliding scale') }}
-      </div>
-      {{ text_field("cost", "Cost", required=false) }}
-    {% endcall %}
-  </section>
-  <section>
-    <h2>Licensures</h2>
-    {% call(lic) credential_list(clinician.licensures, "No licensures yet.") %}
-      {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None, lic.status | title],
-      delete_url=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string,
-      delete_confirm="Remove this licensure?",
-      attest_url=(entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/attestation") if not lic.attested_active else None,
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/licensures", "Add licensure", "Add licensure") %}
-      {{ select_field("license_type", "License type", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, placeholder=true) }}
-      {{ text_field("license_number", "License number", maxlength=120) }}
-      {{ select_field("issuing_state", "Issuing state", US_STATES, placeholder=true) }}
-      {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
-    {% endcall %}
-  </section>
-  <section>
-    <h2>Education</h2>
-    {% call(edu) credential_list(clinician.educations, "No education entries yet.") %}
-      {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
-            [edu.institution, edu.month_completed],
-            delete_url=entity_url('clinician', id=clinician.id) ~ "/educations/" ~ edu.id|string,
-      delete_confirm="Remove this education entry?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/educations", "Add education", "Add education") %}
-      {{ select_field("education_type", "Education type", EDUCATION_TYPES, labels=EDUCATION_TYPES_LABELS, placeholder=true) }}
-      {{ text_field("institution", "Institution", maxlength=200) }}
-      {{ text_field("month_completed", "Month completed", required=false, type="month") }}
-    {% endcall %}
-  </section>
-  <section>
-    <h2>Certifications</h2>
-    {% call(cert) credential_list(clinician.certifications, "No certifications yet.") %}
-      {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
-            [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
-      delete_url=entity_url('clinician', id=clinician.id) ~ "/certifications/" ~ cert.id|string,
-      delete_confirm="Remove this certification?",
-      ) }}
-    {% endcall %}
-    {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/certifications", "Add certification", "Add certification") %}
-      {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES, labels=CERTIFICATION_TYPES_LABELS, placeholder=true) }}
-      {{ text_field("certifying_body", "Certifying body", maxlength=200) }}
-      {{ text_field("expiration_date", "Expiration date", required=false, type="date") }}
-    {% endcall %}
-  </section>
-  {{ actions(cancel_url=entity_url('clinician', id=clinician.id) ) }}
 {% endblock %}
