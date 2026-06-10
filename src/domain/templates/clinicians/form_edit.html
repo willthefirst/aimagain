@@ -1,6 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import form_section, text_field, select_field, checkbox_field, multi_select_field, entity_select_field -%}
-{%- from "_shared/form_copy.html" import npi_help -%}
+{%- from "_shared/form_copy.html" import npi_help, org_picker_help -%}
 {%- from "_shared/forms.html" import inline_add_form -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "clinicians/_credential_list.html" import credential_list -%}
@@ -72,7 +72,7 @@
          posts blank → schema coerces to None → solo affiliation row.
          Location / sessions left blank → NULLs on the new row; the
          user fills them in via the row's own PATCH later. #}
-      {{ entity_select_field("org_id", "Organization", orgs, required=false, blank_label="(Solo practice — no organization)") }}
+      {{ entity_select_field("org_id", "Organization", orgs, required=false, blank_label="(Solo practice — no organization)", help=org_picker_help() ) }}
       <div class="grid">
         {{ text_field("location_city", "City", required=false, maxlength=120) }}
         {{ select_field("location_state", "State", US_STATES, required=false, placeholder=true) }}
