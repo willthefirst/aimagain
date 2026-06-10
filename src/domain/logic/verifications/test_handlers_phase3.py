@@ -32,7 +32,6 @@ from src.domain.logic.verifications.nppes import nppes_lookup_type2
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import (
     Clinician,
-    ClinicianLicensure,
     Organization,
 )
 from src.framework.audit.repository import AuditRepository
@@ -222,10 +221,10 @@ async def test_nppes_lookup_type2_rejects_type1_record():
 async def test_run_clinician_verification_writes_through_cache(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """After Phase 3, the pipeline writes `npi_match_status='matched'`
-    + `clinician_verified=True` when the score is `verified` AND the
-    clinician has an active license. Without an active license the
-    cache stays False even after a successful NPPES match."""
+    """The pipeline writes `npi_match_status='matched'` +
+    `clinician_verified=True` when the NPPES name match scores
+    `verified`. Licensures are not required — a solo clinician with a
+    matched NPI is fully verified."""
     owner = create_test_user()
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -243,18 +242,6 @@ async def test_run_clinician_verification_writes_through_cache(
             )
             session.add(clinician)
     clinician_id = clinician.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(
-                ClinicianLicensure(
-                    clinician_id=clinician_id,
-                    license_type="lcsw",
-                    license_number="X-1",
-                    issuing_state="IL",
-                    status="active",
-                )
-            )
 
     http = _mock_http(
         {

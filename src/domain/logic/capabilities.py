@@ -5,7 +5,7 @@ into the same predicates so the visible UI affordance and the server-side
 gate cannot disagree.
 
 The two-claim model: a `User` may hold **Claim A** (verified clinician —
-NPPES Type-1 + active license) and/or **Claim B** (verified org rep —
+NPPES Type-1 name match) and/or **Claim B** (verified org rep —
 NPPES Type-2 + authority proven), per (user, org). Capabilities derive
 from claim state; "solo / group / coordinator" labels are emergent, never
 stored.
@@ -141,11 +141,11 @@ def email_verified(user: Any) -> bool:
 
 
 def clinician_verified(user: Any) -> bool:
-    """Claim A: NPPES Type-1 name-matched + ≥1 active license. Reads the
+    """Claim A: NPPES Type-1 name-matched. Reads the
     `Clinician.clinician_verified` denorm cache so the predicate doesn't
-    re-derive from `npi_match_status` + licensure status per call. The
-    cache is recomputed by `recompute_clinician_claim(...)` on every
-    transition that touches its inputs."""
+    re-derive from `npi_match_status` per call. The cache is recomputed
+    by `recompute_clinician_claim(...)` on every transition that touches
+    its inputs."""
     if not email_verified(user):
         return False
     clinicians = getattr(user, "clinicians", None) or ()

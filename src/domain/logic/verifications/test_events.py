@@ -40,8 +40,9 @@ from tests.helpers import (
 # ---------- recompute_clinician_claim ------------------------------------
 
 
-def test_recompute_clinician_claim_requires_matched_npi_and_active_license():
-    """Matched NPI without any active license → False."""
+def test_recompute_clinician_claim_matched_npi_alone_verifies():
+    """Matched NPI alone is sufficient for Claim A — licensures and
+    affiliations are tracked separately but don't gate verification."""
     clinician = Clinician(
         id=uuid4(),
         owner_id=uuid4(),
@@ -51,21 +52,17 @@ def test_recompute_clinician_claim_requires_matched_npi_and_active_license():
     )
     clinician.npi_match_status = "matched"
     clinician.clinician_verified = False
-    clinician.licensures = [
-        ClinicianLicensure(
-            clinician_id=clinician.id,
-            license_type="lcsw",
-            license_number="X-1",
-            issuing_state="IL",
-            status="pending",
-        )
-    ]
+    clinician.verified_at = None
+    clinician.ever_verified_at = None
     recompute_clinician_claim(clinician)
-    assert clinician.clinician_verified is False
+    assert clinician.clinician_verified is True
+    assert clinician.verified_at is not None
+    assert clinician.ever_verified_at is not None
 
 
-def test_recompute_clinician_claim_active_license_without_matched_npi_false():
-    """Active license without matched NPI → False."""
+def test_recompute_clinician_claim_unmatched_npi_unverified():
+    """Without `npi_match_status='matched'` the claim is never granted,
+    regardless of how many active licensures exist."""
     clinician = Clinician(
         id=uuid4(), owner_id=uuid4(), first_name="Eva", last_name="Stone"
     )
@@ -84,54 +81,18 @@ def test_recompute_clinician_claim_active_license_without_matched_npi_false():
     assert clinician.clinician_verified is False
 
 
-def test_recompute_clinician_claim_happy_path():
-    clinician = Clinician(
-        id=uuid4(),
-        owner_id=uuid4(),
-        npi="1234567890",
-        first_name="Eva",
-        last_name="Stone",
-    )
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = False
-    clinician.verified_at = None
-    clinician.ever_verified_at = None
-    clinician.licensures = [
-        ClinicianLicensure(
-            clinician_id=clinician.id,
-            license_type="lcsw",
-            license_number="X-1",
-            issuing_state="IL",
-            status="active",
-        )
-    ]
-    recompute_clinician_claim(clinician)
-    assert clinician.clinician_verified is True
-    assert clinician.verified_at is not None
-    assert clinician.ever_verified_at is not None
-
-
 def test_recompute_clinician_claim_preserves_ever_verified_at_on_regression():
-    """A clinician who was previously verified and now isn't (license
-    expired) must keep `ever_verified_at` set — that's what the
-    `can_access_network` retention rule reads."""
+    """A clinician who was previously verified and now isn't (e.g. admin
+    flipped to `mismatch`) must keep `ever_verified_at` set — that's
+    what the `can_access_network` retention rule reads."""
     historic = datetime(2025, 6, 1, tzinfo=timezone.utc)
     clinician = Clinician(
         id=uuid4(), owner_id=uuid4(), first_name="Eva", last_name="Stone"
     )
-    clinician.npi_match_status = "matched"
+    clinician.npi_match_status = "mismatch"
     clinician.clinician_verified = True
     clinician.verified_at = historic
     clinician.ever_verified_at = historic
-    clinician.licensures = [
-        ClinicianLicensure(
-            clinician_id=clinician.id,
-            license_type="lcsw",
-            license_number="X-1",
-            issuing_state="IL",
-            status="expired",
-        )
-    ]
     recompute_clinician_claim(clinician)
     assert clinician.clinician_verified is False
     assert clinician.ever_verified_at == historic

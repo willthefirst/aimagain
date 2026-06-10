@@ -465,9 +465,9 @@ NPI_MATCH_STATUS_LABELS: Final[dict[str, str]] = NpiMatchStatus.labels()
 
 # Computed-and-stored status of a `ClinicianLicensure`. Derived on write
 # from `expiration_date` and `attested_active` (see Phase 8's nightly
-# expiry worker) and persisted for query-speed reasons: list views and
-# the directory-listing filter both restrict on "has an active license"
-# without recomputing per row.
+# expiry worker) and persisted for query-speed reasons: licensure list
+# views surface this directly without recomputing per row. Licensure
+# status no longer gates Claim A — see `recompute_clinician_claim`.
 class LicenseStatus(LabeledChoice):
     active = "active", "Active", "check"
     expired = "expired", "Expired", "x-circle"
