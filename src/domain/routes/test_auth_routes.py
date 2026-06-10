@@ -172,7 +172,7 @@ async def test_login_success(test_client: AsyncClient, logged_in_user: User):
     auth_header = {"Cookie": f"fastapiusersauth={access_token}"}
     me_response = await test_client.get("/users/me", headers=auth_header)
     assert me_response.status_code == 200
-    assert logged_in_user.email in me_response.text
+    assert logged_in_user.username in me_response.text
 
 
 async def test_login_failure_wrong_password(
