@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Form, Request
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_users import exceptions as fa_users_exceptions
@@ -455,43 +455,105 @@ async def get_reset_password_page(request: Request, token: str):
 
 
 @router.get("/verify", name="auth_pages:verify")
-async def get_verify_page(
-    request: Request,
-    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
-):
-    """Consume the verify token from the email link.
+async def get_verify_page(request: Request):
+    """Render the "click to verify" confirm page.
 
-    The email contains `GET /auth/verify?token=...`. Calling
-    `user_manager.verify(token)` server-side keeps the user out of any
-    HTMX/JS ceremony — the click comes from an email client, which may
-    not run JS at all. Renders one of three states:
+    The email contains `GET /auth/verify?token=...`. The GET handler
+    deliberately does NOT consume the token — it just renders a page
+    with a button that POSTs to the sibling handler. Two reasons:
 
-      - `status="success"`: token consumed, account verified.
-      - `status="already_verified"`: token valid but `is_verified`
-        already True. Treated as success in the UI; explicit branch so
-        a future "the link doesn't seem to work" copy can differentiate.
-      - `status="error"`: token missing / expired / malformed. The page
-        offers a "resend" link back to the nag banner (`/users/me`).
+      - Link prefetchers (corporate AV, Outlook Safe Links, Gmail
+        preview crawlers) issue GETs against email URLs and would burn
+        the token before the user clicks. POST sidesteps every one of
+        them.
+      - GET is supposed to be safe / idempotent. Mutating user state
+        on GET is the kind of accident that makes auditors itch.
+
+    Token validation (expired, malformed, already used) happens at POST
+    time — keeps the GET path stateless and the GET response cacheable.
+    Missing `?token=` is the one case GET catches: a broken URL renders
+    the error state immediately instead of a confirm button that's
+    guaranteed to fail.
     """
     token = request.query_params.get("token", "")
-    if not token:
-        status = "error"
-    else:
-        try:
-            await user_manager.verify(token, request)
-            status = "success"
-        except fa_users_exceptions.UserAlreadyVerified:
-            status = "already_verified"
-        except (
-            fa_users_exceptions.InvalidVerifyToken,
-            fa_users_exceptions.UserNotExists,
-        ):
-            status = "error"
     return APIResponse.html_response(
         template_name="auth/verify.html",
-        context={"status": status},
+        context={"token": token, "status": "error" if not token else None},
         request=request,
     )
+
+
+@router.post("/verify", name="auth_pages:post_verify")
+async def post_verify(
+    request: Request,
+    token: str = Form(""),
+    user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
+    strategy: Strategy[models.UP, models.ID] = Depends(auth_backend.get_strategy),
+):
+    """Consume the verify token, auto-login on success, redirect to /.
+
+    Sole mutation point for the verify flow — GET just hosts the
+    button. Three outcomes:
+
+      - Success → mint the session cookie via `auth_backend.login`
+        (same path `/auth/login` uses); HX-Redirect (or 302 + Location
+        for non-HTMX) to the post-login home, mirroring `post_login`'s
+        HTMX-vs-browser branch. The user is logged in by the response
+        the browser hands back.
+      - `UserAlreadyVerified` → render the `already_verified` state
+        with a login link. Deliberately NOT auto-login — a second
+        click against an already-consumed token could be from a leaked
+        post-use URL (browser history on a shared machine, log
+        scraping, etc.), and convenience here is not worth the risk.
+      - Missing token, `InvalidVerifyToken`, `UserNotExists` → render
+        the error state.
+    """
+    if not token:
+        return APIResponse.html_response(
+            template_name="auth/verify.html",
+            context={"token": "", "status": "error"},
+            request=request,
+        )
+    try:
+        user = await user_manager.verify(token, request)
+    except fa_users_exceptions.UserAlreadyVerified:
+        return APIResponse.html_response(
+            template_name="auth/verify.html",
+            context={"token": "", "status": "already_verified"},
+            request=request,
+        )
+    except (
+        fa_users_exceptions.InvalidVerifyToken,
+        fa_users_exceptions.UserNotExists,
+    ):
+        return APIResponse.html_response(
+            template_name="auth/verify.html",
+            context={"token": "", "status": "error"},
+            request=request,
+        )
+
+    # Success: mint the cookie + redirect, same dual-mode shape as
+    # post_login (HTMX → 204 + HX-Redirect; plain browser POST → 302
+    # + Location). Cookie is preserved on either branch — it's set
+    # by the response `auth_backend.login` returns, which we mutate
+    # in place rather than replace.
+    #
+    # Destination is the clinician-create form, NOT `on_after_login`'s
+    # default (/posts?kind=referral). #1302 routes verify-success into
+    # the create-clinician funnel — the intended next step for a
+    # freshly-verified new user — and that intent persists across the
+    # GET-render / POST-confirm split.
+    from src.framework.rendering.route_urls import entity_form_url
+
+    next_url = entity_form_url("clinician")
+    response = await auth_backend.login(strategy, user)
+    if request.headers.get("HX-Request") == "true":
+        response.headers["HX-Redirect"] = next_url
+        response.status_code = 204
+    else:
+        response.headers["Location"] = next_url
+        response.status_code = 302
+    return response
 
 
 @router.post("/resend-verify", name="auth_pages:resend_verify")

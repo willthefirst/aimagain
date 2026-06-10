@@ -81,6 +81,17 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
         "Empty-body endpoint that reads the user from the session and "
         "re-mints a verify token. Nothing to pin beyond the path."
     ),
+    "POST /auth/verify": (
+        "Single hidden `token` field round-tripped from the email-link "
+        "GET render (see `src/domain/routes/auth_pages.py::post_verify` "
+        "for the GET→POST split rationale). Same wire shape as "
+        "fastapi-users' built-in `POST /auth/verify` which our wrapper "
+        "shadows — no new JSON contract surface. Response shape "
+        "(200 + HTML on already_verified/error; 204 + HX-Redirect or "
+        "302 + Location on success with the session cookie set) is "
+        "pinned by route tests in "
+        "`src/domain/routes/test_auth_routes.py`."
+    ),
     "POST /org_representations": (
         "The Profile Hub's `_add_claim.html` submits to the bespoke "
         "create handler that dispatches on authority_method. Body shape "

@@ -2,7 +2,6 @@ import pytest
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import AsyncClient
 from pydantic import BaseModel
-from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -655,60 +654,44 @@ async def test_card_chrome_only_applies_to_article_list_items(
         )
 
 
-async def test_get_verify_page_without_token_returns_error(test_client: AsyncClient):
-    """Missing `?token=` query param → error state. Page still
-    renders 200 (this is the email-link landing, not an API endpoint
-    — the user shouldn't see a JSON 422)."""
-    response = await test_client.get("/auth/verify")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "didn't work" in response.text.lower() or "error" in response.text.lower()
+# --- /auth/verify --------------------------------------------------------
+#
+# The email-link flow is split GET (render confirm page, NO token
+# consumption) + POST (consume + auto-login + redirect). This shape
+# defends against email-link prefetchers (corporate AV, Outlook Safe
+# Links, Gmail preview) burning the token before the user clicks —
+# prefetchers issue GETs, not POSTs. See `auth_pages.py:get_verify_page`
+# for the full rationale.
 
 
-async def test_get_verify_page_with_invalid_token_returns_error(
-    test_client: AsyncClient,
-):
-    """An obviously-bad token (not a valid JWT) renders the error
-    state, never raises a 500. The page route swallows
-    `InvalidVerifyToken` and routes to the error template."""
-    response = await test_client.get("/auth/verify?token=not.a.real.jwt")
-    assert response.status_code == 200
-    assert "didn't work" in response.text.lower() or "error" in response.text.lower()
-
-
-async def test_get_verify_page_with_valid_token_verifies_user(
-    test_client: AsyncClient,
+async def _mint_verify_token(
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A valid verification token flips `is_verified` to True, the
-    landing page renders the success state, and the footer CTA points
-    into the clinician-create flow (the intended next step after
-    confirming email — pins the template's success-path link)."""
+    user_id,
+) -> str:
+    """Helper: mint a real fastapi-users verify JWT for a user by routing
+    through `request_verify` (the same path the email send uses) and
+    capturing the token off the send hook.
+
+    fastapi-users doesn't expose a public `make_verify_token` so this
+    is the supported way to obtain one in tests.
+    """
     from src.auth_config import get_user_manager
     from src.db import get_user_db
 
-    # Mint a real verify token by calling `request_verify` through the
-    # manager — same path the email-link generation uses.
     async with db_test_session_manager() as session:
         user_db_gen = get_user_db(session)
         user_db = await anext(user_db_gen)
         manager_gen = get_user_manager(user_db)
         manager = await anext(manager_gen)
-        # Pull a fresh user row from this session so the manager can
-        # operate on it without touching a closed session.
+
         from sqlalchemy import select
 
         fresh_user = (
-            await session.execute(select(User).where(User.id == logged_in_user.id))
+            await session.execute(select(User).where(User.id == user_id))
         ).scalar_one()
-        # Mark unverified so the verify call has work to do (the dev
-        # auto-verify pathway leaves users at True; reset to False here).
+        # Reset to unverified so request_verify works (dev auto-verify
+        # leaves new users at True).
         await user_db.update(fresh_user, {"is_verified": False})
-        # Mint the token via the manager. fastapi-users doesn't expose
-        # a `make_verify_token` helper but `request_verify` produces
-        # one and triggers `on_after_request_verify` — we capture the
-        # token from there.
 
         captured: dict = {}
 
@@ -724,27 +707,155 @@ async def test_get_verify_page_with_valid_token_verifies_user(
         finally:
             emails_module.send_verification_email = original
 
-    token = captured["token"]
+    return captured["token"]
+
+
+async def test_get_verify_page_without_token_renders_error(
+    test_client: AsyncClient,
+):
+    """Missing `?token=` query param → error state. The page renders
+    200 (this is the email-link landing, not an API endpoint — the
+    user shouldn't see a JSON 422)."""
+    response = await test_client.get("/auth/verify")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "didn't work" in response.text.lower()
+
+
+async def test_get_verify_page_renders_confirm_form_without_mutating(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """GET with any token renders the confirm-button form and leaves
+    `is_verified` untouched. The whole point of the GET/POST split is
+    that prefetcher GETs don't burn the token."""
+    token = await _mint_verify_token(db_test_session_manager, logged_in_user.id)
 
     response = await test_client.get(f"/auth/verify?token={token}")
     assert response.status_code == 200
-    assert "verified" in response.text.lower()
-    # Footer CTA on the success state routes into the clinician-create
-    # flow, not /users/me. The failure / already-verified states still
-    # land on the profile (see the template).
-    tree = HTMLParser(response.text)
-    cta = tree.css_first("section.auth-page footer a[role='button']")
-    assert cta is not None, "verify-success page is missing the footer CTA"
-    assert cta.attributes.get("href") == "/clinicians/form"
+    # Confirm form is rendered and the token is round-tripped into the
+    # hidden field for the POST.
+    body = response.text
+    assert '<form action="/auth/verify"' in body
+    assert 'name="token"' in body
+    assert token in body
+    assert "Verify and sign in" in body
 
-    # Confirm the DB column actually flipped.
+    # And the GET did NOT flip the column — POST is the mutation.
+    from sqlalchemy import select
+
     async with db_test_session_manager() as session:
-        from sqlalchemy import select
+        user = (
+            await session.execute(select(User).where(User.id == logged_in_user.id))
+        ).scalar_one()
+        assert user.is_verified is False
 
+
+async def test_post_verify_with_valid_token_verifies_and_auto_logs_in(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Valid token at POST: `is_verified` flips, a session cookie is
+    set, and the response steers the browser into the clinician-create
+    funnel (#1302 — the intended next step for a freshly-verified
+    user)."""
+    token = await _mint_verify_token(db_test_session_manager, logged_in_user.id)
+
+    response = await test_client.post(
+        "/auth/verify",
+        data={"token": token},
+        follow_redirects=False,
+    )
+    # Non-HTMX POST → 302 + Location to the clinician-create form
+    # (NOT `on_after_login`'s default `/posts?kind=referral`).
+    assert response.status_code == 302
+    assert response.headers["location"] == "/clinicians/form"
+    # Session cookie was minted.
+    assert (
+        "fastapiusersauth" in response.headers.get("set-cookie", "")
+        or "fastapiusersauth" in response.cookies
+    )
+
+    # DB column actually flipped.
+    from sqlalchemy import select
+
+    async with db_test_session_manager() as session:
         user = (
             await session.execute(select(User).where(User.id == logged_in_user.id))
         ).scalar_one()
         assert user.is_verified is True
+
+
+async def test_post_verify_htmx_redirects_via_hx_header(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """HTMX POST gets `HX-Redirect` + 204 so HTMX does a full
+    navigation (mirrors `post_login`'s HTMX branch). Cookie is still
+    set on the same response."""
+    token = await _mint_verify_token(db_test_session_manager, logged_in_user.id)
+
+    response = await test_client.post(
+        "/auth/verify",
+        data={"token": token},
+        headers={"HX-Request": "true"},
+    )
+    assert response.status_code == 204
+    assert response.headers.get("HX-Redirect") == "/clinicians/form"
+    # `Location` is not set on the HTMX branch — HTMX navigates via
+    # the `HX-Redirect` header instead.
+    assert "location" not in {k.lower() for k in response.headers.keys()}
+
+
+async def test_post_verify_without_token_renders_error(test_client: AsyncClient):
+    """Empty `token` form field → error state. No 422, no 500."""
+    response = await test_client.post("/auth/verify", data={"token": ""})
+    assert response.status_code == 200
+    assert "didn't work" in response.text.lower()
+    # No cookie set.
+    assert "set-cookie" not in {k.lower() for k in response.headers.keys()}
+
+
+async def test_post_verify_with_invalid_token_renders_error(test_client: AsyncClient):
+    """Malformed token → error state. fastapi-users raises
+    `InvalidVerifyToken`; the route swallows it and routes to the
+    error template. Never auto-logs in."""
+    response = await test_client.post("/auth/verify", data={"token": "not.a.real.jwt"})
+    assert response.status_code == 200
+    assert "didn't work" in response.text.lower()
+    assert "set-cookie" not in {k.lower() for k in response.headers.keys()}
+
+
+async def test_post_verify_with_already_used_token_does_not_auto_login(
+    test_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Second POST with an already-consumed token renders the
+    already_verified state WITHOUT auto-login. A second click could be
+    from a leaked-after-use URL (shared browser history, log scraping);
+    the convenience of auto-login isn't worth the risk on this branch."""
+    token = await _mint_verify_token(db_test_session_manager, logged_in_user.id)
+
+    # First POST: consumes the token, auto-logs in.
+    first = await test_client.post(
+        "/auth/verify", data={"token": token}, follow_redirects=False
+    )
+    assert first.status_code == 302
+
+    # Drop the cookie the first POST set so the second POST is a fresh
+    # anonymous click (the realistic "leaked URL replayed by someone
+    # else" scenario).
+    test_client.cookies.clear()
+
+    second = await test_client.post("/auth/verify", data={"token": token})
+    assert second.status_code == 200
+    assert "already verified" in second.text.lower()
+    # NO cookie minted on the already_verified branch.
+    assert "set-cookie" not in {k.lower() for k in second.headers.keys()}
 
 
 async def test_post_resend_verify_unauthenticated_returns_401(test_client: AsyncClient):
