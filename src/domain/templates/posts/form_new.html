@@ -3,27 +3,26 @@
 Reached when a user visits `/posts/form` without `?kind=` — the
 framework's `handle_get_new_form` falls through to
 `spec.templates.form_new` (this file) when no kind is specified.
-Labels are simplified ("Referral" / "Clinician" / "Organization")
-rather than the generated `entity_create_label` strings — the picker
-context already makes the action implicit and the short noun reads
-better. The H1 on the kind-specific form page still funnels through
-`entity_create_label` so the create button on the next page reads
-"Create client referral" / "Create clinician opening" /
-"Create program intake".
+
+The options are sourced from `POST_KINDS` (the SOT) — each kind
+contributes its capital-case `noun` for the heading and its
+`picker_description` for the tagline. Adding a new kind or renaming
+an existing one is a one-place change in
+`src/domain/models/posts/post_kinds.py`; this picker, the /posts
+sidebar `kind` filter, and every "Create X" / "Edit X" headline all
+read from the same field.
 #}
 {% extends "views/form_new.html" %}
 {%- from "_shared/_picker.html" import picker -%}
 {% block resource_label %}Posts{% endblock %}
 {% block form_content %}
-  {{ picker([
-    {"href": entity_form_url("post") + "?kind=referral",
-  "heading": "Referral",
-  "description": "A client you're looking to place with another clinician."},
-  {"href": entity_form_url("post") + "?kind=clinician_opening",
-  "heading": "Clinician",
-  "description": "An individual clinician with availability on their caseload."},
-  {"href": entity_form_url("post") + "?kind=program_intake",
-  "heading": "Organization",
-  "description": "An organization's program announcing open intake slots."},
-  ]) }}
+  {%- set _opts = namespace(items=[]) -%}
+  {%- for kind in POST_KINDS.values() -%}
+    {%- set _opts.items = _opts.items + [
+        {"href": entity_form_url("post") + "?kind=" + kind.name,
+        "heading": kind.noun,
+        "description": kind.picker_description}
+        ] -%}
+  {%- endfor -%}
+  {{ picker(_opts.items) }}
 {% endblock %}

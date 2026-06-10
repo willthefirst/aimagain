@@ -31,6 +31,7 @@ from src.domain.logic.posts.view import (
 )
 from src.domain.logic.users.view import onboarding_readiness
 from src.domain.models import enums
+from src.domain.models.posts.post_kinds import POST_KINDS
 from src.framework.rendering.form_fields import register_choice_labels
 from src.framework.rendering.templating import register_template_globals
 
@@ -98,6 +99,14 @@ register_template_globals(
     opening_create_schema=ClinicianOpeningCreate,
     intake_create_schema=ProgramIntakeCreate,
     referral_create_schema=ReferralCreate,
+    # `POST_KINDS` is the SOT for per-kind nouns + picker descriptions.
+    # The /posts/form picker iterates this directly so the headings
+    # (e.g. "Referral" / "Opening" / "Program intake") and their
+    # taglines can't drift from the source. The sidebar filter's
+    # `kind` choices and every "Create X" / "Edit X" headline also
+    # read POST_KINDS[k].noun via the labels helpers. See
+    # `src/domain/models/posts/post_kinds.py`.
+    POST_KINDS=POST_KINDS,
     # Post-specific view helpers.
     insurance_posture=insurance_posture_for_post,
     referral_headline=referral_headline,
