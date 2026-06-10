@@ -26,7 +26,6 @@ from pydantic import BeforeValidator
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
-    Location,
     LocationPartial,
 )
 from src.domain.models.enums import (
@@ -54,16 +53,25 @@ class ClinicianAffiliationRead(FlatLocationSchema, ReadProjection):
     via `from_attributes` and dumps flat (JSON responses still expose
     `location_city` / `location_state` / `location_zip` at the top
     level). The Location value object owns the cleaning rules.
+
+    `org_id`, `in_person_sessions`, `virtual_sessions`, and `location`
+    are nullable here — solo practices (#1311) carry the practice posture
+    without an organizational entity, and a freshly-created (stub)
+    affiliation has not yet been asked the session-availability or
+    location questions. The wire shape mirrors the DB columns, which
+    are nullable for the same reason. `LocationPartial` accepts any
+    subset of `(city, state, zip)` being set so a partial-location
+    affiliation round-trips through `from_attributes` cleanly.
     """
 
     id: uuid.UUID
     clinician_id: uuid.UUID
-    org_id: uuid.UUID
+    org_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
-    location: Location
-    in_person_sessions: str
-    virtual_sessions: str
+    location: LocationPartial | None = None
+    in_person_sessions: str | None = None
+    virtual_sessions: str | None = None
     accepts_out_of_network: bool
     in_network_carriers: list[str] = []
     sliding_scale: bool
@@ -74,14 +82,20 @@ class ClinicianAffiliationCreate(FlatLocationSchema, WirePayload):
     """Create payload for a new ClinicianAffiliation row.
 
     `clinician_id` is bound from the URL by the framework's sub-resource
-    create handler — not accepted on the wire. Only the per-role fields
-    the user actually fills out come in here.
+    create handler — not accepted on the wire. Every field is optional
+    because a "solo practice" affiliation (#1311) is a valid create
+    shape: `org_id` NULL means "no organizational entity"; missing
+    location / sessions means "not specified yet, fill in later." A
+    completely empty body therefore creates a stub affiliation with
+    default values for the NOT NULL columns
+    (`accepts_out_of_network=True`, `in_network_carriers=[]`,
+    `sliding_scale=False`) and NULLs everywhere else.
     """
 
-    org_id: uuid.UUID
-    location: Location
-    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    org_id: uuid.UUID | None = None
+    location: LocationPartial | None = None
+    in_person_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    virtual_sessions: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
     accepts_out_of_network: bool = True
     in_network_carriers: InNetworkCarriersField = []
     sliding_scale: bool = False

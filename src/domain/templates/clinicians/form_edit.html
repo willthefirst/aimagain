@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import form_section, text_field, select_field, checkbox_field, multi_select_field -%}
+{%- from "_shared/form_fields.html" import form_section, text_field, select_field, checkbox_field, multi_select_field, entity_select_field -%}
 {%- from "_shared/form_copy.html" import npi_help -%}
 {%- from "_shared/forms.html" import inline_add_form -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -68,21 +68,19 @@
       ) }}
     {% endcall %}
     {% call inline_add_form(entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations", "Add another practice", "Add another practice") %}
-      <label for="aff_org_id">
-        Organization
-        <select id="aff_org_id" name="org_id" required>
-          <option value="" disabled selected>--</option>
-          {%- for o in orgs %}<option value="{{ o.id }}">{{ o.name }}</option>{%- endfor %}
-        </select>
-      </label>
+      {# Every field is optional. Org = "(Solo practice)" → `org_id`
+         posts blank → schema coerces to None → solo affiliation row.
+         Location / sessions left blank → NULLs on the new row; the
+         user fills them in via the row's own PATCH later. #}
+      {{ entity_select_field("org_id", "Organization", orgs, required=false, blank_label="(Solo practice — no organization)") }}
       <div class="grid">
-        {{ text_field("location_city", "City", maxlength=120) }}
-        {{ select_field("location_state", "State", US_STATES, placeholder=true) }}
-        {{ text_field("location_zip", "ZIP", pattern="\\d{5}", maxlength=5) }}
+        {{ text_field("location_city", "City", required=false, maxlength=120) }}
+        {{ select_field("location_state", "State", US_STATES, required=false, placeholder=true) }}
+        {{ text_field("location_zip", "ZIP", required=false, pattern="\\d{5}", maxlength=5) }}
       </div>
       <div class="grid">
-        {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
-        {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current="yes") }}
+        {{ select_field("in_person_sessions", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, required=false, placeholder=true) }}
+        {{ select_field("virtual_sessions", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, required=false, placeholder=true) }}
       </div>
       {{ multi_select_field("in_network_carriers", "In-network carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS) }}
       <div class="grid">
