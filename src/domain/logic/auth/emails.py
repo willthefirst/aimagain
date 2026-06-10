@@ -43,9 +43,10 @@ async def send_verification_email(user: User, token: str) -> None:
 
     `token` is fastapi-users' verification JWT. The link lands on
     `GET /auth/verify?token=...` (the page route in `auth_pages.py`),
-    which calls `user_manager.verify` server-side and renders a
-    success/error page — keeps the user out of HTMX-only territory
-    since the click comes from an email client.
+    which renders a confirm-button page; the user's click POSTs to
+    the sibling handler that actually consumes the token and signs
+    them in. GET deliberately does NOT mutate — see
+    `auth_pages.py:get_verify_page` for why (link prefetchers).
     """
     verify_url = _absolute_url(f"/auth/verify?token={token}")
     context = {
