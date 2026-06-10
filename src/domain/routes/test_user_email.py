@@ -80,3 +80,111 @@ async def test_email_form_breadcrumb_points_to_profile(
     assert (
         back.attributes.get("href") == f"/users/{logged_in_user.id}"
     ), "breadcrumb back-affordance must link to the user's profile"
+
+
+# --- Inbox CTA (post-register / post-resend) -----------------------------
+#
+# The page doubles as the destination both `POST /auth/register` and
+# `POST /auth/resend-verify` redirect to. When the viewer is unverified
+# it renders an "open your inbox" affordance — smart link for recognized
+# webmail providers, plain sentence otherwise. `?sent=1` swaps the lede
+# to a "just sent" confirmation.
+
+
+async def test_email_form_renders_smart_link_for_gmail(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Unverified Gmail user sees an "Open Gmail" button whose href is a
+    pre-filtered search URL for the verify sender."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.email = "alice@gmail.com"
+            user.is_verified = False
+
+    response = await authenticated_client.get("/users/me/email/form")
+    assert response.status_code == 200
+    assert "Open Gmail" in response.text
+    # The Gmail search URL is pinned in test_email_providers.py; here we
+    # just verify the template actually renders it.
+    assert "mail.google.com/mail/u/0/#search/" in response.text
+    assert "from%3Ano-reply%40bedlamconnect.com" in response.text
+    assert "alice@gmail.com" in response.text
+
+
+async def test_email_form_falls_back_for_unknown_domain(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Unverified user on an unrecognized domain (default fixture user
+    is `@example.com`) → no button, plain sentence referencing the
+    from address."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.is_verified = False
+
+    response = await authenticated_client.get("/users/me/email/form")
+    assert response.status_code == 200
+    assert "Open Gmail" not in response.text
+    assert "mail.google.com" not in response.text
+    # The from address is named in the plain-sentence fallback.
+    assert "no-reply@bedlamconnect.com" in response.text
+    # The user's email is still surfaced so they know which address to check.
+    assert logged_in_user.email in response.text
+
+
+async def test_email_form_shows_just_sent_banner_with_query_flag(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`?sent=1` (set by the resend redirect) renders the "just sent"
+    status line."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.is_verified = False
+
+    response = await authenticated_client.get("/users/me/email/form?sent=1")
+    assert response.status_code == 200
+    assert "Verification email sent" in response.text
+
+
+async def test_email_form_omits_just_sent_banner_without_query_flag(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The "just sent" status is opt-in via `?sent=1`; first-visit
+    (post-registration redirect) doesn't show it."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.is_verified = False
+
+    response = await authenticated_client.get("/users/me/email/form")
+    assert response.status_code == 200
+    assert "Verification email sent" not in response.text
+
+
+async def test_email_form_omits_inbox_cta_when_verified(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Verified users have nothing to nudge — neither inbox CTA nor
+    "just sent" banner should appear, even with `?sent=1`."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.email = "alice@gmail.com"
+            user.is_verified = True
+
+    response = await authenticated_client.get("/users/me/email/form?sent=1")
+    assert response.status_code == 200
+    assert "Open Gmail" not in response.text
+    assert "Verification email sent" not in response.text

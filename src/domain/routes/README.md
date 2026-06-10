@@ -32,11 +32,11 @@ The grammar fits resource-shaped CRUD. These stay hand-written:
 | Route(s) | File | Reason |
 |---|---|---|
 | `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). |
-| `GET /auth/{register,login,forgot-password,reset-password/{token},check-email}` | `auth_pages.py` | Pure form / CTA rendering. |
+| `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering. |
 | `GET /users/me`, `GET /users/me/clinicians` | `users.py` | Singleton aliases — mounted via `singleton_alias=` on the existing `mount_detail` / `mount_related_list`. |
 | `POST/DELETE/GET /users/me/favorites[/{clinician_id}]` | `favorites.py` | M:N edge add/remove — no `mount_*` helper for edge mutations. |
 | `GET /users/me/access`, `GET /users/me/access/capabilities/{name}` | `access.py` | Derived read view — capability posture, no stored row. |
-| `GET /users/me/email/form` | `user_email.py` | Email field-cluster subresource form — self-only; surfaces verification status and the resend-verification action. |
+| `GET /users/me/email/form` | `user_email.py` | Email field-cluster subresource form — self-only; surfaces verification status, hosts the post-register / post-resend inbox CTA, and the resend-verification action. |
 | `GET /`, `GET /health` | `../../main.py` | Utility endpoints. |
 
 ## Tests
