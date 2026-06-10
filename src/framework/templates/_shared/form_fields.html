@@ -243,7 +243,7 @@ emitted attribute string. #}
        {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
        {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
     <span class="form-field-label" id="{{ name }}-label">{{ _field_label(label, required) }}</span>
-    <div class="checkbox-list checkbox-list-bordered">
+    <div class="checkbox-list">
       {%- for v in options %}
         <label>
           <input type="checkbox"
