@@ -41,24 +41,19 @@ def _now() -> datetime:
 def recompute_clinician_claim(clinician: Clinician) -> None:
     """Compute `Clinician.clinician_verified` + the timestamp triplet
     (`verified_at`, `ever_verified_at`, regression detection) from the
-    current `npi_match_status` + the licensure set, then mutate the
-    clinician in place. The caller is responsible for committing the
-    enclosing transaction.
+    current `npi_match_status`, then mutate the clinician in place. The
+    caller is responsible for committing the enclosing transaction.
 
-    Claim A requires:
-      1. `npi_match_status == 'matched'`
-      2. at least one `ClinicianLicensure` with `status == 'active'`
+    Claim A requires only an NPPES Type-1 name match
+    (`npi_match_status == 'matched'`). Licensures and affiliations are
+    tracked for display and credentialing but do not gate the claim —
+    a solo practitioner with a matched NPI is fully verified.
 
     `ever_verified_at` is set on the first transition to True and
     preserved on regression — that's what powers the once-verified feed
     retention rule (handoff §7.1).
     """
-    matched = clinician.npi_match_status == "matched"
-    licensures = getattr(clinician, "licensures", None) or ()
-    has_active_license = any(
-        getattr(lic, "status", None) == "active" for lic in licensures
-    )
-    is_verified_now = matched and has_active_license
+    is_verified_now = clinician.npi_match_status == "matched"
 
     if is_verified_now:
         if not clinician.clinician_verified:
