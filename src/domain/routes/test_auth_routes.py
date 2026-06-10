@@ -95,9 +95,10 @@ async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncCli
         headers={"HX-Request": "true", "Content-Type": "application/json"},
     )
     assert response.status_code == 200
-    # Post-register HTMX flow lands on the "check your email" CTA so
-    # the user is nudged to open their inbox and click the verify link.
-    assert response.headers.get("HX-Redirect") == "/auth/check-email"
+    # Post-register HTMX flow lands on the consolidated email management /
+    # CTA page so the user is nudged to open their inbox and click the
+    # verify link.
+    assert response.headers.get("HX-Redirect") == "/users/me/email/form"
     # A session cookie must be set so the redirect lands authenticated.
     assert (
         "fastapiusersauth" in response.cookies
@@ -745,15 +746,16 @@ async def test_post_resend_verify_unauthenticated_returns_401(test_client: Async
     assert response.status_code == 401
 
 
-async def test_post_resend_verify_authenticated_redirects_to_check_email(
+async def test_post_resend_verify_authenticated_redirects_to_email_form(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
     monkeypatch,
 ):
     """Authed user can re-request the verify email. Response is
-    `HX-Redirect: /auth/check-email?sent=1` so HTMX navigates to the
-    shared CTA page — same UX surface as the post-registration flow."""
+    `HX-Redirect: /users/me/email/form?sent=1` so HTMX navigates to
+    the consolidated email management / CTA page — same UX surface as
+    the post-registration flow."""
     # Stub the actual send so the test doesn't print to stderr.
     from unittest.mock import AsyncMock
 
@@ -763,77 +765,7 @@ async def test_post_resend_verify_authenticated_redirects_to_check_email(
 
     response = await authenticated_client.post("/auth/resend-verify")
     assert response.status_code == 200
-    assert response.headers.get("HX-Redirect") == "/auth/check-email?sent=1"
-
-
-async def test_check_email_page_unauthenticated_is_rejected(
-    test_client: AsyncClient,
-):
-    """`GET /auth/check-email` reads the user from the session — no
-    cookie means no page. Same posture as `/auth/resend-verify`."""
-    response = await test_client.get("/auth/check-email", follow_redirects=False)
-    assert response.status_code != 200
-
-
-async def test_check_email_page_renders_smart_link_for_gmail(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Gmail user sees an "Open Gmail" button whose href is a pre-filtered
-    search URL for the verify sender."""
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            user = await session.get(User, logged_in_user.id)
-            user.email = "alice@gmail.com"
-
-    response = await authenticated_client.get("/auth/check-email")
-    assert response.status_code == 200
-    assert "Open Gmail" in response.text
-    # The Gmail search URL is pinned in test_email_providers.py; here we
-    # just verify the template actually renders it.
-    assert "mail.google.com/mail/u/0/#search/" in response.text
-    assert "from%3Ano-reply%40bedlamconnect.com" in response.text
-    assert "alice@gmail.com" in response.text
-
-
-async def test_check_email_page_falls_back_for_unknown_domain(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """Unrecognized domain (the default fixture user is `@example.com`)
-    → no button, plain sentence referencing the from address."""
-    response = await authenticated_client.get("/auth/check-email")
-    assert response.status_code == 200
-    # No provider button rendered.
-    assert "Open Gmail" not in response.text
-    assert "mail.google.com" not in response.text
-    # The from address is named in the plain-sentence fallback.
-    assert "no-reply@bedlamconnect.com" in response.text
-    # The user's email is still surfaced so they know which address to check.
-    assert logged_in_user.email in response.text
-
-
-async def test_check_email_page_shows_just_sent_banner_with_query_flag(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`?sent=1` (set by the resend redirect) renders the "just sent"
-    status line."""
-    response = await authenticated_client.get("/auth/check-email?sent=1")
-    assert response.status_code == 200
-    assert "Verification email sent" in response.text
-
-
-async def test_check_email_page_omits_just_sent_banner_without_query_flag(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """The "just sent" status is opt-in via `?sent=1`; first-visit
-    (post-registration redirect) doesn't show it."""
-    response = await authenticated_client.get("/auth/check-email")
-    assert response.status_code == 200
-    assert "Verification email sent" not in response.text
+    assert response.headers.get("HX-Redirect") == "/users/me/email/form?sent=1"
 
 
 async def test_unauthorized_redirect_for_browser_requests(test_client: AsyncClient):
