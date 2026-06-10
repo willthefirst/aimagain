@@ -73,7 +73,7 @@ Fieldset-level "everything below is optional" lines (the previous `<small>Both l
 ### Buttons
 
 - **Verb-noun, sentence case.** `Create program`, `Post referral`, `Save changes`, `Send reset link`.
-- **Create / edit submit pattern.** Create forms use `entity_create_label(spec.name, kind=...)` so the submit button text matches the H1 (`Create clinician opening` everywhere). Edit forms use `Save changes` — every edit form, no exceptions. The structural pin lives in `entity_create_label` (see [`../../framework/templates/README.md` § "Create / filter labels"](../../framework/templates/README.md)).
+- **Create / edit submit pattern.** Create forms use `entity_create_label(spec.name, kind=...)` so the submit button text matches the H1 (`Create Opening` everywhere). Edit forms use `Save changes` — every edit form, no exceptions. The structural pin lives in `entity_create_label` (see [`../../framework/templates/README.md` § "Create / filter labels"](../../framework/templates/README.md)).
 
 ### Vocabulary
 

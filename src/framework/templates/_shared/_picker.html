@@ -11,9 +11,10 @@ description} — self- vs cross-resource hrefs are the caller's business.
 Adopted from the `/posts/form` pattern (issue #704).
 
 Each option renders as a vanilla Pico `<article>` (default chrome — border,
-padding, header band); articles are block-level so options stack as rows on
-every viewport. The heading is a vanilla `<h3><a>` link; the description is
-a plain `<p>`. No custom CSS — markup alone carries the look.
+padding) with the heading + tagline flowing directly inside, no `<header>`
+band. Articles are block-level so options stack as rows on every viewport.
+The heading is a vanilla `<h2><a>` link; the description is a plain `<p>`.
+No custom CSS — markup alone carries the look.
 
 Each option is a dict with keys:
   href:        URL to navigate to on click (ignored when selected=true)
@@ -28,20 +29,16 @@ Each option is a dict with keys:
   {%- for opt in options %}
     {%- if opt.selected %}
       <article class="picker-option" aria-current="page">
-        <header>
-          <h2>
-            <i class="icon-check"></i> {{ opt.heading }}
-          </h2>
-        </header>
+        <h2>
+          <i class="icon-check"></i> {{ opt.heading }}
+        </h2>
         <p>{{ opt.description }}</p>
       </article>
     {%- else %}
       <article class="picker-option">
-        <header>
-          <h2>
-            <a href="{{ opt.href }}">{{ opt.heading }}</a>
-          </h2>
-        </header>
+        <h2>
+          <a href="{{ opt.href }}">{{ opt.heading }}</a>
+        </h2>
         <p>{{ opt.description }}</p>
       </article>
     {%- endif %}

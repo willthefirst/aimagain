@@ -45,20 +45,23 @@ def entity_create_label(name: str, *, kind: str | None = None) -> str:
     Resolution order:
 
       1. ``kind`` supplied and the spec carries a `discriminator` →
-         use the registry's per-kind ``list_label`` (e.g. ``"clinician
-         opening"``, ``"program intake"``, ``"client referral"``). The
-         result is ``"Create clinician opening"``.
+         use the registry's per-kind ``noun`` (e.g. ``"Referral"``,
+         ``"Opening"``, ``"Program intake"`` for POST_KINDS). The
+         result is ``"Create Referral"``.
       2. The spec is kind-locked (``discriminator_value`` set) → use
-         the bound kind's ``list_label``, regardless of what the caller
+         the bound kind's ``noun``, regardless of what the caller
          passes. No URL family uses this mode today, but the resolution
          path is retained for any future single-kind face.
       3. Otherwise → ``"Create " + spec.singular_label`` (the default
          path for non-polymorphic entities and for the subset-supertype
          picker page).
 
-    The function lowercases the noun so CTAs and H1s read in the same
-    "sentence-fragment" style — title-casing happens via CSS where
-    needed, never in the string itself.
+    Per-kind nouns are **capital-case** ("Referral" / "Opening" /
+    "Program intake") — they're the canonical SOT for "what is this
+    kind called" across the picker, the sidebar filter, and the CTA /
+    H1 chain. The non-polymorphic fallback `spec.singular_label` stays
+    lowercase ("organization", "clinician", "post") because those are
+    spec names rather than curated nouns.
     """
     spec = _spec_by_name(name)
     return create_label_for(spec, kind=kind)
@@ -68,12 +71,12 @@ def entity_edit_label(name: str, *, kind: str | None = None) -> str:
     """Return the canonical "Edit <noun>" string for an entity.
 
     Mirrors `entity_create_label`'s resolution rule — same per-kind
-    `list_label` lookup so the edit page's H1 reads "Edit clinician
-    opening" / "Edit program intake" / "Edit client referral" / "Edit
-    organization" rather than the row's identity string ("Edit Adult
-    male (25-64)" was the friction this funnel fixes). The row
-    identity stays on the breadcrumb's middle segment via the
-    template's `current_label` block.
+    `noun` lookup so the edit page's H1 reads "Edit Opening" / "Edit
+    Program intake" / "Edit Referral" / "Edit organization" rather
+    than the row's identity string ("Edit Adult male (25-64)" was the
+    friction this funnel fixes). The row identity stays on the
+    breadcrumb's middle segment via the template's `current_label`
+    block.
     """
     spec = _spec_by_name(name)
     return edit_label_for(spec, kind=kind)
@@ -128,15 +131,15 @@ def _noun_for(spec: "EntitySpec", *, kind: str | None) -> str:
     if spec.discriminator is not None:
         # Kind-locked face: the bound discriminator_value wins even when
         # the caller doesn't pass `kind`, so a single-kind URL family's
-        # form page always reads the bound kind's label (matches the
+        # form page always reads the bound kind's noun (matches the
         # picker option on any umbrella page that points to it). No URL
         # family uses this mode today. `getattr` lets test specs use a
-        # minimal registry kind type without a `list_label` attribute
-        # and still round-trip through the helper.
+        # minimal registry kind type without a `noun` attribute and
+        # still round-trip through the helper.
         effective_kind = kind or spec.discriminator_value
         if effective_kind is not None and effective_kind in spec.discriminator:
             kind_spec = spec.discriminator[effective_kind]
-            label = getattr(kind_spec, "list_label", None)
+            label = getattr(kind_spec, "noun", None)
             if label:
                 return label
     return spec.singular_label

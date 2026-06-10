@@ -35,8 +35,9 @@ def _render_picker(env: Environment, options: list[dict]) -> str:
 
 def test_picker_renders_one_article_card_per_option_in_order() -> None:
     """Each non-selected option becomes an ``<article class="picker-option">``
-    card whose ``<header><h2><a>`` carries the option's ``href`` and heading
-    text, with the description as a plain ``<p>`` — in the order supplied."""
+    card whose top-level ``<h2><a>`` carries the option's ``href`` and
+    heading text, with the description as a plain ``<p>`` — in the order
+    supplied. No ``<header>`` wrapping after #1330."""
     env = _make_env()
     options = [
         {
@@ -54,7 +55,7 @@ def test_picker_renders_one_article_card_per_option_in_order() -> None:
 
     cards = tree.css("article.picker-option")
     assert len(cards) == 2
-    headings = [c.css_first("header h2 a") for c in cards]
+    headings = [c.css_first("h2 a") for c in cards]
     assert [h.attributes.get("href") for h in headings] == [
         "/posts/form?kind=referral",
         "/posts/form?kind=clinician_opening",
@@ -87,7 +88,7 @@ def test_picker_is_href_agnostic_across_both_species() -> None:
     assert len(cards) == 2
     # Cross-resource hrefs render through unchanged — same card shape as the
     # discriminator species, no special-casing.
-    hrefs = {c.css_first("header h2 a").attributes.get("href") for c in cards}
+    hrefs = {c.css_first("h2 a").attributes.get("href") for c in cards}
     assert hrefs == {"/clinicians/form", "/organizations/form"}
     # No "selected" marker species leaks in for a plain option list.
     assert tree.css_first("article.picker-option[aria-current]") is None
@@ -114,11 +115,11 @@ def test_picker_selected_option_renders_marked_card_not_a_link() -> None:
     assert selected is not None
     assert selected.attributes.get("aria-current") == "page"
     # Selected card is not a link — its heading is plain text, no nested <a>.
-    assert selected.css_first("header h2 a") is None
+    assert selected.css_first("h2 a") is None
     assert selected.css_first("i.icon-check") is not None
-    assert selected.css_first("header h2").text(strip=True).endswith("Path A")
+    assert selected.css_first("h2").text(strip=True).endswith("Path A")
     # The non-selected sibling is still a real link card.
-    links = tree.css("article.picker-option:not([aria-current]) header h2 a")
+    links = tree.css("article.picker-option:not([aria-current]) h2 a")
     assert len(links) == 1
     assert links[0].attributes.get("href") == "/x/form?kind=b"
 
