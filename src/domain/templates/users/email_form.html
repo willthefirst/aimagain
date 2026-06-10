@@ -3,30 +3,39 @@
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
 {% block form_content %}
-  <section class="entity-facts">
-    <dl>
-      {{ fact('email', 'Email', target_user.email) }}
-    </dl>
-  </section>
-  {% if not target_user.is_verified %}
+  {# Verified users see only the email row — there is no edit affordance
+     on this page today, so this is a confirmation surface. Unverified
+     users instead get the inline check-your-inbox CTA below, which names
+     the email itself, so the standalone row would be a redundant
+     restatement of the same string. #}
+  {% if target_user.is_verified %}
+    <section class="entity-facts">
+      <dl>
+        {{ fact('email', 'Email', target_user.email) }}
+      </dl>
+    </section>
+  {% else %}
     {# Doubles as the post-registration / post-resend CTA: the inbox
        link is the primary affordance, "Resend" is the secondary fallback.
        Both `POST /auth/register` and `POST /auth/resend-verify` redirect
        here (the latter with `?sent=1` so the lede swaps to a "just sent"
        confirmation). `hx-swap="none"` on the Resend button lets HTMX
        follow the `HX-Redirect` without trying to swap a body. #}
-    <aside role="alert" id="verify-banner">
-      {% if just_sent %}
-        <p>
-          <strong>Verification email sent.</strong>
-          Check your inbox — the link expires in an hour.
-        </p>
-      {% else %}
-        <p>
-          We sent a verification link to <strong>{{ target_user.email }}</strong>.
-        </p>
-        <p>Click it to finish setting up your account.</p>
-      {% endif %}
+    <article role="alert">
+      <header>
+        <hgroup>
+          {% if just_sent %}
+            <h2>Verification email sent</h2>
+            <p>Check your inbox — the link expires in an hour.</p>
+          {% else %}
+            <h2>Check your inbox</h2>
+            <p>
+              We sent a verification link to <strong>{{ target_user.email }}</strong>.
+            </p>
+            <p>Click it to finish setting up your account.</p>
+          {% endif %}
+        </hgroup>
+      </header>
       {% if provider_url %}
         <p>
           <a href="{{ provider_url }}"
@@ -42,13 +51,13 @@
           Look for a message from <strong>{{ from_address }}</strong>.
         </p>
       {% endif %}
-      <p>
-        Didn't get it?
+      <footer>
+        <small>Didn't get it?</small>
         <button type="button"
                 hx-post="/auth/resend-verify"
                 hx-swap="none"
                 class="secondary">Resend verification email</button>
-      </p>
-    </aside>
+      </footer>
+    </article>
   {% endif %}
 {% endblock %}
