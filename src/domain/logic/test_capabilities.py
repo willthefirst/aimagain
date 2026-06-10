@@ -539,6 +539,61 @@ def test_reason_meta_covers_every_reason_constant_with_nonempty_copy():
         assert meta.fix_label, f"REASON {reason!r} has empty fix_label"
 
 
+# ---------- leaf factories ------------------------------------------------
+#
+# Each leaf is the SOT for one fact's `(label_active, label_done,
+# fix_url)` triple. Pinning them here catches drift the moment a second
+# capability tree starts composing the same leaves — if `check_network`
+# and a later `check_*` ever rendered "Verify email" with different copy
+# or a different fix URL, *one* of them is wrong.
+
+
+def test_email_leaf_canonical_shape():
+    leaf = capabilities._email_leaf(_user(is_verified=False))
+    assert leaf.label_active == "Verify your email"
+    assert leaf.label_done == "Email verified"
+    assert leaf.fix_url == "/users/me/email/form"
+    assert leaf.met is False
+
+
+def test_email_leaf_met_tracks_email_verified():
+    assert capabilities._email_leaf(_user(is_verified=True)).met is True
+    assert capabilities._email_leaf(None).met is False
+
+
+def test_clinician_verified_leaf_canonical_shape():
+    leaf = capabilities._clinician_verified_leaf(_user(is_verified=True))
+    assert leaf.label_active == "Verify a clinician"
+    assert leaf.label_done == "Clinician verified"
+    assert leaf.fix_url == "/clinicians/form"
+    assert leaf.met is False
+
+
+def test_clinician_verified_leaf_met_with_verified_clinician():
+    user = _user(
+        is_verified=True,
+        clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
+    )
+    assert capabilities._clinician_verified_leaf(user).met is True
+
+
+def test_org_rep_any_leaf_canonical_shape():
+    leaf = capabilities._org_rep_any_leaf(_user(is_verified=True))
+    assert leaf.label_active == "Verify your organization"
+    assert leaf.label_done == "Organization verified"
+    assert leaf.fix_url == "/organizations/form"
+    assert leaf.met is False
+
+
+def test_org_rep_any_leaf_met_with_verified_rep():
+    org = _org(org_verified=True)
+    user = _user(
+        is_verified=True,
+        org_representations=[_rep(org_id=org.id, authority_status="verified")],
+    )
+    assert capabilities._org_rep_any_leaf(user).met is True
+
+
 # ---------- check_network -------------------------------------------
 
 
