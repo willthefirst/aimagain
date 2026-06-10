@@ -232,8 +232,7 @@ dd { margin: 0; }
 }
 .entity-form-page form .form-field > input,
 .entity-form-page form .form-field > select,
-.entity-form-page form .form-field > textarea,
-.entity-form-page form .form-field > .form-field-control { margin: 0; min-width: 0; }
+.entity-form-page form .form-field > textarea { margin: 0; min-width: 0; }
 /* Multi-selection rendered as a scrollable checkbox list (replaces the
    old `<select multiple>` listbox — see `multi_select_field` in
    `_shared/form_fields.html`). The max-height cap is the whole point:
@@ -313,18 +312,6 @@ dd { margin: 0; }
   grid-column: auto;
 }
 .entity-form-page form .grid > .form-field > small { grid-column: 2; }
-/* Radio cluster: yes/no labels inline inside the right column. */
-.form-field-control {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-}
-.form-field-control > .form-field-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
 @media (max-width: 640px) {
   .entity-form-page form {
     grid-template-columns: 1fr;
