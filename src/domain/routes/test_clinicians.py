@@ -221,8 +221,11 @@ async def test_get_clinician_renders_detail_page(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`GET /clinicians/{id}` renders the read-only HTML detail page
-    with practice fields and an Edit link for the owner."""
+    """`GET /clinicians/{id}` is a dispatching picker (#1336): person-
+    level identity in the H1 + subtitle band, plus four cards deep-
+    linking to the sub-resource list pages. The owner toolbar carries
+    Edit / Delete; no inline sub-resource data appears on this page
+    (it lives on `/clinicians/{id}/<sub>` after the restyle)."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id, practice_name="Mine"
     )
@@ -239,18 +242,27 @@ async def test_get_clinician_renders_detail_page(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    # Licensure section renders the seeded row.
-    assert "L-99999" in response.text
-    # Owner sees an Edit link, no edit forms (read-only) in the page body.
-    # (The header dropdown link is not a form — scoping to main is still
-    #  the right approach for future-proofing, but the original reason no
-    #  longer applies.)
+    # Inline sub-resource data is NOT on the detail page anymore — it
+    # lives on each sub-resource's own list page.
+    assert "L-99999" not in response.text
+    # Toolbar carries the owner's Edit link.
     assert tree.css_first(f'a[href="/clinicians/{clinician_id}/form"]') is not None
     assert tree.css_first("main form") is None
-    # Regression for #594 — the practice name lives in the header
-    # `<strong>` only. The facts list relabels its row "Organization"
-    # so the same string is not repeated under a "Practice name" `<dt>`.
-    assert "<dt>Practice name</dt>" not in response.text
+    # Four picker cards, deep-linking to the four sub-resource list
+    # pages mounted in #1335. The picker macro renders one
+    # `article.picker-option` per option (no `<header>` band after
+    # #1330) with the link inside `<h2><a>`.
+    cards = tree.css("main article.picker-option")
+    assert len(cards) == 4
+    hrefs = {card.css_first("h2 a").attributes.get("href") for card in cards}
+    assert hrefs == {
+        f"/clinicians/{clinician_id}/clinician_affiliations",
+        f"/clinicians/{clinician_id}/licensures",
+        f"/clinicians/{clinician_id}/educations",
+        f"/clinicians/{clinician_id}/certifications",
+    }
+    headings = {card.css_first("h2 a").text(strip=True) for card in cards}
+    assert headings == {"Practices", "Licensures", "Education", "Certifications"}
 
 
 async def test_get_clinician_detail_shows_verification_badge(
@@ -286,75 +298,6 @@ async def test_get_clinician_detail_shows_no_badge_without_verification(
     assert response.status_code == 200
     assert "icon-shield-check" not in response.text
     assert "icon-shield-x" not in response.text
-
-
-async def test_get_clinician_detail_renders_stacked_affiliation_cards(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """`GET /clinicians/{id}` renders one stacked card per ClinicianAffiliation
-    after #642 PR 2. Seed a Clinician with two affiliations (the one
-    `Clinician.__init__` builds from the create payload + a second one
-    appended) and assert both org names render and both
-    `[data-testid="affiliation-card"]` blocks appear, in the order
-    `clinician.clinician_affiliations` returns (oldest first by `created_at`).
-    """
-    from src.domain.models import ClinicianAffiliation
-
-    clinician_id = await _seed_clinician_for(
-        db_test_session_manager,
-        user_id=logged_in_user.id,
-        practice_name="Bedlam Health",
-        location_city="Brooklyn",
-        location_state="NY",
-        location_zip="11201",
-    )
-    # Append a second ClinicianAffiliation at a different Org.
-    second_org_id = await _seed_org(
-        db_test_session_manager,
-        owner_id=logged_in_user.id,
-        name="Wellspring",
-    )
-    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(
-                ClinicianAffiliation(
-                    clinician_id=clinician_id,
-                    org_id=second_org_id,
-                    location_city="Queens",
-                    location_state="NY",
-                    location_zip="11101",
-                    in_person_sessions="yes",
-                    virtual_sessions="please_contact",
-                    accepts_out_of_network=True,
-                    in_network_carriers=[],
-                    sliding_scale=True,
-                    cost="$220/session",
-                )
-            )
-
-    response = await authenticated_client.get(f"/clinicians/{clinician_id}")
-
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    cards = tree.css('article[data-testid="affiliation-card"]')
-    assert len(cards) == 2, f"expected one card per affiliation, got {len(cards)}"
-    # Both org names render — one card per practice.
-    assert "Bedlam Health" in response.text
-    assert "Wellspring" in response.text
-    # Per-affiliation address rendered inside each card (not just at
-    # the clinician header) — the location belongs to the affiliation.
-    assert "Brooklyn" in response.text
-    assert "Queens" in response.text
-    # Each card links its heading to the owning Organization.
-    org_links_in_cards = []
-    for card in cards:
-        anchor = card.css_first("header.entity-header a[href^='/organizations/']")
-        assert anchor is not None
-        org_links_in_cards.append(anchor.attributes.get("href"))
-    assert f"/organizations/{second_org_id}" in org_links_in_cards
 
 
 async def test_get_clinician_hides_edit_link_for_non_owner(
@@ -1303,16 +1246,16 @@ async def test_delete_affiliation_returns_404_for_mismatched_clinician(
     assert response.status_code == 404
 
 
-async def test_owner_edit_form_renders_affiliations_section(
+async def test_clinician_edit_form_has_no_inline_subresource_ui(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The clinician edit page surfaces every `ClinicianAffiliation` row
-    in a dedicated section. The DB model calls them affiliations
-    (clinician × org); the UI surfaces them as "Practices" because
-    that's what they are to the user — including the solo case where
-    `org_id` is NULL. Inline add + per-row delete are present."""
+    """After #1336 the clinician edit form is **person-level only** —
+    the inline lists for affiliations / licensures / educations /
+    certifications moved onto each sub-resource's own list page
+    (`/clinicians/{id}/<sub>`). The picker on the detail page is what
+    deep-links into them."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -1321,43 +1264,27 @@ async def test_owner_edit_form_renders_affiliations_section(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    headings = [h.text(strip=True) for h in tree.css("h2")]
-    assert "Practices" in headings
-
-    # The inline add form posts to /clinicians/{id}/clinician_affiliations.
-    add_form = tree.css_first(
-        f'form[hx-post="/clinicians/{clinician_id}/clinician_affiliations"]'
-    )
-    assert add_form is not None
-    assert add_form.css_first('select[name="org_id"]') is not None
-    assert add_form.css_first('input[name="location_city"]') is not None
-
-    # The existing primary affiliation renders as a row with a
-    # delete button pointing at its own URL.
-    from src.domain.models import ClinicianAffiliation
-
-    async with db_test_session_manager() as session:
-        aff_id = (
-            await session.execute(
-                select(ClinicianAffiliation.id).where(
-                    ClinicianAffiliation.clinician_id == clinician_id
-                )
+    # No `<h2>` headings on the edit form — only the toolbar `<h1>`
+    # ("Edit clinician") and the one `<form>` for person-level fields.
+    assert tree.css("main h2") == []
+    # The sub-resource POST/DELETE forms that used to live inline are gone.
+    for collection in (
+        "clinician_affiliations",
+        "licensures",
+        "educations",
+        "certifications",
+    ):
+        assert (
+            tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/{collection}"]')
+            is None
+        )
+        # No delete buttons for sub-resource rows on this page either.
+        assert (
+            tree.css_first(
+                f'button[hx-delete^="/clinicians/{clinician_id}/{collection}/"]'
             )
-        ).scalar_one()
-    delete_button = tree.css_first(
-        f'button[hx-delete="/clinicians/{clinician_id}/clinician_affiliations/{aff_id}"]'
-    )
-    assert delete_button is not None
-
-    # The inline add-practice form's Organization dropdown carries the
-    # shared `org_picker_help()` affordance so the "Don't see your
-    # organization? Create one." escape hatch is one click away —
-    # mirrors the program create/edit forms. The same `<small>` slot
-    # carries the link to the org create form.
-    helper = add_form.css_first('select[name="org_id"] ~ small')
-    assert helper is not None
-    assert "Don't see your organization" in helper.text()
-    assert helper.css_first('a[href="/organizations/form"]') is not None
+            is None
+        )
 
 
 # --- Education / certification happy paths ------------------------------
@@ -1415,22 +1342,14 @@ async def test_owner_can_open_edit_form(
     logged_in_user: User,
 ):
     """Owner sees the edit form pre-filled with the person-level
-    Clinician fields (first/last/npi) plus the credential and
-    affiliation sub-rows. Practice posture moved off this form in
-    #1308 — `org_id` / location / sessions / insurance now live on
-    each affiliation's own row."""
+    Clinician fields (first/last/npi) only. Practice posture, licensures,
+    educations, and certifications each live on their own list page
+    after #1336."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
         user_id=logged_in_user.id,
         practice_name="Acme Counseling",
     )
-    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    licensure = make_clinician_licensure(
-        clinician_id=clinician_id, license_type="lcsw", license_number="L-12345"
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(licensure)
 
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
     assert response.status_code == 200
@@ -1441,93 +1360,25 @@ async def test_owner_can_open_edit_form(
     assert practice_form.css_first('input[name="first_name"]') is not None
     assert practice_form.css_first('input[name="last_name"]') is not None
     assert practice_form.css_first('input[name="npi"]') is not None
-    # Per-affiliation posture inputs (`org_id`, `location_city`,
-    # `in_person_sessions`, etc.) are NOT on the clinician form — they
-    # belong to each affiliation's own row below.
+    # Per-affiliation posture inputs are not on the clinician form.
     assert practice_form.css_first('select[name="org_id"]') is None
     assert practice_form.css_first('input[name="location_city"]') is None
     assert practice_form.css_first('select[name="in_person_sessions"]') is None
-    # The seeded licensure should be rendered in the licensures list.
-    assert "L-12345" in response.text
-    # Sub-section add forms target the right URLs.
-    assert (
-        tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/licensures"]')
-        is not None
-    )
-    assert (
-        tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/educations"]')
-        is not None
-    )
-    assert (
-        tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/certifications"]')
-        is not None
-    )
 
 
-async def test_owner_edit_form_renders_credentials_as_rows(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Credential lists render as `.credential-row` blocks (not raw
-    `<li>`s) — bold type label, muted meta line, owner-side Delete
-    button. The owning `<section>` already provides the framing; rows
-    stay flat to avoid the card-on-card look."""
-    clinician_id = await _seed_clinician_for(
-        db_test_session_manager,
-        user_id=logged_in_user.id,
-        practice_name="Acme Counseling",
-    )
-    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
-    licensure = make_clinician_licensure(
-        clinician_id=clinician_id,
-        license_type="lcsw",
-        license_number="L-12345",
-        issuing_state="CA",
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(licensure)
-
-    response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
-    tree = HTMLParser(response.text)
-    # After #642 PR 1 the affiliations section also renders rows via
-    # `.credential-list .credential-row` (it reuses the same partial);
-    # locate the licensure row by its hx-delete URL, not by section
-    # ordering.
-    delete = tree.css_first(
-        f'button[hx-delete="/clinicians/{clinician_id}/licensures/{licensure.id}"]'
-    )
-    assert delete is not None
-    assert delete.text(strip=True) == "Delete"
-    row = delete.parent  # `.credential-row`
-    while row is not None and "credential-row" not in (
-        row.attributes.get("class") or ""
-    ):
-        row = row.parent
-    assert row is not None
-    assert (
-        row.css_first("strong").text(strip=True)
-        == "Licensed Clinical Social Worker (LCSW)"
-    )
-    meta = row.css_first(".credential-row-text small")
-    assert meta is not None
-    assert "L-12345" in meta.text()
-    assert "CA" in meta.text()
-
-
-async def test_owner_edit_form_renders_solo_affiliation_without_crashing(
+# Placeholder docstring kept to anchor the section comment that
+# follows. The actual solo-affiliation rendering is now pinned at the
+# affiliations list page level (`test_get_clinician_affiliations_*`).
+async def test_clinician_edit_form_renders_for_solo_clinician(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """Solo clinician path: a `ClinicianAffiliation` with `org_id` NULL
-    (the shape #1311 introduced for solo practitioners) renders without
-    dereferencing `aff.org.name`. The row label falls back to
-    "Solo practice" and the section heading reads "Practices" — the UI
-    drops the "affiliation" word in the solo case, matching how the
-    user thinks about it."""
-    from src.domain.models import Clinician, ClinicianAffiliation
+    (the shape #1311 introduced for solo practitioners) doesn't break
+    the edit form, because the form is now person-level only and never
+    derefs affiliation fields."""
+    from src.domain.models import ClinicianAffiliation
 
     clinician = make_clinician(
         owner_id=logged_in_user.id,
@@ -1544,25 +1395,9 @@ async def test_owner_edit_form_renders_solo_affiliation_without_crashing(
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # Section heading is "Practices", not "Affiliations".
-    headings = [h.text(strip=True) for h in tree.css("h2")]
-    assert "Practices" in headings
-    assert "Affiliations" not in headings
-    # The solo affiliation row's label falls back to "Solo practice".
-    async with db_test_session_manager() as session:
-        loaded = await session.get(Clinician, clinician_id)
-        aff_id = loaded.clinician_affiliations[0].id
-    delete = tree.css_first(
-        f'button[hx-delete="/clinicians/{clinician_id}/clinician_affiliations/{aff_id}"]'
-    )
-    assert delete is not None
-    row = delete.parent
-    while row is not None and "credential-row" not in (
-        row.attributes.get("class") or ""
-    ):
-        row = row.parent
-    assert row is not None
-    assert row.css_first("strong").text(strip=True) == "Solo practice"
+    # Person-level form is present; no `<h2>` sub-sections.
+    assert tree.css_first(f'form[hx-patch="/clinicians/{clinician_id}"]') is not None
+    assert tree.css("main h2") == []
 
 
 async def test_admin_can_open_edit_form_for_any_clinician(
