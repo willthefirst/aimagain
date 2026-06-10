@@ -1,32 +1,50 @@
 {% extends "base.html" %}
 {% block content %}
   <section class="auth-page">
-    <header>
-      {% if status == "success" %}
-        <h1>Email verified</h1>
-        <p>Thanks — your email is confirmed. The nag banner will go away on your next page load.</p>
-      {% elif status == "already_verified" %}
+    {# Three render states. `status=None` (default) is the confirm-page
+       branch the GET handler hits when a token is present — clicking
+       the button POSTs to `/auth/verify`, which is where the token
+       is actually consumed (see auth_pages.py:post_verify for why GET
+       doesn't mutate). The success branch isn't a template state —
+       the POST handler redirects (via on_after_login + override) into
+       the clinician-create flow, preserving the funnel intent from
+       #1302. #}
+    {% if status == "already_verified" %}
+      <header>
         <h1>Already verified</h1>
-        <p>This email was already confirmed. Nothing more to do.</p>
-      {% else %}
+        <p>This email was already confirmed. Log in to continue.</p>
+      </header>
+      <footer>
+        <p>
+          <a href="/auth/login" role="button">Log in</a>
+        </p>
+      </footer>
+    {% elif status == "error" %}
+      <header>
         <h1>Verification link didn't work</h1>
         <p>
           The link may have expired, been used already, or been mis-copied. Sign in and use the resend link in the banner at the top of the page.
         </p>
-      {% endif %}
-    </header>
-    <footer>
-      {# On success, route the user into the clinician-create flow — the
-         intended next step after confirming email. The two other states
-         (already-verified / link-failed) still bounce to /users/me, where
-         the user can resend or self-manage. #}
-      <p>
-        {% if status == "success" %}
-          <a href="{{ entity_form_url('clinician') }}" role="button">{{ entity_create_label("clinician") }}</a>
-        {% else %}
-          <a href="{{ entity_url('user', id='me') }}" role="button">Go to your profile</a>
-        {% endif %}
-      </p>
-    </footer>
+      </header>
+      <footer>
+        <p>
+          <a href="/auth/login" role="button">Log in</a>
+        </p>
+      </footer>
+    {% else %}
+      <header>
+        <h1>Verify your email</h1>
+        <p>Click the button below to confirm your email and sign in.</p>
+      </header>
+      {# Plain form POST — no HTMX. The page is the landing for an
+         email link, so we can't assume HTMX is mounted and the
+         browser-native form submit + 302 follow is the simpler path.
+         (The POST handler still honors `HX-Request: true` if a
+         future HTMX caller wants the 204 + HX-Redirect shape.) #}
+      <form action="/auth/verify" method="post">
+        <input type="hidden" name="token" value="{{ token }}">
+        <button type="submit">Verify and sign in</button>
+      </form>
+    {% endif %}
   </section>
 {% endblock %}
