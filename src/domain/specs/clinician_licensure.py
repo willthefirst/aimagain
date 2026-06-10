@@ -6,8 +6,10 @@ Owned subentity of `Clinician`: routes nest under
 `_credential.py` for the shared factory. License attestation is the
 only credential-specific addition: a state axis at
 ``PUT /clinicians/{clinician_id}/licensures/{licensure_id}/attestation``
-that flips `attested_active=True` + recomputes the owning clinician's
-Claim-A cache.
+that flips `attested_active=True`. The owning clinician's Claim-A
+cache is recomputed for symmetry with other licensure transitions,
+but licensure status no longer gates the claim — only `npi_match_status`
+does.
 
 Read by `src/domain/routes/clinicians.py` (derives `LICENSURE_SPEC` for
 the mount helpers).
