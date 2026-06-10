@@ -49,15 +49,25 @@ class ClinicianAffiliation(LocationMixin, BaseModel):
         "Clinician", back_populates="clinician_affiliations", lazy="selectin"
     )
 
+    # `org_id` is nullable: a solo clinician with no LLC has an
+    # affiliation row whose `org_id` is NULL — the row still carries
+    # their practice posture (location, availability, insurance, cost),
+    # but there is no organizational entity to point at. See the
+    # clinician-affiliations README for the "always ≥1 affiliation per
+    # clinician" invariant and the stub-null-org case.
     org_id = Column(
         Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
     org = relationship("Organization", lazy="selectin")
 
-    in_person_sessions = Column(Text, nullable=False)
-    virtual_sessions = Column(Text, nullable=False)
+    # `in_person_sessions` / `virtual_sessions` are nullable: a stub
+    # affiliation auto-created at verify time has not yet been asked
+    # "do you see clients in person / virtually?" — NULL means "unset",
+    # distinct from any of the LOCATION_AVAILABILITY_OPTIONS values.
+    in_person_sessions = Column(Text, nullable=True)
+    virtual_sessions = Column(Text, nullable=True)
     accepts_out_of_network = Column(
         Boolean, nullable=False, server_default=text("1"), default=True
     )
