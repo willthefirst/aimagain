@@ -8,7 +8,6 @@ from fastapi_users.manager import BaseUserManager
 from pydantic import BaseModel, EmailStr, ValidationError
 
 from src.auth_config import auth_backend, current_active_user, get_user_manager
-from src.domain.logic.auth.email_providers import email_provider_search_url
 from src.domain.models import User
 from src.domain.routes.dev_auth import DEV_SEED_USERS
 from src.framework import APIResponse, BaseRouter
@@ -495,37 +494,6 @@ async def get_verify_page(
     )
 
 
-@router.get("/check-email", name="auth_pages:check_email")
-async def get_check_email_page(
-    request: Request,
-    current_user: User = Depends(current_active_user),
-):
-    """Post-registration / post-resend CTA: "open your inbox" with a
-    smart link when we recognize the provider.
-
-    Both flows that send a verification email land here:
-
-      - `POST /auth/register` (HTMX) redirects here after auto-login.
-      - `POST /auth/resend-verify` redirects here with `?sent=1` so the
-        page renders a "just sent another email" status line.
-
-    The page reads the user's email from the session and the from
-    address from `settings.EMAIL_FROM`; the provider lookup is pure.
-    """
-    label, url = email_provider_search_url(current_user.email, settings.EMAIL_FROM)
-    return APIResponse.html_response(
-        template_name="auth/check_email.html",
-        context={
-            "email": current_user.email,
-            "from_address": settings.EMAIL_FROM,
-            "provider_label": label,
-            "provider_url": url,
-            "just_sent": request.query_params.get("sent") == "1",
-        },
-        request=request,
-    )
-
-
 @router.post("/resend-verify", name="auth_pages:resend_verify")
 async def post_resend_verify(
     request: Request,
@@ -540,9 +508,9 @@ async def post_resend_verify(
     the session cookie; calls `request_verify` which triggers
     `on_after_request_verify` → `send_verification_email`.
 
-    Returns `HX-Redirect: /auth/check-email?sent=1` so the user lands
-    on the shared CTA page with a "just sent another email" status —
-    same UX surface as the post-registration flow.
+    Returns `HX-Redirect: /users/me/email/form?sent=1` so the user lands
+    on the consolidated email-management / CTA page with a "just sent
+    another email" status — same UX surface as the post-registration flow.
     """
     try:
         await user_manager.request_verify(current_user, request)
@@ -552,7 +520,7 @@ async def post_resend_verify(
         # let it render and the nag goes away on next reload.
         pass
     response = Response(status_code=200)
-    response.headers["HX-Redirect"] = "/auth/check-email?sent=1"
+    response.headers["HX-Redirect"] = "/users/me/email/form?sent=1"
     return response
 
 

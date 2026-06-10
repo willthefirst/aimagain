@@ -9,13 +9,46 @@
     </dl>
   </section>
   {% if not target_user.is_verified %}
+    {# Doubles as the post-registration / post-resend CTA: the inbox
+       link is the primary affordance, "Resend" is the secondary fallback.
+       Both `POST /auth/register` and `POST /auth/resend-verify` redirect
+       here (the latter with `?sent=1` so the lede swaps to a "just sent"
+       confirmation). `hx-swap="none"` on the Resend button lets HTMX
+       follow the `HX-Redirect` without trying to swap a body. #}
     <aside role="alert" id="verify-banner">
-      <p>Your email address has not been verified. Check your inbox for the verification link, or request a new one.</p>
-      {# The POST returns `HX-Redirect: /auth/check-email?sent=1` so the
-         user lands on the shared CTA page with a "just sent" status —
-         same surface as the post-registration flow. `hx-swap="none"`
-         lets HTMX handle the redirect without trying to swap a body. #}
-      <button hx-post="/auth/resend-verify" hx-swap="none">Resend verification email</button>
+      {% if just_sent %}
+        <p>
+          <strong>Verification email sent.</strong>
+          Check your inbox — the link expires in an hour.
+        </p>
+      {% else %}
+        <p>
+          We sent a verification link to <strong>{{ target_user.email }}</strong>.
+        </p>
+        <p>Click it to finish setting up your account.</p>
+      {% endif %}
+      {% if provider_url %}
+        <p>
+          <a href="{{ provider_url }}"
+             target="_blank"
+             rel="noopener"
+             role="button">Open {{ provider_label }}</a>
+        </p>
+        <p>
+          <small>We'll search your inbox for messages from <strong>{{ from_address }}</strong>.</small>
+        </p>
+      {% else %}
+        <p>
+          Look for a message from <strong>{{ from_address }}</strong>.
+        </p>
+      {% endif %}
+      <p>
+        Didn't get it?
+        <button type="button"
+                hx-post="/auth/resend-verify"
+                hx-swap="none"
+                class="secondary">Resend verification email</button>
+      </p>
     </aside>
   {% endif %}
 {% endblock %}
