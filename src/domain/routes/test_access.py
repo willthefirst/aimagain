@@ -59,6 +59,16 @@ async def test_capabilities_index_shows_granted_or_denied(
     assert "Available" in response.text or "Not available yet" in response.text
 
 
+async def test_capabilities_index_renders_articles_without_list(
+    authenticated_client: AsyncClient,
+):
+    """Capabilities render as bare <article>s — no <ul>/<li> wrapping."""
+    response = await authenticated_client.get("/users/me/access/capabilities")
+    assert response.status_code == 200
+    assert "<article>" in response.text
+    assert "capability-list" not in response.text
+
+
 async def test_capability_detail_network_returns_200(
     authenticated_client: AsyncClient,
 ):
