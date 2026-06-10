@@ -59,18 +59,20 @@
    The Active row is an admin signal — it makes sense to an admin
    auditing someone else's account, not to the user themselves (#597).
    Hide it on the self-view; an admin viewing another user still sees
-   it. Email stays for self since users routinely glance at it to
-   confirm which account they're signed in as.
+   it. Email is hidden on the self-view too — it's already reachable
+   via the Email card below, which links to /users/me/email/form
+   where the value lives next to the verification controls. Admins
+   viewing someone else still see the email row.
 
    `is_verified` removed in #696 — no verification flow exists and
    every account is permanently False; showing it was misleading.
    Verification status and the resend action live at
    /users/me/email/form (linked in the Email card below). #}
-  {% if can_view_private %}
+  {% if can_view_private and not is_self %}
     <article>
       <dl>
         {{ fact('email', 'Email', target_user.email) }}
-        {% if not is_self %}{{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}{% endif %}
+        {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
       </dl>
     </article>
   {% endif %}
