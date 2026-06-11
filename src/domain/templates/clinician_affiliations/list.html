@@ -1,0 +1,43 @@
+{# `/clinicians/{clinician_id}/clinician_affiliations` — canonical list.
+
+   The DB model calls them affiliations because that's what the
+   (clinician × org) join is; the UI calls them "practices" because
+   that's what they are to the user. A row with `org_id` NULL is a
+   solo practice — see the affiliations cluster README for the model.
+
+   Read-only list (PR 4 of the canonical-resource-pattern conversion):
+   no inline add form, no per-row delete. "Create practice" sits in
+   the toolbar; rows are whole-row navigation links to the edit page
+   where Delete lives in the actions cluster.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/_credential_list.html" import credential_list -%}
+{%- from "_shared/_credential_row.html" import credential_row -%}
+{% block resource_label %}Practices{% endblock %}
+{% block actions %}
+  <li>
+    <a href="{{ entity_url('clinician', id=clinician.id) }}/clinician_affiliations/form"
+       role="button">Create practice</a>
+  </li>
+{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(aff) credential_list(rows, "No practices yet.") %}
+      {%- set meta_parts = [
+            aff.location_city,
+            aff.location_state,
+            aff.location_zip,
+            ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
+            ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
+            ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
+            "Out-of-network OK" if aff.accepts_out_of_network else None,
+            "Sliding scale" if aff.sliding_scale else None,
+            aff.cost,
+            ] -%}
+      {{ credential_row((aff.org.name if aff.org else "Solo practice") ,
+      meta_parts,
+      href=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string ~ "/form",
+      ) }}
+    {% endcall %}
+  </section>
+{% endblock %}

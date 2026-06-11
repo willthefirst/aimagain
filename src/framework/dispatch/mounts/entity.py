@@ -446,7 +446,16 @@ def mount_entity(
     # are entirely standard. Supplying the explicit key still works
     # and overrides the default; that's the escape hatch for
     # subentities that need bespoke creates / updates / deletes.
-    factory_makers = owned_factory_makers() if owned_subentities else {}
+    # Owned-subentity recursion only collects EXPLICIT handler bindings
+    # (`<owned.name>.<verb>` keys in the parent's `handlers` dict) and
+    # forwards them to the recursive `mount_entity` call. Auto-binding
+    # of factory-built handlers (when the verb is opted-in but no
+    # explicit binding exists) happens in the recursive call's own
+    # auto-bind loop — which knows how to resolve the spec's extras
+    # (`form_extras_path`, `list_extras_path`, etc.) and pass them to
+    # the factory makers. Auto-binding here would silently skip the
+    # extras resolution and trigger the "form_extras_path alongside
+    # an explicit handler" validation downstream.
     for owned in owned_subentities:
         if owned.parent is not entity:
             raise ValueError(
@@ -470,15 +479,6 @@ def mount_entity(
             if k in handlers:
                 owned_handlers[verb] = handlers[k]
                 consumed.add(k)
-            elif verb in factory_makers:
-                owned_handlers[verb] = factory_makers[verb](owned)
-            else:
-                raise KeyError(
-                    f"mount_entity({entity.name!r}): owned subentity "
-                    f"{owned.name!r} opts into {verb!r} but no handler "
-                    f"was supplied at handlers[{k!r}] and no default "
-                    "factory exists for this verb."
-                )
         mount_entity(router, owned, handlers=owned_handlers)
 
     # Typo detection — surface stale keys at mount time.
