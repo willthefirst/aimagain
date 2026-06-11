@@ -26,13 +26,27 @@ if TYPE_CHECKING:
 
 
 def _spec_by_name(name: str) -> "EntitySpec":
-    """Resolve an entity name to its registered spec. Duplicates the
-    helper in `route_urls.py` because importing across rendering helpers
-    would close a cycle; the helper is one-liner."""
+    """Resolve an entity name to its registered spec (or owned subentity
+    of a registered spec). Duplicates the helper in `route_urls.py`
+    because importing across rendering helpers would close a cycle; the
+    helper is one-liner.
+
+    Top-level entities live in `entity_registry` directly. Owned
+    subentities (e.g. `clinician_licensure`) self-register on their
+    parent's `_children` instead — those still need to resolve via this
+    helper so their list-page CTA / form-page H1 can read
+    `entity_create_label('clinician_licensure')` and produce
+    "Create licensure" via the subentity's own `singular_label`.
+    """
     for spec in entity_registry.specs():
         if spec.name == name:
             return spec
-    known = sorted(s.name for s in entity_registry.specs())
+        for child in spec.children:
+            if child.name == name:
+                return child
+    known = sorted(
+        s.name for spec in entity_registry.specs() for s in (spec, *spec.children)
+    )
     raise ValueError(
         f"Unknown entity name {name!r}. Known entities: {known}. "
         "Entity names are singular (e.g. 'organization', not 'organizations')."

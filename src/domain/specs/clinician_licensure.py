@@ -57,6 +57,7 @@ def _attestation_response_to_dict(licensure: ClinicianLicensure) -> dict:
 
 LICENSURE_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     name="clinician_licensure",
+    singular_label="licensure",
     url_collection="licensures",
     id_param="licensure_id",
     model=ClinicianLicensure,

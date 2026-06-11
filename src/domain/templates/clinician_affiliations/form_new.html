@@ -5,7 +5,7 @@
 {% block form_content %}
   {{ affiliation_form(resource_url,
     "post",
-    "Create practice",
-    cancel_url=resource_url,
-    orgs=orgs) }}
+    entity_create_label('clinician_affiliation') ,
+  cancel_url=resource_url,
+  orgs=orgs) }}
 {% endblock %}

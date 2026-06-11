@@ -24,7 +24,7 @@
 {% block actions %}
   <li>
     <a href="{{ entity_url('clinician', id=clinician.id) }}/clinician_affiliations/form"
-       role="button">Create practice</a>
+       role="button">{{ entity_create_label("clinician_affiliation") }}</a>
   </li>
 {% endblock %}
 {%- macro affiliation_card(aff) %}

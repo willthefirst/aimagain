@@ -10,7 +10,7 @@
 {% block actions %}
   <li>
     <a href="{{ entity_url('clinician', id=clinician.id) }}/certifications/form"
-       role="button">Create certification</a>
+       role="button">{{ entity_create_label("clinician_certification") }}</a>
   </li>
 {% endblock %}
 {%- macro certification_card(cert) %}
