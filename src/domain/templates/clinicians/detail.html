@@ -3,6 +3,7 @@
 {%- from "_shared/_locked.html" import locked_name -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- from "_shared/icon_label.html" import icon_label -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {%- set view = clinician_card_view(clinician) -%}
 {# When the viewer lacks provider-network access and isn't the owner,
    redact identifying fields per the `_clinician_card.html` /
@@ -68,18 +69,46 @@
    land on the sub-resource list pages and see those pages' own
    redaction rules. #}
 {% block content %}
-  {{ picker([
-    {"href": entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations",
-  "heading": "Practices",
-  "description": "Where this clinician sees clients — location, availability, in-network insurance, and rates."},
-  {"href": entity_url('clinician', id=clinician.id) ~ "/licensures",
-  "heading": "Licensures",
-  "description": "Professional licenses on file with their issuing states."},
-  {"href": entity_url('clinician', id=clinician.id) ~ "/educations",
-  "heading": "Education",
-  "description": "Degrees, programs, and where they were completed."},
-  {"href": entity_url('clinician', id=clinician.id) ~ "/certifications",
-  "heading": "Certifications",
-  "description": "Specialized credentials and their certifying bodies."},
-  ]) }}
-{% endblock %}
+  {# Person-level identity cluster (#1358 PR-a/c/f). Affirming identities,
+     languages, and clinical niches are *person* attributes — they move
+     with the clinician across affiliations, the same way credentials
+     do. We render the block above the sub-resource picker so the
+     viewer reads "who this clinician is" before "where they practice
+     / what they're licensed in". Each row is guarded by
+     `{% if view.x %}` so an unset list cleanly suppresses the row.
+     Redacted viewers see the same cluster — affirming identities /
+     languages / niches are non-identifying. Display-label dicts
+     (`AFFIRMING_IDENTITY_LABELS`, `LANGUAGE_LABELS`) are Jinja
+     globals; `clinical_niches` is free-form and renders verbatim. #}
+  {%- if view.affirming_identities or view.languages or view.clinical_niches %}
+    {% call facts_block() %}
+      {%- if view.affirming_identities %}
+        {%- set _ai_labels = [] -%}
+        {%- for a in view.affirming_identities -%}{%- set _ = _ai_labels.append(AFFIRMING_IDENTITY_LABELS[a]) -%}{%- endfor -%}
+          {{ fact('affirming_identities', 'Affirming identities', _ai_labels | join(", ") , icon='heart') }}
+        {%- endif %}
+        {%- if view.languages %}
+          {%- set _lang_labels = [] -%}
+          {%- for lg in view.languages -%}{%- set _ = _lang_labels.append(LANGUAGE_LABELS[lg]) -%}{%- endfor -%}
+            {{ fact('languages', 'Languages', _lang_labels | join(", ") , icon='message-circle') }}
+          {%- endif %}
+          {%- if view.clinical_niches %}
+            {{ fact('clinical_niches', 'Clinical niches', view.clinical_niches | join(", ") , icon='tag') }}
+          {%- endif %}
+        {% endcall %}
+      {%- endif %}
+      {{ picker([
+            {"href": entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations",
+      "heading": "Practices",
+      "description": "Where this clinician sees clients — location, availability, in-network insurance, and rates."},
+      {"href": entity_url('clinician', id=clinician.id) ~ "/licensures",
+      "heading": "Licensures",
+      "description": "Professional licenses on file with their issuing states."},
+      {"href": entity_url('clinician', id=clinician.id) ~ "/educations",
+      "heading": "Education",
+      "description": "Degrees, programs, and where they were completed."},
+      {"href": entity_url('clinician', id=clinician.id) ~ "/certifications",
+      "heading": "Certifications",
+      "description": "Specialized credentials and their certifying bodies."},
+      ]) }}
+    {% endblock %}

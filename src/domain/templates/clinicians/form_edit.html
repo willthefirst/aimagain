@@ -1,7 +1,7 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import form_section, text_field -%}
+{%- from "_shared/form_fields.html" import form_section, multi_select_field, text_field -%}
 {%- from "_shared/forms.html" import entity_form -%}
-{%- from "_shared/form_copy.html" import npi_help -%}
+{%- from "_shared/form_copy.html" import npi_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Clinicians{% endblock %}
 {# H1-fallback: name when set, else primary affiliation's org name when
@@ -35,6 +35,63 @@
       {{ text_field("last_name", "Last name", current=clinician.last_name, maxlength=120) }}
       {{ text_field("npi", "NPI", current=clinician.npi, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
+    {# Person-level matching-dimension fields (#1358 PR-a/c). Symmetric
+       to the referral request side (`ReferralDetail.affirming_identities`
+       / `clinical_niches` — see `posts/_form_referral.html`). Both
+       move with the person across affiliations, the same way
+       credentials do. `languages` (#1358 PR-f) is on the model and
+       displayed on the detail page, but is intentionally NOT in this
+       form yet — `ClinicianUpdate` does not currently accept
+       `languages`; adding it requires a schema patch tracked outside
+       this PR. #}
+    {% call form_section("Affirming identities & niches") %}
+      {{ multi_select_field("affirming_identities", "Affirming identities", AFFIRMING_IDENTITIES, labels=AFFIRMING_IDENTITY_LABELS, current=clinician.affirming_identities, required=false, help=select_all_help() ) }}
+      {# Clinical-niche tags (#1358 PR-c). Free-form `list[str]` on the
+         wire — the niche vocabulary is too open-ended to commit to a
+         closed enum on day one. UI is a single comma-separated text
+         input that a tiny inline script (below) splits into multiple
+         hidden `clinical_niches` inputs on submit, so the server still
+         receives the wire shape Pydantic expects (repeated
+         `clinical_niches=tag` pairs the `clean_free_form_tags`
+         validator accepts). Mirrors the pattern PR #1403 introduced on
+         the Referral form. #}
+      {{ text_field("_clinical_niches_input", "Clinical niches", current=((clinician.clinical_niches | join(", ") ) if clinician.clinical_niches else None), required=false, help="Comma-separated free-form tags (e.g. \"DGBI, ADHD in women, complex trauma\").") }}
+      <div id="clinical-niches-hidden" hidden></div>
+    {% endcall %}
     {{ actions("Save changes", cancel_url=entity_url('clinician', id=clinician.id) ) }}
   {% endcall %}
+  <script>
+  /* Clinical-niche tag splitter (#1358 PR-c). The visible input is a
+     single comma-separated text field; on form submit (capture phase
+     so htmx's submit handler sees the synthesized hidden inputs) we
+     split on comma, strip, drop empties, dedupe, and inject one
+     hidden input per tag with name="clinical_niches" — the wire
+     shape the `clean_free_form_tags` validator expects. The raw
+     input is then disabled so it doesn't also POST a stale comma-
+     joined value under its `_clinical_niches_input` name. Empty
+     input is fine — zero hidden inputs, which the schema reads as
+     "leave unchanged" via the `None` default on `ClinicianUpdate`. */
+  (function () {
+    var raw = document.querySelector('input[name="_clinical_niches_input"]');
+    var hidden = document.getElementById('clinical-niches-hidden');
+    if (!raw || !hidden) return;
+    var form = raw.closest('form');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      hidden.innerHTML = '';
+      var seen = {};
+      (raw.value || '').split(',').forEach(function (part) {
+        var tag = part.trim();
+        if (!tag || seen[tag]) return;
+        seen[tag] = true;
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'clinical_niches';
+        input.value = tag;
+        hidden.appendChild(input);
+      });
+      raw.disabled = true;
+    }, true);
+  })();
+  </script>
 {% endblock %}
