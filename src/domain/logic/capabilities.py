@@ -290,6 +290,12 @@ OWNS_PROGRAM_LEAF = LEAVES.register(
         label_done="Program added",
         fix_url="/programs/form",
         predicate=owns_program,
+        # A user can't own a program until they're a verified rep for
+        # that program's org (Program.create requires Claim B). Declaring
+        # the dependency on the leaf means every capability that pulls
+        # `owns_program` in via `evaluate_chain` gets `org_rep_any`
+        # surfaced as a sibling step without each consumer re-listing it.
+        requires=(ORG_REP_ANY_LEAF,),
     )
 )
 
@@ -342,7 +348,9 @@ def check_program_intake(user: Any) -> CapabilityCheck:
     Tree: email_verified AND any_org_rep_verified AND owns_a_program.
     Each conjunct corresponds to one Condition leaf with its own
     `fix_url`, so the user can see exactly which step is open and click
-    straight into it.
+    straight into it. `ORG_REP_ANY_LEAF` is pulled in via
+    `OWNS_PROGRAM_LEAF.requires` rather than listed inline — the
+    dependency is declared once on the leaf.
 
     Per-row Claim B for the specific program's org is *not* enforced
     here — `_assert_post_payload_capability` (Phase 5) does that at
@@ -358,8 +366,7 @@ def check_program_intake(user: Any) -> CapabilityCheck:
             label_done="Program intake",
             children=(
                 EMAIL_LEAF.evaluate(user),
-                ORG_REP_ANY_LEAF.evaluate(user),
-                OWNS_PROGRAM_LEAF.evaluate(user),
+                *OWNS_PROGRAM_LEAF.evaluate_chain(user),
             ),
         ),
     )
