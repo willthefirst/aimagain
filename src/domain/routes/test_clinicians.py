@@ -392,7 +392,7 @@ async def test_list_clinicians_renders_html(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-list article.entity-card")
+    rows = tree.css("#clinicians-list article")
     assert len(rows) == 1
     assert rows[0].attributes.get("data-row-id") == str(clinician_id)
     # Org name renders as a link to the owning Organization.
@@ -623,7 +623,7 @@ async def test_list_owner_me_scopes_to_viewer_owned_clinicians(
     response = await authenticated_client.get("/clinicians?owner=me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-list article.entity-card")
+    rows = tree.css("#clinicians-list article")
     assert len(rows) == 1, "?owner=me must return only the viewer's own clinician"
     assert rows[0].attributes.get("data-row-id") == str(own_id)
     assert "My Clinic" in response.text
@@ -719,7 +719,7 @@ async def test_list_clinicians_filters_by_license_type(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-list article.entity-card")
+    rows = tree.css("#clinicians-list article")
     assert len(rows) == 1
     # After #642 PR 3 the row scopes by `data-row-id` (the Clinician id);
     # the row's Practice cell anchors out to Orgs, not to the clinician.
@@ -770,7 +770,7 @@ async def test_list_clinicians_treats_empty_filter_values_as_absent(
 
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-list article.entity-card")
+    rows = tree.css("#clinicians-list article")
     assert len(rows) == 1, "Empty filter values should not exclude rows"
 
 
@@ -808,8 +808,8 @@ async def test_clinician_detail_favorite_toggle_lives_in_toolbar(
     logged_in_user: User,
 ):
     """The favorite/unfavorite button is a primary resource action and
-    renders inside the toolbar, not in `<footer>` or any `.entity-card`
-    body. Pins the chrome rule in `src/framework/templates/README.md`."""
+    renders inside the toolbar, not in `<footer>` or anywhere else on
+    the page. Pins the chrome rule in `src/framework/templates/README.md`."""
     other = create_test_user(username=f"other-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -821,8 +821,8 @@ async def test_clinician_detail_favorite_toggle_lives_in_toolbar(
     tree = HTMLParser(response.text)
     favorite_selector = f'button[hx-post="/users/me/favorites/{clinician_id}"]'
     assert tree.css_first(f".toolbar {favorite_selector}") is not None
-    # The favorite button is not duplicated inside any detail-card body.
-    assert tree.css_first(f".entity-card {favorite_selector}") is None
+    # The favorite button is not duplicated anywhere else on the page.
+    assert len(tree.css(favorite_selector)) == 1
 
 
 async def test_clinician_form_new_renders_form_actions_cluster(
@@ -1460,7 +1460,7 @@ async def test_list_paginates_when_over_per_page(
     response = await authenticated_client.get("/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#clinicians-list article.entity-card")
+    rows = tree.css("#clinicians-list article")
     assert len(rows) == 2
     pagination = tree.css_first('nav[aria-label="Pagination"]')
     assert pagination is not None
@@ -1470,7 +1470,7 @@ async def test_list_paginates_when_over_per_page(
     response2 = await authenticated_client.get("/clinicians?page=2")
     assert response2.status_code == 200
     tree2 = HTMLParser(response2.text)
-    rows2 = tree2.css("#clinicians-list article.entity-card")
+    rows2 = tree2.css("#clinicians-list article")
     assert len(rows2) == 1
     pagination2 = tree2.css_first('nav[aria-label="Pagination"]')
     assert pagination2 is not None

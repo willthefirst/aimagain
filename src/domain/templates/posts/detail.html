@@ -18,13 +18,13 @@
 {% block actions %}
   {% include "posts/_shared/_owner_actions.html" %}
 {% endblock %}
-{# Detail-page layout: same `.entity-card` shape the list cards use,
-   with detail-only sections (description, expanded facts,
-   how-to-refer, footer) stacked vertically. Per-kind branching lives
-   in `post_card_view` (one place); every visual element in the card
+{# Detail-page layout: detail-only sections (description, expanded
+   facts, how-to-refer, footer) stacked vertically inside a
+   `data-kind`-tagged section so per-kind CSS can branch. Per-kind
+   logic lives in `post_card_view` (one place); every visual element
    reads from `view`. #}
 {% block content %}
-  <section class="entity-card" data-kind="{{ post.kind }}">
+  <section data-kind="{{ post.kind }}">
     {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
     {{ facts_block(view, expanded=True, redacted=not can_act_as_provider) }}
     {%- if view.referral %}{{ how_to_refer(view) }}{%- endif %}

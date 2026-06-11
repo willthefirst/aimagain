@@ -137,7 +137,7 @@ async def test_list_users_multiple_users(
     assert "text/html" in response.headers["content-type"]
 
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("#user-list article.entity-card")
+    user_list_items = tree.css("#user-list article")
     assert len(user_list_items) == 2, "Expected two users in the list"
 
     usernames_found = {item.text() for item in user_list_items}
@@ -371,9 +371,9 @@ async def test_detail_admin_actions_render_inside_toolbar(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Admin actions render inside the page toolbar (not the
-    `.entity-card` body). This pins the "primary resource actions live
-    in the toolbar" rule documented in `src/framework/templates/README.md`."""
+    """Admin actions render inside the page toolbar (not elsewhere on
+    the page). This pins the "primary resource actions live in the
+    toolbar" rule documented in `src/framework/templates/README.md`."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -384,8 +384,8 @@ async def test_detail_admin_actions_render_inside_toolbar(
     tree = HTMLParser(response.text)
     activation_selector = f"button[hx-put='/users/{target.id}/activation']"
     assert tree.css_first(f".toolbar {activation_selector}") is not None
-    # Sanity: not duplicated inside the detail-page card body.
-    assert tree.css_first(f".entity-card {activation_selector}") is None
+    # Sanity: not duplicated anywhere else on the page.
+    assert len(tree.css(activation_selector)) == 1
 
 
 async def test_self_detail_renders_favorites_link_in_body_not_toolbar(
@@ -1008,7 +1008,7 @@ async def test_get_user_clinicians_self(
     response = await authenticated_client.get(f"/users/{logged_in_user.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-clinicians-list article.entity-card")) == 1
+    assert len(tree.css("#user-clinicians-list article")) == 1
 
 
 async def test_get_user_clinicians_admin_can_view_other(
@@ -1029,7 +1029,7 @@ async def test_get_user_clinicians_admin_can_view_other(
     response = await authenticated_client.get(f"/users/{target.id}/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    assert len(tree.css("#user-clinicians-list article.entity-card")) == 1
+    assert len(tree.css("#user-clinicians-list article")) == 1
 
 
 async def test_get_user_clinicians_non_admin_forbidden_for_other(

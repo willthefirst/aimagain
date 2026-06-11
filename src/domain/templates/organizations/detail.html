@@ -24,21 +24,17 @@ and organization.id not in viewer_rep_org_ids -%}
     ) }}
   {% endif %}
 {% endblock %}
-{# Organization detail uses the `.entity-card` chrome shared with
-   posts/detail.html and clinicians/detail.html. NPI is the only fact
-   surfaced here; optional rows omit themselves rather than rendering
-   placeholder text — matches the optional-field grammar used by
-   posts/clinicians/programs detail templates. #}
+{# NPI is the only fact surfaced here; optional rows omit themselves
+   rather than rendering placeholder text — matches the optional-field
+   grammar used by posts/clinicians/programs detail templates. #}
 {% block content %}
-  <section class="entity-card">
-    {%- call facts_block() %}
-      {%- if organization.npi %}
-        {% if _redacted %}
-          {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
-          {% else %}
-            {{ fact('npi', 'NPI', organization.npi) }}
-          {% endif %}
-        {%- endif %}
-      {%- endcall %}
-    </section>
+  {%- call facts_block() %}
+    {%- if organization.npi %}
+      {% if _redacted %}
+        {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
+        {% else %}
+          {{ fact('npi', 'NPI', organization.npi) }}
+        {% endif %}
+      {%- endif %}
+    {%- endcall %}
   {% endblock %}
