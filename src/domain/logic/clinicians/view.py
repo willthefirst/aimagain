@@ -203,6 +203,15 @@ def clinician_card_view(clinician) -> dict[str, Any]:
         sliding_scale_label: ``"Yes"`` or ``"No"``.
         cost: pass-through optional free-text.
         npi: pass-through optional 10-digit NPI.
+        affirming_identities / clinical_niches / languages: person-level
+            matching-dimension lists (#1358 PR-a/c/f). Raw token lists
+            (free-form ``str`` for ``clinical_niches``); empty list both
+            for clinicians with none set and for SimpleNamespace stubs
+            that don't carry the attribute, so the detail-page facts
+            block can iterate them uniformly via ``{% if view.x %}``.
+            ``languages`` defaults to ``["en"]`` at the model layer; an
+            empty list here would only happen on a stub or unflushed
+            row.
         licensures / educations / certifications: pass-through ORM
             collections (the template iterates them via the existing
             ``credential_row`` partial; no shape change).
@@ -236,6 +245,16 @@ def clinician_card_view(clinician) -> dict[str, Any]:
         ),
         "cost": _role_attr(clinician, "cost"),
         "npi": getattr(clinician, "npi", None),
+        # Person-level matching-dimension lists (#1358 PR-a/c/f). The
+        # detail-page facts block surfaces these; empty lists are
+        # rendered as suppressed rows via ``{% if view.x %}``. We
+        # default each to ``[]`` so SimpleNamespace stubs without these
+        # attributes don't blow the template up.
+        "affirming_identities": list(
+            getattr(clinician, "affirming_identities", None) or []
+        ),
+        "clinical_niches": list(getattr(clinician, "clinical_niches", None) or []),
+        "languages": list(getattr(clinician, "languages", None) or []),
         "licensures": list(getattr(clinician, "licensures", None) or []),
         "educations": list(getattr(clinician, "educations", None) or []),
         "certifications": list(getattr(clinician, "certifications", None) or []),
