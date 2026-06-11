@@ -22,27 +22,23 @@
    Backend self-guards live in src/logic/users/user_processing.py — this
    `{% if %}` is presentation only.
 #}
-{%- from "_shared/actions.html" import confirm_delete_button -%}
+{%- from "_shared/actions.html" import confirm_action_button, confirm_delete_button -%}
 {% if can_admin_actions %}
   {% if target_user.is_active %}
     <li>
-      <button type="button"
-              class="secondary outline"
-              hx-put="{{ entity_url('user', id=target_user.id, subresource='activation') }}"
-              hx-ext="json-enc"
-              hx-vals='{"state": "deactivated"}'
-              hx-confirm="Deactivate {{ target_user.username }}? They will be unable to log in until reactivated.">
-        Deactivate
-      </button>
+      {{ confirm_action_button("put",
+            entity_url('user', id=target_user.id, subresource='activation') ,
+      "Deactivate " ~ target_user.username ~ "? They will be unable to log in until reactivated.",
+      "Deactivate",
+      hx_vals='{"state": "deactivated"}') }}
     </li>
   {% else %}
     <li>
-      <button type="button"
-              class="secondary outline"
-              hx-put="{{ entity_url('user', id=target_user.id, subresource='activation') }}"
-              hx-ext="json-enc"
-              hx-vals='{"state": "active"}'
-              hx-confirm="Reactivate {{ target_user.username }}?">Reactivate</button>
+      {{ confirm_action_button("put",
+            entity_url('user', id=target_user.id, subresource='activation') ,
+      "Reactivate " ~ target_user.username ~ "?",
+      "Reactivate",
+      hx_vals='{"state": "active"}') }}
     </li>
   {% endif %}
   <li>
