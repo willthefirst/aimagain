@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/icon_label.html" import icon_label -%}
 {% block title %}Capabilities{% endblock %}
 {% block breadcrumb %}
   {{ breadcrumb([
@@ -23,11 +24,11 @@
         </hgroup>
         <small data-state="{{ 'unlocked' if check.granted else 'locked' }}">
           {% if check.bypass %}
-            <i class="icon-check" aria-hidden="true"></i>Available (superuser)
+            {{ icon_label('check', 'Available (superuser)') }}
           {% elif check.granted %}
-            <i class="icon-check" aria-hidden="true"></i>Available
+            {{ icon_label('check', 'Available') }}
           {% else %}
-            <i class="icon-lock" aria-hidden="true"></i>Not available yet
+            {{ icon_label('lock', 'Not available yet') }}
           {% endif %}
         </small>
       </header>

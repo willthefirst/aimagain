@@ -1,4 +1,5 @@
 {# Form-skeleton macros for HTMX-driven CRUD forms. #}
+{% from "_shared/icon_label.html" import icon_label %}
 {# Single-fieldset add form. Wraps caller-supplied field markup in
 `<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><button type="submit">…</button></form>`. Used by sub-resource sections that
 have the same shape (legend + flat field list + submit button), e.g. the
@@ -79,14 +80,13 @@ the former `form_actions`). Import from there. #}
   {% macro filter_checkbox(name, value, label, checked=False) %}
     {# djlint:off #}<label><input type="checkbox" name="{{ name }}" value="{{ value }}"{% if checked %} checked{% endif %} />{{ label }}</label>{# djlint:on #}
   {% endmacro %}
-  {# Fieldset legend with a leading Lucide icon.
-   djlint reformats <legend> as a block element, adding newlines that
-   render as visible whitespace before the icon. The pragma lives here
-   once so call sites stay clean.
+  {# Fieldset legend with a leading Lucide icon. Composes `icon_label`
+   from `_shared/icon_label.html` — the macro owns the no-whitespace
+   guarantee + the single djlint:off pragma repo-wide.
 
    Example:
      {{ icon_legend("map-pin", "Location") }}
 #}
   {% macro icon_legend(icon, text) %}
-    {# djlint:off #}<legend><i class="icon-{{ icon }}"></i>{{ text }}</legend>{# djlint:on #}
+    <legend>{{ icon_label(icon, text) }}</legend>
   {% endmacro %}

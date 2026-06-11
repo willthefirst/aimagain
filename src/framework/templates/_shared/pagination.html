@@ -20,6 +20,7 @@ Args:
 The handler is responsible for building `paginator_base_query`; see
 `_make_paginator_base_query` in `src/framework/dispatch/handlers.py`.
 #}
+{% from "_shared/icon_label.html" import icon_label %}
 {% macro pagination(page_meta, paginator_base_query="") -%}
   {%- if page_meta.has_prev or page_meta.has_next -%}
     {%- set sep = "&" if paginator_base_query else "" -%}
@@ -28,11 +29,11 @@ The handler is responsible for building `paginator_base_query`; see
         {%- if page_meta.has_prev %}
           <li>
             <a href="?{{ paginator_base_query }}{{ sep }}page={{ page_meta.prev_page }}"
-               rel="prev"><i class="icon-chevron-left"></i>Prev</a>
+               rel="prev">{{ icon_label('chevron-left', 'Prev') }}</a>
           </li>
         {%- else %}
           <li>
-            <span aria-disabled="true"><i class="icon-chevron-left"></i>Prev</span>
+            <span aria-disabled="true">{{ icon_label('chevron-left', 'Prev') }}</span>
           </li>
         {%- endif %}
         <li>

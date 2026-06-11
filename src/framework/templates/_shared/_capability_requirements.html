@@ -8,6 +8,7 @@
    Leaf nodes have no `children`; branches carry `op` ("all" / "any") and a
    `children` sequence. The macro detects which is which via duck-typing so
    it works with both Python dataclass instances and plain Jinja dicts. #}
+{% from "_shared/icon_label.html" import icon_label %}
 {% macro capability_requirements_panel(tree, granted, description=none) %}
   {% macro render_leaf(node) %}
     <span>
@@ -77,9 +78,9 @@
       </hgroup>
       <small data-state="{{ 'unlocked' if granted else 'locked' }}">
         {% if granted %}
-          <i class="icon-check" aria-hidden="true"></i>Available
+          {{ icon_label('check', 'Available') }}
         {% else %}
-          <i class="icon-lock" aria-hidden="true"></i>Not available yet
+          {{ icon_label('lock', 'Not available yet') }}
         {% endif %}
       </small>
       <small>{{ root_met }} of {{ root_total }} requirements met</small>

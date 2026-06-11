@@ -32,12 +32,9 @@ Example:
         {"icon": "heart-handshake","label": "Couples therapy"},
     ]) }}
 #}
+{% from "_shared/icon_label.html" import icon_label %}
 {% macro icon_list(items) -%}
   <ul class="glyph-list">
-    {%- for item in items %}
-      <li>
-        <i class="icon-{{ item.icon }}" aria-hidden="true"></i>{{ item.label }}
-      </li>
-    {%- endfor %}
+    {%- for item in items %}<li>{{ icon_label(item.icon, item.label) }}</li>{%- endfor %}
   </ul>
 {%- endmacro %}

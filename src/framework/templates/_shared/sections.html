@@ -1,4 +1,5 @@
 {# Section-shape macros shared across CRUD detail/edit pages. #}
+{% from "_shared/icon_label.html" import icon_label %}
 {# Render one fact-row inside an `<section class="entity-facts">
    <dl>` block. Each row is wrapped in a `<div>` (so the parent
    grid treats the `<dt>`/`<dd>` pair as one logical row — see the
@@ -24,7 +25,7 @@
 #}
 {% macro fact(key, label, value="", dd_class=None, icon=None) -%}
   <div data-fact="{{ key }}">
-    {# djlint:off #}<dt>{% if icon %}<i class="icon-{{ icon }}"></i>{% endif %}{{ label }}</dt>{# djlint:on #}
+    <dt>{{ icon_label(icon, label) if icon else label }}</dt>
     <dd {% if dd_class %}class="{{ dd_class }}"{% endif %}>
       {{ caller() if caller else value }}
     </dd>
