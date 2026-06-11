@@ -29,11 +29,11 @@ The PR-f refactor shipped in three sub-PRs:
 
 `languages` is *not* in this set on the affiliation — it moves to `Clinician` (a person attribute, invariant across affiliations). See [`../clinicians/README.md`](../clinicians/README.md).
 
-`currently_accepting_new_patients` is a denormalized cache toggled by the `OpeningDetail` lifecycle. Distinct from the analogous flag on `Program.accepting_referrals` which is an operator-set standing posture.
+`currently_accepting_new_patients` is a denormalized cache toggled by the `OpeningDetail` lifecycle. Distinct from the analogous flag on `Program.accepting_referrals` which is an operator-set standing posture. The wire surface (`src/domain/logic/clinician_affiliations/schema.py`) exposes the steady-state profile fields on `ClinicianAffiliationCreate` / `ClinicianAffiliationUpdate` / `ClinicianAffiliationRead`; `currently_accepting_new_patients` is `Read`-only — server-managed, never accepted on the wire.
 
 ## Write path: how a clinician edit lands on ClinicianAffiliation
 
-After #1308, practice posture is patched **directly on the affiliation**, not through the clinician's PATCH form: `ClinicianUpdate` accepts only `first_name` / `last_name` / `npi`, and the affiliation owns everything else. The clinician edit page surfaces affiliations as inline rows for create / delete; an inline-edit affordance is the next step.
+After #1308, practice posture is patched **directly on the affiliation**, not through the clinician's PATCH form: `ClinicianUpdate` is **person-level only** (identity + person-level claims like `affirming_identities`, `clinical_niches`, `languages`), and the affiliation owns the per-(clinician × org) practice posture. The clinician edit page surfaces affiliations as inline rows for create / delete; an inline-edit affordance is the next step.
 
 - **Create clinician**: the framework's generic create handler calls `Clinician(**payload.model_dump())`. If per-role kwargs are supplied (older code paths / tests), they are forwarded into a new `ClinicianAffiliation` appended onto `clinician.clinician_affiliations`; otherwise the verification handler creates a stub with all per-role columns NULL/default. `cascade="all, delete-orphan"` flushes both rows together.
 - **Patch a ClinicianAffiliation's posture**: `PATCH /clinicians/{id}/clinician_affiliations/{aff_id}` with the per-role fields. Mounted via the framework's generic sub-resource update handler against `ClinicianAffiliationUpdate`. This is the canonical write path for posture after #1308.

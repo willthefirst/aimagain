@@ -35,6 +35,7 @@ from pydantic import BeforeValidator
 from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
     GENDERS,
+    LANGUAGES,
     REFERRAL_SERVICES,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
@@ -67,6 +68,7 @@ _AgeGroupsField = Annotated[
     list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(scalar_to_list)
 ]
 _GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
+_LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(scalar_to_list)]
 # Free-text fields. `website` is rendered as `<input type=url>` (the
 # `HtmlUrl` marker drives `field_for`). `referral_instructions` renders
 # as `<textarea>`. Both stripped-to-None on blank input.
@@ -97,6 +99,11 @@ class ProgramRead(ReadProjection):
     modalities: _ModalitiesField = []
     age_groups: _AgeGroupsField = []
     genders: _GendersField = []
+    # Defaults to `["en"]` matching the column's server-side default
+    # and the prior `OpeningDetail` default. `languages` lives on
+    # Program (and on Clinician) because a program may operate in a
+    # different language set than any individual clinician staffing it.
+    languages: _LanguagesField = ["en"]
     website: str | None = None
     referral_instructions: str | None = None
 
@@ -126,6 +133,10 @@ class ProgramCreate(WirePayload):
     modalities: _ModalitiesField = []
     age_groups: _AgeGroupsField = []
     genders: _GendersField = []
+    # Defaults to `["en"]` matching the column's server-side default.
+    # Create accepts an explicit list so a brand-new program records
+    # its language set on day one.
+    languages: _LanguagesField = ["en"]
     website: _WebsiteField = None
     referral_instructions: _ReferralInstructionsField = None
 
@@ -151,5 +162,8 @@ class ProgramUpdate(PartialUpdate):
     modalities: _ModalitiesField | None = None
     age_groups: _AgeGroupsField | None = None
     genders: _GendersField | None = None
+    # List-valued PATCH replaces the whole list. `None` = leave
+    # unchanged. `[]` = clear (no languages stated).
+    languages: _LanguagesField | None = None
     website: _WebsiteField = None
     referral_instructions: _ReferralInstructionsField = None
