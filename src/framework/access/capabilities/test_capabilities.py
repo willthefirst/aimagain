@@ -7,11 +7,15 @@ Only the structural / evaluation logic is covered here. Domain predicates
 
 from __future__ import annotations
 
+import pytest
+
 from src.framework.access.capabilities.capabilities import (
     Bundle,
     CapabilityCheck,
     Condition,
     Gate,
+    Leaf,
+    LeafRegistry,
 )
 
 
@@ -152,3 +156,103 @@ def test_nested_gate_inside_bundle():
     )
     b = Bundle(label_active="root", label_done="root", children=(_met(), inner))
     assert b.met is False
+
+
+# ---------- Leaf -----------------------------------------------------------
+
+
+def _leaf(name: str = "x", predicate=lambda a: True) -> Leaf:
+    return Leaf(
+        name=name,
+        label_active=f"Do {name}",
+        label_done=f"{name} done",
+        fix_url=f"/fix/{name}",
+        predicate=predicate,
+    )
+
+
+def test_leaf_evaluate_returns_condition_with_canonical_copy():
+    """`evaluate(actor)` packages the leaf's `(label_active, label_done,
+    fix_url)` into a `Condition` whose `met` reflects the predicate."""
+    cond = _leaf(predicate=lambda a: True).evaluate(actor="anything")
+    assert isinstance(cond, Condition)
+    assert cond.label_active == "Do x"
+    assert cond.label_done == "x done"
+    assert cond.fix_url == "/fix/x"
+    assert cond.met is True
+
+
+def test_leaf_evaluate_predicate_receives_actor():
+    """The predicate is invoked with the actor passed to `evaluate`."""
+    seen: list = []
+
+    def pred(actor):
+        seen.append(actor)
+        return False
+
+    _leaf(predicate=pred).evaluate(actor="sentinel")
+    assert seen == ["sentinel"]
+
+
+def test_leaf_evaluate_coerces_truthy_predicate_to_bool():
+    """A predicate that returns a non-bool truthy value (e.g. a list) still
+    produces a bool `Condition.met` — Conditions hold strict bool."""
+    cond = _leaf(predicate=lambda a: [1, 2, 3]).evaluate(actor=None)
+    assert cond.met is True
+    assert isinstance(cond.met, bool)
+
+
+def test_leaf_evaluate_coerces_falsy_predicate_to_bool():
+    cond = _leaf(predicate=lambda a: []).evaluate(actor=None)
+    assert cond.met is False
+    assert isinstance(cond.met, bool)
+
+
+# ---------- LeafRegistry --------------------------------------------------
+
+
+def test_registry_register_and_get_roundtrip():
+    reg = LeafRegistry()
+    leaf = _leaf(name="email")
+    assert reg.register(leaf) is leaf
+    assert reg.get("email") is leaf
+
+
+def test_registry_register_rejects_duplicate_name():
+    """Re-registering the same name raises — a typo or accidental
+    re-import can't silently shadow an existing fact."""
+    reg = LeafRegistry()
+    reg.register(_leaf(name="email"))
+    with pytest.raises(ValueError, match="email"):
+        reg.register(_leaf(name="email"))
+
+
+def test_registry_get_unknown_raises_key_error():
+    """Callers reference leaves by literal name, so a miss is a domain
+    bug — surface it as KeyError, not None."""
+    reg = LeafRegistry()
+    with pytest.raises(KeyError):
+        reg.get("nope")
+
+
+def test_registry_all_returns_immutable_tuple_in_insertion_order():
+    """`.all()` is the introspection surface — returns a tuple snapshot
+    so a caller can't mutate the registry through it."""
+    reg = LeafRegistry()
+    a = reg.register(_leaf(name="a"))
+    b = reg.register(_leaf(name="b"))
+    c = reg.register(_leaf(name="c"))
+    snapshot = reg.all()
+    assert isinstance(snapshot, tuple)
+    assert snapshot == (a, b, c)
+
+
+def test_registry_all_snapshot_unaffected_by_later_register():
+    """A snapshot taken before a new registration doesn't include the
+    new leaf — tuples are immutable."""
+    reg = LeafRegistry()
+    reg.register(_leaf(name="a"))
+    early = reg.all()
+    reg.register(_leaf(name="b"))
+    assert len(early) == 1
+    assert len(reg.all()) == 2
