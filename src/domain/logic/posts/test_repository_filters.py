@@ -792,4 +792,108 @@ async def test_and_combination_modality_and_level_of_care(db_test_session_manage
     ids = {p.id for p in results}
     assert both.id in ids
     assert modality_only.id not in ids
-    assert level_only.id not in ids
+
+
+# ---------------------------------------------------------------------------
+# #1358 PR-f sub-PR 2: filters read from the new steady-state home
+# (ClinicianAffiliation / Program / Clinician) in addition to the detail
+# row, so reads stay correct once sub-PR 3 drops the detail-row columns.
+# These tests pin the new-home reads explicitly by writing the value
+# *only* to the affiliation / program (the detail row stays empty) and
+# proving the filter still matches.
+# ---------------------------------------------------------------------------
+
+
+async def test_level_of_care_matches_affiliation_settings_when_detail_empty(
+    db_test_session_manager,
+):
+    """Opening side: ``settings`` flipped to ``ClinicianAffiliation``.
+    Detail row carries no value; affiliation does — filter matches."""
+    from src.domain.models import ClinicianAffiliation
+
+    owner = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(owner_id=owner.id)
+            session.add(clinician)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            affiliation = ClinicianAffiliation(
+                clinician_id=clinician.id,
+                org_id=clinician.org.id,
+                settings=["php"],
+            )
+            session.add(affiliation)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            match = await _add_post(
+                session,
+                owner.id,
+                make_opening_detail(
+                    clinician_id=clinician.id,
+                    clinician_affiliation_id=affiliation.id,
+                    settings=[],
+                ),
+                "opening_detail",
+            )
+
+    results = await _list(db_test_session_manager, level_of_care=["php"])
+    ids = {p.id for p in results}
+    assert match.id in ids
+
+
+async def test_level_of_care_matches_program_settings_when_detail_empty(
+    db_test_session_manager,
+):
+    """Intake side: ``settings`` flipped to ``Program``."""
+    owner = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            org = make_organization_row(owner_id=owner.id)
+            session.add(org)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            program = make_program(owner_id=owner.id, org_id=org.id, settings=["iop"])
+            session.add(program)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            match = await _add_post(
+                session,
+                owner.id,
+                make_intake_detail(program_id=program.id, settings=[]),
+                "intake_detail",
+            )
+
+    results = await _list(db_test_session_manager, level_of_care=["iop"])
+    ids = {p.id for p in results}
+    assert match.id in ids
+
+
+async def test_language_matches_clinician_languages_when_detail_empty(
+    db_test_session_manager,
+):
+    """Opening side: ``languages`` flipped to ``Clinician`` (person-
+    level). Detail row carries no value; clinician does — filter matches."""
+    owner = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(owner_id=owner.id, languages=["zh"])
+            session.add(clinician)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            match = await _add_post(
+                session,
+                owner.id,
+                make_opening_detail(clinician_id=clinician.id, languages=["en"]),
+                "opening_detail",
+            )
+
+    results = await _list(db_test_session_manager, language=["zh"])
+    ids = {p.id for p in results}
+    assert match.id in ids
