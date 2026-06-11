@@ -28,14 +28,9 @@
   {%- elif f.kind == "choice" -%}
     {%- if f.multi -%}
       {%- set selected = value or [] -%}
-      {# Long choice sets (US states, license-type lists) get a multi-column
-     grid on desktop so the form doesn't become absurdly tall. The
-     threshold (>12) keeps short multi-selects — Age groups, Languages —
-     as a single column where each option already reads cleanly. #}
-      {%- set grid_class = " checkbox-list-grid" if f.choices|length > 12 else "" -%}
       <fieldset class="search-checkbox-fieldset">
         <legend>{{ f.display_label }}</legend>
-        <div class="checkbox-list{{ grid_class }}">
+        <div class="checkbox-list">
           {%- for v, l in f.choices %}
             <label>
               <input type="checkbox"

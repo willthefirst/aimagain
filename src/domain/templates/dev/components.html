@@ -419,26 +419,14 @@ it's dev-only chrome that should never ship to production. #}
           Checkbox list (<code>.checkbox-list</code>)
         </h2>
         <p>
-          <small>Shared scrollable list-of-checkboxes primitive. Bordered + scrollable by default; adds <code>.checkbox-list-grid</code> to swap the vertical column for a responsive grid (long filter lists). Used by search/list filter sidebars (<code>_shared/_filter_field.html</code>) and by <code>multi_select_field</code> in entity forms.</small>
+          <small>Shared scrollable list-of-checkboxes primitive. Bordered + scrollable; always renders as a single column — long vocabularies scroll inside the bordered envelope rather than spreading into columns. Used by search/list filter sidebars (<code>_shared/_filter_field.html</code>) and by <code>multi_select_field</code> in entity forms.</small>
         </p>
-        <h3>Single-column (default — filter sidebar)</h3>
         <fieldset class="search-checkbox-fieldset">
           {{ icon_legend('filter', 'Kind') }}
           <div class="checkbox-list">
             {{ filter_checkbox("kind", "referral", "Referral", checked=True) }}
             {{ filter_checkbox("kind", "clinician_opening", "Opening", checked=False) }}
             {{ filter_checkbox("kind", "program_intake", "Intake", checked=False) }}
-          </div>
-        </fieldset>
-        <h3>
-          Grid layout (<code>.checkbox-list-grid</code>) — long filter lists
-        </h3>
-        <fieldset class="search-checkbox-fieldset">
-          {{ icon_legend('map-pin', 'State') }}
-          <div class="checkbox-list checkbox-list-grid">
-            {% for abbr, label in [("CA", "California"), ("NY", "New York"), ("TX", "Texas"), ("FL", "Florida"), ("WA", "Washington"), ("OR", "Oregon")] %}
-              {{ filter_checkbox("state", abbr, label, checked=(abbr == "CA") ) }}
-            {% endfor %}
           </div>
         </fieldset>
       </section>
