@@ -1,6 +1,6 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
-{%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_locked.html" import locked_name, locked_field -%}
 {% block actions %}
@@ -20,17 +20,15 @@
     id=org.id,
     headline_url=None if _redacted else entity_url('organization', id=org.id),
     headline=locked_name("Doe Health Group") if _redacted else org.name) -%}{# title-case-ignore: placeholder org name #}
-    <section class="entity-facts">
-      <dl>
-        {%- if org.npi %}
-          {% if _redacted %}
-            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
-            {% else %}
-              {{ fact('npi', 'NPI', org.npi) }}
-            {% endif %}
-          {%- endif %}
-        </dl>
-      </section>
+    {%- call facts_block() %}
+      {%- if org.npi %}
+        {% if _redacted %}
+          {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
+          {% else %}
+            {{ fact('npi', 'NPI', org.npi) }}
+          {% endif %}
+        {%- endif %}
+      {%- endcall %}
     {%- endcall %}
   {%- endmacro %}
   {% block list_body %}

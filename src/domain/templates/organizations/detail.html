@@ -1,6 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions -%}
-{%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {%- from "_shared/_locked.html" import locked_name, locked_field -%}
 {# Redact identifying fields (name H1, NPI) when the viewer is neither
    the owner, a verified rep, nor a provider-network member. The viewer's
@@ -31,16 +31,14 @@ and organization.id not in viewer_rep_org_ids -%}
    posts/clinicians/programs detail templates. #}
 {% block content %}
   <section class="entity-card">
-    <section class="entity-facts">
-      <dl>
-        {%- if organization.npi %}
-          {% if _redacted %}
-            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
-            {% else %}
-              {{ fact('npi', 'NPI', organization.npi) }}
-            {% endif %}
-          {%- endif %}
-        </dl>
-      </section>
+    {%- call facts_block() %}
+      {%- if organization.npi %}
+        {% if _redacted %}
+          {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
+          {% else %}
+            {{ fact('npi', 'NPI', organization.npi) }}
+          {% endif %}
+        {%- endif %}
+      {%- endcall %}
     </section>
   {% endblock %}

@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
 {% block form_content %}
@@ -9,11 +9,9 @@
      the email itself, so the standalone row would be a redundant
      restatement of the same string. #}
   {% if target_user.is_verified %}
-    <section class="entity-facts">
-      <dl>
-        {{ fact('email', 'Email', target_user.email) }}
-      </dl>
-    </section>
+    {%- call facts_block() %}
+      {{ fact('email', 'Email', target_user.email) }}
+    {%- endcall %}
   {% else %}
     {# Doubles as the post-registration / post-resend CTA: the inbox
        link is the primary affordance, "Resend" is the secondary fallback.
