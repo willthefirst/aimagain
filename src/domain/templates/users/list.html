@@ -6,7 +6,7 @@
   {# Redact the username (the only identifying field surfaced in the
      card chrome) when the viewer lacks network access and isn't this
      user themselves. The viewer's own row always renders un-redacted. #}
-  {%- set _redacted = not can_access_network and user.id != current_user_id -%}
+  {%- set _redacted = not can_act_as_provider and user.id != current_user_id -%}
   {%- set status_subtitle %}
     <span>
       {% if user.is_active %}

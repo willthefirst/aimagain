@@ -4,7 +4,7 @@ from fastapi import Depends, Request
 from pydantic import BaseModel, Field, field_validator
 
 from src.auth_config import current_active_user
-from src.domain.logic.capabilities import can_access_network
+from src.domain.logic.capabilities import can_act_as_provider
 from src.domain.logic.posts.emails import send_post_message_email
 from src.domain.logic.posts.repository import PostRepository, get_post_repository
 from src.domain.models import Post, User
@@ -69,7 +69,7 @@ async def send_post_message(
     in their own mail client, so any history we'd persist would only
     diverge from what actually happened.
 
-    Authz: the sender must clear `can_access_network` — the same gate
+    Authz: the sender must clear `can_act_as_provider` — the same gate
     that controlled visibility of the prior `mailto:` Email button on
     the post detail/list cards. Tightening this to `can_message`
     (clinician-only, per `domain/logic/capabilities.py`) is a separate
@@ -79,7 +79,7 @@ async def send_post_message(
 
     Returns an HTML fragment HTMX swaps over the form in place.
     """
-    if not can_access_network(requesting_user):
+    if not can_act_as_provider(requesting_user):
         raise ForbiddenError(detail="Provider network access required.")
     post = await post_repo.get_by_model_id(Post, post_id)
     if post is None:

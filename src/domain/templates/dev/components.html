@@ -665,11 +665,11 @@ it's dev-only chrome that should never ship to production. #}
         <div class="gallery-row">
           <div>
             <small class="gallery-specimen-label">Default</small>
-            {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "+ Post a referral") }}
+            {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "+ Post a referral") }}
           </div>
           <div>
             <small class="gallery-specimen-label">extra_class="secondary"</small>
-            {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Email", extra_class="secondary") }}
+            {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Email", extra_class="secondary") }}
           </div>
           <div>
             <small class="gallery-specimen-label">email reason</small>
@@ -682,13 +682,13 @@ it's dev-only chrome that should never ship to production. #}
           <small>Rendered in place of an <code>&lt;a&gt;</code> the user can't navigate to yet. Muted, not-allowed cursor, opens CTA popover.</small>
         </p>
         <div class="gallery-row">
-          <div>{{ locked_link(capabilities.REASON_NETWORK_UNVERIFIED, "View full profile") }}</div>
+          <div>{{ locked_link(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "View full profile") }}</div>
           <div>{{ locked_link(capabilities.REASON_EMAIL_UNVERIFIED, "Continue") }}</div>
         </div>
         {# locked_name — withheld identity placeholder #}
         <h3 class="gallery-section-subheading">locked_name</h3>
         <p>
-          <small>Rendered where a clinician or org name would appear. The placeholder communicates "a real name exists here." Always uses <code>REASON_NETWORK_UNVERIFIED</code>.</small>
+          <small>Rendered where a clinician or org name would appear. The placeholder communicates "a real name exists here." Always uses <code>REASON_NOT_A_VERIFIED_PROVIDER</code>.</small>
         </p>
         <div class="gallery-row">
           <div>
@@ -708,7 +708,7 @@ it's dev-only chrome that should never ship to production. #}
         <div class="gallery-row">
           <div>
             <small class="gallery-specimen-label">network_unverified</small>
-            {{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}
+            {{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}
           </div>
           <div>
             <small class="gallery-specimen-label">email_unverified</small>

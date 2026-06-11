@@ -3,17 +3,17 @@
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_locked.html" import locked_action -%}
 {% block actions %}
-  {% if can_access_network %}
+  {% if can_act_as_provider %}
     <li>
       <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
     </li>
   {% else %}
-    <li>{{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, entity_create_label("post") ) }}</li>
+    <li>{{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, entity_create_label("post") ) }}</li>
   {% endif %}
 {% endblock %}
 {% block list_body %}
   {#- Poster names / contact are anonymized server-side via
-      `can_access_network`. The chrome `#onboarding-banner` (base.html)
+      `can_act_as_provider`. The chrome `#onboarding-banner` (base.html)
       is the single place explaining verification unlocks the full view —
       no per-list notice repeats it. -#}
   {%- set _empty %}{{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",

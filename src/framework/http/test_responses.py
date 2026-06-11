@@ -28,7 +28,7 @@ def test_base_context_anonymous():
         # Anonymous users don't get the verify nag — default True so
         # the banner stays silent.
         "current_user_is_verified": True,
-        "can_access_network": False,
+        "can_act_as_provider": False,
         # No org-rep affiliations.
         "viewer_rep_org_ids": frozenset(),
     }
@@ -46,13 +46,13 @@ def test_base_context_regular_user():
         "current_user_id": user_id,
         "has_clinician_profile": False,
         "current_user_is_verified": True,
-        "can_access_network": False,
+        "can_act_as_provider": False,
         "viewer_rep_org_ids": frozenset(),
     }
 
 
-def test_base_context_can_access_network_true_for_verified_clinician():
-    """A verified clinician gets `can_access_network` True — gates both the
+def test_base_context_can_act_as_provider_true_for_verified_clinician():
+    """A verified clinician gets `can_act_as_provider` True — gates both the
     Create Post CTA and full feed access."""
     user = SimpleNamespace(
         id=uuid.uuid4(),
@@ -68,11 +68,11 @@ def test_base_context_can_access_network_true_for_verified_clinician():
         ],
         org_representations=[],
     )
-    assert base_context(user)["can_access_network"] is True
+    assert base_context(user)["can_act_as_provider"] is True
 
 
-def test_base_context_can_access_network_true_for_org_rep():
-    """A verified org rep (no clinician profile) gets `can_access_network`
+def test_base_context_can_act_as_provider_true_for_org_rep():
+    """A verified org rep (no clinician profile) gets `can_act_as_provider`
     True — org reps are network-verified and may post."""
     org_id = uuid.uuid4()
     user = SimpleNamespace(
@@ -89,7 +89,7 @@ def test_base_context_can_access_network_true_for_org_rep():
             )
         ],
     )
-    assert base_context(user)["can_access_network"] is True
+    assert base_context(user)["can_act_as_provider"] is True
 
 
 def test_base_context_unverified_user_surfaces_for_nag_banner():

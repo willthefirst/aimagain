@@ -84,7 +84,7 @@ def test_recompute_clinician_claim_unmatched_npi_unverified():
 def test_recompute_clinician_claim_preserves_ever_verified_at_on_regression():
     """A clinician who was previously verified and now isn't (e.g. admin
     flipped to `mismatch`) must keep `ever_verified_at` set — that's
-    what the `can_access_network` retention rule reads."""
+    what the `can_act_as_provider` retention rule reads."""
     historic = datetime(2025, 6, 1, tzinfo=timezone.utc)
     clinician = Clinician(
         id=uuid4(), owner_id=uuid4(), first_name="Eva", last_name="Stone"

@@ -630,7 +630,7 @@ async def test_create_form_picker_labels_solo_with_name_only(
     assert option.text(strip=True) == "Janet Solo"
 
 
-# --- Anonymization gate (can_access_network) ---------------------------------
+# --- Anonymization gate (can_act_as_provider) ---------------------------------
 
 
 async def test_list_has_no_inline_verify_notice_for_unverified(
@@ -700,7 +700,7 @@ async def test_list_shows_create_cta_for_claim_b_org_rep(
     logged_in_user,
 ):
     """A verified org rep (no clinician profile) must see the `/posts` toolbar
-    Create CTA — `can_access_network` is the single gate for posting."""
+    Create CTA — `can_act_as_provider` is the single gate for posting."""
     org = make_organization_row(owner_id=logged_in_user.id)
     rep = OrgRepresentation(
         user_id=logged_in_user.id,
@@ -730,7 +730,7 @@ async def test_detail_hides_message_form_and_shows_cta_for_unverified(
     """Unverified users see a locked Message CTA (no form, no contact
     info) on post detail — the inline form is not rendered, and the
     poster's email address is not sent to the browser. Replaces the
-    prior `mailto:`-button assertion: the same `can_access_network`
+    prior `mailto:`-button assertion: the same `can_act_as_provider`
     gate now hides the form instead of disabling a button."""
     author = create_test_user(
         username=f"detail-author-{uuid.uuid4()}",
@@ -864,7 +864,7 @@ async def test_message_send_unverified_user_is_forbidden(
 ):
     """A claimless viewer can't see the form (existing visibility gate),
     so the route must also reject the request server-side. Mirrors the
-    `can_access_network` gate that hid the prior `mailto:` button."""
+    `can_act_as_provider` gate that hid the prior `mailto:` button."""
     send_mock = pytest.importorskip("unittest.mock").AsyncMock()
     monkeypatch.setattr("src.domain.routes.posts.send_post_message_email", send_mock)
 
@@ -888,7 +888,7 @@ async def test_message_send_verified_user_dispatches_email(
     logged_in_user,
     monkeypatch,
 ):
-    """Verified-network viewer (`can_access_network=True`) reaches the
+    """Verified-network viewer (`can_act_as_provider=True`) reaches the
     handler and we hand the post + sender + body to the domain email
     wrapper. Tests for `Reply-To`, recipient, and link shape live in
     `src/domain/logic/posts/test_emails.py` — this test only pins the
@@ -929,7 +929,7 @@ async def test_message_send_404_when_post_missing(
     monkeypatch,
 ):
     """Unknown post id returns 404 — even for an authorized sender.
-    The `can_access_network` check fires first, so the user must clear
+    The `can_act_as_provider` check fires first, so the user must clear
     that gate before the missing-post path is reachable."""
     from unittest.mock import AsyncMock
 

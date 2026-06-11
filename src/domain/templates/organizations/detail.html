@@ -5,7 +5,7 @@
 {# Redact identifying fields (name H1, NPI) when the viewer is neither
    the owner, a verified rep, nor a provider-network member. The viewer's
    own orgs (owned OR represented) always render un-redacted. #}
-{%- set _redacted = not can_access_network
+{%- set _redacted = not can_act_as_provider
 and organization.owner_id != current_user_id
 and organization.id not in viewer_rep_org_ids -%}
 {% block resource_label %}Organizations{% endblock %}
@@ -35,7 +35,7 @@ and organization.id not in viewer_rep_org_ids -%}
       <dl>
         {%- if organization.npi %}
           {% if _redacted %}
-            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}{%- endcall %}
+            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
             {% else %}
               {{ fact('npi', 'NPI', organization.npi) }}
             {% endif %}
