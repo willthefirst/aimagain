@@ -472,6 +472,81 @@ def test_clinician_read_round_trips_clinical_niches():
     assert p.clinical_niches == ["DGBI", "ADHD in women"]
 
 
+# --- Languages (person-level, #1358 PR-f) -------------------------------
+
+
+def test_clinician_update_accepts_languages_patch():
+    """`languages` is a multi-checkbox `Literal[*LANGUAGES]` field on the
+    person-level Update — clinicians declare which languages they can
+    deliver care in. Empty list and a populated list both validate;
+    `None` (omitted) means "leave unchanged" per `PartialUpdate`
+    semantics."""
+    upd = ClinicianUpdate(languages=["en", "es"])
+    assert upd.languages == ["en", "es"]
+
+
+def test_clinician_update_accepts_empty_languages():
+    """Explicit empty list = clear the language list. Distinct from
+    `None` (omitted = leave unchanged)."""
+    upd = ClinicianUpdate(languages=[])
+    assert upd.languages == []
+
+
+def test_clinician_update_coerces_scalar_language_to_list():
+    """HTML form checkboxes with a single checked value submit as a
+    scalar string — `scalar_to_list` normalizes to `["value"]` before
+    `Literal[*LANGUAGES]` validation."""
+    upd = ClinicianUpdate(languages="en")
+    assert upd.languages == ["en"]
+
+
+def test_clinician_update_rejects_unknown_language():
+    with pytest.raises(ValidationError):
+        ClinicianUpdate(languages=["not_a_real_language"])
+
+
+def test_clinician_create_rejects_languages_on_create():
+    """Create stays minimal — languages, like affirming_identities, is
+    claim-management set later via PATCH."""
+    with pytest.raises(ValidationError, match="extra"):
+        ClinicianCreate(**_VALID_CREATE, languages=["en"])
+
+
+def test_clinician_read_defaults_languages_to_english():
+    """A row with no explicit languages reads as `["en"]`, matching the
+    column's server-side default."""
+    now = _now()
+    p = ClinicianRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+        }
+    )
+    assert p.languages == ["en"]
+
+
+def test_clinician_read_round_trips_languages():
+    now = _now()
+    p = ClinicianRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+            "languages": ["en", "es"],
+        }
+    )
+    assert p.languages == ["en", "es"]
+
+
 # --- Insurance carrier label guardrail ----------------------------------
 
 

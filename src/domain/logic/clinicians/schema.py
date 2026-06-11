@@ -51,6 +51,7 @@ from src.domain.models.enums import (
     AFFIRMING_IDENTITIES,
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
+    LANGUAGES,
     LICENSE_TYPES,
     US_STATES,
 )
@@ -80,6 +81,15 @@ AffirmingIdentitiesField = Annotated[
 # used tags later. `clean_free_form_tags` strips, drops empties, and
 # deduplicates.
 ClinicalNichesField = Annotated[list[str], BeforeValidator(clean_free_form_tags)]
+
+# Languages spoken — person-level (#1358 PR-f). Multi-checkbox shape
+# matches `affirming_identities` above: scalar-to-list coercion lets a
+# 1-checkbox form post validate, and the per-member `Literal[*LANGUAGES]`
+# check stays in lockstep with the `LANGUAGES` tuple. Defined here (not
+# in `posts/schema.py`) because that module's alias is internal to the
+# post wire surface; clinicians own this typed alias for their own
+# person-level use.
+LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(scalar_to_list)]
 
 _NPI_RE = re.compile(r"^[0-9]{10}$")
 
@@ -258,6 +268,10 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     # niches stated. See `ClinicalNichesField` for the simplicity
     # rationale (tagged free-text now; promote to enum later).
     clinical_niches: ClinicalNichesField = []
+    # Languages spoken (#1358 PR-f). Person-level: invariant across
+    # affiliations. Defaults to `["en"]` matching the column's
+    # server-side default and the prior `OpeningDetail` default.
+    languages: LanguagesField = ["en"]
     licensures: list[ClinicianLicensureRead] = []
     educations: list[ClinicianEducationRead] = []
     certifications: list[ClinicianCertificationRead] = []
@@ -306,6 +320,11 @@ class ClinicianUpdate(PartialUpdate):
     # Same partial-update semantics as `affirming_identities` above:
     # `None` = leave unchanged, `[]` = clear all tags, list = replace.
     clinical_niches: ClinicalNichesField | None = None
+    # Same partial-update semantics: `None` = leave unchanged,
+    # `[]` = clear (no languages stated), list = replace. List-valued
+    # PATCH replaces the whole list — partial add/remove is out of
+    # scope. (#1358 PR-f)
+    languages: LanguagesField | None = None
 
 
 # --- Admin verification-state axis ---------------------------------------
