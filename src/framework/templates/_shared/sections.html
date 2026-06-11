@@ -30,6 +30,29 @@
     </dd>
   </div>
 {%- endmacro %}
+{# Wrap a stack of `fact(...)` rows in the canonical
+   `<section class="entity-facts"><dl>…</dl></section>` chrome.
+
+   Every list-card body, detail-page card body, and form-page
+   confirmation surface that surfaces labeled key/value rows uses this
+   pair (`facts_block` outside, `fact` inside) — there is no reason for
+   a domain template to hand-roll the `<section>`/`<dl>` wrapper.
+
+   Example:
+     {% call facts_block() %}
+       {{ fact('npi', 'NPI', org.npi) }}
+       {%- call fact('parent', 'Parent') -%}
+         <a href="…">View parent</a>
+       {%- endcall %}
+     {% endcall %}
+#}
+{% macro facts_block() -%}
+  <section class="entity-facts">
+    <dl>
+      {{ caller() }}
+    </dl>
+  </section>
+{%- endmacro %}
 {# Render a `<ul>` of items or an empty-state `<p>`. The caller passes
 the per-item `<li>` body via `{% call(item) %}…{% endcall %}`. The macro
 owns the if/else split — callers own the row markup and the surrounding

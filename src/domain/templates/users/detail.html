@@ -1,5 +1,5 @@
 {% extends "views/detail.html" %}
-{%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- from "_shared/_locked.html" import locked_name -%}
 {% block resource_label %}Users{% endblock %}
@@ -70,10 +70,10 @@
    /users/me/email/form (linked in the Email card below). #}
   {% if can_view_private and not is_self %}
     <article>
-      <dl>
+      {%- call facts_block() %}
         {{ fact('email', 'Email', target_user.email) }}
         {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
-      </dl>
+      {%- endcall %}
     </article>
   {% endif %}
   {# Self-only navigation. Each option dispatches to a sub-page or
