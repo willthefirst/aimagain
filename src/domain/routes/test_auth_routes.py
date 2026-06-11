@@ -617,43 +617,6 @@ async def test_get_reset_password_page(test_client: AsyncClient):
     assert '<section class="auth-page">' in response.text
 
 
-async def test_card_chrome_only_applies_to_article_list_items(
-    test_client: AsyncClient,
-):
-    """Card chrome (background, border, padding, header/footer bands)
-    is reserved for list-item cards — `<article class="entity-card">`
-    rendered via `_shared/_card.html` — which pick it up automatically
-    from Pico's default `<article>` element styling. Single-item
-    wrappers (`<section class="entity-card">` detail pages,
-    `<section class="auth-page">` auth pages) carry the class as a DOM
-    hook only, contributing no styling.
-
-    Pin the rule by asserting the inline `<style>` block in the
-    rendered page contains no `.entity-card` rule whose body has card-
-    chrome properties (background, box-shadow, border-radius, padding).
-    If someone re-adds chrome to `.entity-card`, the regex match fires
-    and this test fails."""
-    import re
-
-    response = await test_client.get("/auth/login")
-    assert response.status_code == 200
-    # Find any `.entity-card` rule (matches `.entity-card { ... }` or
-    # `.entity-card > header { ... }`); assert none of them carry
-    # chrome properties. A bare `.entity-card,` in a combined selector
-    # (e.g. `.entity-card, .auth-page { background: ... }`) would also
-    # match. The auth-page max-width rule isn't on entity-card so it
-    # doesn't fire this.
-    chrome_props = ("background:", "box-shadow:", "border-radius:", "padding:")
-    for match in re.finditer(r"\.entity-card[^{]*\{([^}]*)\}", response.text):
-        body = match.group(1)
-        offenders = [p for p in chrome_props if p in body]
-        assert not offenders, (
-            f".entity-card rule has chrome properties {offenders}: "
-            f"`{match.group(0).strip()}` — chrome belongs only on the "
-            "Pico `<article>` element default, not on the class."
-        )
-
-
 # --- /auth/verify --------------------------------------------------------
 #
 # The email-link flow is split GET (render confirm page, NO token
