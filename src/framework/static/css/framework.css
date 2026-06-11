@@ -421,15 +421,15 @@ dd { margin: 0; }
 }
 /* Page-header band — the single fixed top-chrome element
    (`_shared/_page_header.html`). Stacks nav → breadcrumb row → toolbar
-   row → boundary rule. The rule is the page's one horizontal divider and
-   sits at a constant Y across pages at a given screen size (see the
-   partial's header for the reservation rationale). */
-.page-header { display: flex; flex-direction: column; }
+   row, with a `border-bottom` boundary. The boundary is the page's one
+   horizontal divider and sits at a constant Y across pages at a given
+   screen size (see the partial's header for the reservation rationale). */
+.page-header { display: flex; flex-direction: column; border-bottom: 1px solid var(--pico-muted-border-color); color: inherit; }
 .page-header-crumb { margin-block-start: 0.25rem; }
 /* Reserve the breadcrumb row's intrinsic height on pages without a real
    breadcrumb (list pages): the placeholder is a real back-affordance
    shape, hidden — so the reserved height equals a rendered breadcrumb's
-   and the rule lines up with detail pages. No size unit is pinned. */
+   and the boundary lines up with detail pages. No size unit is pinned. */
 .page-header-crumb-placeholder { visibility: hidden; }/* `<menu>` is HTML's native "list of commands" element — used
    by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
    and any in-row action cluster (e.g. the users-table Actions
