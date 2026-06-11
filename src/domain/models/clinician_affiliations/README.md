@@ -17,19 +17,19 @@ That means every clinician — including a solo practitioner with no LLC and no 
 
 Sessions columns (`in_person_sessions`, `virtual_sessions`) are also nullable: a stub affiliation auto-created at NPI verify time hasn't yet been asked those questions; NULL means "unset," distinct from any `LOCATION_AVAILABILITY_OPTIONS` value. The auto-create lives in `after_create_clinician_verification` ([`../../logic/clinicians/handlers.py`](../../logic/clinicians/handlers.py)) — the canonical "this clinician is real and going to stick around" moment. The backfill migration `9501786659b3` covers pre-existing solo clinicians.
 
-## Steady-state profile (#1358 PR-f, in progress)
+## Steady-state profile (#1358 PR-f)
 
 The columns `services` / `settings` / `modalities` / `age_groups` / `genders` / `website` / `referral_instructions` / `currently_accepting_new_patients` are the per-(clinician × org) **steady-state practice profile**. The mental model from #1358: *steady-state goes on Clinician/Affiliation; events go on Post*. A clinician who reposts the same opening three times in six months has the same services / modalities / age groups across all three — those are properties of the affiliation, not of the announcement.
 
-The PR-f refactor is shipping in three sub-PRs:
+The PR-f refactor shipped in three sub-PRs:
 
-1. **Add the columns + backfill** (`e3e0a73e9bc5` + `f3c128112fa7`). The columns exist with defaults; the data migration copies values from the most-recent `OpeningDetail` attached to each affiliation. Reads and writes still go to `OpeningDetail`.
-2. **Flip reads + dual-write** (this PR). The view layer (`src/domain/logic/posts/view.py`) reads steady-state fields from this affiliation row (with fallback to the detail row's column when the affiliation has an empty value — the dual-write safety net); the list filters (`PostRepository.list_posts`) OR the affiliation column with the detail-row column. `PostRepository` overrides `create_polymorphic` / `patch` to mirror any non-empty steady-state field from a freshly-created or patched `OpeningDetail` onto this row, keeping the two homes consistent until sub-PR 3 drops the detail-row columns.
-3. *(Pending)* **Drop the columns from `OpeningDetail`.** `OpeningDetail` collapses to the announcement core (`desired_times`, `schedule_text`, optional per-announcement overrides, capacity, pointer to the affiliation).
+1. **Add the columns + backfill** (`e3e0a73e9bc5` + `f3c128112fa7`). Columns added with defaults; data migration copied values from the most-recent `OpeningDetail` attached to each affiliation.
+2. **Flip reads + dual-write** (`PostRepository` / `view.py` changes in #1386). Reads flipped to the new home with a fallback-to-detail safety net; writes dual-wrote the detail row's profile fields onto the affiliation.
+3. **Drop the detail-row columns** (`57161384b6db`). `OpeningDetail` collapsed to the announcement core (`desired_times` / `schedule_text` / `subject` / `description` / `treatment_modality` + the context FKs). The dual-write and the fallback read are both gone — the affiliation is now the canonical source.
 
 `languages` is *not* in this set on the affiliation — it moves to `Clinician` (a person attribute, invariant across affiliations). See [`../clinicians/README.md`](../clinicians/README.md).
 
-`currently_accepting_new_patients` is a denormalized cache toggled by the `OpeningDetail` lifecycle (sub-PR 2/3 wires the toggle). Distinct from the analogous flag on `Program.accepting_referrals` which is an operator-set standing posture.
+`currently_accepting_new_patients` is a denormalized cache toggled by the `OpeningDetail` lifecycle. Distinct from the analogous flag on `Program.accepting_referrals` which is an operator-set standing posture.
 
 ## Write path: how a clinician edit lands on ClinicianAffiliation
 

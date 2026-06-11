@@ -396,9 +396,9 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     logged_in_user,
 ):
     """Integration smoke for `POST_ENTITY.form_error_render` exercised
-    against the clinician_opening kind. HX-Request POST with invalid
-    `age_groups` returns 422 + HTML and the response surfaces the
-    failing field's inline error.
+    against the clinician_opening kind. HX-Request POST with an invalid
+    `clinician_affiliation_id` (a non-UUID string) returns 422 + HTML
+    and the response surfaces the failing field's inline error.
 
     Structural contracts live in their owning layers, not here:
 
@@ -413,7 +413,10 @@ async def test_clinician_opening_create_form_error_render_is_wired(
             session.add(clinician)
 
     payload = opening_payload(clinician_id=str(clinician.id))
-    payload["age_groups"] = []
+    # Force a 422 on the required affiliation FK by sending a non-UUID
+    # value — the only required wire field on the thin opening shape
+    # (#1358 PR-f sub-3).
+    payload["clinician_affiliation_id"] = "not-a-uuid"
 
     response = await authenticated_client.post(
         "/posts",
@@ -422,12 +425,10 @@ async def test_clinician_opening_create_form_error_render_is_wired(
     )
     assert response.status_code == 422, response.text
     assert response.headers["content-type"].startswith("text/html")
-    # `multi_select_field` renders a `<div role="group" id="age_groups">`
-    # wrapper; the aria-invalid lives on the group, not on each checkbox.
-    assert 'id="age_groups"' in response.text
-    group_start = response.text.index('id="age_groups"')
-    age_block = response.text[max(0, group_start - 200) : group_start + 200]
-    assert 'aria-invalid="true"' in age_block, age_block
+    assert 'name="clinician_affiliation_id"' in response.text
+    aff_start = response.text.index('name="clinician_affiliation_id"')
+    aff_block = response.text[max(0, aff_start - 200) : aff_start + 200]
+    assert 'aria-invalid="true"' in aff_block, aff_block
     # Fragment-only response: the re-render returns just the `<form>`,
     # not the full `new_clinician_opening.html` page (which extends
     # base.html).

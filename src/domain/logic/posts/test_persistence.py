@@ -337,10 +337,12 @@ async def test_create_post_persists_parent_and_opening_detail(
         assert detail_row.clinician.org.name == "Acme Health"
 
 
-async def test_create_post_round_trips_free_text_fields(
+async def test_create_post_round_trips_announcement_core(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """`description`, `referral_instructions`, `website` persist + read back."""
+    """``description`` / ``schedule_text`` / ``subject`` persist + read
+    back. ``referral_instructions`` / ``website`` moved to the
+    affiliation in #1358 PR-f sub-3 and are no longer detail columns."""
     owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -348,8 +350,8 @@ async def test_create_post_round_trips_free_text_fields(
         detail = make_opening_detail(
             clinician_id=clinician.id,
             description="Lead pitch",
-            referral_instructions="Email the coordinator",
-            website="example.com",
+            schedule_text="Tues PM",
+            subject="Spring cohort",
         )
         created = await _create_post(
             repo,
@@ -370,15 +372,15 @@ async def test_create_post_round_trips_free_text_fields(
             .first()
         )
         assert detail_row.description == "Lead pitch"
-        assert detail_row.referral_instructions == "Email the coordinator"
-        assert detail_row.website == "example.com"
+        assert detail_row.schedule_text == "Tues PM"
+        assert detail_row.subject == "Spring cohort"
 
 
-async def test_create_post_free_text_fields_default_null(
+async def test_create_post_announcement_core_defaults_null(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Omitting the three new fields persists them as NULL — additive
-    columns must not break a row that doesn't supply them."""
+    """Omitting the announcement-core scalars persists them as NULL —
+    none of the surviving columns are NOT NULL beyond the FK + identity."""
     owner, clinician = await _seed_owner_and_clinician(
         db_test_session_manager, practice_name="No-extras"
     )
@@ -404,8 +406,8 @@ async def test_create_post_free_text_fields_default_null(
             .first()
         )
         assert detail_row.description is None
-        assert detail_row.referral_instructions is None
-        assert detail_row.website is None
+        assert detail_row.subject is None
+        assert detail_row.schedule_text is None
 
 
 async def test_update_post_writes_to_opening_detail(

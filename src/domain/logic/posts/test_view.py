@@ -191,8 +191,37 @@ def _make_cr_post(**detail_overrides):
     )
 
 
-def _make_pa_post(*, clinician_attrs=None, **detail_overrides):
-    """Realistic PA stub. Defaults populate clinician + detail fields."""
+# Steady-state profile fields and where they live after #1358 PR-f sub-3.
+# Anything in this set is read from the linked affiliation / clinician /
+# program — NOT from the detail row.
+_PA_AFFILIATION_PROFILE_DEFAULTS = dict(
+    services=["psychotherapy"],
+    settings=["individual"],
+    age_groups=["adults_25_64"],
+    genders=["female", "non_binary"],
+    modalities=[],
+    website="https://example.com",
+    referral_instructions="Email intake@example.com",
+)
+_PA_CLINICIAN_PERSON_DEFAULTS = dict(
+    languages=["en"],
+)
+_PA_OPENING_CORE_DEFAULTS = dict(
+    treatment_modality="DBT",
+    description="Accepting new clients.",
+    schedule_text="Mon-Wed 9-5",
+    desired_times=["weekday_morning"],
+    subject=None,
+)
+
+
+def _make_pa_post(*, clinician_attrs=None, **overrides):
+    """Realistic PA stub. ``overrides`` can target the announcement core
+    (``description`` / ``schedule_text`` / ``desired_times`` /
+    ``treatment_modality`` / ``subject``) or any steady-state profile
+    field — steady-state fields land on the affiliation (or, for
+    ``languages``, on the clinician), matching the post-#1358 PR-f
+    storage layout."""
     p = dict(
         id="prov-1",
         first_name="Jane",
@@ -207,60 +236,69 @@ def _make_pa_post(*, clinician_attrs=None, **detail_overrides):
         accepts_out_of_network=False,
         sliding_scale=True,
         cost="$150/session",
+        **_PA_CLINICIAN_PERSON_DEFAULTS,
     )
+    aff = dict(**_PA_AFFILIATION_PROFILE_DEFAULTS)
+    core = dict(**_PA_OPENING_CORE_DEFAULTS)
+    for k, v in overrides.items():
+        if k in _PA_AFFILIATION_PROFILE_DEFAULTS:
+            aff[k] = v
+        elif k in _PA_CLINICIAN_PERSON_DEFAULTS:
+            p[k] = v
+        else:
+            core[k] = v
     if clinician_attrs:
         p.update(clinician_attrs)
-    d = dict(
-        services=["psychotherapy"],
-        settings=["individual"],
-        age_groups=["adults_25_64"],
-        languages=["en"],
-        genders=["female", "non_binary"],
-        treatment_modality="DBT",
-        description="Accepting new clients.",
-        schedule_text="Mon-Wed 9-5",
-        desired_times=["weekday_morning"],
-        website="https://example.com",
-        referral_instructions="Email intake@example.com",
-    )
-    d.update(detail_overrides)
     return SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             clinician=SimpleNamespace(**p),
-            **d,
+            clinician_affiliation=SimpleNamespace(**aff),
+            **core,
         ),
     )
 
 
-def _make_program_post(*, program_attrs=None, **detail_overrides):
+_PROGRAM_PROFILE_DEFAULTS = dict(
+    services=["psychotherapy"],
+    settings=["group"],
+    age_groups=["adolescents_14_18"],
+    languages=["en"],
+    genders=[],
+    modalities=[],
+    website="https://riseiop.example.com",
+    referral_instructions=None,
+)
+_PROGRAM_INTAKE_CORE_DEFAULTS = dict(
+    treatment_modality="DBT",
+    description="Intake cohort opens June 1.",
+    schedule_text="M-F 9-3",
+    desired_times=["weekday_morning"],
+    subject=None,
+)
+
+
+def _make_program_post(*, program_attrs=None, **overrides):
     p = dict(
         id="prog-1",
         name="RISE IOP",
         state_preference="CT",
         organization=SimpleNamespace(id="org-h", name="Acme Health"),
+        **_PROGRAM_PROFILE_DEFAULTS,
     )
+    core = dict(**_PROGRAM_INTAKE_CORE_DEFAULTS)
+    for k, v in overrides.items():
+        if k in _PROGRAM_PROFILE_DEFAULTS:
+            p[k] = v
+        else:
+            core[k] = v
     if program_attrs:
         p.update(program_attrs)
-    d = dict(
-        services=["psychotherapy"],
-        settings=["group"],
-        age_groups=["adolescents_14_18"],
-        languages=["en"],
-        genders=[],
-        treatment_modality="DBT",
-        description="Intake cohort opens June 1.",
-        schedule_text="M-F 9-3",
-        desired_times=["weekday_morning"],
-        website="https://riseiop.example.com",
-        referral_instructions=None,
-    )
-    d.update(detail_overrides)
     return SimpleNamespace(
         kind="program_intake",
         intake_detail=SimpleNamespace(
             program=SimpleNamespace(**p),
-            **d,
+            **core,
         ),
     )
 
@@ -466,17 +504,12 @@ def test_view_pa_no_location_chunk_when_clinician_missing():
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             clinician=None,
-            services=[],
-            settings=[],
-            age_groups=[],
-            languages=[],
-            genders=[],
+            clinician_affiliation=None,
             treatment_modality=None,
             description=None,
             schedule_text=None,
             desired_times=[],
-            website=None,
-            referral_instructions=None,
+            subject=None,
         ),
     )
     v = post_card_view(post)
@@ -579,23 +612,19 @@ def test_view_cr_missing_detail_returns_base_skeleton():
 
 def test_view_pa_missing_clinician_returns_partial_view():
     """PA's detail has a `clinician` relationship that could be None
-    in test stubs. View-model populates the detail-row fields it can
-    and leaves clinician-derived fields at None."""
+    in test stubs. View-model populates the announcement core and the
+    affiliation-sourced steady-state profile and leaves clinician-
+    derived fields at None."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             clinician=None,
-            services=["psychotherapy"],
-            settings=[],
-            age_groups=[],
-            languages=[],
-            genders=[],
+            clinician_affiliation=SimpleNamespace(services=["psychotherapy"]),
             treatment_modality=None,
             description="x",
             schedule_text=None,
             desired_times=[],
-            website=None,
-            referral_instructions=None,
+            subject=None,
         ),
     )
     v = post_card_view(post)
@@ -605,8 +634,8 @@ def test_view_pa_missing_clinician_returns_partial_view():
     assert v["practice_link"] is None
     assert v["organization_link"] is None
     assert v["sliding_scale"] is None
-    # Detail-row fields independent of the clinician relationship still
-    # populate so the card can render whatever it can.
+    # Affiliation-sourced profile still populates so the card can render
+    # whatever it can.
     assert v["services"] == ["psychotherapy"]
     assert v["description"] == "x"
 
@@ -770,30 +799,34 @@ def test_row_summary_referral_missing_detail():
 
 
 def test_row_summary_opening_with_description_and_settings():
-    """Opening with description + first settings label + sliding scale."""
+    """Opening with description + first settings label + sliding scale.
+    Settings come from the linked affiliation (#1358 PR-f sub-3)."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             description="2 slots open",
-            settings=["outpatient"],
-            age_groups=[],
-            services=[],
             clinician=SimpleNamespace(sliding_scale=True),
+            clinician_affiliation=SimpleNamespace(
+                settings=["outpatient"], age_groups=[], services=[]
+            ),
         ),
     )
     assert post_row_summary(post) == "2 slots open · Outpatient · sliding scale"
 
 
 def test_row_summary_opening_no_description_builds_from_fields():
-    """When opening has no description, age + service labels are used."""
+    """When opening has no description, age + service labels are used —
+    both come from the linked affiliation."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             description=None,
-            settings=[],
-            age_groups=["adults_25_64"],
-            services=["psychotherapy"],
             clinician=SimpleNamespace(sliding_scale=False),
+            clinician_affiliation=SimpleNamespace(
+                settings=[],
+                age_groups=["adults_25_64"],
+                services=["psychotherapy"],
+            ),
         ),
     )
     summary = post_row_summary(post)
@@ -806,10 +839,10 @@ def test_row_summary_opening_no_sliding_scale():
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             description="Accepting new clients",
-            settings=[],
-            age_groups=[],
-            services=[],
             clinician=SimpleNamespace(sliding_scale=False),
+            clinician_affiliation=SimpleNamespace(
+                settings=[], age_groups=[], services=[]
+            ),
         ),
     )
     assert post_row_summary(post) == "Accepting new clients"
@@ -919,8 +952,10 @@ def test_feed_headline_opening_missing_clinician_returns_fallback():
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             clinician=None,
-            services=["psychotherapy"],
-            settings=[],
+            clinician_affiliation=SimpleNamespace(
+                services=["psychotherapy"], settings=[]
+            ),
+            subject=None,
         ),
     )
     # Practice name cannot be derived; headline falls back to "Opening — <service>".
@@ -1017,22 +1052,21 @@ def test_passthrough_keys_present_for_every_kind(make_post):
 
 
 def test_passthrough_forwards_detail_values_for_opening():
-    """An opening's detail-row scalars/lists land on the view verbatim,
-    proving the helper reads the right attributes (no rename drift)."""
+    """An opening's announcement-core detail-row scalars/lists land on
+    the view verbatim, proving the passthrough helper reads the right
+    attributes (no rename drift). Steady-state fields (services /
+    settings) read from the linked affiliation — see the dedicated
+    affiliation read tests below."""
     v = post_card_view(
         _make_pa_post(
             description="Forwarded description",
             schedule_text="Forwarded schedule",
             treatment_modality="ACT",
-            services=["psychotherapy", "group_therapy"],
-            settings=["group"],
         )
     )
     assert v["description"] == "Forwarded description"
     assert v["schedule_text"] == "Forwarded schedule"
     assert v["treatment_modality"] == "ACT"
-    assert v["services"] == ["psychotherapy", "group_therapy"]
-    assert v["settings"] == ["group"]
 
 
 def test_passthrough_missing_attr_falls_back_to_base_default():
@@ -1045,22 +1079,20 @@ def test_passthrough_missing_attr_falls_back_to_base_default():
     assert v["schedule_text"] is None
 
 
-# --- #1358 PR-f sub-PR 2: steady-state read flip ------------------------
+# --- #1358 PR-f: steady-state read from the new home --------------------
 #
 # The opening side reads steady-state profile fields (services /
 # settings / modalities / age_groups / genders / website /
 # referral_instructions) from the linked ``ClinicianAffiliation``, and
 # ``languages`` from the linked ``Clinician``. The intake side reads
 # them from the linked ``Program`` (with ``languages`` also there).
-# Each helper falls back to the detail row's column when the new home
-# is empty — that's the dual-write safety net for this PR's window.
+# Sub-PR 3 dropped the per-announcement columns; there is no detail-row
+# fallback any more.
 
 
-def test_opening_reads_services_from_affiliation_over_detail():
-    """Sub-PR 2 flip: ``view.services`` comes from the linked
-    ``ClinicianAffiliation``, NOT from the detail row, when the
-    affiliation has values."""
-    post = _make_pa_post(services=["psychotherapy"])
+def test_opening_reads_services_from_affiliation():
+    """``view.services`` comes from the linked ``ClinicianAffiliation``."""
+    post = _make_pa_post()
     post.opening_detail.clinician_affiliation = SimpleNamespace(
         services=["medication_management", "group_therapy"],
         settings=[],
@@ -1074,51 +1106,33 @@ def test_opening_reads_services_from_affiliation_over_detail():
     assert v["services"] == ["medication_management", "group_therapy"]
 
 
-def test_opening_falls_back_to_detail_when_affiliation_empty():
-    """Dual-write safety net: the affiliation has no values yet (a
-    fresh row that hasn't been mirrored to) — read still surfaces the
-    detail row's value, so the listing card doesn't go blank during
-    the dual-write window."""
-    post = _make_pa_post(services=["psychotherapy"])
-    post.opening_detail.clinician_affiliation = SimpleNamespace(
-        services=[],
-        settings=[],
-        modalities=[],
-        age_groups=[],
-        genders=[],
-        website=None,
-        referral_instructions=None,
-    )
-    v = post_card_view(post)
-    assert v["services"] == ["psychotherapy"]
-
-
-def test_opening_falls_back_to_detail_when_no_affiliation():
-    """No ``clinician_affiliation`` relationship loaded at all — read
-    still surfaces the detail row's value."""
-    post = _make_pa_post(services=["psychotherapy"])
+def test_opening_no_affiliation_yields_empty_lists():
+    """No ``clinician_affiliation`` relationship loaded at all → the
+    steady-state fields read as empty (no detail-row fallback after
+    sub-3)."""
+    post = _make_pa_post()
     post.opening_detail.clinician_affiliation = None
     v = post_card_view(post)
-    assert v["services"] == ["psychotherapy"]
+    assert v["services"] == []
+    assert v["settings"] == []
+    assert v["genders"] == []
 
 
 def test_opening_reads_languages_from_clinician_not_affiliation():
     """``languages`` is person-level on the opening side (#1358):
     it lives on ``Clinician``, not ``ClinicianAffiliation``. Pin
     that the view reads it through the clinician relationship."""
-    post = _make_pa_post(languages=["en"])
+    post = _make_pa_post()
     post.opening_detail.clinician.languages = ["en", "zh"]
     v = post_card_view(post)
     assert v["languages"] == ["en", "zh"]
 
 
 def test_opening_reads_referral_section_from_affiliation():
-    """``website`` / ``referral_instructions`` flip to the linked
+    """``website`` / ``referral_instructions`` are read from the linked
     affiliation. The bundled ``view.referral`` section reads from the
     new home."""
-    post = _make_pa_post(
-        website="https://detail-row.example", referral_instructions="OLD"
-    )
+    post = _make_pa_post()
     post.opening_detail.clinician_affiliation = SimpleNamespace(
         services=[],
         settings=[],
@@ -1135,10 +1149,9 @@ def test_opening_reads_referral_section_from_affiliation():
     }
 
 
-def test_intake_reads_services_from_program_over_detail():
-    """Sub-PR 2 flip: intake reads steady-state from the linked
-    ``Program``, not the detail row."""
-    post = _make_program_post(services=["group_therapy"])
+def test_intake_reads_services_from_program():
+    """Intake reads steady-state from the linked ``Program``."""
+    post = _make_program_post()
     post.intake_detail.program.services = ["medication_management"]
     post.intake_detail.program.languages = []
     post.intake_detail.program.settings = []
@@ -1154,10 +1167,8 @@ def test_intake_reads_services_from_program_over_detail():
 def test_intake_reads_languages_from_program():
     """``languages`` is Program-level on the intake side (#1358) —
     distinct from the opening side, where it's on the Clinician."""
-    post = _make_program_post(languages=["en"])
+    post = _make_program_post()
     post.intake_detail.program.languages = ["en", "es"]
-    # The other Program fields stay empty so the detail-row fallback
-    # surfaces the existing values where the test asserts none.
     for field_name in (
         "services",
         "settings",
@@ -1172,19 +1183,20 @@ def test_intake_reads_languages_from_program():
     assert v["languages"] == ["en", "es"]
 
 
-def test_intake_falls_back_to_detail_when_no_program():
+def test_intake_no_program_yields_empty_lists():
     """Defensive — intake without a program relationship (unrealistic
-    but possible for stub fixtures) falls back to the detail row."""
-    post = _make_program_post(services=["psychotherapy"])
+    but possible for stub fixtures) reads as empty after sub-3."""
+    post = _make_program_post()
     post.intake_detail.program = None
     v = post_card_view(post)
-    assert v["services"] == ["psychotherapy"]
+    assert v["services"] == []
+    assert v["languages"] == []
 
 
 def test_feed_headline_opening_uses_affiliation_services():
     """``post_feed_headline`` for openings reads ``services`` from the
-    linked affiliation when present (flips alongside ``post_card_view``)."""
-    post = _make_pa_post(services=["psychotherapy"])
+    linked affiliation."""
+    post = _make_pa_post()
     post.opening_detail.subject = None  # force the auto-generated branch
     post.opening_detail.clinician_affiliation = SimpleNamespace(
         services=["medication_management"],
@@ -1201,7 +1213,7 @@ def test_feed_headline_opening_uses_affiliation_services():
 def test_row_summary_opening_uses_affiliation_settings():
     """``post_row_summary`` for openings reads ``settings`` (and
     ``age_groups``/``services``) from the linked affiliation."""
-    post = _make_pa_post(settings=["individual"], description=None)
+    post = _make_pa_post(description=None)
     post.opening_detail.clinician_affiliation = SimpleNamespace(
         services=["psychotherapy"],
         settings=["iop"],
@@ -1212,7 +1224,4 @@ def test_row_summary_opening_uses_affiliation_settings():
         referral_instructions=None,
     )
     summary = post_row_summary(post)
-    # Settings label "IOP" comes from the affiliation — not
-    # "Individual" (which would be from the detail row).
     assert "IOP" in summary
-    assert "Individual" not in summary

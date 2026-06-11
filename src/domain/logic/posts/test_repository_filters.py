@@ -302,26 +302,59 @@ async def test_include_telehealth_alone_adds_no_constraint(db_test_session_manag
 # ---------------------------------------------------------------------------
 
 
-async def test_level_of_care_matches_opening_settings(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
+async def _seed_clinician_with_affiliation(
+    db_test_session_manager, owner_id, **affiliation_kwargs
+):
+    """Persist a Clinician + a ClinicianAffiliation with custom profile
+    values. Returns ``(clinician_id, affiliation_id)``."""
+    from src.domain.models import ClinicianAffiliation
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
+            clinician = make_clinician_with_org(owner_id=owner_id)
             session.add(clinician)
+        clinician_id = clinician.id
+        org_id = clinician.org.id
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            affiliation = ClinicianAffiliation(
+                clinician_id=clinician_id,
+                org_id=org_id,
+                **affiliation_kwargs,
+            )
+            session.add(affiliation)
+        affiliation_id = affiliation.id
+    return clinician_id, affiliation_id
+
+
+async def test_level_of_care_matches_opening_settings(db_test_session_manager):
+    """Opening-side settings live on ``ClinicianAffiliation`` after
+    #1358 PR-f sub-3."""
+    owner = await _seed_user(db_test_session_manager)
+    match_cid, match_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["php"]
+    )
+    no_cid, no_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["outpatient"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             match = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["php"]),
+                make_opening_detail(
+                    clinician_id=match_cid, clinician_affiliation_id=match_aid
+                ),
                 "opening_detail",
             )
             no_match = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["outpatient"]),
+                make_opening_detail(
+                    clinician_id=no_cid, clinician_affiliation_id=no_aid
+                ),
                 "opening_detail",
             )
 
@@ -332,30 +365,40 @@ async def test_level_of_care_matches_opening_settings(db_test_session_manager):
 
 
 async def test_level_of_care_matches_intake_settings(db_test_session_manager):
+    """Intake-side settings live on ``Program``."""
     owner = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         async with session.begin():
             org = make_organization_row(owner_id=owner.id)
             session.add(org)
+        org_id = org.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            program = make_program(owner_id=owner.id, org_id=org.id)
-            session.add(program)
+            match_prog = make_program(
+                owner_id=owner.id, org_id=org_id, name="P1", settings=["iop"]
+            )
+            no_prog = make_program(
+                owner_id=owner.id, org_id=org_id, name="P2", settings=["outpatient"]
+            )
+            session.add(match_prog)
+            session.add(no_prog)
+        match_pid = match_prog.id
+        no_pid = no_prog.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
             match = await _add_post(
                 session,
                 owner.id,
-                make_intake_detail(program_id=program.id, settings=["iop"]),
+                make_intake_detail(program_id=match_pid),
                 "intake_detail",
             )
             no_match = await _add_post(
                 session,
                 owner.id,
-                make_intake_detail(program_id=program.id, settings=["outpatient"]),
+                make_intake_detail(program_id=no_pid),
                 "intake_detail",
             )
 
@@ -368,30 +411,40 @@ async def test_level_of_care_matches_intake_settings(db_test_session_manager):
 async def test_level_of_care_multi_value_or(db_test_session_manager):
     """Two level_of_care values → posts matching either appear."""
     owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
+    php_cid, php_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["php"]
+    )
+    iop_cid, iop_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["iop"]
+    )
+    out_cid, out_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["outpatient"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             php_post = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["php"]),
+                make_opening_detail(
+                    clinician_id=php_cid, clinician_affiliation_id=php_aid
+                ),
                 "opening_detail",
             )
             iop_post = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["iop"]),
+                make_opening_detail(
+                    clinician_id=iop_cid, clinician_affiliation_id=iop_aid
+                ),
                 "opening_detail",
             )
             outpatient_post = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["outpatient"]),
+                make_opening_detail(
+                    clinician_id=out_cid, clinician_affiliation_id=out_aid
+                ),
                 "opening_detail",
             )
 
@@ -404,24 +457,29 @@ async def test_level_of_care_multi_value_or(db_test_session_manager):
 
 async def test_level_of_care_absent_returns_all(db_test_session_manager):
     owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
+    php_cid, php_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["php"]
+    )
+    out_cid, out_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["outpatient"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             p1 = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["php"]),
+                make_opening_detail(
+                    clinician_id=php_cid, clinician_affiliation_id=php_aid
+                ),
                 "opening_detail",
             )
             p2 = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, settings=["outpatient"]),
+                make_opening_detail(
+                    clinician_id=out_cid, clinician_affiliation_id=out_aid
+                ),
                 "opening_detail",
             )
 
@@ -470,25 +528,31 @@ async def test_modality_matches_referral_modalities(db_test_session_manager):
 
 
 async def test_modality_matches_opening_modalities(db_test_session_manager):
+    """Opening-side modalities live on ``ClinicianAffiliation``."""
     owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
+    match_cid, match_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["ifs"]
+    )
+    no_cid, no_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["dbt"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             match = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["ifs"]),
+                make_opening_detail(
+                    clinician_id=match_cid, clinician_affiliation_id=match_aid
+                ),
                 "opening_detail",
             )
             no_match = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["dbt"]),
+                make_opening_detail(
+                    clinician_id=no_cid, clinician_affiliation_id=no_aid
+                ),
                 "opening_detail",
             )
 
@@ -499,30 +563,40 @@ async def test_modality_matches_opening_modalities(db_test_session_manager):
 
 
 async def test_modality_matches_intake_modalities(db_test_session_manager):
+    """Intake-side modalities live on ``Program``."""
     owner = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         async with session.begin():
             org = make_organization_row(owner_id=owner.id)
             session.add(org)
+        org_id = org.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            program = make_program(owner_id=owner.id, org_id=org.id)
-            session.add(program)
+            match_prog = make_program(
+                owner_id=owner.id, org_id=org_id, name="P1", modalities=["somatic"]
+            )
+            no_prog = make_program(
+                owner_id=owner.id, org_id=org_id, name="P2", modalities=["act"]
+            )
+            session.add(match_prog)
+            session.add(no_prog)
+        match_pid = match_prog.id
+        no_pid = no_prog.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
             match = await _add_post(
                 session,
                 owner.id,
-                make_intake_detail(program_id=program.id, modalities=["somatic"]),
+                make_intake_detail(program_id=match_pid),
                 "intake_detail",
             )
             no_match = await _add_post(
                 session,
                 owner.id,
-                make_intake_detail(program_id=program.id, modalities=["act"]),
+                make_intake_detail(program_id=no_pid),
                 "intake_detail",
             )
 
@@ -535,30 +609,40 @@ async def test_modality_matches_intake_modalities(db_test_session_manager):
 async def test_modality_multi_value_or(db_test_session_manager):
     """Two modality values → posts matching either appear."""
     owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
+    emdr_cid, emdr_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["emdr"]
+    )
+    cbt_cid, cbt_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["cbt"]
+    )
+    dbt_cid, dbt_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["dbt"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             emdr_post = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["emdr"]),
+                make_opening_detail(
+                    clinician_id=emdr_cid, clinician_affiliation_id=emdr_aid
+                ),
                 "opening_detail",
             )
             cbt_post = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["cbt"]),
+                make_opening_detail(
+                    clinician_id=cbt_cid, clinician_affiliation_id=cbt_aid
+                ),
                 "opening_detail",
             )
             dbt_post = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["dbt"]),
+                make_opening_detail(
+                    clinician_id=dbt_cid, clinician_affiliation_id=dbt_aid
+                ),
                 "opening_detail",
             )
 
@@ -571,24 +655,25 @@ async def test_modality_multi_value_or(db_test_session_manager):
 
 async def test_modality_absent_returns_all(db_test_session_manager):
     owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
+    a_cid, a_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["emdr"]
+    )
+    b_cid, b_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=[]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             p1 = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["emdr"]),
+                make_opening_detail(clinician_id=a_cid, clinician_affiliation_id=a_aid),
                 "opening_detail",
             )
             p2 = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=[]),
+                make_opening_detail(clinician_id=b_cid, clinician_affiliation_id=b_aid),
                 "opening_detail",
             )
 
@@ -601,18 +686,16 @@ async def test_modality_absent_returns_all(db_test_session_manager):
 async def test_modality_unknown_value_returns_no_match(db_test_session_manager):
     """Unknown modality value is silently ignored — no error, no match."""
     owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
+    cid, aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, modalities=["emdr"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
             p = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, modalities=["emdr"]),
+                make_opening_detail(clinician_id=cid, clinician_affiliation_id=aid),
                 "opening_detail",
             )
 
@@ -744,44 +827,41 @@ async def test_insurance_absent_returns_all(db_test_session_manager):
 async def test_and_combination_modality_and_level_of_care(db_test_session_manager):
     """A post must satisfy BOTH active filters to appear."""
     owner = await _seed_user(db_test_session_manager)
+    both_cid, both_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["php"], modalities=["emdr"]
+    )
+    modality_only_cid, modality_only_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["outpatient"], modalities=["emdr"]
+    )
+    level_only_cid, level_only_aid = await _seed_clinician_with_affiliation(
+        db_test_session_manager, owner.id, settings=["php"], modalities=["cbt"]
+    )
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            # Matches both
             both = await _add_post(
                 session,
                 owner.id,
                 make_opening_detail(
-                    clinician_id=clinician.id,
-                    settings=["php"],
-                    modalities=["emdr"],
+                    clinician_id=both_cid, clinician_affiliation_id=both_aid
                 ),
                 "opening_detail",
             )
-            # Matches modality only
             modality_only = await _add_post(
                 session,
                 owner.id,
                 make_opening_detail(
-                    clinician_id=clinician.id,
-                    settings=["outpatient"],
-                    modalities=["emdr"],
+                    clinician_id=modality_only_cid,
+                    clinician_affiliation_id=modality_only_aid,
                 ),
                 "opening_detail",
             )
-            # Matches level_of_care only
-            level_only = await _add_post(
+            _level_only = await _add_post(
                 session,
                 owner.id,
                 make_opening_detail(
-                    clinician_id=clinician.id,
-                    settings=["php"],
-                    modalities=["cbt"],
+                    clinician_id=level_only_cid,
+                    clinician_affiliation_id=level_only_aid,
                 ),
                 "opening_detail",
             )
@@ -795,102 +875,34 @@ async def test_and_combination_modality_and_level_of_care(db_test_session_manage
 
 
 # ---------------------------------------------------------------------------
-# #1358 PR-f sub-PR 2: filters read from the new steady-state home
-# (ClinicianAffiliation / Program / Clinician) in addition to the detail
-# row, so reads stay correct once sub-PR 3 drops the detail-row columns.
-# These tests pin the new-home reads explicitly by writing the value
-# *only* to the affiliation / program (the detail row stays empty) and
-# proving the filter still matches.
+# #1358 PR-f sub-3: the opening-side steady-state home is
+# ``ClinicianAffiliation`` (and ``Clinician`` for ``languages``); the
+# intake-side home is ``Program``. The general filter tests above already
+# pin reads from the new home — the legacy "when detail empty" cases
+# went away with sub-PR 3 because the detail-row columns no longer exist.
+# This last test pins the ``languages`` ↔ ``Clinician`` link specifically,
+# since ``languages`` lives on the person — not the affiliation — for
+# openings only.
 # ---------------------------------------------------------------------------
 
 
-async def test_level_of_care_matches_affiliation_settings_when_detail_empty(
-    db_test_session_manager,
-):
-    """Opening side: ``settings`` flipped to ``ClinicianAffiliation``.
-    Detail row carries no value; affiliation does — filter matches."""
-    from src.domain.models import ClinicianAffiliation
-
-    owner = await _seed_user(db_test_session_manager)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            affiliation = ClinicianAffiliation(
-                clinician_id=clinician.id,
-                org_id=clinician.org.id,
-                settings=["php"],
-            )
-            session.add(affiliation)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(
-                    clinician_id=clinician.id,
-                    clinician_affiliation_id=affiliation.id,
-                    settings=[],
-                ),
-                "opening_detail",
-            )
-
-    results = await _list(db_test_session_manager, level_of_care=["php"])
-    ids = {p.id for p in results}
-    assert match.id in ids
-
-
-async def test_level_of_care_matches_program_settings_when_detail_empty(
-    db_test_session_manager,
-):
-    """Intake side: ``settings`` flipped to ``Program``."""
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            org = make_organization_row(owner_id=owner.id)
-            session.add(org)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            program = make_program(owner_id=owner.id, org_id=org.id, settings=["iop"])
-            session.add(program)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=program.id, settings=[]),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, level_of_care=["iop"])
-    ids = {p.id for p in results}
-    assert match.id in ids
-
-
-async def test_language_matches_clinician_languages_when_detail_empty(
-    db_test_session_manager,
-):
-    """Opening side: ``languages`` flipped to ``Clinician`` (person-
-    level). Detail row carries no value; clinician does — filter matches."""
+async def test_language_matches_clinician_languages(db_test_session_manager):
+    """Opening side: ``languages`` lives on ``Clinician`` (person-
+    level), distinct from the other steady-state fields which live on
+    the affiliation."""
     owner = await _seed_user(db_test_session_manager)
     async with db_test_session_manager() as session:
         async with session.begin():
             clinician = make_clinician_with_org(owner_id=owner.id, languages=["zh"])
             session.add(clinician)
+        clinician_id = clinician.id
 
     async with db_test_session_manager() as session:
         async with session.begin():
             match = await _add_post(
                 session,
                 owner.id,
-                make_opening_detail(clinician_id=clinician.id, languages=["en"]),
+                make_opening_detail(clinician_id=clinician_id),
                 "opening_detail",
             )
 
