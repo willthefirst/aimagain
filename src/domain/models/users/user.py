@@ -43,9 +43,9 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         lazy="selectin",
         viewonly=True,
     )
-    # Reverse of `Organization.owner_id`. Used by the profile hub to detect
-    # demo context (any owned org with `is_demo=True`) without a separate
-    # query — same selectin pattern as `clinicians` and `programs`.
+    # Reverse of `Organization.owner_id`. Selectin so a single `user`-shaped
+    # read picks up owned orgs without a follow-up query — same pattern as
+    # `clinicians` and `programs`.
     organizations = relationship(
         "Organization",
         foreign_keys="Organization.owner_id",

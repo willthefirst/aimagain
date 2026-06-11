@@ -22,7 +22,6 @@ existing CRUD authz on those entities — the submit endpoint is a
 narrower verb on the same resource.
 """
 
-from typing import Literal
 from uuid import UUID
 
 import httpx
@@ -43,7 +42,6 @@ from src.domain.logic.verifications.handlers import (
     HTTP_TIMEOUT_SECONDS,
     handle_create_clinician_verification,
     run_clinician_verification,
-    run_org_demo_verification,
     run_org_verification,
 )
 from src.domain.logic.verifications.repository import (
@@ -62,20 +60,14 @@ from src.framework.persistence.dependencies import get_audit_repository
 
 verifications_api_router = APIRouter(tags=["Verifications"])
 
-_DEMO_OUTCOMES = ("verified", "needs_review", "failed")
-
 
 class NpiSubmitBody(BaseModel):
     """Wire shape for the inline NPI submit endpoints. The 10-digit
     GLOB constraint also lives on the DB column; pinning it here too
     means a malformed value fails with a Pydantic 422 before the DB
-    layer ever sees it (better error message + no DB round-trip).
-
-    `demo_outcome` is optional and only honored when the target entity
-    has `is_demo=True`; ignored for real organizations."""
+    layer ever sees it (better error message + no DB round-trip)."""
 
     npi: str
-    demo_outcome: Literal["verified", "needs_review", "failed"] | None = None
 
     @field_validator("npi")
     @classmethod
@@ -191,10 +183,7 @@ async def submit_organization_npi(
     inline and the row is settled before the response returns. The
     org's Type-2 NPI is verified once per Organization (handoff §6) —
     subsequent representatives prove authority through
-    `OrgRepresentation`, not by re-submitting the NPI.
-
-    When `org.is_demo` is True and `body.demo_outcome` is set, NPPES is
-    bypassed and the selected outcome is persisted directly."""
+    `OrgRepresentation`, not by re-submitting the NPI."""
     org = await org_repo.get_by_model_id(Organization, organization_id)
     if org is None:
         raise NotFoundError(detail="Organization not found")
@@ -213,25 +202,15 @@ async def submit_organization_npi(
         actor_id=requesting_user.id,
     )
 
-    if org.is_demo and body.demo_outcome:
-        await run_org_demo_verification(
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
+        await run_org_verification(
             org_id=org.id,
-            demo_outcome=body.demo_outcome,
             verification_repo=verification_repo,
             org_repo=org_repo,
             audit_repo=audit_repo,
+            http=http,
             actor_id=requesting_user.id,
         )
-    else:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as http:
-            await run_org_verification(
-                org_id=org.id,
-                verification_repo=verification_repo,
-                org_repo=org_repo,
-                audit_repo=audit_repo,
-                http=http,
-                actor_id=requesting_user.id,
-            )
     return refreshed_response()
 
 

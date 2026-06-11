@@ -44,8 +44,7 @@ class OrganizationCreate(WirePayload):
     user and not accepted on the wire.
 
     The create form (``organizations/_form_new_fragment.html``) collects
-    just `name` + `npi`. ``is_demo`` stays on the wire schema for
-    superuser API consumers; it's surfaced in the edit form for admins.
+    just `name` + `npi`.
     """
 
     name: Annotated[StrippedText, HtmlPattern(maxlength=200)]
@@ -53,9 +52,6 @@ class OrganizationCreate(WirePayload):
     # Claim-B NPPES verification inline (see
     # `after_create_organization_owner_grant`).
     npi: RequiredNpiText
-    # Admin-only: marks this org as a demo environment. See
-    # `Organization.is_demo` for the full contract.
-    is_demo: bool = False
 
 
 class OrganizationUpdate(PartialUpdate):
@@ -63,7 +59,6 @@ class OrganizationUpdate(PartialUpdate):
 
     name: StrippedText | None = None
     npi: NpiText = None
-    is_demo: bool | None = None
 
 
 # --- Admin verification-state axis ---------------------------------------

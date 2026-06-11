@@ -50,10 +50,6 @@ class Organization(BaseModel):
     # `capabilities.org_rep_verified(user, org)`.
     org_verified = Column(Boolean, nullable=False, server_default="0", default=False)
     verified_at = Column(TIMESTAMP, nullable=True)
-    # Marks this org as a demonstration environment. Clinicians and orgs in
-    # demo mode bypass NPPES/OIG and let the user choose a simulated outcome
-    # from the profile hub. Admin-set; never writable by regular users.
-    is_demo = Column(Boolean, nullable=False, server_default="0", default=False)
     # Cached from NPPES; the AO name-match path
     # (`AuthorityMethod.authorized_official`) compares this against the
     # requesting user's verified `Clinician.first_name`/`last_name` per
