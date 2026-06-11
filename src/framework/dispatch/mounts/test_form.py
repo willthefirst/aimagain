@@ -19,6 +19,7 @@ from src.framework.dispatch.entity_spec import EntitySpec, RouteSet
 from src.framework.dispatch.mounts.conftest import (
     FakeRepo,
     FixtureRow,
+    child_spec,
     make_audit,
     make_user,
     top_level_spec,
@@ -546,3 +547,73 @@ def test_make_new_form_handler_includes_extra_repos_in_signature():
     sig = inspect.signature(handler)
     assert "organization_repo" in sig.parameters
     assert sig.parameters["organization_repo"].annotation is _RepoMarker
+
+
+# --- Parent-owned form (subentity) ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_new_form_parent_owned_resource_url_includes_parent_id():
+    """For a parent-owned spec, ``resource_url`` in the form context walks
+    the parent chain so the rendered form posts to
+    ``/<parent_collection>/<parent_id>/<child_collection>`` — same shape
+    ``mount_create`` already mounts for the same spec."""
+    spec = child_spec()
+    parent_uuid = uuid4()
+
+    context = await handle_get_new_form(
+        spec,
+        request=_request_stub(),
+        requesting_user=make_user(),
+        parent_id=parent_uuid,
+    )
+
+    assert context["resource_url"] == f"/parents/{parent_uuid}/widget_parts"
+
+
+@pytest.mark.asyncio
+async def test_edit_form_parent_owned_urls_include_parent_id():
+    """Both ``resource_url`` and ``resource_detail_url`` walk the parent
+    chain on edit — the edit page renders both."""
+    spec = child_spec()
+    parent_uuid = uuid4()
+    target_id = uuid4()
+    target = FixtureRow(id=target_id)
+    repo = FakeRepo()
+    repo.seed(FixtureRow, target)
+
+    context = await handle_get_edit_form(
+        spec,
+        request=_request_stub(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=make_user(),
+        parent_id=parent_uuid,
+    )
+
+    assert context["resource_url"] == f"/parents/{parent_uuid}/widget_parts"
+    assert (
+        context["resource_detail_url"]
+        == f"/parents/{parent_uuid}/widget_parts/{target_id}"
+    )
+
+
+def test_make_new_form_handler_signature_includes_parent_id_for_parent_owned_spec():
+    """``include_parent_id`` is on ``_NEW_FORM_SHAPE`` — the synthesized
+    handler binds the parent's ``id_param`` so FastAPI dependency
+    injection forwards the URL segment into the call."""
+    spec = child_spec()
+    handler = make_new_form_handler(spec)
+    names = list(inspect.signature(handler).parameters)
+    assert "parent_id" in names
+
+
+def test_make_edit_form_handler_signature_includes_parent_id_for_parent_owned_spec():
+    """Same shape on ``_EDIT_FORM_SHAPE``: the edit-form handler
+    receives ``parent_id`` alongside the leaf id."""
+    spec = child_spec()
+    handler = make_edit_form_handler(spec)
+    names = list(inspect.signature(handler).parameters)
+    assert "parent_id" in names
+    # The leaf id_param is still bound — the URL has both.
+    assert "part_id" in names
