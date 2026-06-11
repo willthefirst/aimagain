@@ -4,7 +4,7 @@
 (PUT/POST + ``hx-confirm`` + optional JSON-encoded ``hx-vals``). It's
 the cousin of ``confirm_delete_button``; three sites use it today —
 the two activation buttons in ``users/_admin_actions.html`` and the
-Attest-active button in ``clinicians/_credential_row.html``.
+Attest-active button in ``licensures/_form_licensure.html``.
 """
 
 from __future__ import annotations

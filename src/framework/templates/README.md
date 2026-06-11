@@ -128,7 +128,7 @@ Edit forms keep a bottom `<a class="secondary outline">Cancel</a>` pointing at t
 
 ## Partial convention
 
-Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_credential_row.html`) are partials, `{% include %}`d from full pages — never rendered directly by routes. A partial documents its required context in a `{# ... #}` comment at the top and guards visibility on a single named flag (`{% if can_edit %}`). The handler computes the flag using [`../authz.py`](../authz.py) predicates; partials never introspect `current_user` to decide visibility. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
+Files prefixed with `_` (e.g. `_breadcrumb.html`, `_toolbar.html`, `_card.html`) are partials, `{% include %}`d from full pages — never rendered directly by routes. A partial documents its required context in a `{# ... #}` comment at the top and guards visibility on a single named flag (`{% if can_edit %}`). The handler computes the flag using [`../authz.py`](../authz.py) predicates; partials never introspect `current_user` to decide visibility. Backend authorization is enforced separately in the logic layer — the template guard is presentation only.
 
 ## Shared macros (`_shared/`)
 
