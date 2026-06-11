@@ -155,3 +155,39 @@ dialog is what keeps misfires unlikely. #}
           hx-delete="{{ url }}"
           hx-confirm="{{ confirm_message }}">{{ label }}</button>
 {%- endmacro %}
+{# Toolbar Favorite / Unfavorite toggle for a target entity.
+
+   Emits a toolbar `<li>` because the only call site today is the
+   per-target detail-page toolbar (`/clinicians/{id}`'s actions menu);
+   the wrapping `<menu class="toolbar-right">` is provided by the view
+   chrome. The macro covers both states so the caller doesn't branch:
+
+     {{ favorite_toggle(clinician.id, is_favorited) }}
+
+   The two states use deliberately different Pico treatments:
+     - Not favorited → `class="outline"` (the primary call-to-action;
+       the recommended next step on a clinician you're interested in).
+     - Favorited     → `class="secondary outline"` + `hx-confirm` (muted,
+       since you've already taken the primary action; the confirm
+       dialog protects against accidental Unfavorite).
+
+   Favorite POSTs to `user_favorite` (the favorite is created with the
+   clinician as the target); Unfavorite DELETEs the same URL. The handler
+   returns no body — the toolbar re-renders via HTMX swap targets the
+   detail-page route configures. #}
+{% macro favorite_toggle(target_id, is_favorited) -%}
+  {%- if is_favorited %}
+    <li>
+      <button type="button"
+              class="secondary outline"
+              hx-delete="{{ entity_url('user_favorite', id=target_id) }}"
+              hx-confirm="Remove this clinician from your favorites?">Unfavorite</button>
+    </li>
+  {%- else %}
+    <li>
+      <button type="button"
+              class="outline"
+              hx-post="{{ entity_url('user_favorite', id=target_id) }}">Favorite</button>
+    </li>
+  {%- endif %}
+{%- endmacro %}
