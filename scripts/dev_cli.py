@@ -424,6 +424,10 @@ class QualityCommands:
                 [sys.executable, "scripts/dev/template_route_check.py"],
             ),
             (
+                "🧱 Checking domain templates for raw HTML primitives...",
+                [sys.executable, "scripts/dev/template_component_check.py"],
+            ),
+            (
                 "🤝 Checking contract-form coverage...",
                 [sys.executable, "scripts/dev/contract_form_coverage_check.py"],
             ),
