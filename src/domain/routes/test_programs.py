@@ -444,3 +444,234 @@ async def test_delete_program(
 
     rows = await _audit_rows_for(db_test_session_manager, resource_id=program_id)
     assert any(r.action == "delete_program" for r in rows)
+
+
+# --- Steady-state profile UI (#1358 PR-f) -------------------------------
+#
+# The steady-state practice profile columns landed on Program in #1380
+# (PR-f sub-1) and became canonical in #1398 (sub-3 dropped the per-
+# announcement copies on IntakeDetail). The wire schema and UI surface
+# both grew the matching field set in this PR — these tests pin the
+# render contract (every field has an input on the form, every set
+# value renders on the detail page) and the round-trip (POST/PATCH
+# persists, GET surfaces).
+
+
+async def test_form_new_renders_steady_state_profile_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Each new profile field renders at least one input/textarea on the
+    create form. Asserts by `name=` because that's the wire contract."""
+    await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    response = await authenticated_client.get("/programs/form")
+    assert response.status_code == 200
+    body = response.text
+    for field in (
+        "services",
+        "settings",
+        "modalities",
+        "age_groups",
+        "genders",
+        "website",
+        "referral_instructions",
+    ):
+        assert f'name="{field}"' in body, f"missing input for {field}"
+
+
+async def test_form_edit_renders_steady_state_profile_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    program_id = await _seed_program_for(
+        db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
+    )
+    response = await authenticated_client.get(f"/programs/{program_id}/form")
+    assert response.status_code == 200
+    body = response.text
+    for field in (
+        "services",
+        "settings",
+        "modalities",
+        "age_groups",
+        "genders",
+        "website",
+        "referral_instructions",
+    ):
+        assert f'name="{field}"' in body, f"missing input for {field}"
+
+
+async def test_form_edit_pre_checks_persisted_profile_values(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A profile field that was previously saved renders pre-checked
+    (multi-selects) or pre-filled (free-text). Mirrors PR #1403's
+    pre-check assertions on the referral edit form."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    program = Program(
+        owner_id=logged_in_user.id,
+        org_id=org_id,
+        name="Profiled IOP",
+        services=["psychotherapy"],
+        modalities=["dbt"],
+        age_groups=["adults_25_64"],
+        website="https://example.com/intake",
+        referral_instructions="Email intake@example.com.",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(program)
+        await session.refresh(program)
+
+    response = await authenticated_client.get(f"/programs/{program.id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    svc_checked = tree.css('input[name="services"][checked]')
+    assert {c.attributes.get("value") for c in svc_checked} == {"psychotherapy"}
+    mod_checked = tree.css('input[name="modalities"][checked]')
+    assert {c.attributes.get("value") for c in mod_checked} == {"dbt"}
+    age_checked = tree.css('input[name="age_groups"][checked]')
+    assert {c.attributes.get("value") for c in age_checked} == {"adults_25_64"}
+
+    website_input = tree.css_first('input[name="website"]')
+    assert website_input is not None
+    assert website_input.attributes.get("value") == "https://example.com/intake"
+    instructions = tree.css_first('textarea[name="referral_instructions"]')
+    assert instructions is not None
+    assert "Email intake@example.com." in instructions.text()
+
+
+async def test_create_program_persists_steady_state_profile(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """POST the new profile fields end-to-end; the row carries every value."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    payload = _program_payload(
+        org_id=org_id,
+        services=["psychotherapy", "medication_management"],
+        settings=["outpatient"],
+        modalities=["dbt"],
+        age_groups=["adults_25_64"],
+        genders=["female"],
+        website="https://example.com",
+        referral_instructions="Call intake.",
+    )
+    # `httpx.AsyncClient.post(data=...)` form-encodes lists by repeating
+    # the key — same shape an HTML multi-checkbox form posts.
+    response = await authenticated_client.post("/programs", data=payload)
+    assert response.status_code == 201, response.text
+    new_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Program, new_id)
+        assert loaded is not None
+        assert loaded.services == ["psychotherapy", "medication_management"]
+        assert loaded.settings == ["outpatient"]
+        assert loaded.modalities == ["dbt"]
+        assert loaded.age_groups == ["adults_25_64"]
+        assert loaded.genders == ["female"]
+        assert loaded.website == "https://example.com"
+        assert loaded.referral_instructions == "Call intake."
+
+
+async def test_patch_updates_steady_state_profile(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """PATCH a single profile field; the row is updated and the rest
+    untouched. Mirrors `test_patch_updates_name`."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    program_id = await _seed_program_for(
+        db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
+    )
+    response = await authenticated_client.patch(
+        f"/programs/{program_id}",
+        data={"services": ["psychotherapy"], "website": "https://updated.example"},
+    )
+    assert response.status_code in (200, 204)
+
+    async with db_test_session_manager() as session:
+        loaded = await session.get(Program, program_id)
+        assert loaded is not None
+        assert loaded.services == ["psychotherapy"]
+        assert loaded.website == "https://updated.example"
+
+
+async def test_detail_renders_steady_state_profile(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Persisted profile fields surface as facts rows on the detail page,
+    keyed by their stable `data-fact` selectors. Empty fields suppress
+    the row entirely — pin both branches here."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    program = Program(
+        owner_id=logged_in_user.id,
+        org_id=org_id,
+        name="Detail Profiled",
+        services=["psychotherapy"],
+        modalities=["dbt"],
+        age_groups=["adults_25_64"],
+        genders=["female"],
+        website="https://example.com",
+        referral_instructions="Email intake@example.com.",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(program)
+        await session.refresh(program)
+
+    response = await authenticated_client.get(f"/programs/{program.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    for key in (
+        "services",
+        "modalities",
+        "age_groups",
+        "genders",
+        "website",
+        "referral_instructions",
+    ):
+        assert (
+            tree.css_first(f'[data-fact="{key}"]') is not None
+        ), f"missing fact row for {key}"
+    # `settings` was never populated — no row should render.
+    assert tree.css_first('[data-fact="settings"]') is None
+
+
+async def test_detail_omits_empty_steady_state_facts(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A Program with no profile values rendered today (the model
+    defaults are empty lists / NULL) skips every steady-state row."""
+    org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
+    program_id = await _seed_program_for(
+        db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
+    )
+    response = await authenticated_client.get(f"/programs/{program_id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    for key in (
+        "services",
+        "settings",
+        "modalities",
+        "age_groups",
+        "genders",
+        "website",
+        "referral_instructions",
+    ):
+        assert (
+            tree.css_first(f'[data-fact="{key}"]') is None
+        ), f"unexpected empty-state row for {key}"

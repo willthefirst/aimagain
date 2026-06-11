@@ -11,9 +11,9 @@
    `with context` lets the form-field macros auto-resolve `error=` /
    `current=` from the `form_errors` / `form_values` injected into
    the render context by `mount_create` on a 422. #}
-{%- from "_shared/form_fields.html" import entity_select_field, field_for, checkbox_field, text_field, form_section with context -%}
+{%- from "_shared/form_fields.html" import entity_select_field, field_for, checkbox_field, text_field, form_section, multi_select_field with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
-{%- from "_shared/form_copy.html" import org_picker_help -%}
+{%- from "_shared/form_copy.html" import org_picker_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {# `org_id` is the FK to the owning Organization. The dropdown is
    scoped per-viewer by `program_form_extras` (the spec's
@@ -33,6 +33,26 @@
   {% endcall %}
   {% call form_section("Intake") %}
     {{ checkbox_field("accepting_referrals", "Currently accepting referrals", current=true) }}
+  {% endcall %}
+  {# Steady-state practice profile (#1358 PR-f). Mirrors the
+     historical IntakeDetail grouping in `posts/_form_program_intake.html`
+     pre-sub-3 — services / settings / modalities are the "what we
+     deliver" cluster; age_groups / genders are the "who we serve"
+     cluster; website / referral_instructions are the "how to reach
+     us" cluster. Multi-selects accept empty list ("no value
+     provided"), matching the schema defaults. #}
+  {% call form_section("Services offered") %}
+    {{ field_for(schema, "services", "Services", required=false, help=select_all_help() ) }}
+    {{ field_for(schema, "settings", "Treatment settings", required=false, help=select_all_help() ) }}
+    {{ field_for(schema, "modalities", "Treatment modalities", required=false, help=select_all_help() ) }}
+  {% endcall %}
+  {% call form_section("Clients served") %}
+    {{ field_for(schema, "age_groups", "Age groups", required=false, help=select_all_help() ) }}
+    {{ field_for(schema, "genders", "Genders", required=false, help=select_all_help() ) }}
+  {% endcall %}
+  {% call form_section("How to refer") %}
+    {{ field_for(schema, "website", "Website", required=false) }}
+    {{ field_for(schema, "referral_instructions", "Referral instructions", required=false) }}
   {% endcall %}
   {{ actions(entity_create_label('program') , cancel_url=entity_url('program')) }}
 {% endcall %}

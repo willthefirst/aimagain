@@ -68,6 +68,13 @@ async def test_consumer_program_create_form_submits(
     # checkbox so default-true booleans round-trip — checked submits
     # both, the parser collapses to the last value (see
     # `src/framework/http/forms.py`).
+    # The "Services offered" / "Clients served" multi-checkbox groups
+    # serialize *only* their checked options — none are checked on this
+    # blank submission, so they emit zero key=value pairs. The "How to
+    # refer" cluster's `website` and `referral_instructions` are blank
+    # text/textarea inputs, so they each serialize as `<name>=` — same
+    # shape as `description=` above. `StrippedOptionalText` collapses
+    # `''` to `None` server-side.
     expected_request_body = (
         f"org_id={STUB_PROGRAM_FORM_ORG_ID}"
         "&name=Intensive+Outpatient"
@@ -77,6 +84,8 @@ async def test_consumer_program_create_form_submits(
         "&end_date="
         "&accepting_referrals=false"
         "&accepting_referrals=true"
+        "&website="
+        "&referral_instructions="
     )
 
     (
