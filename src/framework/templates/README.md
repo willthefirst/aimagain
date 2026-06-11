@@ -28,6 +28,8 @@ Names resolve by walking the list, so a domain page can `{% extends "views/list.
 
 A template under `<resource>/` in either root may only `{% extends %}` / `{% include %}` / `{% from %}` / `{% import %}` from: a root-level file (`base.html`), its own directory, `_shared/`, or `views/`. Cross-cluster references (e.g. `posts/...` from `clinicians/...`) mean the partial is *de facto* shared and belongs in `_shared/`. Enforced by [`../../../scripts/dev/template_imports_check.py`](../../../scripts/dev/template_imports_check.py) (runs in `dev lint` and pre-commit).
 
+**Domain templates compose macros; raw HTML primitives are forbidden.** Every list-card body, detail-page card, form, action button, etc. under `src/domain/templates/` must use a macro from `_shared/` (or a per-cluster `_shared/`) rather than hand-rolling the underlying tag. Enforced by [`../../../scripts/dev/template_component_check.py`](../../../scripts/dev/template_component_check.py) — the forbidden tag set is `<button>`, `<form>`, `<input>` (except `type="hidden"`), `<select>`, `<fieldset>`, `<article>`, `<menu>`, `<dl>`, `<dt>`, `<dd>`. The error message names the macro to use instead. Files that genuinely don't fit any existing macro and aren't worth promoting (the `dev/components.html` showcase, the `auth/*` opt-out, one-off onboarding surfaces) live in the script's `ALLOWLIST` constant.
+
 ## Generic view-type templates (`views/`)
 
 Each view-type template fills the same unified page-header band (nav + breadcrumb + toolbar + boundary rule, see "Page chrome contract" below) from `base.html` with the breadcrumb and toolbar shape that matches the verb. A child template extending one of these declares only what's unique: a label, a URL, the body markup, and an optional action cluster.
