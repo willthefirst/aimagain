@@ -65,6 +65,19 @@ ul.entity-list > li { list-style: none; padding: 0; }
    which Pico does not card-style. The `entity-card` /
    `entity-header` / `entity-facts` / etc. class names persist as
    DOM hooks (tests query them) but contribute no styling. */
+/* Article inner-spacing reset — applied to every `<article>` so
+   the card chrome (background, border, padding band) owns the
+   visual rhythm, not the default heading / section margins inside.
+   Two rules:
+     1) `article > header` headings (h1-h6) drop bottom margin so the
+        subtitle / body sits flush against the headline inside the
+        tinted header band — otherwise Pico's h-margin stacks an
+        extra gap below the title and the band reads oversized.
+     2) `article section` zeros out section margin so nested
+        `<section class="entity-facts">` etc. don't push their own
+        gap on top of the article's padding. */
+article > header :is(h1, h2, h3, h4, h5, h6) { margin-bottom: 0; }
+article section { margin: 0; }
 /* Lucide icons — single source of truth for sizing AND
    spacing. `color: inherit` lets each icon pick up the
    surrounding text color (so an icon inside a `<small>` or a
