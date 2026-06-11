@@ -1,5 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import entity_select_field, form_section, checkbox_field, select_field, text_field -%}
+{%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Programs{% endblock %}
@@ -10,7 +11,7 @@
    Org (added by `program_form_extras` on the edit path even when
    the user doesn't own it, so the form doesn't silently drop the
    FK on submit). #}
-  <form hx-patch="{{ entity_url('program', id=program.id) }}">
+  {% call entity_form(entity_url('program', id=program.id) ) %}
     {% call form_section("Identity") %}
       {{ entity_select_field("org_id", "Organization", organizations, current=program.org_id, help=org_picker_help() ) }}
       {{ text_field("name", "Name", current=program.name) }}
@@ -29,5 +30,5 @@
     delete_url=entity_url('program', id=program.id),
     delete_confirm="Delete this program?",
     ) }}
-  </form>
+  {% endcall %}
 {% endblock %}

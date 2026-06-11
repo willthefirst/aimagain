@@ -1,5 +1,6 @@
 {% extends "views/form_edit.html" %}
 {%- from "_shared/form_fields.html" import form_section, text_field -%}
+{%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import npi_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Clinicians{% endblock %}
@@ -28,12 +29,12 @@
    `/clinicians/{id}/<sub>` (#1335); the detail page at
    `/clinicians/{id}` is a picker that links into them. This edit form
    is the one place name + NPI get patched. #}
-  <form hx-patch="{{ entity_url('clinician', id=clinician.id) }}">
+  {% call entity_form(entity_url('clinician', id=clinician.id) ) %}
     {% call form_section("Clinician") %}
       {{ text_field("first_name", "First name", current=clinician.first_name, maxlength=120) }}
       {{ text_field("last_name", "Last name", current=clinician.last_name, maxlength=120) }}
       {{ text_field("npi", "NPI", current=clinician.npi, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
     {{ actions("Save changes", cancel_url=entity_url('clinician', id=clinician.id) ) }}
-  </form>
+  {% endcall %}
 {% endblock %}
