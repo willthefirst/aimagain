@@ -8,12 +8,17 @@ list handler and its factory, originally in `handlers.py`.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from uuid import UUID
 
 from fastapi import Request
 
 from src.framework.access.actor.actor import Actor
 from src.framework.access.authz.authz import is_admin
-from src.framework.dispatch.mounts._common import call_handler_with
+from src.framework.dispatch.mounts._common import (
+    call_handler_with,
+    parent_path_param_pairs,
+    path_segments_under_router,
+)
 from src.framework.dispatch.mounts._spec import QueryParam, ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
 from src.framework.dispatch.pagination import (
@@ -67,16 +72,17 @@ def mount_list(
     ``requesting_user: User | None`` so the synthesis can pass ``None``
     for anonymous viewers.
     """
-    if spec.parent is not None:
-        raise NotImplementedError(
-            "mount_list with spec.parent is not supported yet "
-            "(slice 8 / #253). Use mount_related_list for child collections."
-        )
     if spec.list_template is None:
         raise ValueError(
             f"mount_list requires {spec.collection!r} to set list_template."
         )
     list_template = spec.list_template
+    # Path is computed relative to the router prefix (which is the topmost
+    # ancestor's collection). For a top-level spec that's `""`; for a
+    # parent-owned spec the chain segment `/{parent_id}/<collection>`
+    # is prepended (mirrors the per-verb mounts in create / update / delete).
+    path = path_segments_under_router(spec, with_id=False)
+    parent_id_names = tuple(p[0] for p in parent_path_param_pairs(spec))
 
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
@@ -96,10 +102,11 @@ def mount_list(
         options=SynthOptions(
             user_dep=user_dep,
             query_params=query_params,
+            path_param_names=parent_id_names,
         ),
         response_builder=response_builder,
     )
-    router.get("")(route_fn)
+    router.get(path)(route_fn)
 
 
 def _active_filter_descriptors(
@@ -142,6 +149,7 @@ async def handle_list(
     repo: BaseRepository,
     requesting_user: Actor | None,
     filter_values: dict[str, Any],
+    parent_id: UUID | None = None,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -188,6 +196,14 @@ async def handle_list(
         list_kwargs[column] = user_kinds or list(spec.discriminator_values)
     if spec.list_exclude_self and requesting_user is not None:
         list_kwargs["exclude_self"] = requesting_user
+    # For parent-owned specs, the parent_id path param scopes the listing
+    # to children belonging to that parent. Threaded into list_kwargs so
+    # the bespoke `list_<collection>` method can use it as a filter.
+    # list_default doesn't know about parent_id; specs without a bespoke
+    # listing path that opt into list=True must also supply a custom
+    # handler — checked below.
+    if parent_id is not None:
+        list_kwargs[spec.parent.id_param] = parent_id
     list_kwargs["offset"] = offset_for(page_number, per_page)
     list_kwargs["limit"] = per_page + 1
     # Stamp the viewer onto the repo so bespoke ``list_<collection>``
@@ -202,6 +218,15 @@ async def handle_list(
     if list_method is not None:
         items_plus_one = await list_method(**list_kwargs)
     else:
+        if spec.parent is not None:
+            raise ValueError(
+                f"handle_list: spec {spec.name!r} has parent "
+                f"{spec.parent.name!r} but no bespoke "
+                f"list_{spec.url_collection!s}() method on the repo — "
+                "list_default doesn't know how to scope by parent_id. "
+                f"Either add list_{spec.url_collection!s}() or supply a "
+                "custom list handler via handlers['list']."
+            )
         if spec.list_order_by is None:
             raise ValueError(
                 f"handle_list: spec {spec.name!r} has no list_order_by and "
