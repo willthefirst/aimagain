@@ -180,6 +180,13 @@ def _make_cr_post(**detail_overrides):
         accepts_out_of_network_superbill=False,
         accepts_private_pay=False,
         insurance_carriers=["anthem_bcbs"],
+        # CR-only matching-dimension lists (#1358 PR-a/b/c). Default
+        # empty so tests that don't care about matching-dimension
+        # surfacing don't have to override; tests that do pin
+        # their own values.
+        affirming_identities=[],
+        acceptable_license_types=[],
+        clinical_niches=[],
     )
     defaults.update(detail_overrides)
     return SimpleNamespace(
@@ -394,6 +401,45 @@ def test_view_cr_subject_none_when_absent():
     """No subject on the detail row → `subject` key is None in view."""
     v = post_card_view(_make_cr_post(subject=None))
     assert v["subject"] is None
+
+
+def test_view_cr_matching_dimensions_default_empty():
+    """CR matching-dimension lists (#1358 PR-a/b/c) propagate as empty
+    lists when the detail row has none set, matching the schema's
+    column-default of `[]`. Templates iterate them via `{% if view.x %}`
+    so an empty list cleanly suppresses the row."""
+    v = post_card_view(_make_cr_post())
+    assert v["affirming_identities"] == []
+    assert v["acceptable_license_types"] == []
+    assert v["clinical_niches"] == []
+
+
+def test_view_cr_matching_dimensions_round_trip():
+    """When the CR detail row carries matching-dimension tokens, the
+    view-model surfaces them as plain Python lists so the facts block
+    can label-lookup (`AFFIRMING_IDENTITY_LABELS`, `LICENSE_TYPES_LABELS`)
+    and join. `clinical_niches` is free-form so values pass through
+    unchanged."""
+    v = post_card_view(
+        _make_cr_post(
+            affirming_identities=["lgbtq", "trans"],
+            acceptable_license_types=["md", "pmhnp"],
+            clinical_niches=["DGBI", "ADHD in women"],
+        )
+    )
+    assert v["affirming_identities"] == ["lgbtq", "trans"]
+    assert v["acceptable_license_types"] == ["md", "pmhnp"]
+    assert v["clinical_niches"] == ["DGBI", "ADHD in women"]
+
+
+def test_view_pa_matching_dimensions_empty_for_other_kinds():
+    """Matching-dimension keys are CR-only; PA/program populate the
+    view-model with empty lists so templates iterate uniformly without
+    branching on `view.kind`."""
+    v = post_card_view(_make_pa_post())
+    assert v["affirming_identities"] == []
+    assert v["acceptable_license_types"] == []
+    assert v["clinical_niches"] == []
 
 
 # --- post_card_view: opening ------------------------------

@@ -299,6 +299,11 @@ def post_card_view(post) -> dict[str, Any]:
             detail row; ``None`` for other kinds.
         insurance_carriers: CR-only list of carrier tokens; empty list
             for CR with no carriers specified, ``[]`` for other kinds.
+        affirming_identities / acceptable_license_types /
+        clinical_niches: CR-only matching-dimension lists (#1358 PR-a/b/c).
+            Raw token lists (free-form `str` for `clinical_niches`);
+            empty list both for CR with none specified and for other
+            kinds, so templates iterate uniformly via ``{% if view.x %}``.
         in_network_carriers / accepts_out_of_network: PA-only raw
             values from the linked Clinician. ``in_network_carriers``
             comes back as an empty list when unset, matching the
@@ -342,6 +347,12 @@ def post_card_view(post) -> dict[str, Any]:
         "insurance_carriers": [],
         "in_network_carriers": [],
         "accepts_out_of_network": None,
+        # CR-only matching-dimension lists (#1358 PR-a/b/c). Default
+        # empty so the detail-page facts block can iterate them
+        # uniformly across kinds via `{% if view.x %}`.
+        "affirming_identities": [],
+        "acceptable_license_types": [],
+        "clinical_niches": [],
         "referral": None,
     }
 
@@ -379,6 +390,14 @@ def post_card_view(post) -> dict[str, Any]:
             ),
             accepts_private_pay=getattr(d, "accepts_private_pay", None),
             insurance_carriers=list(getattr(d, "insurance_carriers", None) or []),
+            # CR-only matching-dimension lists (#1358 PR-a/b/c). The
+            # detail-page facts block surfaces these on the expanded
+            # view; empty list = "no preference / no constraint".
+            affirming_identities=list(getattr(d, "affirming_identities", None) or []),
+            acceptable_license_types=list(
+                getattr(d, "acceptable_license_types", None) or []
+            ),
+            clinical_niches=list(getattr(d, "clinical_niches", None) or []),
         )
         return base
 
