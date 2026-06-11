@@ -1,5 +1,5 @@
 {% extends "views/detail.html" %}
-{%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/actions.html" import actions, favorite_toggle -%}
 {%- from "_shared/_locked.html" import locked_name -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- set view = clinician_card_view(clinician) -%}
@@ -47,22 +47,7 @@
    authorization predicates inline. Each action is a `<li>` because
    the toolbar's right zone is a `<menu class="toolbar-right">` of
    commands. #}
-  {% if is_authenticated %}
-    {% if is_favorited %}
-      <li>
-        <button type="button"
-                class="secondary outline"
-                hx-delete="{{ entity_url('user_favorite', id=clinician.id) }}"
-                hx-confirm="Remove this clinician from your favorites?">Unfavorite</button>
-      </li>
-    {% else %}
-      <li>
-        <button type="button"
-                class="outline"
-                hx-post="{{ entity_url('user_favorite', id=clinician.id) }}">Favorite</button>
-      </li>
-    {% endif %}
-  {% endif %}
+  {% if is_authenticated %}{{ favorite_toggle(clinician.id, is_favorited) }}{% endif %}
   {% if can_edit %}
     {{ actions(wrapper="toolbar",
         edit_url=entity_form_url('clinician', id=clinician.id) ,
