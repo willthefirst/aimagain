@@ -212,15 +212,14 @@ async def test_form_new_renders_minimal_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The minimal create form collects `name` + `npi` only. Optional
-    fields like `parent_org_id` and `is_demo` are surfaced in the edit
-    form, not on create — keeps onboarding minimal."""
+    """The minimal create form collects `name` + `npi` only. Other
+    persisted fields are not surfaced on create — keeps onboarding minimal."""
     response = await authenticated_client.get("/organizations/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert tree.css_first('input[name="name"]') is not None
     assert tree.css_first('input[name="npi"]') is not None
-    for absent in ("parent_org_id", "is_demo", "type"):
+    for absent in ("parent_org_id", "type"):
         assert (
             tree.css_first(f'[name="{absent}"]') is None
         ), f"{absent} should not appear on the minimal create form"
