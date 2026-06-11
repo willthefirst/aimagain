@@ -1,0 +1,65 @@
+{# Shared form-body macro for affiliation create + edit.
+
+   Every field is optional. Org = "(Solo practice)" → `org_id` posts
+   blank → schema coerces to None → solo affiliation row. Location /
+   sessions left blank → NULLs on the new row; the user can fill them
+   in via a subsequent edit.
+
+   Args:
+     action_url, method, submit_label, cancel_url, delete_url,
+     delete_confirm, current — same contract as
+     `licensures/_form_licensure.html::licensure_form`.
+     orgs — list of organizations for the picker. Required (the
+     handler injects it via context).
+#}
+{%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field, multi_select_field, entity_select_field, form_section with context -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
+{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/actions.html" import actions -%}
+{% macro affiliation_form(action_url, method, submit_label, cancel_url, orgs, delete_url=None, delete_confirm=None, current=None) -%}
+  <div class="entity-form-page">
+    {% call entity_form(action_url, method=method) %}
+      {% call form_section(submit_label) %}
+        {{ entity_select_field("org_id", "Organization", orgs,
+                required=false,
+                current=(current.org_id if current else None) ,
+        blank_label="(Solo practice — no organization)",
+        help=org_picker_help()) }}
+        {{ text_field("location_city", "City", required=false,
+                current=(current.location_city if current else None) ,
+        maxlength=120) }}
+        {{ select_field("location_state", "State", US_STATES,
+                current=(current.location_state if current else None) ,
+        required=false, placeholder=true) }}
+        {{ text_field("location_zip", "ZIP",
+                current=(current.location_zip if current else None) ,
+        required=false, pattern="\\d{5}", maxlength=5) }}
+        {{ select_field("in_person_sessions", "In-person sessions",
+                LOCATION_AVAILABILITY_OPTIONS,
+                labels=LOCATION_AVAILABILITY_LABELS,
+                current=(current.in_person_sessions if current else None) ,
+        required=false, placeholder=true) }}
+        {{ select_field("virtual_sessions", "Virtual sessions",
+                LOCATION_AVAILABILITY_OPTIONS,
+                labels=LOCATION_AVAILABILITY_LABELS,
+                current=(current.virtual_sessions if current else None) ,
+        required=false, placeholder=true) }}
+        {{ multi_select_field("in_network_carriers", "In-network carriers",
+                INSURANCE_CARRIERS,
+                labels=INSURANCE_CARRIER_LABELS,
+                current=(current.in_network_carriers if current else None) ) }}
+        {{ checkbox_field("accepts_out_of_network",
+                "Accepts out-of-network patients",
+                current=(current.accepts_out_of_network if current else true) ) }}
+        {{ checkbox_field("sliding_scale", "Offers sliding scale",
+                current=(current.sliding_scale if current else false) ) }}
+        {{ text_field("cost", "Cost", required=false,
+                current=(current.cost if current else None) ) }}
+      {% endcall %}
+      {{ actions(submit_label,
+            cancel_url=cancel_url,
+            delete_url=delete_url,
+            delete_confirm=delete_confirm) }}
+    {% endcall %}
+  </div>
+{%- endmacro %}

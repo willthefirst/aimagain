@@ -1,4 +1,5 @@
 from src.domain.logic.clinicians.handlers import (
+    handle_list_clinician_affiliations,
     handle_list_clinician_certifications,
     handle_list_clinician_educations,
     handle_list_clinician_licensures,
@@ -39,5 +40,6 @@ mount_entity(
         "clinician_licensure.list": handle_list_clinician_licensures,
         "clinician_education.list": handle_list_clinician_educations,
         "clinician_certification.list": handle_list_clinician_certifications,
+        "clinician_affiliation.list": handle_list_clinician_affiliations,
     },
 )

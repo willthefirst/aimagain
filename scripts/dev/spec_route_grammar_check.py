@@ -47,12 +47,6 @@ from dataclasses import dataclass
 # PR for that resource ships.
 ALLOWLIST: frozenset[str] = frozenset(
     {
-        # The remaining clinician sub-resource (affiliations) predates
-        # parent-aware mount_list / mount_form. PRs 2 + 3 converted
-        # licensure / education / certification (they share
-        # `make_clinician_credential_entity`); affiliations land last
-        # (different spec shape).
-        "clinician_affiliation",
         # `org_representation` is a headless resource: a User↔Org
         # authority carrier mutated via JSON-only mutations from
         # affordances embedded on `/organizations/{id}` and
