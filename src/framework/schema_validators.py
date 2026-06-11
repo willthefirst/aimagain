@@ -86,6 +86,47 @@ def scalar_to_list(v):
     return v
 
 
+def clean_free_form_tags(v):
+    """Normalize a list-of-strings tag field for free-form vocabularies.
+
+    Accepts either a scalar string (single comma-separated tag input or
+    a one-element checkbox group — same shape `scalar_to_list` handles)
+    or a list. Strips each element; drops empty/whitespace-only entries;
+    preserves order; deduplicates by first occurrence so a UI that
+    accidentally submits ``["trauma", "trauma"]`` collapses to one tag.
+    Non-string members are left untouched so Pydantic's per-member
+    ``str`` check still 422s them downstream.
+
+    Used by free-form-tag fields (e.g. `Clinician.clinical_niches`,
+    `ReferralDetail.clinical_niches`) where the vocabulary is open and
+    `Literal[*TUPLE]` would be premature. Each schema layers a per-element
+    ``str`` check over the shared coercion:
+
+        MyField = Annotated[
+            list[str],
+            BeforeValidator(clean_free_form_tags),
+        ]
+    """
+    if isinstance(v, str):
+        v = [v]
+    if not isinstance(v, list):
+        return v
+    seen: set[str] = set()
+    out: list = []
+    for item in v:
+        if isinstance(item, str):
+            stripped = item.strip()
+            if not stripped:
+                continue
+            if stripped in seen:
+                continue
+            seen.add(stripped)
+            out.append(stripped)
+        else:
+            out.append(item)
+    return out
+
+
 # --- Annotated field types ----------------------------------------------
 #
 # Attach the cleaning rule to the field's type, not to a per-class

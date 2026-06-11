@@ -267,6 +267,46 @@ def test_post_create_referral_rejects_unknown_license_type():
         )
 
 
+def test_post_create_referral_defaults_clinical_niches_to_empty_list():
+    """`clinical_niches` is optional on the wire; empty list is the
+    default (no niche-specific constraint)."""
+    payload = referral_payload()
+    payload.pop("clinical_niches", None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.clinical_niches == []
+
+
+def test_post_create_referral_accepts_clinical_niches_list():
+    p = post_create_adapter.validate_python(
+        referral_payload(clinical_niches=["DGBI", "ADHD in women"])
+    )
+    assert p.clinical_niches == ["DGBI", "ADHD in women"]
+
+
+def test_post_create_referral_coerces_scalar_clinical_niche_to_list():
+    """Single-value tag submits as a bare string; `clean_free_form_tags`
+    wraps it in a one-element list before per-member `str` validation."""
+    p = post_create_adapter.validate_python(referral_payload(clinical_niches="DGBI"))
+    assert p.clinical_niches == ["DGBI"]
+
+
+def test_post_create_referral_strips_and_drops_empty_clinical_niches():
+    """Free-form tags: stripped on the wire, empty/whitespace-only
+    entries dropped silently."""
+    p = post_create_adapter.validate_python(
+        referral_payload(clinical_niches=["  DGBI  ", "", "   ", "catatonia"])
+    )
+    assert p.clinical_niches == ["DGBI", "catatonia"]
+
+
+def test_post_create_referral_dedupes_clinical_niches():
+    """Duplicate-tag submissions collapse to first-occurrence order."""
+    p = post_create_adapter.validate_python(
+        referral_payload(clinical_niches=["DGBI", "catatonia", "DGBI"])
+    )
+    assert p.clinical_niches == ["DGBI", "catatonia"]
+
+
 def test_post_create_referral_rejects_invalid_zip():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(referral_payload(location_zip="abc"))

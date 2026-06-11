@@ -713,6 +713,25 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Seed vocabulary for `clinical_niches` — free-form on the wire (#1358
+# PR-c) but the seed generator still needs a believable subset to draw
+# from. Sourced from the referral-email corpus in #1355; promote into a
+# `Literal[*ENUM]` once usage stabilizes.
+CLINICAL_NICHES_SEED: Final[tuple[str, ...]] = (
+    "DGBI",
+    "catatonia",
+    "ADHD in women",
+    "complex trauma",
+    "psychedelic-knowledgeable",
+    "minor consent",
+    "perinatal mood",
+    "eating disorders",
+    "OCD",
+    "couples and family",
+    "first-episode psychosis",
+    "TBI",
+)
+
 # JSON-list columns → which enum to subset over. Most JSON columns
 # carry a vocabulary referenced from `enums.py`; the generator can't
 # infer the link from the column itself, so we declare it explicitly.
@@ -727,6 +746,9 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "in_network_carriers": INSURANCE_CARRIERS,
     "affirming_identities": AFFIRMING_IDENTITIES,
     "acceptable_license_types": LICENSE_TYPES,
+    # Free-form on the wire — the seed subset above is realism only,
+    # not a closed vocabulary. See `CLINICAL_NICHES_SEED` above.
+    "clinical_niches": CLINICAL_NICHES_SEED,
     "flags": (  # Verification.flags — free-form bag of strings
         "name_mismatch",
         "nppes_inactive",

@@ -90,6 +90,9 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     # Default to "no constraint" — most tests don't care about
     # license-class restriction; tests that do override.
     "acceptable_license_types": [],
+    # Default to "no niche tags" — most tests don't care about clinical-
+    # niche match; tests that do override. Free-form `list[str]`.
+    "clinical_niches": [],
     # FK fields: always None here. Add stub string UUIDs to _REFERRAL_WIRE_DEFAULTS instead.
     "referring_clinician_id": None,
 }

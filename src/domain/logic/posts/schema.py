@@ -75,6 +75,7 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
+    clean_free_form_tags,
     scalar_to_list,
 )
 
@@ -162,6 +163,14 @@ AffirmingIdentitiesField = Annotated[
 AcceptableLicenseTypesField = Annotated[
     list[Literal[*LICENSE_TYPES]], BeforeValidator(scalar_to_list)
 ]
+# `referral.clinical_niches` — free-form tag list. Symmetric to
+# `Clinician.clinical_niches` on the provider side. Deliberately NOT an
+# enum (#1358 PR-c): the corpus shows the niche vocabulary
+# ("DGBI", "ADHD in women", "psychedelic-knowledgeable", "complex trauma")
+# is too open-ended to commit to a closed `Literal` on day one. Tags are
+# stripped non-empty strings; empty/whitespace entries are dropped and
+# duplicates collapsed by `clean_free_form_tags`.
+ClinicalNichesField = Annotated[list[str], BeforeValidator(clean_free_form_tags)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -239,6 +248,9 @@ class ReferralRead(_PostReadBase):
     # `LICENSE_TYPES` tokens; empty list = "no constraint" (any license
     # class accepted).
     acceptable_license_types: AcceptableLicenseTypesField = []
+    # Clinical-niche request tags — free-form (see `ClinicalNichesField`).
+    # Empty list = no niche-specific constraint.
+    clinical_niches: ClinicalNichesField = []
     # FK to the Clinician the submitting user designated as referrer.
     # Nullable on the read side — rows created before this field existed
     # will have None here.
@@ -363,6 +375,11 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # License-class disjunction on the referred provider. Multi-checkbox
     # on the wire; empty list = "no constraint" (the default).
     acceptable_license_types: AcceptableLicenseTypesField = []
+    # Clinical-niche request tags — free-form (see `ClinicalNichesField`
+    # for the simplicity rationale). Empty list (default) = no niche-
+    # specific constraint stated. Tags are stripped on the wire;
+    # empty/duplicate entries are dropped.
+    clinical_niches: ClinicalNichesField = []
     # Context: which ClinicianAffiliation the referring clinician acts
     # under. This is what the form's practice picker submits (one option
     # per affiliation). Required on new referrals. The server resolves
@@ -511,6 +528,9 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # List-valued PATCH replaces the whole list, matching `services` /
     # `affirming_identities` semantics.
     acceptable_license_types: AcceptableLicenseTypesField | None = None
+    # `None` = leave unchanged; `[]` = clear all tags. Same list-replace
+    # semantics as `affirming_identities`.
+    clinical_niches: ClinicalNichesField | None = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `referring_clinician_id` from it (and re-checks
     # ownership of the resolved clinician) in `_assert_post_payload_authz`.
@@ -620,6 +640,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     insurance_carrier: OptionalInsuranceCarrier = None
     affirming_identities: AffirmingIdentitiesField = []
     acceptable_license_types: AcceptableLicenseTypesField = []
+    clinical_niches: ClinicalNichesField = []
     referring_clinician_id: uuid.UUID | None = None
     clinician_affiliation_id: uuid.UUID | None = None
 

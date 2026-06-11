@@ -22,6 +22,7 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
+    clean_free_form_tags,
     scalar_to_list,
 )
 
@@ -281,3 +282,70 @@ def test_scalar_to_list_rejects_invalid_member_after_lifting():
 
     with pytest.raises(ValidationError):
         _Checkboxes(choices="z")
+
+
+# --- clean_free_form_tags -----------------------------------------------
+#
+# The free-form-tag normalizer used by `clinical_niches` on both sides
+# of the referral. Open vocabulary (no `Literal[*TUPLE]`); the helper
+# handles the same scalar-lift idiom as `scalar_to_list` and adds strip /
+# drop-empty / dedupe.
+
+
+def _tags_field():
+    """A minimal schema exercising `clean_free_form_tags` over `list[str]`."""
+
+    class _Tagged(WirePayload):
+        tags: Annotated[list[str], BeforeValidator(clean_free_form_tags)] = []
+
+    return _Tagged
+
+
+def test_clean_free_form_tags_passes_clean_list_through():
+    _Tagged = _tags_field()
+    assert _Tagged(tags=["DGBI", "catatonia"]).tags == ["DGBI", "catatonia"]
+
+
+def test_clean_free_form_tags_lifts_scalar_string_to_list():
+    """Single-tag input lands as a bare string — the helper wraps it
+    just like `scalar_to_list` does for closed-vocab checkboxes."""
+    _Tagged = _tags_field()
+    assert _Tagged(tags="DGBI").tags == ["DGBI"]
+
+
+def test_clean_free_form_tags_strips_each_member():
+    _Tagged = _tags_field()
+    assert _Tagged(tags=["  DGBI ", "catatonia\t"]).tags == ["DGBI", "catatonia"]
+
+
+def test_clean_free_form_tags_drops_empty_and_whitespace_only_members():
+    """Don't 422 the whole submission for an accidental blank — drop
+    silently so a sloppy form post still validates."""
+    _Tagged = _tags_field()
+    assert _Tagged(tags=["DGBI", "", "   ", "catatonia"]).tags == [
+        "DGBI",
+        "catatonia",
+    ]
+
+
+def test_clean_free_form_tags_dedupes_preserving_first_occurrence():
+    _Tagged = _tags_field()
+    assert _Tagged(tags=["DGBI", "catatonia", "DGBI", "catatonia"]).tags == [
+        "DGBI",
+        "catatonia",
+    ]
+
+
+def test_clean_free_form_tags_empty_list_default():
+    """`[]` is the field default and a valid explicit value."""
+    _Tagged = _tags_field()
+    assert _Tagged().tags == []
+    assert _Tagged(tags=[]).tags == []
+
+
+def test_clean_free_form_tags_leaves_non_string_members_for_pydantic_to_reject():
+    """The helper only normalizes strings — non-string members pass
+    through unchanged so Pydantic's per-member `str` check still 422s."""
+    _Tagged = _tags_field()
+    with pytest.raises(ValidationError):
+        _Tagged(tags=["DGBI", 42])

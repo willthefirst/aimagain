@@ -389,6 +389,89 @@ def test_clinician_read_round_trips_affirming_identities():
     assert p.affirming_identities == ["lgbtq", "neurodiversity"]
 
 
+# --- Clinical-niche (free-form tags) ------------------------------------
+
+
+def test_clinician_update_accepts_clinical_niches_patch():
+    """`clinical_niches` is a free-form `list[str]` on the person-level
+    Update — clinicians self-claim niches like "DGBI" or "ADHD in
+    women". Empty list and populated list both validate; `None` (omitted)
+    means "leave unchanged" per `PartialUpdate` semantics."""
+    upd = ClinicianUpdate(clinical_niches=["DGBI", "complex trauma"])
+    assert upd.clinical_niches == ["DGBI", "complex trauma"]
+
+
+def test_clinician_update_accepts_empty_clinical_niches():
+    """Explicit empty list = clear the niche list. Distinct from `None`
+    (omitted = leave unchanged)."""
+    upd = ClinicianUpdate(clinical_niches=[])
+    assert upd.clinical_niches == []
+
+
+def test_clinician_update_coerces_scalar_clinical_niche_to_list():
+    """Single-value tag input lands as a scalar string — the shared
+    `clean_free_form_tags` validator wraps it in a one-element list
+    before per-member `str` validation."""
+    upd = ClinicianUpdate(clinical_niches="DGBI")
+    assert upd.clinical_niches == ["DGBI"]
+
+
+def test_clinician_update_strips_and_drops_empty_clinical_niches():
+    """Free-form tags are stripped; empty/whitespace-only entries are
+    dropped silently rather than 422'ing the whole submission."""
+    upd = ClinicianUpdate(clinical_niches=["  DGBI ", "", "   ", "catatonia"])
+    assert upd.clinical_niches == ["DGBI", "catatonia"]
+
+
+def test_clinician_update_dedupes_clinical_niches():
+    """A UI that accidentally submits the same tag twice should collapse
+    to one entry — preserve first-occurrence order."""
+    upd = ClinicianUpdate(clinical_niches=["DGBI", "catatonia", "DGBI"])
+    assert upd.clinical_niches == ["DGBI", "catatonia"]
+
+
+def test_clinician_create_rejects_clinical_niches_on_create():
+    """Create stays minimal: niches are claim-management, set later via
+    PATCH (mirrors `affirming_identities`)."""
+    with pytest.raises(ValidationError, match="extra"):
+        ClinicianCreate(**_VALID_CREATE, clinical_niches=["DGBI"])
+
+
+def test_clinician_read_defaults_clinical_niches_to_empty_list():
+    """A row with no niches reads as `[]`, matching the column's
+    server-side default."""
+    now = _now()
+    p = ClinicianRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+        }
+    )
+    assert p.clinical_niches == []
+
+
+def test_clinician_read_round_trips_clinical_niches():
+    now = _now()
+    p = ClinicianRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+            "clinical_niches": ["DGBI", "ADHD in women"],
+        }
+    )
+    assert p.clinical_niches == ["DGBI", "ADHD in women"]
+
+
 # --- Insurance carrier label guardrail ----------------------------------
 
 

@@ -60,6 +60,7 @@ from src.framework.schema_validators import (
     ReadProjection,
     StrippedText,
     WirePayload,
+    clean_free_form_tags,
     scalar_to_list,
 )
 
@@ -70,6 +71,15 @@ from src.framework.schema_validators import (
 AffirmingIdentitiesField = Annotated[
     list[Literal[*AFFIRMING_IDENTITIES]], BeforeValidator(scalar_to_list)
 ]
+
+# Clinical-niche tags — free-form vocabulary on the provider side
+# (#1358 PR-c). Symmetric to `ReferralDetail.clinical_niches`.
+# Deliberately NOT an enum: the corpus vocabulary ("DGBI", "ADHD in
+# women", "psychedelic-knowledgeable", "complex trauma") is too
+# open-ended to commit to `Literal[*ENUM]` on day one; promote heavily-
+# used tags later. `clean_free_form_tags` strips, drops empties, and
+# deduplicates.
+ClinicalNichesField = Annotated[list[str], BeforeValidator(clean_free_form_tags)]
 
 _NPI_RE = re.compile(r"^[0-9]{10}$")
 
@@ -244,6 +254,10 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     # tokens; person-level (lives directly on the clinician, not on an
     # affiliation). Empty list = "none stated".
     affirming_identities: AffirmingIdentitiesField = []
+    # Clinical-niche claims — free-form tag list. Empty list = no
+    # niches stated. See `ClinicalNichesField` for the simplicity
+    # rationale (tagged free-text now; promote to enum later).
+    clinical_niches: ClinicalNichesField = []
     licensures: list[ClinicianLicensureRead] = []
     educations: list[ClinicianEducationRead] = []
     certifications: list[ClinicianCertificationRead] = []
@@ -289,6 +303,9 @@ class ClinicianUpdate(PartialUpdate):
     # semantic); `[]` = clear all claims. List-valued PATCH replaces the
     # whole list — partial add/remove is intentionally out of scope.
     affirming_identities: AffirmingIdentitiesField | None = None
+    # Same partial-update semantics as `affirming_identities` above:
+    # `None` = leave unchanged, `[]` = clear all tags, list = replace.
+    clinical_niches: ClinicalNichesField | None = None
 
 
 # --- Admin verification-state axis ---------------------------------------

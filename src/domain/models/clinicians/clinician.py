@@ -78,6 +78,19 @@ class Clinician(BaseModel):
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
 
+    # Clinical-niche tags — free-form vocabulary (#1358 PR-c). Examples
+    # from the referral corpus: "DGBI", "catatonia", "ADHD in women",
+    # "psychedelic-knowledgeable", "minor consent", "complex trauma".
+    # Person-level (the niche moves with the clinician across affiliations),
+    # symmetric to `ReferralDetail.clinical_niches` on the request side.
+    # Deliberately NOT an enum — the vocabulary is too open-ended on day
+    # one; we plan to promote heavily-used tags to `Literal[*ENUM]` once
+    # usage patterns stabilize. Each tag is a stripped non-empty string;
+    # no SQL CHECK against array members (vocabulary is open).
+    clinical_niches = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+
     # NPPES Type-1 match state. Source-of-truth field for Claim A: the
     # `verifications` table is the event log; this column is the cache
     # `capabilities.clinician_verified(user)` reads. `none` = no NPI
