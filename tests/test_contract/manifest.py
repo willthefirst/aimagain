@@ -125,9 +125,13 @@ CONTRACT_PAIRS: list[ContractPair] = [
     # this form's per-role fields (`location_*`, sessions, insurance,
     # `sliding_scale`, `cost`) write through Clinician per-role property
     # proxies to the primary (oldest) affiliation row — the wire shape
-    # is unchanged. The sub-resource PATCH endpoint
-    # `PATCH /clinicians/{id}/clinician_affiliations/{aff_id}` exists but has no
-    # consumer UI today, so it is intentionally not contract-tested.
+    # is unchanged. The sub-resource POST / PATCH endpoints
+    # `POST /clinicians/{id}/clinician_affiliations` and
+    # `PATCH /clinicians/{id}/clinician_affiliations/{aff_id}` have their own
+    # consumer UI (canonical-pattern conversion #1402; profile fields surfaced
+    # in #1358 PR-f UI), but the wire round-trip is already covered by the
+    # route tests in `src/domain/routes/test_clinicians.py`; adding a Pact
+    # pair for them is deferred until a new HTTP client is involved.
     ContractPair(
         consumer_name="clinician-edit-form",
         provider_name="clinicians-api",

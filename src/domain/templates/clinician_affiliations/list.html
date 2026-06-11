@@ -23,21 +23,46 @@
 {% block list_body %}
   <section>
     {% call(aff) credential_list(rows, "No practices yet.") %}
-      {%- set meta_parts = [
-            aff.location_city,
-            aff.location_state,
-            aff.location_zip,
-            ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
-            ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
-            ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
-            "Out-of-network OK" if aff.accepts_out_of_network else None,
-            "Sliding scale" if aff.sliding_scale else None,
-            aff.cost,
-            ] -%}
-      {{ credential_row((aff.org.name if aff.org else "Solo practice") ,
-      meta_parts,
-      href=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string ~ "/form",
-      ) }}
-    {% endcall %}
-  </section>
-{% endblock %}
+      {#- Steady-state-profile parts (#1358 PR-f UI). Multi-selects are
+         joined as comma-separated human-readable labels via the
+         registered choice-label dicts; empty lists / NULLs suppress
+         their own meta entry via the `credential_row` falsy filter.
+         `currently_accepting_new_patients` surfaces as an explicit
+         "Accepting new patients" badge — it's the denormalized cache
+         flipped server-side by the OpeningDetail lifecycle, not
+         user-editable. -#}
+      {%- set _svc_labels = [] -%}
+      {%- for s in (aff.services or []) -%}{%- set _ = _svc_labels.append(REFERRAL_SERVICE_LABELS[s]) -%}{%- endfor -%}
+        {%- set _setting_labels = [] -%}
+        {%- for s in (aff.settings or []) -%}{%- set _ = _setting_labels.append(TREATMENT_SETTINGS_LABELS[s]) -%}{%- endfor -%}
+          {%- set _mod_labels = [] -%}
+          {%- for m in (aff.modalities or []) -%}{%- set _ = _mod_labels.append(TREATMENT_MODALITY_LABELS[m]) -%}{%- endfor -%}
+            {%- set _age_labels = [] -%}
+            {%- for g in (aff.age_groups or []) -%}{%- set _ = _age_labels.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+              {%- set _gender_labels = [] -%}
+              {%- for g in (aff.genders or []) -%}{%- set _ = _gender_labels.append(GENDER_LABELS[g]) -%}{%- endfor -%}
+                {%- set meta_parts = [
+                                ("Accepting new patients" if aff.currently_accepting_new_patients else None) ,
+                                aff.location_city,
+                                aff.location_state,
+                                aff.location_zip,
+                                ("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) if aff.in_person_sessions else None,
+                                ("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) if aff.virtual_sessions else None,
+                                ("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) if aff.in_network_carriers else None,
+                                "Out-of-network OK" if aff.accepts_out_of_network else None,
+                                "Sliding scale" if aff.sliding_scale else None,
+                                aff.cost,
+                                ("Services: " ~ (_svc_labels | join(', '))) if _svc_labels else None,
+                                ("Settings: " ~ (_setting_labels | join(', '))) if _setting_labels else None,
+                                ("Modalities: " ~ (_mod_labels | join(', '))) if _mod_labels else None,
+                                ("Ages: " ~ (_age_labels | join(', '))) if _age_labels else None,
+                                ("Genders: " ~ (_gender_labels | join(', '))) if _gender_labels else None,
+                                aff.website,
+                                ] -%}
+                {{ credential_row((aff.org.name if aff.org else "Solo practice") ,
+                meta_parts,
+                href=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string ~ "/form",
+                ) }}
+              {% endcall %}
+            </section>
+          {% endblock %}
