@@ -67,7 +67,7 @@ def _prefix(spec: "EntitySpec") -> str:
     )
 
 
-def url_for_spec(spec: "EntitySpec", *, id: Any = None) -> str:
+def url_for_spec(spec: "EntitySpec", *, id: Any = None, parent_id: Any = None) -> str:
     """Spec-direct form of `entity_url` — same path resolution, no
     registry lookup.
 
@@ -76,8 +76,26 @@ def url_for_spec(spec: "EntitySpec", *, id: Any = None) -> str:
     context. Routing through the spec directly lets handler tests with
     synthetic (unregistered) specs round-trip without registering them
     with `entity_registry` first.
+
+    For a parent-owned spec, ``parent_id`` is required and the returned
+    URL walks the parent chain: ``/<parent.url_collection>/<parent_id>/
+    <spec.url_collection>[/{id}]``. Today's parent chains are one deep
+    (a credential under a clinician); the helper raises if asked to
+    construct a URL for a deeper chain without a richer signature.
     """
     prefix = _prefix(spec)
+    if spec.parent is not None:
+        if parent_id is None:
+            raise ValueError(
+                f"url_for_spec({spec.name!r}): spec has parent "
+                f"{spec.parent.name!r} but no parent_id was supplied."
+            )
+        if spec.parent.parent is not None:
+            raise NotImplementedError(
+                f"url_for_spec({spec.name!r}): only one-deep parent "
+                "chains are supported (need richer kwargs for grandparents)."
+            )
+        prefix = f"{_prefix(spec.parent)}/{parent_id}{prefix}"
     if id is None:
         return prefix
     return f"{prefix}/{id}"

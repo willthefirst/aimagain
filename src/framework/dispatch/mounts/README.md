@@ -13,8 +13,15 @@ Per-verb modules (each defines exactly one `mount_*` function):
 - `delete.py` — `DELETE /<collection>/{id}`
 - `detail.py` — `GET /<collection>/{id}`
 - `list_.py` — `GET /<collection>` (underscored to avoid shadowing the
-  built-in `list`)
-- `form.py` — `GET /<collection>/form` and `GET /<collection>/{id}/form`
+  built-in `list`). For parent-owned specs, mounts the prefixed shape
+  `GET /<parent>/{parent_id}/<collection>` automatically — the bespoke
+  `list_<collection>` repo method must accept the parent id under
+  `spec.parent.id_param` to scope the listing.
+- `form.py` — `GET /<collection>/form` and `GET /<collection>/{id}/form`.
+  For parent-owned specs, mounts the prefixed shape
+  `GET /<parent>/{parent_id}/<collection>/form` (and the edit-form
+  counterpart). Both `resource_url` and `resource_detail_url` in the
+  rendered template context walk the parent chain.
 - `create.py` — `POST /<collection>`
 - `update.py` — `PATCH /<collection>/{id}`
 - `state_axis.py` — `PUT /<collection>/{id}/<axis>`. Also home to

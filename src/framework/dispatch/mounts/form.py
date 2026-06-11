@@ -17,6 +17,8 @@ from src.framework.access.actor.actor import Actor
 from src.framework.dispatch.mounts._common import (
     assert_kind_lock,
     call_handler_with,
+    parent_path_param_pairs,
+    path_segments_under_router,
 )
 from src.framework.dispatch.mounts._spec import QueryParam, ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
@@ -57,15 +59,17 @@ def mount_form(
     each ``query_params`` entry under its declared name, and any
     typed repos the handler declares (resolved via the registry).
     """
-    if spec.parent is not None:
-        raise NotImplementedError(
-            "mount_form with spec.parent is not supported yet (slice 8 / #253)."
-        )
     id_param = spec.id_param
     spec_template = spec.form_template
 
-    path = f"/{{{id_param}}}/form" if on_existing else "/form"
-    path_param_names = (id_param,) if on_existing else ()
+    # Path is computed relative to the router prefix (which is the topmost
+    # ancestor's collection). For a top-level spec that's just `/form` or
+    # `/{id}/form`; for a parent-owned spec the chain segment
+    # `/{parent_id}/<collection>` is prepended.
+    base = path_segments_under_router(spec, with_id=on_existing)
+    path = f"{base}/form"
+    parent_id_names = tuple(p[0] for p in parent_path_param_pairs(spec))
+    path_param_names = parent_id_names + ((id_param,) if on_existing else ())
 
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
@@ -109,6 +113,7 @@ async def handle_get_edit_form(
     target_id: UUID,
     repo: BaseRepository,
     requesting_user: Actor,
+    parent_id: UUID | None = None,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -151,8 +156,8 @@ async def handle_get_edit_form(
         "entity_name": spec.name,
         "current_user": requesting_user,
         "edit_heading": edit_label_for(spec, kind=edit_kind),
-        "resource_url": url_for_spec(spec),
-        "resource_detail_url": url_for_spec(spec, id=target.id),
+        "resource_url": url_for_spec(spec, parent_id=parent_id),
+        "resource_detail_url": url_for_spec(spec, id=target.id, parent_id=parent_id),
     }
     # Spec-declared constants (enum labels, schema classes the form
     # references, etc.) — same merge precedence as detail/list.
@@ -210,6 +215,7 @@ async def handle_get_new_form(
     request: Request,
     requesting_user: Actor,
     kind: str | None = None,
+    parent_id: UUID | None = None,
     extras: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     extra_kwargs: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -238,13 +244,15 @@ async def handle_get_new_form(
     # `resource_url` is derivable from `spec.name` — every form-new
     # template used to set it via a `{% set %}` line. Inject from the
     # handler so child templates skip the boilerplate; same funnel
-    # `create_heading` uses for the H1.
+    # `create_heading` uses for the H1. For parent-owned specs the
+    # URL includes the parent_id segment so the form posts to the
+    # right nested collection.
     context: dict[str, Any] = {
         "request": request,
         "entity_name": spec.name,
         "current_user": requesting_user,
         "create_heading": create_label_for(spec, kind=kind),
-        "resource_url": url_for_spec(spec),
+        "resource_url": url_for_spec(spec, parent_id=parent_id),
     }
     if spec.static_context:
         context.update(spec.static_context)
