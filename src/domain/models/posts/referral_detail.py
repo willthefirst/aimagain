@@ -92,6 +92,18 @@ class ReferralDetail(LocationMixin, Base):
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
 
+    # Clinical-niche tags — free-form request-side vocabulary (#1358 PR-c).
+    # Symmetric to `Clinician.clinical_niches` on the provider side: the
+    # referrer states the niches the client needs ("DGBI", "ADHD in women"),
+    # the clinician claims the ones they cover. Deliberately NOT an enum —
+    # the vocabulary is too open-ended on day one. Empty array = no
+    # niche-specific constraint; matching is best-effort substring/exact
+    # against the provider claim. See `Clinician.clinical_niches` for the
+    # full design rationale.
+    clinical_niches = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+
     # Section 5 — insurance. Split into two concerns: `network_preference`
     # is the referrer's posture (mandatory / preferred / indifferent) and
     # is always set; `insurance_carrier` is the patient's actual carrier
