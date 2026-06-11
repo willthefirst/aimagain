@@ -34,7 +34,9 @@ Two modes:
     (program), organization link (PA + program — clickable jump to
     `/organizations/{id}`), full address line, desired times,
     schedule notes (PA/program), payment paths + insurance carriers
-    (CR), sliding scale + cost (PA). Languages always render in
+    (CR), sliding scale + cost (PA), matching-dimension rows
+    (CR: affirming identities, acceptable license classes, clinical
+    niches per #1358 PR-a/b/c). Languages always render in
     expanded mode (the English-only suppression is a list-density
     concern; on detail the row is welcome). Gender for CR is also
     shown in expanded mode — the headline still carries it but the
@@ -196,6 +198,22 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                           {%- if view.accepts_private_pay %}{{ fact('accepts_private_pay', 'Private pay', 'Yes', icon='shield') }}{%- endif %}
                             {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
                               {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
-                              {%- endif %}
-                            {%- endcall %}
-                          {%- endmacro %}
+                                {#- Matching-dimension rows (#1358 PR-a/b/c). CR-only;
+                                  other kinds populate the view-model keys as empty
+                                  lists, so the `{% if view.x %}` guards skip them. #}
+                                {%- if view.affirming_identities %}
+                                  {%- set _ai_labels = [] -%}
+                                  {%- for a in view.affirming_identities -%}{%- set _ = _ai_labels.append(AFFIRMING_IDENTITY_LABELS[a]) -%}{%- endfor -%}
+                                    {{ fact('affirming_identities', 'Affirming identities', _ai_labels | join(", ") , icon='heart') }}
+                                  {%- endif %}
+                                  {%- if view.acceptable_license_types %}
+                                    {%- set _lic_labels = [] -%}
+                                    {%- for l in view.acceptable_license_types -%}{%- set _ = _lic_labels.append(LICENSE_TYPES_LABELS[l]) -%}{%- endfor -%}
+                                      {{ fact('acceptable_license_types', 'Acceptable license classes', _lic_labels | join(", ") , icon='award') }}
+                                    {%- endif %}
+                                    {%- if view.clinical_niches %}
+                                      {{ fact('clinical_niches', 'Clinical niches', view.clinical_niches | join(", ") , icon='tag') }}
+                                    {%- endif %}
+                                  {%- endif %}
+                                {%- endcall %}
+                              {%- endmacro %}

@@ -637,6 +637,186 @@ async def test_create_form_picker_labels_solo_with_name_only(
     assert option.text(strip=True) == "Janet Solo"
 
 
+# --- Referral form: matching-dimension fields (#1358 PR-a/b/c) -------------
+
+
+async def test_referral_create_form_renders_matching_dimension_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """GET /posts/form?kind=referral renders the three matching-dimension
+    fields the schema-reconciliation work added (#1358 PR-a/b/c):
+
+    * `affirming_identities` — multi-checkbox sourced from
+      `AFFIRMING_IDENTITIES` (request-side mirror of the clinician claim).
+    * `acceptable_license_types` — multi-checkbox sourced from
+      `LICENSE_TYPES` (the "psychiatrist OR PMHNP" disjunction).
+    * `clinical_niches` — free-form comma-separated tag input.
+
+    Pins each field's `name` (and the surrounding wrapper for the multi-
+    checkbox groups) so a future refactor of the form template can't
+    silently drop them.
+    """
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    # affirming_identities — multi_select_field renders a
+    # `<div role="group" id="affirming_identities">` wrapper around per-
+    # value checkboxes.
+    ai_group = tree.css_first('div[role="group"]#affirming_identities')
+    assert ai_group is not None, "no affirming_identities checkbox group"
+    assert (
+        tree.css_first(
+            'input[type="checkbox"][name="affirming_identities"][value="lgbtq"]'
+        )
+        is not None
+    ), "affirming_identities is missing the `lgbtq` option"
+
+    # acceptable_license_types — same multi_select_field shape.
+    lic_group = tree.css_first('div[role="group"]#acceptable_license_types')
+    assert lic_group is not None, "no acceptable_license_types checkbox group"
+    assert (
+        tree.css_first(
+            'input[type="checkbox"][name="acceptable_license_types"][value="md"]'
+        )
+        is not None
+    ), "acceptable_license_types is missing the `md` option"
+
+    # clinical_niches — text input under the staging name
+    # `_clinical_niches_input`; the inline splitter script rewrites it to
+    # repeated hidden `clinical_niches` inputs on submit.
+    niches_input = tree.css_first('input[name="_clinical_niches_input"]')
+    assert (
+        niches_input is not None
+    ), "no _clinical_niches_input text field (clinical_niches tag input)"
+    assert (
+        tree.css_first("#clinical-niches-hidden") is not None
+    ), "no #clinical-niches-hidden container for the niche splitter"
+
+
+async def test_referral_edit_form_prefills_matching_dimension_fields(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The edit form (`GET /posts/{id}/form`) pre-checks any stored
+    affirming-identity / license-class tokens and pre-populates the
+    clinical-niches text input with a comma-joined view of the persisted
+    tags. Asserts the round-trip-display path matches what the create
+    form would have accepted on submit."""
+    post = _referral_post(
+        owner_id=logged_in_user.id,
+        affirming_identities=["lgbtq", "trans"],
+        acceptable_license_types=["md", "pmhnp"],
+        clinical_niches=["DGBI", "ADHD in women"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    # Both selected affirming-identity checkboxes are pre-checked.
+    for tok in ("lgbtq", "trans"):
+        box = tree.css_first(
+            f'input[type="checkbox"][name="affirming_identities"][value="{tok}"]'
+        )
+        assert box is not None, f"affirming_identities option {tok!r} missing"
+        assert (
+            "checked" in box.attributes
+        ), f"affirming_identities[{tok}] should be pre-checked on edit"
+
+    # Both selected license classes are pre-checked.
+    for tok in ("md", "pmhnp"):
+        box = tree.css_first(
+            f'input[type="checkbox"][name="acceptable_license_types"][value="{tok}"]'
+        )
+        assert box is not None, f"acceptable_license_types option {tok!r} missing"
+        assert (
+            "checked" in box.attributes
+        ), f"acceptable_license_types[{tok}] should be pre-checked on edit"
+
+    # The clinical_niches text input is pre-populated with a comma-joined
+    # view of the persisted tags. Order matches storage order.
+    niches_input = tree.css_first('input[name="_clinical_niches_input"]')
+    assert niches_input is not None
+    assert (
+        niches_input.attributes.get("value") == "DGBI, ADHD in women"
+    ), niches_input.attributes.get("value")
+
+
+async def test_referral_detail_renders_matching_dimension_rows(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The referral detail page (`/posts/{id}`) surfaces each matching-
+    dimension row when the persisted referral has values for it. The
+    facts block uses `AFFIRMING_IDENTITY_LABELS` / `LICENSE_TYPES_LABELS`
+    for display labels (the raw enum tokens shouldn't appear) and renders
+    the free-form `clinical_niches` values verbatim."""
+    post = _referral_post(
+        owner_id=logged_in_user.id,
+        affirming_identities=["lgbtq"],
+        acceptable_license_types=["md"],
+        clinical_niches=["DGBI", "ADHD in women"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    body = response.text
+
+    # Label dicts: AFFIRMING_IDENTITY_LABELS["lgbtq"] is "LGBTQ+";
+    # LICENSE_TYPES_LABELS["md"] is the MD label. Assert the label
+    # appears (not the raw token), so a future label rename will
+    # surface here as a single diff. We assert the row's section label
+    # is present rather than pin the entire `<dt>` markup.
+    assert "Affirming identities" in body
+    assert "Acceptable license classes" in body
+    assert "Clinical niches" in body
+    # Free-form niches render verbatim (they pass through label lookup).
+    assert "DGBI" in body
+    assert "ADHD in women" in body
+
+
+async def test_referral_detail_hides_matching_dimension_rows_when_empty(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """An older / minimal referral with no matching-dimension data set
+    omits all three rows — `{% if view.x %}` guards each row, so an
+    empty list does not render a labeled-but-empty row."""
+    post = _referral_post(
+        owner_id=logged_in_user.id,
+        affirming_identities=[],
+        acceptable_license_types=[],
+        clinical_niches=[],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    body = response.text
+    assert "Affirming identities" not in body
+    assert "Acceptable license classes" not in body
+    assert "Clinical niches" not in body
+
+
 # --- Anonymization gate (can_act_as_provider) ---------------------------------
 
 

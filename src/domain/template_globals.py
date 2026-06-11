@@ -73,6 +73,12 @@ register_template_globals(
     GENDER_LABELS=enums.GENDER_LABELS,
     INSURANCE_POSTURES=enums.INSURANCE_POSTURES,
     INSURANCE_POSTURE_LABELS=enums.INSURANCE_POSTURE_LABELS,
+    # Affirming-identity vocabulary (#1358 PR-a). Referral request side
+    # and Clinician person-level side both pull from this tuple; the
+    # referral create/edit form's multi-checkbox renders directly from
+    # the global.
+    AFFIRMING_IDENTITIES=enums.AFFIRMING_IDENTITIES,
+    AFFIRMING_IDENTITY_LABELS=enums.AFFIRMING_IDENTITY_LABELS,
     # LICENSE_TYPES and EDUCATION/CERTIFICATION equivalents are exposed here
     # as globals so bespoke templates (like the profile hub's license step)
     # can reference them without relying on CLINICIAN_ENTITY.static_context,
@@ -157,6 +163,7 @@ register_choice_labels(enums.REFERRAL_SERVICES, enums.REFERRAL_SERVICE_LABELS)
 register_choice_labels(enums.TREATMENT_SETTINGS, enums.TREATMENT_SETTINGS_LABELS)
 register_choice_labels(enums.TREATMENT_MODALITIES, enums.TREATMENT_MODALITY_LABELS)
 register_choice_labels(enums.GENDERS, enums.GENDER_LABELS)
+register_choice_labels(enums.AFFIRMING_IDENTITIES, enums.AFFIRMING_IDENTITY_LABELS)
 register_choice_labels(enums.LICENSE_TYPES, enums.LICENSE_TYPES_LABELS)
 register_choice_labels(enums.EDUCATION_TYPES, enums.EDUCATION_TYPES_LABELS)
 register_choice_labels(enums.CERTIFICATION_TYPES, enums.CERTIFICATION_TYPES_LABELS)
