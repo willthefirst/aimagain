@@ -160,27 +160,14 @@ class Language(LabeledChoice):
 LANGUAGES: Final[tuple[str, ...]] = Language.values()
 
 
-# Referrer's posture toward in-network matching for a `referral`.
-# Paired with `insurance_carrier` (nullable, from `INSURANCE_CARRIERS`) on
-# the same detail row: `network_preference` describes *strictness*,
-# `insurance_carrier` describes *which carrier* (null = self-pay /
-# unknown / no carrier). When `network_preference == 'no_preference'`
-# the carrier value is irrelevant — the form hides the control.
-class NetworkPreference(LabeledChoice):
-    in_network_required = "in_network_required", "In-network required"
-    in_network_preferred = "in_network_preferred", "In-network preferred"
-    no_preference = "no_preference", "No preference / self-pay"
-
-
-NETWORK_PREFERENCES: Final[tuple[str, ...]] = NetworkPreference.values()
-
-
-# Carrier vocabulary for `Clinician.in_network_carriers` and
-# `ReferralDetail.insurance_carrier`. Single-sourced so the
-# referral side (one carrier per patient) and the clinician side (the
-# list of carriers the practice accepts) share tokens. On the clinician
-# side an empty list means "no in-network"; nullable on the referral
-# side (null = self-pay / unknown / no carrier).
+# Carrier vocabulary for `ClinicianAffiliation.in_network_carriers` and
+# `ReferralDetail.insurance_carriers`. Single-sourced so the request
+# side (the carriers the patient has) and the provider side (the list
+# of carriers the practice accepts) share tokens. Both columns are
+# JSON arrays of these tokens; an empty array means "no carrier
+# specified" on either side (on the request side this is the natural
+# shape when only ``accepts_private_pay`` is true; see
+# ``ReferralDetail`` for the payment-path booleans, #1358 PR-e).
 class InsuranceCarrier(LabeledChoice):
     aetna = "aetna", "Aetna"
     anthem_bcbs = "anthem_bcbs", "Anthem / BCBS"
@@ -337,7 +324,6 @@ CLIENT_AGE_GROUP_LABELS_SINGULAR: Final[dict[str, str]] = {
     m.value: m.label_singular for m in ClientAgeGroup
 }
 LANGUAGE_LABELS: Final[dict[str, str]] = Language.labels()
-NETWORK_PREFERENCE_LABELS: Final[dict[str, str]] = NetworkPreference.labels()
 INSURANCE_CARRIER_LABELS: Final[dict[str, str]] = InsuranceCarrier.labels()
 # Per-axis labels for the desired-times grid. The form-render macro uses these
 # Days carry two labels: the long `.label` (read views, slot labels below)
@@ -363,10 +349,11 @@ GENDER_LABELS: Final[dict[str, str]] = Gender.labels()
 
 # --- Unified insurance posture -----------------------------------------
 #
-# The two post kinds model "insurance situation" with asymmetric vocab:
-#   * `referral` — `network_preference` enum
-#     (`in_network_required` / `in_network_preferred` / `no_preference`)
-#     paired with a nullable `insurance_carrier`.
+# The two post kinds model "insurance situation" with parallel vocab:
+#   * `referral` — three independent payment-path booleans
+#     (`accepts_in_network` / `accepts_out_of_network_superbill` /
+#     `accepts_private_pay`) plus an `insurance_carriers` JSON list of
+#     `INSURANCE_CARRIERS` tokens.
 #   * `opening` → linked `Clinician` carries the
 #     `in_network_carriers` list (empty = no in-network) plus the
 #     `accepts_out_of_network` / `sliding_scale` booleans.

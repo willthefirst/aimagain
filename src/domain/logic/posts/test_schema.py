@@ -37,7 +37,6 @@ from src.domain.models.enums import (
     GENDERS,
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
-    NETWORK_PREFERENCES,
 )
 from tests.helpers import opening_payload, referral_payload
 
@@ -55,8 +54,12 @@ def test_post_create_dispatches_referral():
     # flat — see ``test_post_create_referral_dump_keeps_flat_location``.
     assert p.location.city == "Springfield"
     assert p.location.state == "IL"
-    assert p.network_preference == "in_network_required"
-    assert p.insurance_carrier is None
+    # Payment-paths (#1358 PR-e): defaults to in-network only per the
+    # test helper, with no carriers picked yet.
+    assert p.accepts_in_network is True
+    assert p.accepts_out_of_network_superbill is False
+    assert p.accepts_private_pay is False
+    assert p.insurance_carriers == []
 
 
 def test_post_create_requires_kind():
@@ -103,7 +106,6 @@ def test_post_create_referral_rejects_empty_description():
         "location_virtual",
         "age_groups",
         "description",
-        "network_preference",
         # The picker submits this; `referring_clinician_id` is now
         # server-derived from it, so the affiliation id is the required
         # wire field, not the clinician id.
@@ -324,42 +326,77 @@ def test_post_create_referral_rejects_unknown_age_group():
         post_create_adapter.validate_python(referral_payload(age_groups=["too_old"]))
 
 
-def test_post_create_referral_rejects_unknown_network_preference():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            referral_payload(network_preference="bring_cash")
-        )
-
-
 def test_post_create_referral_rejects_unknown_insurance_carrier():
+    """Vocabulary check on the JSON list: an unknown carrier token
+    (#1358 PR-e — `insurance_carriers` is now `list[Literal[*INSURANCE_CARRIERS]]`)."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            referral_payload(insurance_carrier="my_local_co_op")
+            referral_payload(insurance_carriers=["my_local_co_op"])
         )
 
 
-def test_post_create_referral_allows_null_insurance_carrier():
-    """Carrier is nullable — self-pay / unknown / no carrier all map to
-    NULL on the wire. The form hides the field when network_preference
-    = no_preference; the schema accepts a null carrier with any
-    network_preference value."""
-    for pref in NETWORK_PREFERENCES:
+def test_post_create_referral_allows_empty_carrier_list():
+    """Empty `insurance_carriers` list is valid with any combination of
+    the three payment-path booleans — e.g. an in-network-friendly
+    referral whose carrier is undecided, or a private-pay-only one."""
+    for bools in (
+        {"accepts_in_network": True},
+        {"accepts_private_pay": True},
+        {"accepts_in_network": True, "accepts_private_pay": True},
+        {},  # All false — shape-valid even if uncommon.
+    ):
         p = post_create_adapter.validate_python(
-            referral_payload(network_preference=pref, insurance_carrier=None)
+            referral_payload(insurance_carriers=[], **bools)
         )
-        assert p.network_preference == pref
-        assert p.insurance_carrier is None
+        assert p.insurance_carriers == []
 
 
-def test_post_create_referral_accepts_carrier_with_required():
+def test_post_create_referral_accepts_multiple_carriers():
+    """Multi-select: a referral can list multiple acceptable carriers.
+    Mirrors `ClinicianAffiliation.in_network_carriers` (#1358 PR-e)."""
     p = post_create_adapter.validate_python(
         referral_payload(
-            network_preference="in_network_required",
-            insurance_carrier="cigna",
+            accepts_in_network=True,
+            insurance_carriers=["cigna", "aetna"],
         )
     )
-    assert p.network_preference == "in_network_required"
-    assert p.insurance_carrier == "cigna"
+    assert p.accepts_in_network is True
+    assert p.insurance_carriers == ["cigna", "aetna"]
+
+
+def test_post_create_referral_payment_paths_independent():
+    """The three payment-path booleans are independent — any subset
+    (including all-true or all-false) round-trips through the schema."""
+    p = post_create_adapter.validate_python(
+        referral_payload(
+            accepts_in_network=True,
+            accepts_out_of_network_superbill=True,
+            accepts_private_pay=True,
+            insurance_carriers=["anthem_bcbs"],
+        )
+    )
+    assert p.accepts_in_network is True
+    assert p.accepts_out_of_network_superbill is True
+    assert p.accepts_private_pay is True
+    assert p.insurance_carriers == ["anthem_bcbs"]
+
+
+def test_post_create_referral_payment_paths_default_false():
+    """When a payment-path bool is omitted entirely it defaults to
+    False — the schema does not require any to be true."""
+    payload = referral_payload()
+    for key in (
+        "accepts_in_network",
+        "accepts_out_of_network_superbill",
+        "accepts_private_pay",
+    ):
+        payload.pop(key, None)
+    payload.pop("insurance_carriers", None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.accepts_in_network is False
+    assert p.accepts_out_of_network_superbill is False
+    assert p.accepts_private_pay is False
+    assert p.insurance_carriers == []
 
 
 def test_post_create_rejects_owner_id():
@@ -481,8 +518,13 @@ def test_audit_snapshot_for_referral_post():
     assert snap["owner_id"] == str(owner_id)
     assert snap["description"] == detail_attrs["description"]
     assert snap["location_city"] == detail_attrs["location_city"]
-    assert snap["network_preference"] == detail_attrs["network_preference"]
-    assert snap["insurance_carrier"] == detail_attrs["insurance_carrier"]
+    assert snap["accepts_in_network"] == detail_attrs["accepts_in_network"]
+    assert (
+        snap["accepts_out_of_network_superbill"]
+        == detail_attrs["accepts_out_of_network_superbill"]
+    )
+    assert snap["accepts_private_pay"] == detail_attrs["accepts_private_pay"]
+    assert snap["insurance_carriers"] == detail_attrs["insurance_carriers"]
 
 
 def test_audit_snapshot_unknown_kind_raises():
@@ -558,20 +600,15 @@ def test_post_create_referral_accepts_new_services_tokens(token):
     assert p.services == [token]
 
 
-@pytest.mark.parametrize("token", NETWORK_PREFERENCES)
-def test_post_create_referral_accepts_all_network_preference_tokens(token):
-    """Every `NETWORK_PREFERENCES` token validates as a CR
-    `network_preference` value."""
-    p = post_create_adapter.validate_python(referral_payload(network_preference=token))
-    assert p.network_preference == token
-
-
 @pytest.mark.parametrize("token", INSURANCE_CARRIERS)
 def test_post_create_referral_accepts_all_insurance_carriers(token):
-    """Every `INSURANCE_CARRIERS` token validates as a CR
-    `insurance_carrier` value (shared vocab with Clinician)."""
-    p = post_create_adapter.validate_python(referral_payload(insurance_carrier=token))
-    assert p.insurance_carrier == token
+    """Every `INSURANCE_CARRIERS` token validates as an element of
+    `insurance_carriers` (shared vocab with Clinician, now both
+    sides are lists — #1358 PR-e)."""
+    p = post_create_adapter.validate_python(
+        referral_payload(insurance_carriers=[token])
+    )
+    assert p.insurance_carriers == [token]
 
 
 def test_post_create_referral_rejects_retired_in_network_token():
@@ -812,16 +849,10 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         # test in ``src/domain/logic/value_objects/test_location.py``.
         (ReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         (ReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        (ReferralRead, "network_preference", NETWORK_PREFERENCES),
-        (ReferralRead, "insurance_carrier", INSURANCE_CARRIERS),
         (ReferralRead, "gender", GENDERS),
         # Create variants
-        (ReferralCreate, "network_preference", NETWORK_PREFERENCES),
-        (ReferralCreate, "insurance_carrier", INSURANCE_CARRIERS),
         (ReferralCreate, "gender", GENDERS),
         # Update variants (Optional[Literal[*TUPLE]])
-        (ReferralUpdate, "network_preference", NETWORK_PREFERENCES),
-        (ReferralUpdate, "insurance_carrier", INSURANCE_CARRIERS),
         (ReferralUpdate, "gender", GENDERS),
     ],
 )

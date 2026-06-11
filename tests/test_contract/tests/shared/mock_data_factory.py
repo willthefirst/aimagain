@@ -73,13 +73,7 @@ _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
         "location_in_person": "no",
         "location_virtual": "no",
         "gender": "prefer_not_to_say",
-        "network_preference": "no_preference",
         "location_state": "NY",
-        # `insurance_carrier` is nullable and only meaningful when
-        # `network_preference != "no_preference"`. Default to None so
-        # the detail template's gating (`if d.insurance_carrier and
-        # ...`) renders nothing.
-        "insurance_carrier": None,
     },
     "clinician_opening": {},
     "program_intake": {},
