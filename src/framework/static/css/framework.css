@@ -246,13 +246,10 @@ dd { margin: 0; }
    replacing the old `<select multiple>` listbox) and by
    `_filter_field.html` (search/list filter sidebars, inside a
    `<fieldset>` so the legend stays pinned outside the scroll
-   viewport). Long filter choice sets add `.checkbox-list-grid` to
-   swap the flex-column layout for a responsive grid.
+   viewport).
 
    Each option is a flex row so the checkbox and the text baseline-
-   align even when the label wraps. Spacing is via container `gap`
-   so it works identically for the flex-column default and the grid
-   modifier. */
+   align even when the label wraps. Spacing is via container `gap`. */
 .checkbox-list {
   max-height: 14rem;
   overflow-y: auto;
@@ -532,28 +529,12 @@ td > menu > li > [role="button"] {
    a `.checkbox-list` of single-click checkboxes (replacing the
    previous native `<select multiple>` listbox — #583). The legend
    sits OUTSIDE the `.checkbox-list` scroll viewport so the field
-   label stays pinned while the options scroll. Long choice sets opt
-   into `.checkbox-list-grid` (defined below) which lays the options
-   out in 2–3 responsive columns so a 50-state list doesn't stretch
-   the form to 50 rows tall. */
+   label stays pinned while the options scroll. The list always
+   renders as a single column — the `.checkbox-list` `max-height` cap
+   scrolls long vocabularies inside the bordered envelope rather than
+   letting them stretch the form. */
 .search-checkbox-fieldset {
   margin-block-start: var(--pico-spacing);
-}
-/* Grid modifier — used by long search filter lists (>12 choices)
-   to break the column into a responsive 2–3 col grid on desktop so
-   the filter sidebar doesn't get absurdly tall. Collapses back to
-   single column on narrow viewports. Overrides the base
-   `.checkbox-list` flex layout. */
-.checkbox-list-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-  column-gap: var(--pico-spacing);
-  row-gap: 0.125rem;
-}
-@media (max-width: 540px) {
-  .checkbox-list-grid {
-    grid-template-columns: 1fr;
-  }
 }
 /* Auth-page form — `/auth/login`, `/auth/register`,
    `/auth/forgot-password`, `/auth/reset-password/<token>`,

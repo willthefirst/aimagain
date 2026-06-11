@@ -17,9 +17,10 @@ Control selection (read by `_search_field`):
                               application/x-www-form-urlencoded, which
                               FastAPI parses into a `list[str]` via the
                               filter's `list[...] | None` annotation. The
-                              option list adds `.checkbox-list-grid` when the
-                              choice set is large enough to read better as
-                              a multi-column layout on desktop (see #583).
+                              option list always renders as a single
+                              column inside the bordered `.checkbox-list`
+                              envelope, which scrolls long vocabularies
+                              instead of stretching the form (#583).
 
 Children supply only `resource_label`; the form body is built from
 the spec.
