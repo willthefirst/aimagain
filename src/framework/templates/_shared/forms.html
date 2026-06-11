@@ -1,30 +1,5 @@
 {# Form-skeleton macros for HTMX-driven CRUD forms. #}
 {% from "_shared/icon_label.html" import icon_label %}
-{# Single-fieldset add form. Wraps caller-supplied field markup in
-`<form><fieldset><legend>…</legend>{{ caller() }}</fieldset><button type="submit">…</button></form>`. Used by sub-resource sections that
-have the same shape (legend + flat field list + submit button), e.g. the
-licensure / education / certification add forms in clinicians/form_edit.html.
-
-Forms with multiple fieldsets or non-trivial structure should stay
-hand-rolled — this macro deliberately covers only the single-fieldset
-case.
-
-Example:
-  {% call inline_add_form("/clinicians/" ~ clinician.id ~ "/licensures",
-                          "Add licensure", "Add licensure") %}
-    {{ select_field(...) }}
-    {{ text_field(...) }}
-  {% endcall %}
-#}
-{% macro inline_add_form(action, legend, submit_label, method="post") -%}
-  <form hx-{{ method }}="{{ action }}">
-    <fieldset>
-      <legend>{{ legend }}</legend>
-      {{ caller() }}
-    </fieldset>
-    <button type="submit">{{ submit_label }}</button>
-  </form>
-{%- endmacro %}
 {# Top-level entity create/edit form wrapper.
 
    Emits `<form hx-{method}="{action_url}">` around caller-supplied
@@ -43,9 +18,12 @@ Example:
    today's entity edit forms (org / clinician / program) do not — that's
    a known asymmetry, not load-bearing on this wrapper.
 
-   Used by every top-level entity create/edit form. Sub-resource add
-   forms (single fieldset, no error re-render) use `inline_add_form`
-   above.
+   Used by every top-level entity create/edit form, including
+   sub-resource add forms on the clinician credential list pages
+   (licensures / certifications / educations / clinician_affiliations)
+   — those callers wrap the macro in `<section class="entity-form-page">`
+   so the subgrid label alignment applies the same way it does on the
+   chrome-supplied wrapper in `views/form_new.html`.
 
    Example:
      {% call entity_form(entity_url('organization', id=org.id) ) %}
