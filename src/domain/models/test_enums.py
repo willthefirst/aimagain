@@ -15,7 +15,7 @@ from src.domain.models import enums as e
 # is a schema change — it must come with an Alembic migration.
 MIGRATED_VALUES = {
     e.LocationAvailability: ("yes", "no", "please_contact"),
-    e.Language: ("en", "es"),
+    e.Language: ("en", "es", "zh", "yue", "vi", "tl", "ko", "ru"),
     e.NetworkPreference: (
         "in_network_required",
         "in_network_preferred",
