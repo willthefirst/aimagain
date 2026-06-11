@@ -78,3 +78,44 @@ class ClinicianAffiliation(LocationMixin, BaseModel):
         Boolean, nullable=False, server_default=text("0"), default=False
     )
     cost = Column(Text, nullable=True)
+
+    # ----------------------------------------------------------------
+    # Steady-state practice profile (#1358 PR-f, sub-PR 1).
+    #
+    # These columns are the new home for fields that previously lived
+    # on `OpeningDetail` (the per-announcement row). The mental model
+    # from #1358: *steady-state goes on Clinician/Affiliation; events
+    # go on Post*. A clinician who reposts the same opening three
+    # times in six months has *the same* services/settings/modalities/
+    # age_groups/genders/website/referral_instructions across all three
+    # — they're not per-announcement, they're per-affiliation.
+    #
+    # Sub-PR 1 (this PR) is purely additive: columns added with empty
+    # defaults, backfilled from any existing OpeningDetail rows that
+    # already attach to an affiliation via `clinician_affiliation_id`.
+    # Reads still come from OpeningDetail; writes still dual to neither
+    # site (the model accepts kwargs but the form/spec layers haven't
+    # been flipped). Sub-PR 2 flips reads + adds dual-write; sub-PR 3
+    # removes the columns from OpeningDetail.
+    #
+    # `languages` is deliberately NOT here — it moves to `Clinician`
+    # (person attribute, invariant across affiliations) per #1358.
+    # ----------------------------------------------------------------
+    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    modalities = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    website = Column(Text, nullable=True)
+    referral_instructions = Column(Text, nullable=True)
+
+    # Denormalized accepting-new-patients flag. The source-of-truth
+    # signal is "this affiliation has an active (not-closed)
+    # OpeningDetail" but that's a join + state filter on every list
+    # query. Cache it here so the directory list / filter UI can read
+    # one column. The OpeningDetail lifecycle handlers will toggle
+    # this in sub-PR 2 / 3; today it defaults to False and is left
+    # untouched.
+    currently_accepting_new_patients = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )

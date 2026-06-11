@@ -6,7 +6,7 @@ The clinician's role at one organization — practice-role attributes that vary 
 
 ## Files
 
-- `affiliation.py` — `ClinicianAffiliation`. Holds the per-role columns: `(location_city, location_state, location_zip)` via `LocationMixin`, `in_person_sessions`, `virtual_sessions`, `accepts_out_of_network`, `in_network_carriers`, `sliding_scale`, `cost`. FKs: `clinician_id` (RESTRICT) is the person; `org_id` (RESTRICT, **nullable**) is the organization. The relationship is 1:N — one clinician may carry multiple affiliations. `(clinician_id, org_id)` is not UNIQUE: one clinician can hold multiple affiliations at the same org with different attributes (different rate / schedule / location), and the curation rule belongs in business logic, not the schema.
+- `clinician_affiliation.py` — `ClinicianAffiliation`. Holds the per-role columns: `(location_city, location_state, location_zip)` via `LocationMixin`, `in_person_sessions`, `virtual_sessions`, `accepts_out_of_network`, `in_network_carriers`, `sliding_scale`, `cost`, plus the steady-state practice profile (`services`, `settings`, `modalities`, `age_groups`, `genders`, `website`, `referral_instructions`, `currently_accepting_new_patients`) — see "Steady-state profile" below. FKs: `clinician_id` (RESTRICT) is the person; `org_id` (RESTRICT, **nullable**) is the organization. The relationship is 1:N — one clinician may carry multiple affiliations. `(clinician_id, org_id)` is not UNIQUE: one clinician can hold multiple affiliations at the same org with different attributes (different rate / schedule / location), and the curation rule belongs in business logic, not the schema.
 - `test_affiliation.py` — model-layer regression coverage (multi-affiliation support, per-role writes, persists-via-cascade).
 
 ## The "every clinician has ≥1 affiliation" invariant
@@ -16,6 +16,20 @@ A `ClinicianAffiliation` is the **practice posture container**: it owns location
 That means every clinician — including a solo practitioner with no LLC and no group — has at least one affiliation. The "solo" case is a `ClinicianAffiliation` row with `org_id IS NULL`: the row carries the practice posture; the absence of an `Organization` reflects that there is no separate legal/branding entity. The `Clinician` proxy properties (`clinician.location_city`, `.in_person_sessions`, etc.) read from / write to this single affiliation; per [`../clinicians/README.md#per-affiliation-proxy-setters-require-a-primary-affiliation`](../clinicians/README.md#per-affiliation-proxy-setters-require-a-primary-affiliation), the setters raise if no affiliation exists.
 
 Sessions columns (`in_person_sessions`, `virtual_sessions`) are also nullable: a stub affiliation auto-created at NPI verify time hasn't yet been asked those questions; NULL means "unset," distinct from any `LOCATION_AVAILABILITY_OPTIONS` value. The auto-create lives in `after_create_clinician_verification` ([`../../logic/clinicians/handlers.py`](../../logic/clinicians/handlers.py)) — the canonical "this clinician is real and going to stick around" moment. The backfill migration `9501786659b3` covers pre-existing solo clinicians.
+
+## Steady-state profile (#1358 PR-f, in progress)
+
+The columns `services` / `settings` / `modalities` / `age_groups` / `genders` / `website` / `referral_instructions` / `currently_accepting_new_patients` are the per-(clinician × org) **steady-state practice profile**. The mental model from #1358: *steady-state goes on Clinician/Affiliation; events go on Post*. A clinician who reposts the same opening three times in six months has the same services / modalities / age groups across all three — those are properties of the affiliation, not of the announcement.
+
+The PR-f refactor is shipping in three sub-PRs:
+
+1. **Add the columns + backfill** (this PR, `e3e0a73e9bc5` + `f3c128112fa7`). The columns exist with defaults; the data migration copies values from the most-recent `OpeningDetail` attached to each affiliation. Reads and writes still go to `OpeningDetail`.
+2. *(Pending)* **Flip reads + dual-write.** The view layer and forms read from the new home; writes go to both rows so a rollback to sub-PR 1 stays safe.
+3. *(Pending)* **Drop the columns from `OpeningDetail`.** `OpeningDetail` collapses to the announcement core (`desired_times`, `schedule_text`, optional per-announcement overrides, capacity, pointer to the affiliation).
+
+`languages` is *not* in this set on the affiliation — it moves to `Clinician` (a person attribute, invariant across affiliations). See [`../clinicians/README.md`](../clinicians/README.md).
+
+`currently_accepting_new_patients` is a denormalized cache toggled by the `OpeningDetail` lifecycle (sub-PR 2/3 wires the toggle). Distinct from the analogous flag on `Program.accepting_referrals` which is an operator-set standing posture.
 
 ## Write path: how a clinician edit lands on ClinicianAffiliation
 

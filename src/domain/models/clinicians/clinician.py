@@ -78,6 +78,22 @@ class Clinician(BaseModel):
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
 
+    # Languages spoken (#1358 PR-f, sub-PR 1). Person-level: which
+    # languages a clinician can deliver care in is a property of the
+    # *person*, invariant across affiliations — moves out of
+    # `OpeningDetail` (per-announcement) into here. Defaults to
+    # ``['en']`` matching the prior OpeningDetail default. Vocabulary
+    # is enforced on the wire by Pydantic (`Literal[*LANGUAGES]`);
+    # no SQL CHECK against JSON array members, same pattern as
+    # `in_network_carriers` on `ClinicianAffiliation` and
+    # `affirming_identities` above.
+    languages = Column(
+        JSON,
+        nullable=False,
+        server_default=text("'[\"en\"]'"),
+        default=lambda: ["en"],
+    )
+
     # Clinical-niche tags — free-form vocabulary (#1358 PR-c). Examples
     # from the referral corpus: "DGBI", "catatonia", "ADHD in women",
     # "psychedelic-knowledgeable", "minor consent", "complex trauma".
