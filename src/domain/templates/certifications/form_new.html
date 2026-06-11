@@ -5,6 +5,6 @@
 {% block form_content %}
   {{ certification_form(resource_url,
     "post",
-    "Create certification",
-    cancel_url=resource_url) }}
+    entity_create_label('clinician_certification') ,
+  cancel_url=resource_url) }}
 {% endblock %}

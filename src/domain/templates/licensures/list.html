@@ -20,7 +20,7 @@
 {% block actions %}
   <li>
     <a href="{{ entity_url('clinician', id=clinician.id) }}/licensures/form"
-       role="button">Create licensure</a>
+       role="button">{{ entity_create_label("clinician_licensure") }}</a>
   </li>
 {% endblock %}
 {%- macro licensure_card(lic) %}

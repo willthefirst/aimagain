@@ -26,6 +26,7 @@ from src.framework.dispatch.entity_spec import EntitySpec
 
 CERTIFICATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     name="clinician_certification",
+    singular_label="certification",
     url_collection="certifications",
     id_param="certification_id",
     model=ClinicianCertification,

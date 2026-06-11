@@ -79,6 +79,24 @@ def test_filter_label_uses_url_collection():
     assert filter_label_for(CLINICIAN_ENTITY) == "Filter clinicians"
 
 
+def test_subentity_labels_use_singular_label_not_spec_name():
+    """Clinician sub-resource specs carry URL-identifier names
+    (`clinician_licensure`, `clinician_affiliation`) but the user-facing
+    noun is the bare word — pinned via `singular_label`. Without it,
+    every "Create X" / "Edit X" string in the four sub-resource pages
+    surfaces the snake-case identifier."""
+    assert entity_create_label("clinician_licensure") == "Create licensure"
+    assert entity_edit_label("clinician_licensure") == "Edit licensure"
+    assert entity_create_label("clinician_certification") == "Create certification"
+    assert entity_edit_label("clinician_certification") == "Edit certification"
+    assert entity_create_label("clinician_education") == "Create education"
+    assert entity_edit_label("clinician_education") == "Edit education"
+    # Affiliation diverges intentionally — DB model name is
+    # `clinician_affiliation` but the UI noun is "practice".
+    assert entity_create_label("clinician_affiliation") == "Create practice"
+    assert entity_edit_label("clinician_affiliation") == "Edit practice"
+
+
 # --- Registry-driven structural pins -----------------------------------
 
 

@@ -44,6 +44,12 @@ from src.framework.dispatch.entity_spec import (
 
 CLINICIAN_AFFILIATION_ENTITY: Final[EntitySpec] = EntitySpec(
     name="clinician_affiliation",
+    # The DB model + URL slug call them affiliations because that's
+    # what the (clinician × org) join is; the UI calls them "practices"
+    # because that's what they are to the user. The `singular_label`
+    # carries the UI noun so chrome labels read "Create practice" /
+    # "Edit practice" instead of "Edit clinician_affiliation".
+    singular_label="practice",
     url_collection="clinician_affiliations",
     id_param="clinician_affiliation_id",
     model=ClinicianAffiliation,
