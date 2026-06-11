@@ -41,13 +41,14 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel
+from pydantic import AfterValidator, BaseModel, BeforeValidator
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
     Location,
 )
 from src.domain.models.enums import (
+    AFFIRMING_IDENTITIES,
     CERTIFICATION_TYPES,
     EDUCATION_TYPES,
     LICENSE_TYPES,
@@ -59,7 +60,16 @@ from src.framework.schema_validators import (
     ReadProjection,
     StrippedText,
     WirePayload,
+    scalar_to_list,
 )
+
+# Affirming-identity multi-checkbox field — multi-value JSON list of
+# `AFFIRMING_IDENTITIES` tokens. Mirrors the multi-checkbox idiom posts
+# use (see `domain/logic/posts/schema.py`): a single string from a form
+# checkbox is normalized to a one-element list before validation.
+AffirmingIdentitiesField = Annotated[
+    list[Literal[*AFFIRMING_IDENTITIES]], BeforeValidator(scalar_to_list)
+]
 
 _NPI_RE = re.compile(r"^[0-9]{10}$")
 
@@ -230,6 +240,10 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     in_network_carriers: list[str] = []
     sliding_scale: bool | None = None
     cost: str | None = None
+    # Affirming-identity claims. JSON list of `AFFIRMING_IDENTITIES`
+    # tokens; person-level (lives directly on the clinician, not on an
+    # affiliation). Empty list = "none stated".
+    affirming_identities: AffirmingIdentitiesField = []
     licensures: list[ClinicianLicensureRead] = []
     educations: list[ClinicianEducationRead] = []
     certifications: list[ClinicianCertificationRead] = []
@@ -271,6 +285,10 @@ class ClinicianUpdate(PartialUpdate):
     npi: NpiText = None
     first_name: StrippedText | None = None
     last_name: StrippedText | None = None
+    # `None` = leave unchanged (the repo's standard partial-update
+    # semantic); `[]` = clear all claims. List-valued PATCH replaces the
+    # whole list — partial add/remove is intentionally out of scope.
+    affirming_identities: AffirmingIdentitiesField | None = None
 
 
 # --- Admin verification-state axis ---------------------------------------

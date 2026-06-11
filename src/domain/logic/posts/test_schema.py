@@ -199,6 +199,39 @@ def test_post_create_referral_strips_optional_to_none():
     assert p.treatment_modality is None
 
 
+def test_post_create_referral_defaults_affirming_identities_to_empty_list():
+    """`affirming_identities` is optional on the wire; empty list is
+    the default (no preference stated)."""
+    payload = referral_payload()
+    payload.pop("affirming_identities", None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.affirming_identities == []
+
+
+def test_post_create_referral_accepts_affirming_identities_list():
+    p = post_create_adapter.validate_python(
+        referral_payload(affirming_identities=["lgbtq", "neurodiversity"])
+    )
+    assert p.affirming_identities == ["lgbtq", "neurodiversity"]
+
+
+def test_post_create_referral_coerces_scalar_affirming_identity_to_list():
+    """HTML form checkbox single-value submits land as a bare string;
+    `scalar_to_list` normalizes to a one-element list before the
+    `Literal[*AFFIRMING_IDENTITIES]` per-member check."""
+    p = post_create_adapter.validate_python(
+        referral_payload(affirming_identities="trans")
+    )
+    assert p.affirming_identities == ["trans"]
+
+
+def test_post_create_referral_rejects_unknown_affirming_identity():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            referral_payload(affirming_identities=["not_a_real_token"])
+        )
+
+
 def test_post_create_referral_rejects_invalid_zip():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(referral_payload(location_zip="abc"))

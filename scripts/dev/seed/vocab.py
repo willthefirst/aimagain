@@ -30,6 +30,7 @@ from collections.abc import Callable
 from typing import Final
 
 from src.domain.models.enums import (
+    AFFIRMING_IDENTITIES,
     CERTIFICATION_TYPES,
     CLIENT_AGE_GROUPS,
     DESIRED_TIME_SLOTS,
@@ -724,6 +725,7 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "desired_times": DESIRED_TIME_SLOTS,
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,
+    "affirming_identities": AFFIRMING_IDENTITIES,
     "flags": (  # Verification.flags — free-form bag of strings
         "name_mismatch",
         "nppes_inactive",
