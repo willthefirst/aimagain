@@ -248,23 +248,23 @@ def test_any_org_rep_verified_requires_email_verified():
 # ---------- derived gates -------------------------------------------------
 
 
-def test_can_access_network_anon_false():
-    assert capabilities.can_access_network(None) is False
+def test_can_act_as_provider_anon_false():
+    assert capabilities.can_act_as_provider(None) is False
 
 
-def test_can_access_network_unverified_clinician_false():
-    assert capabilities.can_access_network(_user(is_verified=True)) is False
+def test_can_act_as_provider_unverified_clinician_false():
+    assert capabilities.can_act_as_provider(_user(is_verified=True)) is False
 
 
-def test_can_access_network_verified_clinician_true():
+def test_can_act_as_provider_verified_clinician_true():
     user = _user(
         is_verified=True,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    assert capabilities.can_access_network(user) is True
+    assert capabilities.can_act_as_provider(user) is True
 
 
-def test_can_access_network_ever_verified_no_longer_retains_access():
+def test_can_act_as_provider_ever_verified_no_longer_retains_access():
     """The `ever_verified_at` retention clause was removed — access reverts
     immediately when the underlying claim lapses. A clinician with
     `clinician_verified=False` and only `ever_verified_at` set is denied."""
@@ -280,10 +280,10 @@ def test_can_access_network_ever_verified_no_longer_retains_access():
             )
         ],
     )
-    assert capabilities.can_access_network(user) is False
+    assert capabilities.can_act_as_provider(user) is False
 
 
-def test_can_access_network_org_rep_unlocks_for_user_without_clinician():
+def test_can_act_as_provider_org_rep_unlocks_for_user_without_clinician():
     """A program coordinator with no Type-1 NPI but a verified org rep
     gets full feed access — handoff §3, §7.1."""
     org = _org(org_verified=True)
@@ -291,7 +291,7 @@ def test_can_access_network_org_rep_unlocks_for_user_without_clinician():
         is_verified=True,
         org_representations=[_rep(org_id=org.id, authority_status="verified")],
     )
-    assert capabilities.can_access_network(coordinator) is True
+    assert capabilities.can_act_as_provider(coordinator) is True
 
 
 def test_can_post_referral_tracks_clinician_verified():
@@ -503,12 +503,12 @@ def test_reason_meta_known_reason_carries_full_copy():
     """A known reason resolves to a title, non-empty unlock copy, a fix
     label, and the same deep-link `fix_url_for` returns — one source for
     every display string."""
-    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
+    meta = capabilities.reason_meta(capabilities.REASON_NOT_A_VERIFIED_PROVIDER)
     assert meta.title
     assert meta.unlock
     assert meta.fix_label
     assert meta.fix_url == capabilities.fix_url_for(
-        capabilities.REASON_NETWORK_UNVERIFIED
+        capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
 
 
@@ -516,7 +516,7 @@ def test_reason_meta_network_unverified_points_at_capability_page():
     """The network-access reason (withheld post detail + locked create CTA)
     carries verification-oriented copy and points at the capability detail
     page where the user can see exactly what needs to change."""
-    meta = capabilities.reason_meta(capabilities.REASON_NETWORK_UNVERIFIED)
+    meta = capabilities.reason_meta(capabilities.REASON_NOT_A_VERIFIED_PROVIDER)
     assert "Get access" == meta.fix_label
     assert meta.fix_url == "/users/me/access/capabilities/provider-network"
     assert meta.unlock
@@ -641,23 +641,23 @@ def test_owns_program_predicate_handles_anon():
     assert capabilities.owns_program(None) is False
 
 
-# ---------- check_network -------------------------------------------
+# ---------- check_provider_identity -------------------------------------------
 
 
-def test_check_network_anon_denied():
+def test_check_provider_identity_anon_denied():
     """None user: email not verified → entire Bundle fails."""
-    check = capabilities.check_network(None)
+    check = capabilities.check_provider_identity(None)
     assert check.granted is False
     assert check.name == "provider-network"
 
 
-def test_check_network_email_unverified_denied():
+def test_check_provider_identity_email_unverified_denied():
     """Email unverified: Bundle root fails even if a claim would pass."""
     user = _user(
         is_verified=False,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    check = capabilities.check_network(user)
+    check = capabilities.check_provider_identity(user)
     assert check.granted is False
     # The Condition for email should be unmet.
     email_condition = check.tree.children[0]
@@ -665,10 +665,10 @@ def test_check_network_email_unverified_denied():
     assert email_condition.met is False
 
 
-def test_check_network_email_verified_no_claims_denied():
+def test_check_provider_identity_email_verified_no_claims_denied():
     """Email verified but no clinician or org rep claim → Gate fails."""
     user = _user(is_verified=True)
-    check = capabilities.check_network(user)
+    check = capabilities.check_provider_identity(user)
     assert check.granted is False
     email_condition = check.tree.children[0]
     assert email_condition.met is True
@@ -676,13 +676,13 @@ def test_check_network_email_verified_no_claims_denied():
     assert gate.met is False
 
 
-def test_check_network_clinician_verified_granted():
+def test_check_provider_identity_clinician_verified_granted():
     """Email + clinician_verified → Bundle passes."""
     user = _user(
         is_verified=True,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    check = capabilities.check_network(user)
+    check = capabilities.check_provider_identity(user)
     assert check.granted is True
     gate = check.tree.children[1]
     clin_condition = gate.children[0]
@@ -690,14 +690,14 @@ def test_check_network_clinician_verified_granted():
     assert clin_condition.met is True
 
 
-def test_check_network_org_rep_granted():
+def test_check_provider_identity_org_rep_granted():
     """Email + verified org rep → Bundle passes via the Gate's second child."""
     org = _org(org_verified=True)
     user = _user(
         is_verified=True,
         org_representations=[_rep(org_id=org.id, authority_status="verified")],
     )
-    check = capabilities.check_network(user)
+    check = capabilities.check_provider_identity(user)
     assert check.granted is True
     gate = check.tree.children[1]
     org_condition = gate.children[1]
@@ -705,10 +705,10 @@ def test_check_network_org_rep_granted():
     assert org_condition.met is True
 
 
-def test_check_network_fix_urls_present():
+def test_check_provider_identity_fix_urls_present():
     """Unmet Condition nodes carry fix_url links to the canonical resources."""
     user = _user(is_verified=True)  # no claims
-    check = capabilities.check_network(user)
+    check = capabilities.check_provider_identity(user)
     gate = check.tree.children[1]
     clin_condition = gate.children[0]
     org_condition = gate.children[1]
@@ -716,9 +716,9 @@ def test_check_network_fix_urls_present():
     assert org_condition.fix_url == "/organizations/form"
 
 
-def test_check_network_tree_structure():
+def test_check_provider_identity_tree_structure():
     """The tree is always Bundle > (Condition, Gate > (Condition, Condition))."""
-    check = capabilities.check_network(_user())
+    check = capabilities.check_provider_identity(_user())
     assert check.tree.__class__.__name__ == "Bundle"
     assert len(check.tree.children) == 2
     assert check.tree.children[0].__class__.__name__ == "Condition"
@@ -728,8 +728,8 @@ def test_check_network_tree_structure():
     assert all(c.__class__.__name__ == "Condition" for c in gate.children)
 
 
-def test_check_network_label_and_description():
-    check = capabilities.check_network(_user())
+def test_check_provider_identity_label_and_description():
+    check = capabilities.check_provider_identity(_user())
     assert check.tree.label_active == "Provider network"
     assert check.description == "See full provider details and reach out directly."
 
@@ -807,7 +807,7 @@ def test_check_program_intake_all_three_leaves_grants():
 
 
 def test_can_post_program_intake_picker_superuser_bypass():
-    """Symmetric with `can_access_network` — admins post any kind even
+    """Symmetric with `can_act_as_provider` — admins post any kind even
     without the underlying leaves."""
     admin = _user(is_verified=False, is_superuser=True)
     assert capabilities.can_post_program_intake_picker(admin) is True

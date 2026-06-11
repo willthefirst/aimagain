@@ -63,7 +63,7 @@ def test_collection_tuple_carries_lock_reason_when_viewer_locked_out():
     parent = _User("alice")
     with patch(
         "src.framework.rendering.route_urls.entity_lock_reason",
-        return_value=capabilities.REASON_NETWORK_UNVERIFIED,
+        return_value=capabilities.REASON_NOT_A_VERIFIED_PROVIDER,
     ):
         items = subresource_breadcrumb_items(
             parent_spec=spec,
@@ -72,7 +72,7 @@ def test_collection_tuple_carries_lock_reason_when_viewer_locked_out():
             child_label="Favorites",
             viewer=parent,
         )
-    assert items[0] == ("Users", "/users", capabilities.REASON_NETWORK_UNVERIFIED)
+    assert items[0] == ("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER)
     # Parent-row and child segments are never locked here — only the
     # collection back-target can fail the read policy.
     assert items[1][2] is None

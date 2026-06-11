@@ -16,7 +16,7 @@ from src.framework.access.capabilities.capabilities import mount_capability_rout
 access_router = APIRouter(prefix="/users/me/access", tags=["access"])
 
 _CHECKS = {
-    "provider-network": capabilities.check_network,
+    "provider-network": capabilities.check_provider_identity,
     "program-intake": capabilities.check_program_intake,
 }
 

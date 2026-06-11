@@ -32,7 +32,7 @@ class OnboardingReadiness:
       (`any_org_rep_verified`).
     - `can_post` — holds at least one posting-capable claim (A or B). The
       gate a "Post an opening / referral" CTA must respect.
-    - `can_access_network` — full (un-teased) feed access.
+    - `can_act_as_provider` — full (un-teased) feed access.
     - `next_label` / `next_href` — the single next verification step, or
       ``None`` when nothing remains (the user can post). Hrefs come from
       `capabilities.fix_url_for` (the step subroutes) so the deep-link
@@ -43,7 +43,7 @@ class OnboardingReadiness:
     claim_a_verified: bool
     claim_b_verified: bool
     can_post: bool
-    can_access_network: bool
+    can_act_as_provider: bool
     next_label: str | None
     next_href: str | None
 
@@ -55,7 +55,7 @@ def onboarding_readiness(user: Any) -> OnboardingReadiness:
     `getattr` like the rest of that module, so template stubs and the
     real `User` ORM row both work. `can_post` is "holds a posting-capable
     claim" (Claim A or any verified Claim B), matching the structure of
-    `can_access_network`; the per-kind gates (`can_post_referral`,
+    `can_act_as_provider`; the per-kind gates (`can_post_referral`,
     `can_post_program_intake`) refine it at the actual post boundary.
     """
     email = capabilities.email_verified(user)
@@ -80,7 +80,7 @@ def onboarding_readiness(user: Any) -> OnboardingReadiness:
         claim_a_verified=claim_a,
         claim_b_verified=claim_b,
         can_post=can_post,
-        can_access_network=capabilities.can_access_network(user),
+        can_act_as_provider=capabilities.can_act_as_provider(user),
         next_label=next_label,
         next_href=next_href,
     )

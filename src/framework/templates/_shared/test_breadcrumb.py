@@ -55,11 +55,14 @@ def test_breadcrumb_lock_reason_set_renders_locked_back() -> None:
     """3-tuple with a `REASON_*` code emits the popover-trigger chrome:
     aria-disabled, `data-locked-cta`, and crucially no `href` so a click
     can't navigate to the gated page."""
-    html = _render('[("Users", "/users", capabilities.REASON_NETWORK_UNVERIFIED)]')
+    html = _render('[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER)]')
     a = HTMLParser(html).css_first("a.breadcrumb-back")
     assert a is not None
     assert a.attributes.get("aria-disabled") == "true"
-    assert a.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+    assert (
+        a.attributes.get("data-locked-cta")
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
+    )
     assert "href" not in a.attributes
     assert a.css_first("span.breadcrumb-back-label").text() == "Users"
 
@@ -67,7 +70,7 @@ def test_breadcrumb_lock_reason_set_renders_locked_back() -> None:
 def test_breadcrumb_lock_reason_preserves_chevron() -> None:
     """The locked branch keeps the back-chevron icon — visual continuity
     with the normal breadcrumb-back so the layout doesn't shift."""
-    html = _render('[("Users", "/users", capabilities.REASON_NETWORK_UNVERIFIED)]')
+    html = _render('[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER)]')
     a = HTMLParser(html).css_first("a.breadcrumb-back")
     assert a is not None
     assert a.css_first("i.icon-arrow-left") is not None
@@ -77,7 +80,7 @@ def test_breadcrumb_multi_segment_uses_deepest_linkable_for_lock() -> None:
     """For nested chains, the back target is the deepest item with an href
     — when that item carries a lock_reason, the back link is locked."""
     html = _render(
-        '[("Users", "/users", capabilities.REASON_NETWORK_UNVERIFIED),'
+        '[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER),'
         ' ("Will", "/users/abc", none),'
         ' ("Favorites", none, none)]'
     )
@@ -94,10 +97,13 @@ def test_breadcrumb_two_segment_locks_when_collection_locked() -> None:
     is the current page, the back target IS the collection — locking
     propagates to the visible link."""
     html = _render(
-        '[("Users", "/users", capabilities.REASON_NETWORK_UNVERIFIED),'
+        '[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER),'
         ' ("Favorites", none, none)]'
     )
     a = HTMLParser(html).css_first("a.breadcrumb-back")
     assert a is not None
-    assert a.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+    assert (
+        a.attributes.get("data-locked-cta")
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
+    )
     assert "href" not in a.attributes

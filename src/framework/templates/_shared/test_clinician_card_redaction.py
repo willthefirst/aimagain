@@ -11,7 +11,7 @@ before clearing network verification.
 These tests render the macro directly with synthetic clinicians + viewer
 ids to pin the four combinations:
 
-    | can_access_network | owner == viewer | rendered                       |
+    | can_act_as_provider | owner == viewer | rendered                       |
     | ------------------ | --------------- | ------------------------------ |
     | True               | any             | un-redacted (network bypass)   |
     | False              | True            | un-redacted (owner override)   |
@@ -60,7 +60,7 @@ def _render_card(
     env: Environment,
     *,
     clinician,
-    can_access_network: bool,
+    can_act_as_provider: bool,
     current_user_id,
 ) -> str:
     """Render the card macro with the chrome context the macro reads."""
@@ -70,21 +70,21 @@ def _render_card(
         """)
     return env.from_string(snippet).render(
         clinician=clinician,
-        can_access_network=can_access_network,
+        can_act_as_provider=can_act_as_provider,
         current_user_id=current_user_id,
     )
 
 
 def test_un_redacted_when_viewer_has_network_access() -> None:
     """A network-verified viewer sees every identifying field — the
-    `not can_access_network` half of the redaction predicate fails, so
+    `not can_act_as_provider` half of the redaction predicate fails, so
     redaction never fires regardless of ownership."""
     env = _make_env()
     other_id, viewer_id = uuid.uuid4(), uuid.uuid4()
     html = _render_card(
         env,
         clinician=_clinician(owner_id=other_id),
-        can_access_network=True,
+        can_act_as_provider=True,
         current_user_id=viewer_id,
     )
     tree = HTMLParser(html)
@@ -105,7 +105,7 @@ def test_un_redacted_when_viewer_owns_the_row() -> None:
     html = _render_card(
         env,
         clinician=_clinician(owner_id=viewer_id),
-        can_access_network=False,
+        can_act_as_provider=False,
         current_user_id=viewer_id,
     )
     tree = HTMLParser(html)
@@ -139,7 +139,7 @@ def test_solo_affiliation_renders_as_plain_practice_chip() -> None:
     html = _render_card(
         env,
         clinician=solo,
-        can_access_network=True,
+        can_act_as_provider=True,
         current_user_id=viewer_id,
     )
     tree = HTMLParser(html)
@@ -161,7 +161,7 @@ def test_redacted_when_viewer_not_owner_and_not_network() -> None:
     html = _render_card(
         env,
         clinician=_clinician(owner_id=other_id),
-        can_access_network=False,
+        can_act_as_provider=False,
         current_user_id=viewer_id,
     )
     tree = HTMLParser(html)

@@ -38,19 +38,19 @@ def base_context(user: Actor | None) -> dict:
     (see `src.auth_config.UserManager.on_after_register`) so the
     banner is silent for the seed flow.
 
-    `can_access_network` is the single chrome gate for both feed access
+    `can_act_as_provider` is the single chrome gate for both feed access
     and the Create Post CTA — any network-verified user (clinician or
     org rep) gets both.
 
     `viewer_rep_org_ids` is the set of Organization IDs the viewer holds
     a verified, non-archived `OrgRepresentation` for. The clinician /
     organization / user card and detail templates redact identifying
-    rows when `not can_access_network` AND the row isn't the viewer's
+    rows when `not can_act_as_provider` AND the row isn't the viewer's
     own — "own" for an Organization includes verified-rep affiliation,
     matching message-1 "owns/is affiliated to". Empty set for anonymous
     or anyone without rep status.
     """
-    from src.domain.logic.capabilities import can_access_network, claim_state
+    from src.domain.logic.capabilities import can_act_as_provider, claim_state
 
     return {
         "is_authenticated": user is not None,
@@ -61,7 +61,7 @@ def base_context(user: Actor | None) -> dict:
         "current_user_is_verified": (
             True if user is None else bool(getattr(user, "is_verified", True))
         ),
-        "can_access_network": can_access_network(user),
+        "can_act_as_provider": can_act_as_provider(user),
         "viewer_rep_org_ids": claim_state(user).b,
     }
 

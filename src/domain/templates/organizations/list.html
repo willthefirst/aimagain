@@ -13,7 +13,7 @@
    `OrgRepresentation` for the row. `viewer_rep_org_ids` is the
    chrome-context set computed once by `base_context` from `claim_state`. #}
 {%- macro org_card(org) %}
-  {%- set _redacted = not can_access_network
+  {%- set _redacted = not can_act_as_provider
     and org.owner_id != current_user_id
     and org.id not in viewer_rep_org_ids -%}
   {%- call card(
@@ -24,7 +24,7 @@
       <dl>
         {%- if org.npi %}
           {% if _redacted %}
-            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NETWORK_UNVERIFIED) }}{%- endcall %}
+            {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
             {% else %}
               {{ fact('npi', 'NPI', org.npi) }}
             {% endif %}

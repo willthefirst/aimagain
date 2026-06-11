@@ -7,7 +7,7 @@
    redact identifying fields per the `_clinician_card.html` /
    `posts/_shared/_facts_block.html` pattern. The viewer's own
    clinicians always render un-redacted so they can self-manage. #}
-{%- set _redacted = not can_access_network and clinician.owner_id != current_user_id -%}
+{%- set _redacted = not can_act_as_provider and clinician.owner_id != current_user_id -%}
 {% block resource_label %}Clinicians{% endblock %}
 {# H1 — clinician's name when set; falls back to the primary affiliation's
    organization name for legacy rows without name data. Redacted viewers
