@@ -161,13 +161,18 @@ def test_nested_gate_inside_bundle():
 # ---------- Leaf -----------------------------------------------------------
 
 
-def _leaf(name: str = "x", predicate=lambda a: True) -> Leaf:
+def _leaf(
+    name: str = "x",
+    predicate=lambda a: True,
+    requires: tuple[Leaf, ...] = (),
+) -> Leaf:
     return Leaf(
         name=name,
         label_active=f"Do {name}",
         label_done=f"{name} done",
         fix_url=f"/fix/{name}",
         predicate=predicate,
+        requires=requires,
     )
 
 
@@ -206,6 +211,91 @@ def test_leaf_evaluate_coerces_falsy_predicate_to_bool():
     cond = _leaf(predicate=lambda a: []).evaluate(actor=None)
     assert cond.met is False
     assert isinstance(cond.met, bool)
+
+
+# ---------- Leaf.requires / evaluate_chain --------------------------------
+
+
+def test_leaf_requires_defaults_to_empty_tuple():
+    """Leaves with no upstream dependencies don't have to declare
+    `requires` — the default matches the existing single-leaf shape."""
+    assert _leaf().requires == ()
+
+
+def test_leaf_evaluate_chain_no_requires_returns_self_only():
+    """A leaf with no `requires` returns just its own `Condition` — same
+    boolean as `evaluate()`, just wrapped in a one-tuple so callers can
+    splat uniformly."""
+    leaf = _leaf(name="x", predicate=lambda a: True)
+    chain = leaf.evaluate_chain(actor=None)
+    assert len(chain) == 1
+    assert chain[0].label_active == "Do x"
+    assert chain[0].met is True
+
+
+def test_leaf_evaluate_chain_one_requires_emits_dep_first():
+    """`A.requires = (B,)` → `A.evaluate_chain()` yields `(B_cond,
+    A_cond)`. Dep-first order matches reading the UI top-to-bottom:
+    prerequisites appear above the dependent step."""
+    b = _leaf(name="b", predicate=lambda a: True)
+    a = _leaf(name="a", predicate=lambda a: False, requires=(b,))
+    chain = a.evaluate_chain(actor=None)
+    assert [c.label_active for c in chain] == ["Do b", "Do a"]
+    assert [c.met for c in chain] == [True, False]
+
+
+def test_leaf_evaluate_chain_transitive_requires():
+    """A→B→C: `A.evaluate_chain()` yields `(C, B, A)`. The chain is the
+    full transitive closure so a consumer only ever names the top of
+    the chain to pull in everything below it."""
+    c = _leaf(name="c")
+    b = _leaf(name="b", requires=(c,))
+    a = _leaf(name="a", requires=(b,))
+    chain = a.evaluate_chain(actor=None)
+    assert [cnd.label_active for cnd in chain] == ["Do c", "Do b", "Do a"]
+
+
+def test_leaf_evaluate_chain_dedupes_shared_dep():
+    """A.requires=(C,), B.requires=(C,), and a Bundle wants both: each
+    leaf's own chain still includes C. The chain dedupes within a
+    single `evaluate_chain` call by leaf name — and tree-level dedup
+    across siblings is the composer's responsibility (Bundle's
+    children are listed once)."""
+    c = _leaf(name="c")
+    a = _leaf(name="a", requires=(c, c))  # accidental double-require
+    chain = a.evaluate_chain(actor=None)
+    assert [cnd.label_active for cnd in chain] == ["Do c", "Do a"]
+
+
+def test_leaf_evaluate_chain_diamond_dedupes_by_name():
+    """A.requires=(B, C); B.requires=(D,); C.requires=(D,): D is shared
+    so it appears once. Order: D before B and C; A last."""
+    d = _leaf(name="d")
+    b = _leaf(name="b", requires=(d,))
+    c = _leaf(name="c", requires=(d,))
+    a = _leaf(name="a", requires=(b, c))
+    chain = a.evaluate_chain(actor=None)
+    labels = [cnd.label_active for cnd in chain]
+    assert labels == ["Do d", "Do b", "Do c", "Do a"]
+
+
+def test_leaf_evaluate_chain_passes_actor_to_every_predicate():
+    """Every leaf in the chain — including transitive prereqs — sees
+    the same actor passed to `evaluate_chain`."""
+    seen: list = []
+
+    def record(name):
+        def pred(actor):
+            seen.append((name, actor))
+            return True
+
+        return pred
+
+    c = _leaf(name="c", predicate=record("c"))
+    b = _leaf(name="b", predicate=record("b"), requires=(c,))
+    a = _leaf(name="a", predicate=record("a"), requires=(b,))
+    a.evaluate_chain(actor="sentinel")
+    assert seen == [("c", "sentinel"), ("b", "sentinel"), ("a", "sentinel")]
 
 
 # ---------- LeafRegistry --------------------------------------------------

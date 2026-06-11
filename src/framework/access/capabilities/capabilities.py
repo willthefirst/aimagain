@@ -115,9 +115,19 @@ class Leaf:
     capabilities reference the same fact without re-declaring its
     label/fix-URL.
 
-    Use `leaf.evaluate(actor)` to produce a `Condition` for a tree. The
-    predicate is invoked once per evaluation — leaves are not cached,
-    because capability checks are read-light and per-request.
+    `requires` declares this leaf's upstream dependencies in the DAG —
+    other leaves that must hold for this one to be meaningful (e.g.
+    `OWNS_PROGRAM_LEAF.requires = (ORG_REP_ANY_LEAF,)`: you can't own
+    a program without a verified org rep on its org). Composers
+    `evaluate_chain(actor)` to splat the dependency closure into a
+    parent Bundle's children, instead of every consumer remembering to
+    list the prereqs as siblings. The bare `evaluate(actor)` is
+    unchanged: it returns just this leaf's own `Condition` — use it
+    when you don't want the chain (e.g. one fact's bool for a
+    standalone gate).
+
+    The predicate is invoked once per evaluation — leaves are not
+    cached, because capability checks are read-light and per-request.
     """
 
     name: str
@@ -125,6 +135,7 @@ class Leaf:
     label_done: str  # passive-past: "Email verified"
     fix_url: str  # deep-link to the resource that flips this bit
     predicate: Callable[[Any], bool]
+    requires: tuple["Leaf", ...] = ()
 
     def evaluate(self, actor: Any) -> Condition:
         return Condition(
@@ -133,6 +144,29 @@ class Leaf:
             met=bool(self.predicate(actor)),
             fix_url=self.fix_url,
         )
+
+    def evaluate_chain(self, actor: Any) -> tuple[Condition, ...]:
+        """Yield this leaf's `Condition` preceded by every transitive
+        prerequisite, in dependency-first order, dedup'd by leaf name.
+
+        Splat the result into a parent `Bundle`'s `children` so the
+        prereqs appear as siblings of the leaf — same flat structure
+        the existing renderer expects, but declared once on the leaf
+        instead of duplicated at every consumer site.
+        """
+        seen: set[str] = set()
+        chain: list[Condition] = []
+
+        def visit(leaf: "Leaf") -> None:
+            if leaf.name in seen:
+                return
+            seen.add(leaf.name)
+            for req in leaf.requires:
+                visit(req)
+            chain.append(leaf.evaluate(actor))
+
+        visit(self)
+        return tuple(chain)
 
 
 class LeafRegistry:
