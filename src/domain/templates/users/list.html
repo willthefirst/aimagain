@@ -2,6 +2,11 @@
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_locked.html" import locked_name -%}
+{# Admin actions (Deactivate / Reactivate / Delete) live ONLY on the
+   user-detail page (`users/detail.html`'s toolbar), not on this list.
+   Per-row commands on a card list invite mis-clicks on the wrong row,
+   and the bulk-admin efficiency wasn't worth the irreversible-delete
+   risk. Admins click through to a user's detail page to act on them. #}
 {%- macro user_card(user) %}
   {# Redact the username (the only identifying field surfaced in the
      card chrome) when the viewer lacks network access and isn't this
@@ -21,18 +26,6 @@
     headline_url=None if _redacted else entity_url('user', id=user.id),
     headline=locked_name("J. Doe") if _redacted else user.username,
     subtitle=status_subtitle) -%}
-    {# Admin actions live in the card footer. viewer_is_admin() reads the
-       request-scoped viewer set by handle_list, so user_card stays a
-       single-arg callable compatible with item_list. #}
-    {%- if viewer_is_admin() %}
-      <footer>
-        <menu>
-          {%- with target_user = user, can_admin_actions = true -%}
-            {%- include "users/_admin_actions.html" -%}
-          {%- endwith -%}
-        </menu>
-      </footer>
-    {%- endif %}
   {%- endcall %}
 {%- endmacro %}
 {% block list_body %}

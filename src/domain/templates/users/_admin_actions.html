@@ -8,15 +8,16 @@
                           not introspect `current_user`.
 
    Renders nothing unless `can_admin_actions` is truthy. Each action
-   is a `<li>` because this partial renders inside a `<menu>` —
-   either the page toolbar on `/users/{id}` or the card footer on
-   the `/users` index card (`users/list.html` wraps the include in a
-   `<menu>` inside the card's `<footer>`). The buttons themselves
-   carry the user's identity in their `hx-*` URLs
-   (`/users/{id}/activation`, `/users/{id}`); tests find them by
+   is a `<li>` because this partial renders inside the page toolbar's
+   `<menu class="toolbar-right">` on `/users/{id}` — the canonical
+   home for per-target admin actions. The `/users` index card used to
+   wrap this include in a card-footer `<menu>` too, but per-row
+   commands on a list invited mis-clicks (especially for the
+   irreversible Delete); admins click through to detail to act.
+   The buttons themselves carry the user's identity in their `hx-*`
+   URLs (`/users/{id}/activation`, `/users/{id}`); tests find them by
    attribute rather than a wrapper class. To add a new admin action,
-   append a `<li><button>…</button></li>` below; every view that
-   includes this partial picks it up automatically.
+   append a `<li><button>…</button></li>` below.
 
    Backend self-guards live in src/logic/users/user_processing.py — this
    `{% if %}` is presentation only.
