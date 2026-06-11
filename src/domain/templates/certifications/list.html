@@ -1,12 +1,11 @@
 {# `/clinicians/{clinician_id}/certifications` — canonical sub-resource
-   list. Read-only; toolbar carries the create CTA; rows are whole-row
-   navigation links to the edit page. Per-row Delete moves to the edit
-   page's actions cluster (strict canonical, matching licensures /
-   organizations / clinicians / programs).
+   list. See `licensures/list.html` for the card-pattern rationale
+   shared across all four clinician sub-resource lists.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_credential_list.html" import credential_list -%}
-{%- from "_shared/_credential_row.html" import credential_row -%}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Certifications{% endblock %}
 {% block actions %}
   <li>
@@ -14,13 +13,23 @@
        role="button">Create certification</a>
   </li>
 {% endblock %}
+{%- macro certification_card(cert) %}
+  {%- set subtitle %}
+    {%- if cert.certifying_body %}<span>{{ cert.certifying_body }}</span>{%- endif %}
+  {%- endset %}
+  {%- call card(
+    id=cert.id,
+    headline_url=entity_url('clinician', id=clinician.id) ~ "/certifications/" ~ cert.id|string ~ "/form",
+    headline=CERTIFICATION_TYPES_LABELS[cert.certification_type],
+    subtitle=subtitle | trim) -%}
+    {%- if cert.expiration_date -%}
+      {%- call facts_block() %}
+        {{ fact('expiration_date', 'Expires', cert.expiration_date) }}
+      {%- endcall %}
+    {%- endif %}
+  {%- endcall %}
+{%- endmacro %}
 {% block list_body %}
-  <section>
-    {% call(cert) credential_list(rows, "No certifications yet.") %}
-      {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
-            [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
-      href=entity_url('clinician', id=clinician.id) ~ "/certifications/" ~ cert.id|string ~ "/form",
-      ) }}
-    {% endcall %}
-  </section>
+  {{ item_list(rows, certification_card, "certifications-list",
+    empty_msg="No certifications yet.") }}
 {% endblock %}

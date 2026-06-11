@@ -1,16 +1,21 @@
 {# `/clinicians/{clinician_id}/licensures` — canonical sub-resource list.
 
-   First credential migrated to the canonical resource pattern: the
-   list page is read-only (no inline add form, no per-row affordances).
-   "Create licensure" lives in the toolbar; clicking a row opens the
-   edit page where Delete + Attest active live.
+   Renders the licensures as `_shared/_card.html` articles via the
+   shared `item_list` macro — same vocabulary every top-level list
+   page uses (clinicians, organizations, programs). The flat
+   `credential_row` shape this page used to use was a hold-over from
+   when credentials were rendered nested inside the clinician edit
+   card; once the canonical-resource-pattern conversion moved them
+   to standalone pages, the framework README's "every list view
+   uses cards via `_card.html`" rule applies here too.
 
    Breadcrumb is auto-injected by `mount_entity` / the parent-aware
    `mount_list` because `CLINICIAN_ENTITY.display_label_fn` is set.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_credential_list.html" import credential_list -%}
-{%- from "_shared/_credential_row.html" import credential_row -%}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Licensures{% endblock %}
 {% block actions %}
   <li>
@@ -18,13 +23,23 @@
        role="button">Create licensure</a>
   </li>
 {% endblock %}
-{% block list_body %}
-  <section>
-    {% call(lic) credential_list(rows, "No licensures yet.") %}
-      {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
-            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None, lic.status | title],
-      href=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/form",
-      ) }}
-    {% endcall %}
-  </section>
-{% endblock %}
+{%- macro licensure_card(lic) %}
+  {%- set subtitle %}
+    <span>{{ lic.issuing_state }}</span>
+    <span>{{ lic.status | title }}</span>
+  {%- endset %}
+  {%- call card(
+    id=lic.id,
+    headline_url=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/form",
+    headline=LICENSE_TYPES_LABELS[lic.license_type],
+    subtitle=subtitle) -%}
+    {%- call facts_block() %}
+      {{ fact('license_number', 'License #', "#" ~ lic.license_number) }}
+      {%- if lic.expiration_date -%}{{ fact('expiration_date', 'Expires', lic.expiration_date) }}{%- endif %}
+      {%- endcall %}
+    {%- endcall %}
+  {%- endmacro %}
+  {% block list_body %}
+    {{ item_list(rows, licensure_card, "licensures-list",
+        empty_msg="No licensures yet.") }}
+  {% endblock %}
