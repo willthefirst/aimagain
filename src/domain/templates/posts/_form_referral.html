@@ -30,20 +30,15 @@ which FastAPI/Pydantic parses as a list.
    at the top of `_shared/form_fields.html`). No per-field error or
    value threading is required at the callsite below. #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section with context -%}
+{%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import modality_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro referral_form(hx_method, action, submit_label, post=None, schema=None, cancel_url=None) -%}
   {%- set d = post.referral_detail if post else None -%}
-  {# `hx-target="this" hx-swap="outerHTML"` for the error-rerender path;
-     bundled into `_hx_attrs` because `hx-{{ hx_method }}` is a
-     templated attribute *name* and djlint mis-wraps when the line
-     exceeds its budget. `hx-target-4xx`/`hx-swap-4xx` activate the
-     `response-targets` extension (loaded in `base.html`) so a 422
-     validation-error response — the status `mount_create` returns
-     on a Pydantic failure once the rerender path lands the proper
-     code — still swaps the form fragment in place. #}
-  {%- set _hx_attrs = "hx-target=\"this\" hx-swap=\"outerHTML\" hx-target-4xx=\"this\" hx-swap-4xx=\"outerHTML\"" -%}
-  <form hx-{{ hx_method }}="{{ action }}" {{ _hx_attrs|safe }}>
+  {# `error_swap=True` lights up the response-targets attrs that swap a
+     422 validation re-render in place; success path is unaffected
+     because `mount_create` emits `HX-Redirect`. #}
+  {%- call entity_form(action, method=hx_method, error_swap=True) -%}
     <input type="hidden" name="kind" value="referral" />
     {# Referring clinician picker — required; populated from the current
        user's owned clinicians' affiliations. Each option value is the
@@ -100,7 +95,7 @@ which FastAPI/Pydantic parses as a list.
     {% endcall %}
     {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {{ actions(submit_label, cancel_url=cancel_url) }}
-  </form>
+  {%- endcall -%}
   <script>
   (function () {
     var sel = document.querySelector('select[name="network_preference"]');
