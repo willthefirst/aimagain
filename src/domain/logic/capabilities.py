@@ -295,7 +295,21 @@ OWNS_PROGRAM_LEAF = LEAVES.register(
 
 
 def check_provider_identity(user: Any) -> CapabilityCheck:
-    """Structured capability check for full-feed read access.
+    """Structured capability check for "the user has a verified provider
+    identity" — a clinician (Claim A) or an org rep (Claim B), plus a
+    verified email.
+
+    Two surfaces share this gate:
+
+    - **Read** — full-feed access (un-redacted provider details on the
+      directory and feed). `can_act_as_provider` is the boolean form.
+    - **Authored posts** — the `referral` and `clinician_opening`
+      picker tiles on `/posts/form` (see `domain/templates/posts/
+      form_new.html`). The picker is "coarse" — a Claim-B user
+      without an affiliation passes the tile but still bounces at
+      payload-authz time. Per-row payload authz lives in
+      `_assert_post_payload_authz`; this check is for surfacing
+      identity verification as the gating step in the picker UI.
 
     Tree: email_verified AND (clinician_verified OR org_rep_verified).
     `ever_verified_at` retention is intentionally excluded — access
