@@ -63,10 +63,27 @@ which FastAPI/Pydantic parses as a list.
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Referring clinician", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
     {{ textarea_field("description", "About the client", current=d.description if d else None, help="Anything else a clinician needs to know. Please don't include identifying details.") }}
+    {# Clinical-niche tags (#1358 PR-c). Free-form `list[str]` on the
+       wire — the niche vocabulary is too open-ended to commit to a
+       closed enum on day one. UI is a single comma-separated text input
+       that a tiny inline script (below) splits into multiple hidden
+       `clinical_niches` inputs on submit, so the server still receives
+       the wire shape Pydantic expects (repeated `clinical_niches=tag`
+       pairs the `scalar_to_list`/`clean_free_form_tags` validator
+       accepts). The raw input is disabled at submit time so it doesn't
+       also POST a stale comma-joined value. #}
+    {{ text_field("_clinical_niches_input", "Clinical niches", current=((d.clinical_niches | join(", ") ) if d and d.clinical_niches else None), required=false, help="Comma-separated free-form tags (e.g. \"DGBI, ADHD in women, complex trauma\"). Match what the clinician self-claims.") }}
+    <div id="clinical-niches-hidden" hidden></div>
     {% call form_section("Client demographics") %}
       {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
       {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
       {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
+      {# Affirming-identity request constraints (#1358 PR-a). Symmetric
+         to `Clinician.affirming_identities` — the referrer states the
+         affordances the client needs, the clinician claims the ones
+         they offer. Empty selection = "no preference stated", which is
+         the schema default. #}
+      {{ multi_select_field("affirming_identities", "Affirming identities", AFFIRMING_IDENTITIES, labels=AFFIRMING_IDENTITY_LABELS, current=d.affirming_identities if d else None, required=false, help=select_all_help() ) }}
     {% endcall %}
     {% call form_section("Client location") %}
       {{ text_field("location_city", "City", current=d.location_city if d else None) }}
@@ -81,6 +98,12 @@ which FastAPI/Pydantic parses as a list.
     {% call form_section("Services needed") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
+      {# License-class disjunction on the referred provider (#1358 PR-b).
+         Captures "psychiatrist OR PMHNP" patterns that `services` can't
+         express (medication_management could be delivered by a PCP, PA,
+         or non-psychiatric NP). Empty selection = "no constraint" — any
+         license class accepted; the schema default. #}
+      {{ multi_select_field("acceptable_license_types", "Acceptable license classes", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=d.acceptable_license_types if d else None, required=false, help="Leave empty for no constraint. Select multiple to express disjunction (e.g. psychiatrist OR PMHNP).") }}
     {% endcall %}
     {# Insurance / payment paths (#1358 PR-e). Three independent checkbox
      booleans the corpus consistently distinguishes — "Anthem PPO;
@@ -116,6 +139,39 @@ which FastAPI/Pydantic parses as a list.
     }
     inNet.addEventListener('change', sync);
     sync();
+  })();
+  </script>
+  <script>
+  /* Clinical-niche tag splitter (#1358 PR-c). The visible input is a
+     single comma-separated text field; on form submit (capture phase so
+     htmx's submit handler sees the synthesized hidden inputs) we split
+     on comma, strip, drop empties, dedupe, and inject one hidden input
+     per tag with name="clinical_niches" — the wire shape the
+     `clean_free_form_tags` validator expects. The raw input is then
+     disabled so it doesn't also POST a stale comma-joined value under
+     its `_clinical_niches_input` name. Empty input is fine — zero
+     hidden inputs, which the schema reads as the default empty list. */
+  (function () {
+    var raw = document.querySelector('input[name="_clinical_niches_input"]');
+    var hidden = document.getElementById('clinical-niches-hidden');
+    if (!raw || !hidden) return;
+    var form = raw.closest('form');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      hidden.innerHTML = '';
+      var seen = {};
+      (raw.value || '').split(',').forEach(function (part) {
+        var tag = part.trim();
+        if (!tag || seen[tag]) return;
+        seen[tag] = true;
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'clinical_niches';
+        input.value = tag;
+        hidden.appendChild(input);
+      });
+      raw.disabled = true;
+    }, true);
   })();
   </script>
 {%- endmacro -%}
