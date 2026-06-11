@@ -55,6 +55,7 @@ from src.domain.logic.value_objects.location import (
 )
 from src.domain.models import POST_KINDS
 from src.domain.models.enums import (
+    AFFIRMING_IDENTITIES,
     CLIENT_AGE_GROUPS,
     DESIRED_TIME_SLOTS,
     GENDERS,
@@ -146,6 +147,12 @@ GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list
 ModalitiesField = Annotated[
     list[Literal[*TREATMENT_MODALITIES]], BeforeValidator(scalar_to_list)
 ]
+# `referral.affirming_identities` — request-side constraint, multi-checkbox
+# on the wire. Empty list is allowed ("no preference stated"). Symmetric
+# to `Clinician.affirming_identities` on the provider side.
+AffirmingIdentitiesField = Annotated[
+    list[Literal[*AFFIRMING_IDENTITIES]], BeforeValidator(scalar_to_list)
+]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -216,6 +223,9 @@ class ReferralRead(_PostReadBase):
     # See :class:`ReferralCreate` for the carrier/preference split.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # Affirming-identity request constraints. JSON list of
+    # `AFFIRMING_IDENTITIES` tokens; empty list = "no preference stated".
+    affirming_identities: AffirmingIdentitiesField = []
     # FK to the Clinician the submitting user designated as referrer.
     # Nullable on the read side — rows created before this field existed
     # will have None here.
@@ -334,6 +344,9 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # decision.
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    # Affirming-identity request constraints. Multi-checkbox on the wire;
+    # empty list = "no preference stated" (the default).
+    affirming_identities: AffirmingIdentitiesField = []
     # Context: which ClinicianAffiliation the referring clinician acts
     # under. This is what the form's practice picker submits (one option
     # per affiliation). Required on new referrals. The server resolves
@@ -474,6 +487,10 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # repo's "None means leave unchanged" semantic for optional fields).
     network_preference: Literal[*NETWORK_PREFERENCES] | None = None
     insurance_carrier: OptionalInsuranceCarrier = None
+    # `None` = leave unchanged; `[]` = clear all claims. List-valued
+    # PATCH replaces the whole list — partial add/remove is intentionally
+    # out of scope, matching `desired_times` / `services` semantics.
+    affirming_identities: AffirmingIdentitiesField | None = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `referring_clinician_id` from it (and re-checks
     # ownership of the resolved clinician) in `_assert_post_payload_authz`.
@@ -581,6 +598,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     modalities: ModalitiesField = []
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
+    affirming_identities: AffirmingIdentitiesField = []
     referring_clinician_id: uuid.UUID | None = None
     clinician_affiliation_id: uuid.UUID | None = None
 

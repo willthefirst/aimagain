@@ -314,6 +314,81 @@ def test_licensure_create_rejects_unknown_field():
         )
 
 
+# --- Affirming-identity (person-level) ----------------------------------
+
+
+def test_clinician_update_accepts_affirming_identities_patch():
+    """`affirming_identities` is a JSON multi-checkbox field on the
+    person-level Update — clinicians self-claim who they affirm. Empty
+    list and a populated list both validate; `None` (omitted) means
+    "leave unchanged" per `PartialUpdate` semantics."""
+    upd = ClinicianUpdate(affirming_identities=["lgbtq", "trans"])
+    assert upd.affirming_identities == ["lgbtq", "trans"]
+
+
+def test_clinician_update_accepts_empty_affirming_identities():
+    """Explicit empty list = clear the claim list. Distinct from `None`
+    (omitted = leave unchanged)."""
+    upd = ClinicianUpdate(affirming_identities=[])
+    assert upd.affirming_identities == []
+
+
+def test_clinician_update_coerces_scalar_affirming_identity_to_list():
+    """HTML form checkboxes with a single checked value submit as a
+    scalar string — `scalar_to_list` normalizes to `["value"]` before
+    `Literal[*AFFIRMING_IDENTITIES]` validation."""
+    upd = ClinicianUpdate(affirming_identities="lgbtq")
+    assert upd.affirming_identities == ["lgbtq"]
+
+
+def test_clinician_update_rejects_unknown_affirming_identity():
+    with pytest.raises(ValidationError):
+        ClinicianUpdate(affirming_identities=["not_a_real_token"])
+
+
+def test_clinician_create_rejects_affirming_identities_on_create():
+    """Create stays minimal: the field is claim-management, set later
+    via PATCH. Stays out of the minimal-Create surface so the create
+    payload isn't widened ahead of need."""
+    with pytest.raises(ValidationError, match="extra"):
+        ClinicianCreate(**_VALID_CREATE, affirming_identities=["lgbtq"])
+
+
+def test_clinician_read_defaults_affirming_identities_to_empty_list():
+    """A row with no claims reads as `[]`, matching the column's
+    server-side default."""
+    now = _now()
+    p = ClinicianRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+        }
+    )
+    assert p.affirming_identities == []
+
+
+def test_clinician_read_round_trips_affirming_identities():
+    now = _now()
+    p = ClinicianRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "created_at": now,
+            "updated_at": now,
+            "first_name": "Jane",
+            "last_name": "Smith",
+            "npi": "1234567890",
+            "affirming_identities": ["lgbtq", "neurodiversity"],
+        }
+    )
+    assert p.affirming_identities == ["lgbtq", "neurodiversity"]
+
+
 # --- Insurance carrier label guardrail ----------------------------------
 
 
