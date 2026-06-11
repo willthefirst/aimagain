@@ -90,10 +90,12 @@ async def _assert_post_payload_authz(
        (:func:`_assert_post_payload_capability`):
 
        - ``referral`` / ``clinician_opening`` → Claim A
-         (`capabilities.clinician_verified(user)`).
+         (`capabilities.clinician_verified(user)`), via the sync
+         :func:`_assert_post_payload_capability`.
        - ``program_intake`` → Claim B for the referenced Program's org
-         (deferred — the org lookup lands when the Profile Hub PR
-         (Phase 5) wires the program-intake create flow end-to-end).
+         (`capabilities.can_post_program_intake(user, org)`), via the
+         async :func:`_assert_program_intake_org_rep` — split out because
+         the check needs the program's org id, which requires a DB read.
 
     Superusers fall through to the self path, where both the ownership
     and capability checks bypass for admins — so an admin still writes
@@ -124,6 +126,12 @@ async def _assert_post_payload_authz(
         program_repo=program_repo,
     )
     _assert_post_payload_capability(payload, requesting_user)
+    await _assert_program_intake_org_rep(
+        payload=payload,
+        requesting_user=requesting_user,
+        program_repo=program_repo,
+        organization_repo=organization_repo,
+    )
 
 
 async def _is_verified_org_rep_for_affiliation(
@@ -189,13 +197,15 @@ async def _resolve_affiliation_context(
 
 
 def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -> None:
-    """Per-kind capability gate. Skips for superusers (admin write
-    rights override the claim-based gate). For `program_intake`, the
-    Claim-B check requires the referenced Program's org id — which is
-    a DB read we don't want to add to this payload-time hook. The
-    Profile Hub PR (Phase 5) introduces the dedicated program-intake
-    create path that takes the org check; this hook stays focused on
-    Claim A."""
+    """Per-kind Claim-A capability gate. Stays sync because the
+    underlying predicates (`can_post_referral`, `can_post_opening`)
+    only read off the user object and don't touch the database.
+    Superusers bypass — admin writes override the claim-based gate.
+
+    `program_intake`'s Claim-B gate lives in the async
+    :func:`_assert_program_intake_org_rep` helper, called from the
+    orchestrator immediately after this one. Split because the
+    Claim-B check needs the target program's org id — a DB read."""
     if getattr(requesting_user, "is_superuser", False):
         return
     kind = getattr(payload, "kind", None)
@@ -215,8 +225,55 @@ def _assert_post_payload_capability(payload: BaseModel, requesting_user: User) -
                 "profile (Claim A). Visit /users/me to complete verification."
             ),
         )
-    # `program_intake` Claim-B gate is intentionally deferred — see
-    # docstring above.
+
+
+async def _assert_program_intake_org_rep(
+    *,
+    payload: BaseModel,
+    requesting_user: User,
+    program_repo: ProgramRepository,
+    organization_repo: OrganizationRepository,
+) -> None:
+    """Per-row Claim-B check for `program_intake` payloads.
+
+    Loads the referenced `Program`, walks to its `Organization`, and
+    asserts `capabilities.can_post_program_intake(user, org)`. This
+    closes the gap the picker-side `check_program_intake` already
+    expresses on `/posts/form`: without it, a user who owns a Program
+    under an unverified org could direct-POST `kind=program_intake`
+    and bypass the locked tile.
+
+    No-op when:
+    - kind is not `program_intake` (referral/opening go through the
+      sync Claim-A helper above);
+    - the user is a superuser (admin writes bypass);
+    - the payload omits `program_id` (a PATCH that doesn't touch the
+      FK — though create requires it); or
+    - the program/org row isn't loadable (already 404'd by
+      :func:`_assert_post_payload_target_ownership` upstream — re-
+      checking here would only mask the upstream error).
+
+    403s with the `program-intake` capability detail URL so the user
+    lands on the same explainer the picker popover points at."""
+    if getattr(requesting_user, "is_superuser", False):
+        return
+    if getattr(payload, "kind", None) != "program_intake":
+        return
+    program_id = getattr(payload, "program_id", None)
+    if program_id is None:
+        return
+    program = await program_repo.get_by_model_id(Program, program_id)
+    if program is None:
+        return
+    org = await organization_repo.get_by_model_id(Organization, program.org_id)
+    if org is None or not capabilities.can_post_program_intake(requesting_user, org):
+        raise ForbiddenError(
+            detail=(
+                "Posting a program intake requires a verified organization "
+                "claim (Claim B) for the program's owning organization. "
+                "Visit /users/me/access/capabilities/program-intake."
+            ),
+        )
 
 
 async def _assert_post_payload_target_ownership(
