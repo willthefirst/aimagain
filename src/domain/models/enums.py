@@ -138,12 +138,23 @@ CLIENT_AGE_GROUPS: Final[tuple[str, ...]] = ClientAgeGroup.values()
 
 
 # Spoken-language tokens used by the multi-valued `languages` field on
-# both post kinds. Tokens are ISO-639 codes; labels are the English
-# display names. Starts minimal — covers every seed example today — and
-# grows as real posts demand more entries.
+# both post kinds. Tokens are BCP 47 short codes (ISO-639-1 where
+# available); labels are the English display names. Vocabulary widens
+# only — `languages` is a JSON-list column with no SQL CHECK against
+# array members (Pydantic enforces the wire-side `Literal[*LANGUAGES]`
+# in `domain/logic/posts/schema.py`), so adding tokens is non-breaking
+# for persisted rows. Expansion beyond en/es tracks the corpus
+# evidence surfaced in #1355 / #1358 PR-d (Mandarin-speaking referrals
+# plus the next tier of California-relevant languages).
 class Language(LabeledChoice):
     en = "en", "English"
     es = "es", "Spanish"
+    zh = "zh", "Mandarin"
+    yue = "yue", "Cantonese"
+    vi = "vi", "Vietnamese"
+    tl = "tl", "Tagalog"
+    ko = "ko", "Korean"
+    ru = "ru", "Russian"
 
 
 LANGUAGES: Final[tuple[str, ...]] = Language.values()
