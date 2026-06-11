@@ -15,9 +15,11 @@ read from the same field.
 Per-kind locking: a tile renders as a locked-CTA (lock icon + popover)
 when the viewer doesn't yet hold the capability that kind requires.
 `program_intake` is gated on `capabilities.check_program_intake` —
-email + verified org rep + an owned program; the other kinds carry no
-per-tile lock here (their per-row authz lives at create time in
-`_assert_post_payload_capability`).
+email + verified org rep + an owned program. `referral` and
+`clinician_opening` are gated on `capabilities.can_act_as_provider` —
+email + (verified clinician OR verified org rep) — the same gate that
+guards full-feed reads. Per-row authz still fires at create time in
+`_assert_post_payload_capability` / `_assert_post_payload_authz`.
 #}
 {% extends "views/form_new.html" %}
 {%- from "_shared/_picker.html" import picker -%}
@@ -29,6 +31,9 @@ per-tile lock here (their per-row authz lives at create time in
     {%- if kind.name == "program_intake"
       and not capabilities.can_post_program_intake_picker(current_user) -%}
       {%- set _locked_reason = capabilities.REASON_PROGRAM_INTAKE_LOCKED -%}
+    {%- elif kind.name in ("referral", "clinician_opening")
+      and not capabilities.can_act_as_provider(current_user) -%}
+      {%- set _locked_reason = capabilities.REASON_NOT_A_VERIFIED_PROVIDER -%}
     {%- endif -%}
     {%- set _opts.items = _opts.items + [
         {"href": entity_form_url("post") + "?kind=" + kind.name,
