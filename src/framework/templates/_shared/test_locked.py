@@ -80,7 +80,7 @@ def _render_popovers() -> str:
 
 
 def test_locked_action_renders_button_with_label() -> None:
-    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NOT_A_VERIFIED_PROVIDER", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None
     assert "+ Post a referral" in button.text()
@@ -89,7 +89,7 @@ def test_locked_action_renders_button_with_label() -> None:
 def test_locked_action_is_aria_disabled_not_html_disabled() -> None:
     """Uses aria-disabled so keyboard users can still focus and trigger the
     popover — html disabled removes the element from tab order entirely."""
-    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NOT_A_VERIFIED_PROVIDER", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None
     assert button.attributes.get("aria-disabled") == "true"
@@ -97,24 +97,26 @@ def test_locked_action_is_aria_disabled_not_html_disabled() -> None:
 
 
 def test_locked_action_carries_data_locked_cta() -> None:
-    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NOT_A_VERIFIED_PROVIDER", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None
     assert (
         button.attributes.get("data-locked-cta")
-        == capabilities.REASON_NETWORK_UNVERIFIED
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
 
 
 def test_locked_action_always_has_lock_icon() -> None:
-    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NOT_A_VERIFIED_PROVIDER", "+ Post a referral")
     button = HTMLParser(html).css_first("button")
     assert button is not None
     assert button.css_first("i.icon-lock") is not None
 
 
 def test_locked_action_extra_class_appended_to_outline() -> None:
-    html = _render_action("REASON_NETWORK_UNVERIFIED", "Email", extra_class="secondary")
+    html = _render_action(
+        "REASON_NOT_A_VERIFIED_PROVIDER", "Email", extra_class="secondary"
+    )
     button = HTMLParser(html).css_first("button")
     assert button is not None
     cls = button.attributes.get("class", "")
@@ -124,7 +126,7 @@ def test_locked_action_extra_class_appended_to_outline() -> None:
 
 def test_locked_action_no_tooltip_wrapper() -> None:
     """CTA is now a popover, not a data-tooltip — no wrapper span."""
-    html = _render_action("REASON_NETWORK_UNVERIFIED", "+ Post a referral")
+    html = _render_action("REASON_NOT_A_VERIFIED_PROVIDER", "+ Post a referral")
     assert "data-tooltip" not in html
 
 
@@ -134,28 +136,31 @@ def test_locked_action_no_tooltip_wrapper() -> None:
 
 
 def test_locked_link_renders_anchor_with_label() -> None:
-    html = _render_link("REASON_NETWORK_UNVERIFIED", "View full profile")
+    html = _render_link("REASON_NOT_A_VERIFIED_PROVIDER", "View full profile")
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
     assert "View full profile" in a.text()
 
 
 def test_locked_link_is_aria_disabled() -> None:
-    html = _render_link("REASON_NETWORK_UNVERIFIED", "View full profile")
+    html = _render_link("REASON_NOT_A_VERIFIED_PROVIDER", "View full profile")
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
     assert a.attributes.get("aria-disabled") == "true"
 
 
 def test_locked_link_carries_data_locked_cta() -> None:
-    html = _render_link("REASON_NETWORK_UNVERIFIED", "View full profile")
+    html = _render_link("REASON_NOT_A_VERIFIED_PROVIDER", "View full profile")
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
-    assert a.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+    assert (
+        a.attributes.get("data-locked-cta")
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
+    )
 
 
 def test_locked_link_has_lock_icon() -> None:
-    html = _render_link("REASON_NETWORK_UNVERIFIED", "View full profile")
+    html = _render_link("REASON_NOT_A_VERIFIED_PROVIDER", "View full profile")
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
     assert a.css_first("i.icon-lock") is not None
@@ -163,7 +168,7 @@ def test_locked_link_has_lock_icon() -> None:
 
 def test_locked_link_has_no_href() -> None:
     """No href — the popover is the action; navigating to '#' would be wrong."""
-    html = _render_link("REASON_NETWORK_UNVERIFIED", "View full profile")
+    html = _render_link("REASON_NOT_A_VERIFIED_PROVIDER", "View full profile")
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
     assert "href" not in a.attributes
@@ -182,12 +187,13 @@ def test_locked_name_renders_ghost_button_with_placeholder() -> None:
 
 
 def test_locked_name_data_locked_cta_is_network_unverified() -> None:
-    """Hardwired to REASON_NETWORK_UNVERIFIED — the caller doesn't choose."""
+    """Hardwired to REASON_NOT_A_VERIFIED_PROVIDER — the caller doesn't choose."""
     html = _render_name("Dr. J. Doe")
     btn = HTMLParser(html).css_first("button.locked-ghost-btn")
     assert btn is not None
     assert (
-        btn.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+        btn.attributes.get("data-locked-cta")
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
 
 
@@ -210,22 +216,23 @@ def test_locked_name_no_href_link() -> None:
 
 
 def test_locked_field_renders_ghost_button() -> None:
-    html = _render_field("REASON_NETWORK_UNVERIFIED")
+    html = _render_field("REASON_NOT_A_VERIFIED_PROVIDER")
     btn = HTMLParser(html).css_first("button.locked-ghost-btn")
     assert btn is not None
 
 
 def test_locked_field_carries_data_locked_cta() -> None:
-    html = _render_field("REASON_NETWORK_UNVERIFIED")
+    html = _render_field("REASON_NOT_A_VERIFIED_PROVIDER")
     btn = HTMLParser(html).css_first("button.locked-ghost-btn")
     assert btn is not None
     assert (
-        btn.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+        btn.attributes.get("data-locked-cta")
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
 
 
 def test_locked_field_has_lock_icon() -> None:
-    html = _render_field("REASON_NETWORK_UNVERIFIED")
+    html = _render_field("REASON_NOT_A_VERIFIED_PROVIDER")
     btn = HTMLParser(html).css_first("button.locked-ghost-btn")
     assert btn is not None
     assert btn.css_first("i.icon-lock") is not None
@@ -233,7 +240,7 @@ def test_locked_field_has_lock_icon() -> None:
 
 def test_locked_field_shows_redacted_placeholder() -> None:
     """Renders the redacted-dots span, not the raw fix_label."""
-    html = _render_field("REASON_NETWORK_UNVERIFIED")
+    html = _render_field("REASON_NOT_A_VERIFIED_PROVIDER")
     span = HTMLParser(html).css_first(".locked-redacted")
     assert span is not None
     assert "•" in span.text()
@@ -241,7 +248,7 @@ def test_locked_field_shows_redacted_placeholder() -> None:
 
 def test_locked_field_no_href_link() -> None:
     """Field no longer renders a fix-URL link — the popover carries the CTA."""
-    html = _render_field("REASON_NETWORK_UNVERIFIED")
+    html = _render_field("REASON_NOT_A_VERIFIED_PROVIDER")
     assert HTMLParser(html).css_first("a") is None
 
 
@@ -268,7 +275,7 @@ def test_locked_popovers_renders_one_per_known_reason() -> None:
     tree = HTMLParser(html)
     for reason in (
         capabilities.REASON_EMAIL_UNVERIFIED,
-        capabilities.REASON_NETWORK_UNVERIFIED,
+        capabilities.REASON_NOT_A_VERIFIED_PROVIDER,
     ):
         div = tree.css_first(f"#locked-cta-{reason}")
         assert div is not None, f"missing popover for {reason}"
@@ -280,7 +287,7 @@ def test_locked_popovers_contain_fix_url_links() -> None:
     tree = HTMLParser(html)
     for reason in (
         capabilities.REASON_EMAIL_UNVERIFIED,
-        capabilities.REASON_NETWORK_UNVERIFIED,
+        capabilities.REASON_NOT_A_VERIFIED_PROVIDER,
     ):
         meta = capabilities.reason_meta(reason)
         div = tree.css_first(f"#locked-cta-{reason}")
@@ -294,7 +301,7 @@ def test_locked_popovers_contain_unlock_copy() -> None:
     html = _render_popovers()
     for reason in (
         capabilities.REASON_EMAIL_UNVERIFIED,
-        capabilities.REASON_NETWORK_UNVERIFIED,
+        capabilities.REASON_NOT_A_VERIFIED_PROVIDER,
     ):
         meta = capabilities.reason_meta(reason)
         assert meta.unlock in html
@@ -342,12 +349,15 @@ def test_entity_link_unlocked_renders_plain_anchor() -> None:
 def test_entity_link_locked_renders_locked_link_chrome() -> None:
     """Lock reason set → `locked_link` chrome (aria-disabled + data-locked-cta)."""
     html = _render_entity_link(
-        "clinician", "Browse clinicians", capabilities.REASON_NETWORK_UNVERIFIED
+        "clinician", "Browse clinicians", capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
     assert a.attributes.get("aria-disabled") == "true"
-    assert a.attributes.get("data-locked-cta") == capabilities.REASON_NETWORK_UNVERIFIED
+    assert (
+        a.attributes.get("data-locked-cta")
+        == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
+    )
     assert "href" not in a.attributes
 
 
@@ -362,7 +372,7 @@ def test_entity_link_unlocked_explicit_href_overrides_entity_url() -> None:
 def test_entity_link_locked_ignores_explicit_href() -> None:
     """When locked, the href is suppressed — popover is the action."""
     html = _render_entity_link(
-        "user", "Users", capabilities.REASON_NETWORK_UNVERIFIED, href="/users"
+        "user", "Users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER, href="/users"
     )
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None

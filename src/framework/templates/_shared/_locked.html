@@ -20,7 +20,7 @@
      affordance and the route-level guard in lockstep.
 
    - `locked_name(placeholder)` — for withheld identity names (clinician /
-     org). Always uses REASON_NETWORK_UNVERIFIED. Renders as a muted italic
+     org). Always uses REASON_NOT_A_VERIFIED_PROVIDER. Renders as a muted italic
      ghost button with a lock icon so the viewer knows a real name exists.
 
    - `locked_field(reason)` — for withheld data values (address, contact).
@@ -65,7 +65,7 @@ affordances". JS lives inline in `src/framework/templates/base.html`. #}
 {%- endmacro %}
 {% macro locked_name(placeholder) -%}
   <button class="locked-ghost-btn"
-          data-locked-cta="{{ capabilities.REASON_NETWORK_UNVERIFIED }}">
+          data-locked-cta="{{ capabilities.REASON_NOT_A_VERIFIED_PROVIDER }}">
     <i class="icon-lock" aria-hidden="true"></i>{{ placeholder }}
   </button>
 {%- endmacro %}
@@ -77,7 +77,7 @@ affordances". JS lives inline in `src/framework/templates/base.html`. #}
 {% macro locked_popovers() -%}
   {%- set _all = [
     capabilities.REASON_EMAIL_UNVERIFIED,
-    capabilities.REASON_NETWORK_UNVERIFIED,
+    capabilities.REASON_NOT_A_VERIFIED_PROVIDER,
     capabilities.REASON_PROGRAM_INTAKE_LOCKED,
     ] -%}
   {%- for reason in _all -%}

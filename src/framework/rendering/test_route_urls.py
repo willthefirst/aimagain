@@ -140,7 +140,7 @@ def test_entity_form_url_unknown_entity_raises():
 
 
 class _Unverified:
-    """Stand-in viewer that fails `can_access_network` — email unverified
+    """Stand-in viewer that fails `can_act_as_provider` — email unverified
     short-circuits the predicate, no need to construct a real ORM user."""
 
     is_verified = False

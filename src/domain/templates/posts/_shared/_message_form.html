@@ -12,7 +12,7 @@
    form's `<form>` element is replaced in place on a successful send.
    Errors target the same node so 4xx rerenders also stay local.
 
-   Gating: rendered only when the viewer clears `can_access_network`
+   Gating: rendered only when the viewer clears `can_act_as_provider`
    (the post detail template applies the gate); the route handler
    enforces the same predicate server-side. #}
 <form id="post-message"

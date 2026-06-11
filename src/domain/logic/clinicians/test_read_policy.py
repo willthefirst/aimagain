@@ -6,7 +6,7 @@ reachable for every authenticated viewer, with identifying rows redacted
 per-row at render time when the viewer lacks network access and isn't
 the owner (see `_clinician_card.html` / `clinicians/detail.html`).
 
-The predicate (`assert_can_access_network`) is still exercised here
+The predicate (`assert_can_act_as_provider`) is still exercised here
 because it drives the template-side redaction flag, and the data-layer
 guard mechanism remains a framework feature any future entity may opt
 into.
@@ -16,7 +16,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.logic.capabilities import (
-    assert_can_access_network,
+    assert_can_act_as_provider,
 )
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.specs.clinician import CLINICIAN_ENTITY
@@ -38,25 +38,25 @@ def _superuser():
     return create_test_user(username="admin", is_superuser=True)
 
 
-# --- assert_can_access_network unit -------------------------------------------
+# --- assert_can_act_as_provider unit -------------------------------------------
 
 
 def test_assert_denies_unverified_user():
     user = _unverified_user()
     with pytest.raises(ForbiddenError):
-        assert_can_access_network(user)
+        assert_can_act_as_provider(user)
 
 
 def test_assert_denies_email_only_user():
     user = _email_only_user()
     with pytest.raises(ForbiddenError):
-        assert_can_access_network(user)
+        assert_can_act_as_provider(user)
 
 
 def test_assert_allows_superuser():
     """Superusers bypass the capability check regardless of claim state."""
     user = _superuser()
-    assert_can_access_network(user)  # must not raise
+    assert_can_act_as_provider(user)  # must not raise
 
 
 def test_clinician_entity_declares_no_read_policy():
@@ -97,7 +97,7 @@ async def test_repo_guard_blocks_list_for_unverified_user_when_attached(
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
         repo._requesting_user = requester
-        repo._read_guard = assert_can_access_network
+        repo._read_guard = assert_can_act_as_provider
         with pytest.raises(ForbiddenError):
             await repo.list_for_user(owner.id)
 
@@ -118,6 +118,6 @@ async def test_repo_guard_allows_superuser(
     async with db_test_session_manager() as session:
         repo = ClinicianRepository(session)
         repo._requesting_user = admin
-        repo._read_guard = assert_can_access_network
+        repo._read_guard = assert_can_act_as_provider
         rows = await repo.list_for_user(owner.id)
     assert len(rows) == 1

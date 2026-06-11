@@ -76,7 +76,7 @@ REASON_EMAIL_UNVERIFIED = "email_unverified"
 # read-side details (contact info, identity) and write-side affordances
 # (create post CTA) are locked. Fixed by completing any verification
 # path (Claim A or Claim B).
-REASON_NETWORK_UNVERIFIED = "network_unverified"
+REASON_NOT_A_VERIFIED_PROVIDER = "network_unverified"
 # Program-intake gate: the user can't currently publish a program-intake
 # post on /posts/form. Three sub-conditions feed it (email + verified
 # org rep + an owned program); the capability detail page renders the
@@ -120,7 +120,7 @@ _REASON_META = {
         fix_label="Verify email",
         fix_url="/users/me/email/form",
     ),
-    REASON_NETWORK_UNVERIFIED: ReasonMeta(
+    REASON_NOT_A_VERIFIED_PROVIDER: ReasonMeta(
         title="Provider network",
         unlock="Get provider network access to unlock this.",
         fix_label="Get access",
@@ -294,7 +294,7 @@ OWNS_PROGRAM_LEAF = LEAVES.register(
 )
 
 
-def check_network(user: Any) -> CapabilityCheck:
+def check_provider_identity(user: Any) -> CapabilityCheck:
     """Structured capability check for full-feed read access.
 
     Tree: email_verified AND (clinician_verified OR org_rep_verified).
@@ -355,7 +355,7 @@ def can_post_program_intake_picker(user: Any) -> bool:
     """Picker-tile gate: superuser bypass, otherwise the structured
     check.
 
-    Symmetric with `can_access_network` — both are the boolean form of
+    Symmetric with `can_act_as_provider` — both are the boolean form of
     the matching `check_*` for surfaces that only need granted/not
     (the picker tile, the locked-CTA branch). Per-row authorization on
     the post create payload stays with
@@ -367,33 +367,33 @@ def can_post_program_intake_picker(user: Any) -> bool:
     return check_program_intake(user).granted
 
 
-def can_access_network(user: Any) -> bool:
+def can_act_as_provider(user: Any) -> bool:
     """Feed-teaser gate: superuser bypass, otherwise delegates to
-    `check_network`.
+    `check_provider_identity`.
 
-    Symmetric with `assert_can_access_network` — both forms grant
+    Symmetric with `assert_can_act_as_provider` — both forms grant
     superusers full read access regardless of claim state, so the
     route-level guard and the template-level affordance can't
     disagree about what a superuser sees. Without the bypass here,
     a superuser navigating around would clear the route's 403 check
     yet still see locked-popover affordances in templates that read
-    `{% if can_access_network %}` or render `entity_link(...)` for
+    `{% if can_act_as_provider %}` or render `entity_link(...)` for
     a gated entity — a contradictory UX where the chrome treats the
     viewer as locked while the underlying page is open.
     """
     if getattr(user, "is_superuser", False):
         return True
-    return check_network(user).granted
+    return check_provider_identity(user).granted
 
 
-def assert_can_access_network(user: Any) -> None:
-    """Raising form of `can_access_network`. Superuser bypass
+def assert_can_act_as_provider(user: Any) -> None:
+    """Raising form of `can_act_as_provider`. Superuser bypass
     delegates to the predicate, which short-circuits first.
 
     Used as `ReadPolicy.assert_can_read` on entities whose data is
     restricted to verified network members (e.g. clinicians).
     """
-    if not can_access_network(user):
+    if not can_act_as_provider(user):
         from src.framework.http.exceptions import ForbiddenError
 
         raise ForbiddenError(detail="Provider network access required.")
@@ -401,7 +401,7 @@ def assert_can_access_network(user: Any) -> None:
 
 # Pre-built `ReadPolicy` for the network gate. Specs that want
 # "verified-clinician-or-org-rep can read; everyone else 403s and sees a
-# locked-link popover" set `read_policy=NETWORK_GATED_READ_POLICY` rather
+# locked-link popover" set `read_policy=VERIFIED_PROVIDER_READ_POLICY` rather
 # than re-declaring the same three-field `ReadPolicy(...)` block. No
 # entity currently binds this — `USER_ENTITY`, `CLINICIAN_ENTITY`, and
 # `ORGANIZATION_ENTITY` switched to per-row redaction (`_redacted=`
@@ -414,16 +414,16 @@ def assert_can_access_network(user: Any) -> None:
 # Why a constant here and not a `network_gated()` factory or a flag on
 # `EntitySpec`: ReadPolicy is structurally a tuple of (raiser, predicate,
 # reason_code), and the three callables it bundles are themselves named
-# domain facts (`assert_can_access_network`, `can_access_network`,
-# `REASON_NETWORK_UNVERIFIED`). A frozen instance is the cheapest binding
+# domain facts (`assert_can_act_as_provider`, `can_act_as_provider`,
+# `REASON_NOT_A_VERIFIED_PROVIDER`). A frozen instance is the cheapest binding
 # that points all three at the same gate; a factory would just be
 # `lambda: ReadPolicy(...)` over the same args, and a flag would push
 # this domain-specific tuple into the framework which doesn't otherwise
 # know about Claim A/B.
-NETWORK_GATED_READ_POLICY: ReadPolicy = ReadPolicy(
-    assert_can_read=assert_can_access_network,
-    can_read=can_access_network,
-    lock_reason=REASON_NETWORK_UNVERIFIED,
+VERIFIED_PROVIDER_READ_POLICY: ReadPolicy = ReadPolicy(
+    assert_can_read=assert_can_act_as_provider,
+    can_read=can_act_as_provider,
+    lock_reason=REASON_NOT_A_VERIFIED_PROVIDER,
 )
 
 

@@ -26,13 +26,13 @@
 {% block content %}
   <section class="entity-card" data-kind="{{ post.kind }}">
     {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
-    {{ facts_block(view, expanded=True, redacted=not can_access_network) }}
+    {{ facts_block(view, expanded=True, redacted=not can_act_as_provider) }}
     {%- if view.referral %}{{ how_to_refer(view) }}{%- endif %}
       <footer>
-        {% if can_access_network %}
+        {% if can_act_as_provider %}
           {% include "posts/_shared/_message_form.html" %}
         {% else %}
-          {{ locked_action(capabilities.REASON_NETWORK_UNVERIFIED, "Message", extra_class="secondary") }}
+          {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
         {% endif %}
       </footer>
     </section>

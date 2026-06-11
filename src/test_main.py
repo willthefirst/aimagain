@@ -42,7 +42,7 @@ async def test_home_page_shows_post_buttons_when_claim_a_verified(
 ):
     """The home page renders kind-specific CTAs linking to the unified
     `/posts/form` URL when the user is network-verified. CTAs are gated
-    on `can_access_network` from `base_context()` — same
+    on `can_act_as_provider` from `base_context()` — same
     predicate the route's `write_authz` consults — so the visible button
     and the server-side block can't disagree."""
     from tests.helpers import make_clinician_with_org
@@ -122,7 +122,7 @@ async def test_home_page_empty_my_posts_shows_active_cta_when_verified(
 
 async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
     """The blur wrapper (`feed-teaser-blur`) is removed regardless of
-    verification state — anonymization is now server-side via `can_access_network`,
+    verification state — anonymization is now server-side via `can_act_as_provider`,
     not a CSS filter on the client."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200

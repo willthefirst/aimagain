@@ -160,7 +160,7 @@ async def test_list_my_favorites_renders_html(
     superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Uses `superuser_client` so the viewer clears `can_access_network`
+    """Uses `superuser_client` so the viewer clears `can_act_as_provider`
     via the superuser bypass and the favorited clinician's practice name
     renders un-redacted. The redaction branch (where a non-network
     viewer sees their favorite's identifying fields as locked

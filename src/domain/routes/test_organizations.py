@@ -369,11 +369,11 @@ async def test_list_200_for_owner_renders_own_row_unredacted(
     logged_in_user: User,
 ):
     """The viewer's own org renders un-redacted on `/organizations` even
-    when they lack `can_access_network` — owners must be able to manage
+    when they lack `can_act_as_provider` — owners must be able to manage
     what they've created before clearing network verification.
 
     Self-registering an organization also grants the creator a verified
-    `OrgRepresentation`, which flips `can_access_network` to True; the
+    `OrgRepresentation`, which flips `can_act_as_provider` to True; the
     test pins the post-create state where the row is visible by name."""
     create = await authenticated_client.post("/organizations", data=_org_payload())
     assert create.status_code == 201

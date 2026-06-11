@@ -41,7 +41,10 @@ def test_capabilities_global_is_registered_without_app_boot():
     assert "capabilities" in env.globals
     # And the resolved namespace exposes the REASON_* constants used by
     # the locked-affordance macros.
-    assert env.globals["capabilities"].REASON_NETWORK_UNVERIFIED == "network_unverified"
+    assert (
+        env.globals["capabilities"].REASON_NOT_A_VERIFIED_PROVIDER
+        == "network_unverified"
+    )
 
 
 def test_extra_globals_layer_over_prod_globals():

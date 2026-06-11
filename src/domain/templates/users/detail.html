@@ -7,7 +7,7 @@
    and isn't this user themselves. `is_self` is computed by
    `handle_get_user_detail`; the self view always renders un-redacted so
    the viewer can self-manage even before clearing network verification. #}
-{%- set _redacted = not can_access_network and not is_self -%}
+{%- set _redacted = not can_act_as_provider and not is_self -%}
 {% block current_label %}
   {% if _redacted %}
     {{ locked_name("J. Doe") }}

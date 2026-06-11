@@ -9,7 +9,7 @@ These tests assert:
 1. `/home` shows no per-page finish-setup card for a no-claim user — the
    post-action row is suppressed entirely and the only nudge is the chrome
    `#onboarding-banner`.
-2. Post CTAs on `/home` are gated on `can_access_network` (clinician or org rep).
+2. Post CTAs on `/home` are gated on `can_act_as_provider` (clinician or org rep).
 3. The global `#onboarding-banner` is currently disabled (absent on all pages).
 """
 
@@ -82,7 +82,7 @@ async def test_home_renders_post_ctas_when_claim_a_verified(
     logged_in_user,
 ):
     """A verified clinician sees the post CTAs on /home. The chrome gates
-    on `can_access_network`, so any network-verified user gets the active
+    on `can_act_as_provider`, so any network-verified user gets the active
     create links."""
     from tests.helpers import make_clinician_with_org
 
@@ -118,7 +118,7 @@ async def test_home_shows_active_post_actions_for_claim_b_org_rep(
     logged_in_user,
 ):
     """A verified org rep (no clinician profile) gets full posting chrome —
-    `can_access_network` is the single gate. Pins: active create links appear
+    `can_act_as_provider` is the single gate. Pins: active create links appear
     in the toolbar (not disabled buttons), same as a verified clinician."""
     from src.domain.models.org_representations.org_representation import (
         OrgRepresentation,

@@ -224,7 +224,7 @@ async def test_get_user_detail_renders(
 ):
     """GET /users/{id} renders the detail page for an existing user.
 
-    Uses `superuser_client` so the viewer clears `can_access_network`
+    Uses `superuser_client` so the viewer clears `can_act_as_provider`
     via the superuser bypass — the username renders un-redacted in the
     toolbar H1. The non-superuser non-self path (where the H1 carries
     the `locked_name` placeholder) is pinned separately in
@@ -276,7 +276,7 @@ async def test_get_user_detail_renders_breadcrumb_and_heading(
     assert back.attributes.get("href") == "/users"
     assert "data-locked-cta" not in back.attributes
     # Current item lives in the toolbar <h1>, redacted to the placeholder
-    # because `logged_in_user` lacks `can_access_network` and isn't the
+    # because `logged_in_user` lacks `can_act_as_provider` and isn't the
     # target.
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None
