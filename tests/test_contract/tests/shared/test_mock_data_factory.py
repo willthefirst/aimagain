@@ -45,21 +45,16 @@ def test_json_columns_default_to_empty_list(kind):
             ), f"{kind}.{json_field} expected []; got {getattr(detail, json_field)!r}"
 
 
-def test_pa_and_program_settings_default_to_empty_list():
-    """PA + program detail rows carry `settings`; CR does not. The
-    default applies wherever the column exists."""
+def test_pa_and_program_detail_rows_have_no_settings_or_genders_columns():
+    """After #1358 PR-f sub-3, PA + program detail rows are thin —
+    ``settings`` / ``genders`` live on the linked affiliation / program,
+    not on the detail row itself. The factory should not generate a
+    placeholder for a column that no longer exists."""
     for kind in ("clinician_opening", "program_intake"):
         post = make_post_stub(kind, owner_id=uuid.uuid4())
         detail = getattr(post, POST_KINDS[kind].detail_relationship)
-        assert detail.settings == []
-
-
-def test_pa_and_program_genders_default_to_empty_list():
-    """PA + program hold `genders` as a list; CR has a scalar `gender`."""
-    for kind in ("clinician_opening", "program_intake"):
-        post = make_post_stub(kind, owner_id=uuid.uuid4())
-        detail = getattr(post, POST_KINDS[kind].detail_relationship)
-        assert detail.genders == []
+        assert not hasattr(detail, "settings")
+        assert not hasattr(detail, "genders")
 
 
 def test_uuid_columns_get_fresh_uuids():
@@ -86,7 +81,8 @@ def test_text_columns_get_stub_string():
     pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     assert pa.opening_detail.description == "stub description"
     assert pa.opening_detail.schedule_text == "stub schedule_text"
-    assert pa.opening_detail.website == "stub website"
+    # ``website`` moved to the affiliation in #1358 PR-f sub-3 and is no
+    # longer a detail-row column.
 
 
 # --- Defaults: enum-typed Text columns (per-kind registry) -------------
@@ -121,11 +117,13 @@ def test_pa_has_no_enum_text_columns_on_detail_row():
     """PA's enum-typed fields (in_person_sessions, virtual_sessions,
     in_network_carriers, ...) live on the linked Clinician, not on the
     detail row itself. The detail row has no CHECK-constrained Text
-    columns, so the enum-defaults registry for PA is empty."""
+    columns, so the enum-defaults registry for PA is empty.
+
+    After #1358 PR-f sub-3 the PA detail row is thin (announcement
+    core + context FKs) — ``services`` / ``settings`` / etc. live on
+    the linked affiliation."""
     pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
-    # All fields on the detail row are list-typed JSON, Uuid, or
-    # plain Text — none are enum-checked.
-    assert isinstance(pa.opening_detail.services, list)
+    assert isinstance(pa.opening_detail.desired_times, list)
     assert isinstance(pa.opening_detail.clinician_id, uuid.UUID)
     assert pa.opening_detail.description == "stub description"
 

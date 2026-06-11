@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import and_, or_, select
 
@@ -17,36 +16,17 @@ from src.domain.models import (
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
 
-# #1358 PR-f sub-PR 2 — steady-state profile columns mirrored from the
-# detail row onto its linked steady-state home. Opening side: services,
-# settings, modalities, age_groups, genders, website,
-# referral_instructions go on `ClinicianAffiliation`; `languages` goes
-# on `Clinician`. Intake side: the same set goes on `Program`, with
-# `languages` also there (program-level, not person-level). The detail
-# row keeps the column during this PR's dual-write window; sub-PR 3
-# drops them.
-_AFFILIATION_PROFILE_COLS: tuple[str, ...] = (
-    "services",
-    "settings",
-    "modalities",
-    "age_groups",
-    "genders",
-    "website",
-    "referral_instructions",
-)
-_PROGRAM_PROFILE_COLS: tuple[str, ...] = (*_AFFILIATION_PROFILE_COLS, "languages")
-
 
 class PostRepository(BaseRepository):
     """Posts-specific reads.
 
     Every column rendered on `/posts` is filterable. The polymorphic
-    body means most predicates ``OR`` across two paths — the
-    seeking side reads from ``ReferralDetail``, the offering
-    side from ``OpeningDetail`` (and its linked
-    ``ClinicianAffiliation``). Each post has a row in at most one of the two
-    detail tables, so the ``OR`` coalesces the two paths into a
-    single "matches" boolean without duplicating rows.
+    body means most predicates ``OR`` across two paths — the seeking
+    side reads from ``ReferralDetail``, the offering side from
+    ``OpeningDetail``'s linked ``ClinicianAffiliation`` and
+    ``IntakeDetail``'s linked ``Program``. After #1358 PR-f sub-3 the
+    detail rows are thin and carry **no** steady-state profile
+    columns; all profile filters read directly from the new homes.
 
     Filter axes declared on ``POST_ENTITY.filters``:
 
@@ -56,22 +36,21 @@ class PostRepository(BaseRepository):
     * ``posted_by`` (Text) — ILIKE substring over the owner's
       ``username``.
     * ``state`` (Choice, multi) — ``location_state`` ``IN`` across
-      ``ReferralDetail`` (seeking) and the offering side's
-      linked ``ClinicianAffiliation``.
+      ``ReferralDetail`` (seeking) and the offering side's linked
+      ``ClinicianAffiliation``.
     * ``city`` (Text) — ILIKE substring across the same two location
       paths as ``state``.
-    * ``age_group`` (Choice, multi) — JSON-array contains check on the
-      ``age_groups`` columns of ``ReferralDetail``, ``OpeningDetail``,
-      ``ClinicianAffiliation`` (the opening-side new home, #1358 PR-f
-      sub-2), and ``Program`` (the intake-side new home). Uses
-      ``LIKE '%"<token>"%'`` against the JSON-as-text representation
-      — portable across SQLite (dev/test) without a JSON-specific
-      extension; Postgres would prefer ``@>``/``?|`` operators on a
-      ``JSONB`` column when this table moves there.
+    * ``age_group`` (Choice, multi) — JSON-array contains check on
+      ``ReferralDetail.age_groups``, ``ClinicianAffiliation.age_groups``
+      (opening-side steady-state home), and ``Program.age_groups``
+      (intake-side steady-state home). Uses ``LIKE '%"<token>"%'``
+      against the JSON-as-text representation — portable across SQLite
+      (dev/test) without a JSON-specific extension; Postgres would
+      prefer ``@>``/``?|`` operators on a ``JSONB`` column.
     * ``language`` (Choice, multi) — same JSON contains pattern against
-      ``ReferralDetail.languages``, ``OpeningDetail.languages``,
-      ``Clinician.languages`` (the opening-side new home — person-
-      level), and ``Program.languages`` (the intake-side new home).
+      ``ReferralDetail.languages``, ``Clinician.languages``
+      (opening-side, person-level), and ``Program.languages``
+      (intake-side, program-level).
     * ``geography`` (Text) — ILIKE across city, state, and zip on both
       ``ReferralDetail`` (its own location) and ``ClinicianAffiliation``
       (opening/intake's linked practice location).
@@ -79,13 +58,12 @@ class PostRepository(BaseRepository):
       ``geography`` filter to also include openings where the linked
       ClinicianAffiliation has ``virtual_sessions='yes'`` in CA.
     * ``level_of_care`` (Choice, multi) — ``settings`` JSON-array
-      contains check across ``OpeningDetail`` / ``IntakeDetail`` and
-      their new homes ``ClinicianAffiliation`` / ``Program``
-      (``ReferralDetail`` has no settings field and is excluded when
-      this filter is active).
+      contains check across ``ClinicianAffiliation`` (opening-side)
+      and ``Program`` (intake-side). ``ReferralDetail`` has no settings
+      field and is excluded when this filter is active.
     * ``modality`` (Choice, multi) — ``modalities`` JSON-array contains
-      check across all three detail tables plus the new homes
-      ``ClinicianAffiliation`` (opening) / ``Program`` (intake).
+      check across ``ReferralDetail`` (request-side), ``ClinicianAffiliation``
+      (opening), and ``Program`` (intake).
     * ``insurance`` (Choice, multi) — ``insurance_carriers`` JSON-array
       contains check on ``ReferralDetail`` OR ``in_network_carriers``
       JSON-contains on linked ``ClinicianAffiliation`` (#1358 PR-e —
@@ -134,20 +112,17 @@ class PostRepository(BaseRepository):
                 insurance,
             )
         )
-        # #1358 PR-f sub-PR 2 — the steady-state profile (services,
+        # #1358 PR-f sub-3 — the steady-state profile (services,
         # settings, modalities, age_groups, genders, languages,
-        # in/out-of-network carriers, etc.) now lives on
-        # ``ClinicianAffiliation`` / ``Clinician`` / ``Program``.
-        # ``ClinicianAffiliation`` is also where the opening-side
-        # profile filters now read from (services/settings/modalities/
-        # age_groups), so any filter that needs an affiliation column
-        # adds the join. ``Program`` joins whenever an intake-side
-        # profile filter is active. ``Clinician`` comes in only for
-        # ``language`` (the one column whose new home is the person,
-        # not the affiliation). Dual-write keeps the old detail columns
-        # in lockstep during this PR's window, so each filter clause
-        # ORs the new-home column with the detail-row column for
-        # safety; sub-PR 3 collapses to new-home only.
+        # in/out-of-network carriers, etc.) lives exclusively on
+        # ``ClinicianAffiliation`` / ``Clinician`` / ``Program``. The
+        # per-announcement detail rows are thin and carry no profile
+        # columns. ``ClinicianAffiliation`` joins whenever an opening-
+        # side profile filter is active; ``Program`` joins whenever an
+        # intake-side profile filter is active; ``Clinician`` joins only
+        # for ``language`` (the one column whose new home is the person,
+        # not the affiliation). ``IntakeDetail`` is joined when the
+        # ``Program`` join needs its ``program_id`` key.
         needs_clinician_join = bool(
             state
             or city
@@ -228,32 +203,29 @@ class PostRepository(BaseRepository):
                 )
             )
         if age_group:
-            # New home: ClinicianAffiliation (opening) / Program (intake).
-            # Detail rows kept as the dual-write fallback arm. CR's
-            # ``age_groups`` stays on ReferralDetail (referrals describe
-            # one client and have no steady-state home).
+            # Steady-state home: ClinicianAffiliation (opening) /
+            # Program (intake). CR's ``age_groups`` stays on
+            # ReferralDetail (referrals describe one client and have no
+            # steady-state home).
             stmt = stmt.filter(
                 _json_array_contains_any_multi(
                     age_group,
                     (
                         (ReferralDetail, "age_groups"),
-                        (OpeningDetail, "age_groups"),
                         (ClinicianAffiliation, "age_groups"),
                         (Program, "age_groups"),
                     ),
                 )
             )
         if language:
-            # New home: Clinician (opening — person-level) / Program
-            # (intake — program-level). Detail rows kept as the dual-
-            # write fallback arm. CR's ``languages`` stays on
-            # ReferralDetail (no steady-state home on referrals).
+            # Steady-state home: Clinician (opening — person-level) /
+            # Program (intake — program-level). CR's ``languages`` stays
+            # on ReferralDetail (no steady-state home on referrals).
             stmt = stmt.filter(
                 _json_array_contains_any_multi(
                     language,
                     (
                         (ReferralDetail, "languages"),
-                        (OpeningDetail, "languages"),
                         (Clinician, "languages"),
                         (Program, "languages"),
                     ),
@@ -282,14 +254,12 @@ class PostRepository(BaseRepository):
         # only expands the geography filter when both are active.
 
         if level_of_care:
-            # New home: ClinicianAffiliation (opening) / Program
-            # (intake). Detail rows OR'd in as dual-write fallback.
+            # Steady-state home: ClinicianAffiliation (opening) /
+            # Program (intake). ReferralDetail has no settings field.
             stmt = stmt.filter(
                 _json_array_contains_any_multi(
                     level_of_care,
                     (
-                        (OpeningDetail, "settings"),
-                        (IntakeDetail, "settings"),
                         (ClinicianAffiliation, "settings"),
                         (Program, "settings"),
                     ),
@@ -297,17 +267,14 @@ class PostRepository(BaseRepository):
             )
 
         if modality:
-            # New home: ClinicianAffiliation (opening) / Program
-            # (intake). CR's ``modalities`` stays on ReferralDetail
-            # (no steady-state home). Detail rows OR'd in as dual-write
-            # fallback.
+            # Steady-state home: ClinicianAffiliation (opening) /
+            # Program (intake). CR's ``modalities`` stays on
+            # ReferralDetail (no steady-state home on referrals).
             stmt = stmt.filter(
                 _json_array_contains_any_multi(
                     modality,
                     (
                         (ReferralDetail, "modalities"),
-                        (OpeningDetail, "modalities"),
-                        (IntakeDetail, "modalities"),
                         (ClinicianAffiliation, "modalities"),
                         (Program, "modalities"),
                     ),
@@ -375,91 +342,6 @@ class PostRepository(BaseRepository):
         )
         return await self._list(stmt, offset=offset, limit=limit)
 
-    # #1358 PR-f sub-PR 2 — dual-write override hooks. The framework's
-    # generic polymorphic create/update mounts call `create_polymorphic`
-    # and `patch` here; this layer extends both to mirror the steady-
-    # state profile fields onto the linked ClinicianAffiliation /
-    # Clinician / Program so reads from the new homes (see the view layer
-    # flip) stay consistent. Sub-PR 3 removes the per-announcement
-    # columns and this dual-write goes away — only the new-home write
-    # path remains.
-    async def create_polymorphic(
-        self, parent: Any, detail: Any, *, detail_relationship: str
-    ) -> Any:
-        created = await super().create_polymorphic(
-            parent, detail, detail_relationship=detail_relationship
-        )
-        await self._mirror_detail_to_steady_state_home(detail)
-        return created
-
-    async def patch(self, obj: Any, **fields: Any) -> Any:
-        patched = await super().patch(obj, **fields)
-        if isinstance(obj, (OpeningDetail, IntakeDetail)):
-            await self._mirror_detail_to_steady_state_home(patched)
-        return patched
-
-    async def _mirror_detail_to_steady_state_home(self, detail: Any) -> None:
-        """Copy the steady-state profile fields off a fresh / patched
-        OpeningDetail or IntakeDetail onto the linked home row
-        (Affiliation + Clinician for openings; Program for intakes).
-
-        Only mirrors fields the caller actually set on the detail row
-        (``None`` is skipped) so a PATCH that touches only `description`
-        doesn't trample the affiliation's existing profile with a null
-        from the detail row. List fields with an empty `[]` value are
-        skipped on the same principle — an explicit clear has no
-        wire path that hits only the old column today.
-        """
-        if isinstance(detail, OpeningDetail):
-            await self._mirror_opening_detail(detail)
-        elif isinstance(detail, IntakeDetail):
-            await self._mirror_intake_detail(detail)
-
-    async def _mirror_opening_detail(self, detail: OpeningDetail) -> None:
-        affiliation_id = detail.clinician_affiliation_id
-        if affiliation_id is not None:
-            affiliation = await self.get_by_model_id(
-                ClinicianAffiliation, affiliation_id
-            )
-            if affiliation is not None:
-                self._copy_nonempty(detail, affiliation, _AFFILIATION_PROFILE_COLS)
-                self.session.add(affiliation)
-        clinician_id = detail.clinician_id
-        if clinician_id is not None:
-            clinician = await self.get_by_model_id(Clinician, clinician_id)
-            if clinician is not None:
-                self._copy_nonempty(detail, clinician, ("languages",))
-                self.session.add(clinician)
-        await self.session.flush()
-
-    async def _mirror_intake_detail(self, detail: IntakeDetail) -> None:
-        program_id = detail.program_id
-        if program_id is None:
-            return
-        program = await self.get_by_model_id(Program, program_id)
-        if program is None:
-            return
-        self._copy_nonempty(detail, program, _PROGRAM_PROFILE_COLS)
-        self.session.add(program)
-        await self.session.flush()
-
-    @staticmethod
-    def _copy_nonempty(src: Any, dst: Any, cols: Sequence[str]) -> None:
-        """Copy each column in ``cols`` from ``src`` to ``dst`` when
-        the source value is set (not ``None``, not empty list). An
-        empty value on the source means "the writer didn't touch this
-        field" — we leave whatever's on ``dst``. This is the dual-write
-        invariant for the PR-f sub-PR 2 window: every write that lands
-        a value on the detail row also lands it on the new home, but no
-        write nulls a new-home value via the detail mirror."""
-        for col in cols:
-            value = getattr(src, col, None)
-            if value is None:
-                continue
-            if isinstance(value, list) and not value:
-                continue
-            setattr(dst, col, value)
-
     # The single `/posts` URL family lists every kind through
     # `list_posts`. `handle_list` looks up
     # `repo.list_<spec.url_collection>`, so the spec's `url_collection`
@@ -494,11 +376,10 @@ def _json_array_contains_any_multi(
     When this table moves to Postgres with a ``JSONB`` column, prefer
     ``col ?| array[values]`` over this LIKE-based predicate.
 
-    Replaces the older ``_json_array_contains_any`` /
-    ``_three`` helpers — #1358 PR-f sub-PR 2 added a third source
-    (the steady-state home: ClinicianAffiliation / Program /
-    Clinician), and a single variadic helper avoids a third per-arity
-    variant.
+    Replaces the older ``_json_array_contains_any`` / ``_three``
+    helpers — #1358 PR-f introduced a third source (the steady-state
+    home: ClinicianAffiliation / Program / Clinician), and a single
+    variadic helper avoids a third per-arity variant.
     """
     cols = [getattr(model, column) for model, column in targets]
     clauses = []

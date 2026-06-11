@@ -114,26 +114,17 @@ _REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
     "clinician_affiliation_id": str(_STUB_CLINICIAN_AFFILIATION_ID),
 }
 
+# #1358 PR-f sub-3 — OpeningDetail is thin. The steady-state profile
+# fields (services / settings / modalities / age_groups / genders /
+# languages / website / referral_instructions) live on the linked
+# ClinicianAffiliation (and `languages` on the linked Clinician) and
+# are set there directly.
 _OPENING_DEFAULTS: dict[str, Any] = {
     "subject": None,
     "description": None,
-    "referral_instructions": None,
-    "website": None,
     "desired_times": [],
     "schedule_text": None,
-    # PA requires min-1 service on the wire — pick a stable default that
-    # tests overriding `services` can assume isn't already in the list.
-    "services": ["evaluation"],
-    # PA requires min-1 setting on the wire — pick a stable default that
-    # tests overriding `settings` can assume isn't already in the list.
-    "settings": ["outpatient"],
     "treatment_modality": None,
-    "modalities": [],
-    "age_groups": ["adults_25_64"],
-    "languages": ["en"],
-    # Empty allowed = "no restriction stated". Tests that exercise
-    # gender semantics override; everything else gets a clean default.
-    "genders": [],
 }
 
 
@@ -173,20 +164,15 @@ def make_referral_detail(**overrides: Any) -> ReferralDetail:
 # same per-announcement field set. Pydantic-side and ORM-side factories
 # below use the same defaults to keep round-trip tests aligned.
 
+# #1358 PR-f sub-3 — IntakeDetail is thin. The steady-state profile
+# lives on the linked Program (including `languages`, which is
+# program-level on the intake side).
 _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "subject": None,
     "description": None,
-    "referral_instructions": None,
-    "website": None,
     "desired_times": [],
     "schedule_text": None,
-    "services": ["evaluation"],
-    "settings": ["outpatient"],
     "treatment_modality": None,
-    "modalities": [],
-    "age_groups": ["adults_25_64"],
-    "languages": ["en"],
-    "genders": [],
 }
 
 # Stub program_id for schema-validation tests that never hit the DB.

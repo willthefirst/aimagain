@@ -15,13 +15,19 @@ The `clinician_id` FK on the OpeningDetail links this announcement to
 the clinician whose practice it describes. The wrapper templates redirect
 to the clinician-create flow when `current_user.clinicians` is empty.
 
+After #1358 PR-f sub-3 the announcement is **thin by design**: only
+practice picker + availability + announcement-specific free text. The
+steady-state practice profile (services / settings / modalities /
+age_groups / languages / genders / website / referral_instructions) is
+managed on the linked ClinicianAffiliation (and `languages` on the
+Clinician) via their own edit pages — see
+`src/domain/models/clinician_affiliations/README.md`.
+
 Field order:
   1. Which practice — establishes context for the whole form
-  2. About — description, referral instructions, website
+  2. About — description (free-text announcement copy)
   3. Availability — desired times / schedule notes
-  4. Who you serve — age groups, languages, genders
-  5. Services & approach — services, treatment settings, modalities
-  6. Subject — optional, auto-generates; last because most users skip it
+  4. Subject — optional, auto-generates; last because most users skip it
 #}
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected into
@@ -30,9 +36,9 @@ Field order:
    the top of `_shared/form_fields.html`). No per-field error or value
    threading is required at the callsite; explicit overrides still win
    if a future caller needs them. #}
-{%- from "_shared/form_fields.html" import entity_select_field, text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section with context -%}
+{%- from "_shared/form_fields.html" import text_field, composite_select_field, multi_select_field, field_for, form_section with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
-{%- from "_shared/form_copy.html" import modality_help, schedule_notes_help, select_all_help -%}
+{%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.opening_detail if post else None -%}
@@ -61,25 +67,15 @@ Field order:
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Which practice?", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {# About: free-text core fields — description / referral / website. #}
+    {# About: free-text announcement copy. Other steady-state profile
+     fields (referral_instructions, website, services, etc.) are managed
+     on the affiliation profile, not on the announcement. #}
     {% call form_section("About") %}
       {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
-      {{ field_for(schema, "referral_instructions", "Referral instructions", current=d.referral_instructions if d else None) }}
-      {{ field_for(schema, "website", "Website", current=d.website if d else None) }}
     {% endcall %}
     {% call form_section("Availability") %}
       {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
       {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
-    {% endcall %}
-    {% call form_section("Who you serve") %}
-      {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
-      {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
-      {{ multi_select_field("genders", "Genders served", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None) }}
-    {% endcall %}
-    {% call form_section("Services & approach") %}
-      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=d.settings if d else None) }}
-      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
     {% endcall %}
     {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
     {{ actions(submit_label, cancel_url=cancel_url) }}
