@@ -156,12 +156,12 @@ async def test_list_users_multiple_users(
 # --- Admin actions partial visibility ------------------------------------
 
 
-async def test_list_hides_admin_actions_for_non_admin(
+async def test_list_omits_admin_actions_for_non_admin(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Non-admin viewers must not see deactivate/delete buttons."""
+    """Non-admin viewers must not see deactivate/delete buttons on the list."""
     other = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -172,14 +172,24 @@ async def test_list_hides_admin_actions_for_non_admin(
     assert (
         tree.css_first("button[hx-put*='/activation']") is None
     ), "Non-admin should not see admin action buttons"
+    assert (
+        tree.css_first("button[hx-delete*='/users/']") is None
+    ), "Non-admin should not see admin delete buttons"
 
 
-async def test_list_shows_admin_actions_for_admin(
+async def test_list_omits_admin_actions_for_admin(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Admin viewers see deactivate + delete buttons on each non-self row."""
+    """Admin viewers do NOT see admin actions on the user list either.
+
+    Per-row admin actions on a card list invite mis-clicks (especially
+    the irreversible Delete); admins click through to a user's detail
+    page to act. The detail-page toolbar is the canonical home —
+    covered by ``test_detail_shows_admin_actions_for_admin`` and
+    ``test_detail_admin_actions_render_inside_toolbar`` below.
+    """
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
@@ -188,31 +198,12 @@ async def test_list_shows_admin_actions_for_admin(
 
     response = await authenticated_client.get("/users")
     tree = HTMLParser(response.text)
-    activation_buttons = tree.css(f"button[hx-put='/users/{other.id}/activation']")
     assert (
-        len(activation_buttons) == 1
-    ), "Expected one activation button (one non-self row)"
-    assert activation_buttons[0].text().strip() == "Deactivate"
-    assert tree.css_first(f"button[hx-delete='/users/{other.id}']") is not None
-
-
-async def test_list_shows_reactivate_for_deactivated_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """A deactivated user shows 'Reactivate' rather than 'Deactivate'."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    other = create_test_user(username=f"target-{uuid.uuid4()}", is_active=False)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(other)
-
-    response = await authenticated_client.get("/users")
-    tree = HTMLParser(response.text)
-    activation_button = tree.css_first(f"button[hx-put='/users/{other.id}/activation']")
-    assert activation_button is not None
-    assert activation_button.text().strip() == "Reactivate"
+        tree.css_first(f"button[hx-put='/users/{other.id}/activation']") is None
+    ), "Admin should not see per-row activation buttons on the list"
+    assert (
+        tree.css_first(f"button[hx-delete='/users/{other.id}']") is None
+    ), "Admin should not see per-row delete buttons on the list"
 
 
 # --- Detail page ---------------------------------------------------------
