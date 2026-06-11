@@ -24,18 +24,62 @@ Example:
     <button type="submit">{{ submit_label }}</button>
   </form>
 {%- endmacro %}
-{# The Save / Cancel / Delete cluster at the bottom of every entity
+{# Top-level entity create/edit form wrapper.
+
+   Emits `<form hx-{method}="{action_url}">` around caller-supplied
+   form-section markup. The HTMX method is parameterized so the same
+   wrapper covers `POST /collection` (create) and `PATCH /{id}` (edit)
+   without duplicate macros.
+
+   `error_swap=True` adds the `hx-target="this" hx-swap="outerHTML"`
+   pair plus the `hx-target-4xx` / `hx-swap-4xx` counterparts that
+   activate the `response-targets` extension (loaded in `base.html`).
+   With it, a 422 validation-error response from `mount_create` /
+   `mount_update` swaps the form fragment in place — the form re-renders
+   with `form_errors` / `form_values` populated. Without it, the htmx
+   default handler ignores the 4xx body and the user sees a blank-form
+   surface on a failed submit. The polymorphic post forms opt in;
+   today's entity edit forms (org / clinician / program) do not — that's
+   a known asymmetry, not load-bearing on this wrapper.
+
+   Used by every top-level entity create/edit form. Sub-resource add
+   forms (single fieldset, no error re-render) use `inline_add_form`
+   above.
+
+   Example:
+     {% call entity_form(entity_url('organization', id=org.id) ) %}
+       {%- call form_section("Identity") %}
+         {{ text_field("name", "Name", current=org.name) }}
+       {%- endcall %}
+       {{ actions("Save changes", cancel_url=…) }}
+     {% endcall %}
+#}
+{% macro entity_form(action_url, method="patch", error_swap=False) -%}
+  {# A templated attribute *name* (`hx-{{ method }}=...`) confuses djlint's
+     formatter, which rewrites the tag into a mangled multi-line shape.
+     Branching on method and emitting a literal attribute name avoids it.
+     `post` and `patch` are the only methods entity forms use today. #}
+  {%- if method == "post" -%}
+    <form hx-post="{{ action_url }}"
+          {%- if error_swap %}hx-target="this" hx-swap="outerHTML" hx-target-4xx="this" hx-swap-4xx="outerHTML"{% endif %}>
+    {%- else -%}
+      <form hx-patch="{{ action_url }}"
+            {%- if error_swap %}hx-target="this" hx-swap="outerHTML" hx-target-4xx="this" hx-swap-4xx="outerHTML"{% endif %}>
+      {%- endif %}
+      {{ caller() }}
+    </form>
+  {%- endmacro %}
+  {# The Save / Cancel / Delete cluster at the bottom of every entity
 create/edit form lives in `_shared/actions.html::actions` (renamed from
 the former `form_actions`). Import from there. #}
-{# Single checkbox + label row for filter fieldsets.
-
+  {# Single checkbox + label row for filter fieldsets.
    Example:
      {{ filter_checkbox('kind', v, l, checked=(v in active)) }}
 #}
-{% macro filter_checkbox(name, value, label, checked=False) %}
-  {# djlint:off #}<label><input type="checkbox" name="{{ name }}" value="{{ value }}"{% if checked %} checked{% endif %} />{{ label }}</label>{# djlint:on #}
-{% endmacro %}
-{# Fieldset legend with a leading Lucide icon.
+  {% macro filter_checkbox(name, value, label, checked=False) %}
+    {# djlint:off #}<label><input type="checkbox" name="{{ name }}" value="{{ value }}"{% if checked %} checked{% endif %} />{{ label }}</label>{# djlint:on #}
+  {% endmacro %}
+  {# Fieldset legend with a leading Lucide icon.
    djlint reformats <legend> as a block element, adding newlines that
    render as visible whitespace before the icon. The pragma lives here
    once so call sites stay clean.
@@ -43,6 +87,6 @@ the former `form_actions`). Import from there. #}
    Example:
      {{ icon_legend("map-pin", "Location") }}
 #}
-{% macro icon_legend(icon, text) %}
-  {# djlint:off #}<legend><i class="icon-{{ icon }}"></i>{{ text }}</legend>{# djlint:on #}
-{% endmacro %}
+  {% macro icon_legend(icon, text) %}
+    {# djlint:off #}<legend><i class="icon-{{ icon }}"></i>{{ text }}</legend>{# djlint:on #}
+  {% endmacro %}
