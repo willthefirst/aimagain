@@ -44,6 +44,7 @@ CANONICAL_CREDENTIAL_ROUTES: RouteSet = RouteSet(
 def make_clinician_credential_entity(
     *,
     name: str,
+    singular_label: str,
     url_collection: str,
     id_param: str,
     model: type,
@@ -91,6 +92,12 @@ def make_clinician_credential_entity(
 
     return EntitySpec(
         name=name,
+        # The user-visible noun for chrome labels (form-page H1, list
+        # toolbar CTA, etc.). The spec `name` is the URL-identifier
+        # ("clinician_licensure") and would surface in the UI as the
+        # bare snake-case literal without this override. See
+        # `src/framework/rendering/labels.py`.
+        singular_label=singular_label,
         url_collection=url_collection,
         id_param=id_param,
         model=model,

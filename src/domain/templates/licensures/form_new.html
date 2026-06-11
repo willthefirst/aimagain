@@ -10,6 +10,6 @@
 {% block form_content %}
   {{ licensure_form(resource_url,
     "post",
-    "Create licensure",
-    cancel_url=resource_url) }}
+    entity_create_label('clinician_licensure') ,
+  cancel_url=resource_url) }}
 {% endblock %}
