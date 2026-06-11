@@ -152,7 +152,7 @@ dd { margin: 0; }
 }
 /* Form-field layout — the form-side mirror of the `<dl>` grid
    above. The key trick is **subgrid**: the parent `<form>` declares
-   a 2-column grid track once (`max-content 1fr`), and every
+   a 2-column grid track once (`fit-content(40%) 1fr`), and every
    `.form-field` row uses `grid-template-columns: subgrid` to inherit
    those tracks. That makes the label column the SAME width across
    every row in the form — including across fieldset boundaries —
@@ -190,7 +190,11 @@ dd { margin: 0; }
    keep their existing flow. */
 .entity-form-page form {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  /* Label column sizes to its content but is capped at 40% of the
+     form width (a 4:6 max ratio against the control column). Past
+     the cap, long labels wrap instead of squeezing the controls;
+     short labels still hug their text. */
+  grid-template-columns: fit-content(40%) 1fr;
   column-gap: 0.75rem;
   row-gap: var(--pico-spacing);
   align-items: baseline;
