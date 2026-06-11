@@ -641,6 +641,15 @@ def test_owns_program_predicate_handles_anon():
     assert capabilities.owns_program(None) is False
 
 
+def test_owns_program_leaf_requires_org_rep_any():
+    """Owning a program presupposes a verified org rep on the program's
+    org — Program.create gates on Claim B. Declaring the dependency on
+    the leaf means every consumer that pulls `owns_program` in via
+    `evaluate_chain` gets `org_rep_any` surfaced as a sibling step
+    without re-listing it."""
+    assert capabilities.OWNS_PROGRAM_LEAF.requires == (capabilities.ORG_REP_ANY_LEAF,)
+
+
 # ---------- check_provider_identity -------------------------------------------
 
 
