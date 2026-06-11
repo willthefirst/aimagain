@@ -40,6 +40,18 @@ kind are ``None`` (or empty lists); templates render via
 lookup is the template's job (it's the same label dict pattern as
 elsewhere).
 
+The opening and intake branches additionally consult the linked
+``ClinicianAffiliation`` (and the linked ``Clinician`` for the
+person-level ``languages``) — for openings — or the linked
+``Program`` — for intakes — when reading the steady-state profile
+fields (`services` / `settings` / `modalities` / `age_groups` /
+`genders` / `website` / `referral_instructions` / `languages`). These
+fields moved off the per-announcement detail row to their steady-state
+homes in #1358 PR-f. Sub-PR 2 (this layer's current state) reads from
+the home with fallback to the detail row's column when the home is
+empty — the safety net for the dual-write window; sub-PR 3 drops the
+detail-row columns and the fallback goes away.
+
 `post_feed_headline(post)` builds the two-part headline for the
 feed-row component used in the home and browse list views. Format is
 ``"<identity> — <clinical focus>"``: demographics + services for
@@ -166,6 +178,39 @@ _LIST_PASSTHROUGH: dict[str, str] = {
     "desired_times": "desired_times",
 }
 
+# #1358 PR-f sub-PR 2 — steady-state profile fields that have moved homes
+# off the per-announcement detail row. The opening side reads these from
+# the linked ``ClinicianAffiliation`` (and ``languages`` from the linked
+# ``Clinician``); the intake side reads from the linked ``Program``. The
+# detail row still carries the columns (sub-PR 3 removes them) so each
+# helper falls back to the detail value when the new home has nothing,
+# which is the dual-write safety net: if a writer in this PR only updated
+# the old column, the read still surfaces the value.
+_OPENING_AFFILIATION_FIELDS: tuple[tuple[str, str], ...] = (
+    # (view_key, column-on-affiliation-AND-detail)
+    ("services", "services"),
+    ("settings", "settings"),
+    ("modalities", "modalities"),
+    ("ages", "age_groups"),
+    ("genders", "genders"),
+)
+_INTAKE_PROGRAM_LIST_FIELDS: tuple[tuple[str, str], ...] = (
+    *_OPENING_AFFILIATION_FIELDS,
+    # `languages` is person-level for openings (lives on `Clinician`) but
+    # program-level for intakes — Program is the equivalent of the
+    # affiliation here.
+    ("languages", "languages"),
+)
+_OPENING_AFFILIATION_SCALAR_FIELDS: tuple[tuple[str, str], ...] = (
+    # (view_key, column-on-affiliation-AND-detail). `website` /
+    # `referral_instructions` are surfaced via `view.referral` (the
+    # bundled detail-page section); writing them here only matters for the
+    # per-field reads through the unified view-model. The bundling helper
+    # `_referral_or_none` reads the resolved scalars off this dict.
+    ("website", "website"),
+    ("referral_instructions", "referral_instructions"),
+)
+
 
 def _forward_detail_passthrough(base: dict[str, Any], d: Any) -> None:
     """Copy every passthrough field off detail row ``d`` into ``base``.
@@ -177,6 +222,32 @@ def _forward_detail_passthrough(base: dict[str, Any], d: Any) -> None:
         base[view_key] = getattr(d, attr, None)
     for view_key, attr in _LIST_PASSTHROUGH.items():
         base[view_key] = list(getattr(d, attr, None) or [])
+
+
+def _read_list_from_home_then_detail(home: Any, detail: Any, attr: str) -> list:
+    """Steady-state list field: prefer the value from the new home
+    (affiliation / clinician / program), fall back to the detail row.
+
+    Returns a fresh list so templates can iterate without nullability
+    handling. Empty list on the home counts as "empty"; the detail
+    fallback is consulted in that case (matches the dual-write safety
+    net — if a write site only knew about the old column, the read still
+    picks up the value)."""
+    home_val = getattr(home, attr, None) if home is not None else None
+    if home_val:
+        return list(home_val)
+    return list(getattr(detail, attr, None) or [])
+
+
+def _read_scalar_from_home_then_detail(home: Any, detail: Any, attr: str):
+    """Steady-state scalar field: prefer the new home, fall back to the
+    detail row. ``None`` and the empty string both count as "empty" so a
+    blank affiliation override doesn't shadow a value still living on the
+    detail row (the dual-write safety net)."""
+    home_val = getattr(home, attr, None) if home is not None else None
+    if home_val:
+        return home_val
+    return getattr(detail, attr, None)
 
 
 def post_card_view(post) -> dict[str, Any]:
@@ -344,6 +415,20 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         _forward_detail_passthrough(base, d)
         p = getattr(d, "clinician", None)
+        # #1358 PR-f sub-PR 2: flip reads of the steady-state profile
+        # fields onto the linked ClinicianAffiliation (and `languages`
+        # onto the linked Clinician). The detail row still carries the
+        # columns (sub-PR 3 removes them), so each helper falls back
+        # to the detail value when the new home has nothing — the
+        # dual-write safety net during this PR's window.
+        affiliation = getattr(d, "clinician_affiliation", None)
+        for view_key, attr in _OPENING_AFFILIATION_FIELDS:
+            base[view_key] = _read_list_from_home_then_detail(affiliation, d, attr)
+        base["languages"] = _read_list_from_home_then_detail(p, d, "languages")
+        _website = _read_scalar_from_home_then_detail(affiliation, d, "website")
+        _instructions = _read_scalar_from_home_then_detail(
+            affiliation, d, "referral_instructions"
+        )
         _fn = getattr(p, "first_name", None) if p else None
         _ln = getattr(p, "last_name", None) if p else None
         base.update(
@@ -396,10 +481,7 @@ def post_card_view(post) -> dict[str, Any]:
             accepts_out_of_network=(
                 getattr(p, "accepts_out_of_network", None) if p else None
             ),
-            referral=_referral_or_none(
-                getattr(d, "website", None),
-                getattr(d, "referral_instructions", None),
-            ),
+            referral=_referral_or_none(_website, _instructions),
         )
         return base
 
@@ -410,6 +492,17 @@ def post_card_view(post) -> dict[str, Any]:
         _forward_detail_passthrough(base, d)
         prog = getattr(d, "program", None)
         _prog_org = getattr(prog, "organization", None) if prog else None
+        # #1358 PR-f sub-PR 2: flip reads of the steady-state profile
+        # fields onto the linked Program. `languages` is also Program-
+        # level on this side (unlike openings, where it's person-level
+        # on the Clinician). Falls back to the detail row when the
+        # Program has nothing (dual-write safety net).
+        for view_key, attr in _INTAKE_PROGRAM_LIST_FIELDS:
+            base[view_key] = _read_list_from_home_then_detail(prog, d, attr)
+        _website = _read_scalar_from_home_then_detail(prog, d, "website")
+        _instructions = _read_scalar_from_home_then_detail(
+            prog, d, "referral_instructions"
+        )
         base.update(
             poster_name=(getattr(_prog_org, "name", None) if _prog_org else None),
             headline=(getattr(prog, "name", None) if prog else None),
@@ -430,10 +523,7 @@ def post_card_view(post) -> dict[str, Any]:
                 and getattr(prog.organization, "name", None)
                 else None
             ),
-            referral=_referral_or_none(
-                getattr(d, "website", None),
-                getattr(d, "referral_instructions", None),
-            ),
+            referral=_referral_or_none(_website, _instructions),
         )
         return base
 
@@ -502,19 +592,23 @@ def post_row_summary(post) -> str:
         if d is None:
             return "Opening"
         p = getattr(d, "clinician", None)
+        affiliation = getattr(d, "clinician_affiliation", None)
         parts = []
         desc = getattr(d, "description", None)
         if desc:
             parts.append(desc[:100])
         else:
-            ages = list(getattr(d, "age_groups", None) or [])
-            services = list(getattr(d, "services", None) or [])
+            # `age_groups` / `services` flipped to the linked
+            # ClinicianAffiliation (#1358 PR-f sub-PR 2) with fallback to
+            # the detail row's column for the dual-write window.
+            ages = _read_list_from_home_then_detail(affiliation, d, "age_groups")
+            services = _read_list_from_home_then_detail(affiliation, d, "services")
             age_labels = [CLIENT_AGE_GROUP_LABELS_SINGULAR.get(a, a) for a in ages[:2]]
             svc_labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
             combined = age_labels + svc_labels
             if combined:
                 parts.append(", ".join(combined))
-        settings = list(getattr(d, "settings", None) or [])
+        settings = _read_list_from_home_then_detail(affiliation, d, "settings")
         if settings:
             parts.append(TREATMENT_SETTINGS_LABELS.get(settings[0], settings[0]))
         if p and getattr(p, "sliding_scale", None):
@@ -575,15 +669,18 @@ def post_feed_headline(post) -> str:
         if subject := getattr(d, "subject", None):
             return subject
         p = getattr(d, "clinician", None)
+        affiliation = getattr(d, "clinician_affiliation", None)
         practice = (
             p.org.name
             if p and getattr(p, "org", None) and getattr(p.org, "name", None)
             else "Opening"
         )
-        services = list(getattr(d, "services", None) or [])
+        # #1358 PR-f sub-PR 2 — services/settings flipped to the linked
+        # ClinicianAffiliation with detail fallback for dual-write.
+        services = _read_list_from_home_then_detail(affiliation, d, "services")
         focus_parts = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
         if not focus_parts:
-            settings = list(getattr(d, "settings", None) or [])
+            settings = _read_list_from_home_then_detail(affiliation, d, "settings")
             focus_parts = [TREATMENT_SETTINGS_LABELS.get(s, s) for s in settings[:2]]
         if focus_parts:
             return f"{practice} — {', '.join(focus_parts)}"
@@ -597,7 +694,9 @@ def post_feed_headline(post) -> str:
             return subject
         prog = getattr(d, "program", None)
         name = (getattr(prog, "name", None) if prog else None) or "Program"
-        services = list(getattr(d, "services", None) or [])
+        # `services` flipped to the linked Program with detail fallback
+        # (#1358 PR-f sub-PR 2).
+        services = _read_list_from_home_then_detail(prog, d, "services")
         focus_parts = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
         if focus_parts:
             return f"{name} — {', '.join(focus_parts)}"
