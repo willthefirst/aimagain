@@ -412,7 +412,7 @@ async def test_list_owner_me_scopes_to_viewer_owned_orgs(
     response = await authenticated_client.get("/organizations?owner=me")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    rows = tree.css("#organizations-list article.entity-card")
+    rows = tree.css("#organizations-list article")
     assert len(rows) == 1, "?owner=me must return only the viewer's own row"
     assert own_name in response.text
     assert stranger_name not in response.text

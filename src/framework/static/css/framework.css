@@ -44,7 +44,8 @@ h4, h5, h6 { font-size: 1rem; font-weight: 500; }
 /* Entity list — <ul class="entity-list"> wraps every list of entity
    cards. Resets remove browser list chrome while keeping the <ul>/<li>
    in the accessibility tree so screen readers announce "list of N items".
-   Each <li> contains one <article class="entity-card">. */
+   Each <li> contains one Pico-chromed `<article>` (rendered by the
+   shared `card` macro in `_shared/_card.html`). */
 ul.entity-list {
   list-style: none;
   padding: 0;
@@ -56,15 +57,16 @@ ul.entity-list > li { list-style: none; padding: 0; }
 /* Card chrome (background, border, padding, rounded corners,
    tinted header/footer bands) is reserved for items inside a
    possible list of items — post-list cards, the per-affiliation
-   loop in `clinicians/detail.html`, etc. Those render as
-   `<article class="entity-card">` and pick up the chrome from
-   Pico's default `<article>` element styling automatically; no
-   rule below targets them. Single-item containers (detail-page
-   wrappers, auth-page forms) deliberately do NOT carry chrome —
-   they use `<section class="entity-card">` / `<section class="auth-page">`,
-   which Pico does not card-style. The `entity-card` /
-   `entity-header` / `entity-facts` / etc. class names persist as
-   DOM hooks (tests query them) but contribute no styling. */
+   loop in `clinicians/detail.html`, etc. Those render as plain
+   `<article>` and pick up the chrome from Pico's default
+   `<article>` element styling automatically; no rule below targets
+   them. Single-item containers (detail-page bodies, auth-page
+   forms) deliberately do NOT carry chrome — auth pages wrap their
+   form in `<section class="auth-page">` (no Pico card styling on
+   `<section>`); detail pages render their facts blocks directly
+   under `<main>` with no wrapper at all. Marker class names like
+   `entity-list`, `entity-facts`, etc. persist as DOM hooks (tests
+   query them) but contribute no card chrome. */
 /* Article inner-spacing reset — applied to every `<article>` so
    the card chrome (background, border, padding band) owns the
    visual rhythm, not the default heading / section margins inside.
@@ -558,17 +560,15 @@ td > menu > li > [role="button"] {
    `/auth/verify`. Each page extends `base.html` directly (not
    the entity-form grammar) and renders a single
    `<section class="auth-page">`. **No card chrome** — auth
-   pages render as plain forms on the page, not as cards
-   (deliberately distinct from detail-page `<section class="entity-card">`
-   wrappers which DO carry chrome). The section sits inside the
-   `<main class="container">` which Pico already centers and
-   caps; without the rules below the form itself still stretches
-   to the container's full width (~720px on tablet, ~1300px on
-   desktop, #584). Cap at 28rem (~448px) — narrower than
-   `--form-max-width` since the auth forms are visually dense
-   (2–3 short fields). Centered via `margin-inline: auto`.
-   Mobile (< 28rem) is unchanged since the cap is wider than
-   the viewport. */
+   pages render as plain forms on the page, not as cards. The
+   section sits inside the `<main class="container">` which Pico
+   already centers and caps; without the rules below the form
+   itself still stretches to the container's full width (~720px
+   on tablet, ~1300px on desktop, #584). Cap at 28rem (~448px) —
+   narrower than `--form-max-width` since the auth forms are
+   visually dense (2–3 short fields). Centered via
+   `margin-inline: auto`. Mobile (< 28rem) is unchanged since the
+   cap is wider than the viewport. */
 .auth-page {
   max-width: 28rem;
   margin-inline: auto;
