@@ -10,20 +10,20 @@ _TABLE = "intake_details"
 class IntakeDetail(Base):
     """1:1 detail row for posts of kind = 'program_intake'.
 
-    The Program-level equivalent of :class:`OpeningDetail`.
-    The Program announces intake openings as a *group offering* —
-    the referrer is choosing an intake door (the Program) and trusting
-    the Org to assign a clinician internally. Distinct from
-    ``opening``, which names a specific clinician.
+    The Program-level equivalent of :class:`OpeningDetail`. The Program
+    announces intake openings as a *group offering* — the referrer is
+    choosing an intake door (the Program) and trusting the Org to assign
+    a clinician internally. Distinct from ``clinician_opening``, which
+    names a specific clinician.
 
-    Field set mirrors :class:`OpeningDetail` one-to-one
-    (description / referral_instructions / website / desired_times /
-    schedule_text / services / settings / treatment_modality / age_groups
-    / languages / genders); these are per-announcement attributes, not
-    steady-state Program properties (the Program model already carries
-    its name, description, state_preference, intake window, and
-    accepting-referrals flag). The Program's owning Org name surfaces
-    via ``program.organization`` for the templates.
+    After #1358 PR-f sub-3 this row is **thin by design**: it carries
+    only per-announcement attributes (``desired_times`` /
+    ``schedule_text`` / ``subject`` / ``description`` /
+    ``treatment_modality``) plus the ``program_id`` context FK. The
+    steady-state profile (services, settings, modalities, age_groups,
+    genders, languages, website, referral_instructions) lives on the
+    linked ``Program`` — see
+    [`../programs/README.md`](../programs/README.md).
     """
 
     __tablename__ = _TABLE
@@ -35,12 +35,12 @@ class IntakeDetail(Base):
     )
 
     # FK to the Program this announcement is for. The Program's name,
-    # state preference, intake window, and owning Org all live on the
-    # linked row — looked up via ``program.*`` in templates and read
-    # projections. ``ondelete='CASCADE'`` mirrors
-    # ``OpeningDetail.clinician_id``: deleting the Program
-    # tears down its announcements with it (a post about a deleted
-    # Program is stale by construction).
+    # state preference, intake window, owning Org, and steady-state
+    # profile all live on the linked row — looked up via ``program.*``
+    # in templates and read projections. ``ondelete='CASCADE'`` mirrors
+    # ``OpeningDetail.clinician_id``: deleting the Program tears down
+    # its announcements with it (a post about a deleted Program is stale
+    # by construction).
     program_id = Column(
         Uuid(as_uuid=True),
         ForeignKey("programs.id", ondelete="CASCADE"),
@@ -54,19 +54,8 @@ class IntakeDetail(Base):
     )
     schedule_text = Column(Text, nullable=True)
 
-    # Section 4 — featured services
-    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    # Per-announcement free-text overrides — see :class:`OpeningDetail`
+    # for the modeling rationale.
     treatment_modality = Column(Text, nullable=True)
-    modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
-    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    languages = Column(
-        JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
-    )
-    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-
-    # Section 6 — about (free-text core fields)
     subject = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
-    referral_instructions = Column(Text, nullable=True)
-    website = Column(Text, nullable=True)

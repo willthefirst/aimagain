@@ -67,7 +67,7 @@ from src.domain.models.enums import (
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
 )
-from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
+from src.framework.rendering.form_fields import HtmlTextarea
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
@@ -83,12 +83,6 @@ from src.framework.schema_validators import (
 # only affects form rendering (`field_for` picks `<textarea>` over
 # `<input>`); the validator chain is identical to `StrippedOptionalText`.
 TextareaOptional = Annotated[StrippedOptionalText, HtmlTextarea()]
-
-# `website` is a URL with the same `Stripped` cleaning chain — the
-# marker only swaps form rendering from `<input type=text>` to
-# `<input type=url>`. Schema-side validation stays the same; browser
-# gates submission on URL syntax client-side.
-UrlOptional = Annotated[StrippedOptionalText, HtmlUrl()]
 
 
 def _empty_to_none(v):
@@ -123,18 +117,9 @@ DesiredTimesField = Annotated[
 ServicesField = Annotated[
     list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
 ]
-# `opening.services` is required-min-1 on the wire; layer
-# the constraint over the shared alias so the scalar-coercion still runs
-# first. `min_length` only fires on the list arm of `T | None`, so the
-# same alias works for `T` (Create/Read/AuditSnapshot) and `T | None`
-# (Update — `None` means "leave unchanged"; an empty list 422s).
-RequiredServicesField = Annotated[ServicesField, Field(min_length=1)]
 SettingsField = Annotated[
     list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(scalar_to_list)
 ]
-# `opening.settings` is required-min-1 on the wire; same
-# pattern as services.
-RequiredSettingsField = Annotated[SettingsField, Field(min_length=1)]
 LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(scalar_to_list)]
 # `opening.languages` is required-min-1 on the wire — every
 # practice speaks at least one language, and the unfilterable "no
@@ -280,11 +265,19 @@ class ReferralRead(_PostReadBase):
 
 
 class ClinicianOpeningRead(_PostReadBase):
+    """Read projection for a thin opening detail row (#1358 PR-f sub-3).
+
+    The steady-state profile fields (services / settings / modalities /
+    age_groups / genders / languages / website / referral_instructions)
+    moved off this row onto the linked ``ClinicianAffiliation`` /
+    ``Clinician`` in PR-f. Templates dereference via
+    ``post.opening_detail.clinician_affiliation.<field>`` (and
+    ``.clinician.languages`` for the person-level one).
+    """
+
     kind: Literal["clinician_opening"]
     subject: str | None = None
     description: str | None = None
-    referral_instructions: str | None = None
-    website: str | None = None
     # Practice + location + delivery-format + insurance posture all live
     # on the linked Clinician (#448, #449). Read projections expose the
     # FK; templates dereference via
@@ -295,35 +288,27 @@ class ClinicianOpeningRead(_PostReadBase):
     clinician_affiliation_id: uuid.UUID | None = None
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
-    services: ServicesField = []
-    settings: SettingsField = []
     treatment_modality: str | None = None
-    modalities: ModalitiesField = []
-    age_groups: AgeGroupsField = []
-    languages: LanguagesField = []
-    genders: GendersField = []
 
 
 class ProgramIntakeRead(_PostReadBase):
+    """Read projection for a thin program-intake detail row (#1358 PR-f sub-3).
+
+    Same shape as :class:`ClinicianOpeningRead` minus the clinician
+    context — Program is the steady-state home for the intake side.
+    """
+
     kind: Literal["program_intake"]
     subject: str | None = None
     description: str | None = None
-    referral_instructions: str | None = None
-    website: str | None = None
     # FK to the Program this announcement is for. The Program's name,
-    # state preference, intake window, and owning Org all live on the
-    # linked row; templates dereference via
+    # state preference, intake window, owning Org, and steady-state
+    # profile all live on the linked row; templates dereference via
     # `post.intake_detail.program.<field>`.
     program_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
-    services: ServicesField = []
-    settings: SettingsField = []
     treatment_modality: str | None = None
-    modalities: ModalitiesField = []
-    age_groups: AgeGroupsField = []
-    languages: LanguagesField = []
-    genders: GendersField = []
 
 
 PostRead = Annotated[
@@ -409,16 +394,23 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
 
 
 class ClinicianOpeningCreate(WirePayload):
-    """Create payload for `kind='clinician_opening'`. Field set follows
-    the clinician-availability intake form."""
+    """Create payload for `kind='clinician_opening'`.
+
+    After #1358 PR-f sub-3, the steady-state practice profile fields
+    (services / settings / modalities / age_groups / genders / languages
+    / website / referral_instructions) are no longer part of the
+    announcement payload — those live on the linked
+    ``ClinicianAffiliation`` (and ``languages`` on the linked
+    ``Clinician``) and are managed through the affiliation / clinician
+    edit pages. The opening form collects only the announcement core
+    plus the practice picker.
+    """
 
     kind: Literal["clinician_opening"]
     subject: StrippedOptionalText = None
     # Optional initially — graduates to required once seed posts confirm
     # the shape works.
     description: TextareaOptional = None
-    referral_instructions: TextareaOptional = None
-    website: UrlOptional = None
     # Context: which ClinicianAffiliation this opening is offered under.
     # This is what the form's practice picker submits (one option per
     # affiliation). Required on new openings. The server resolves
@@ -435,32 +427,19 @@ class ClinicianOpeningCreate(WirePayload):
     # Free-text companion to `desired_times` for cohort dates / fixed
     # program hours. Single-line input; not a textarea.
     schedule_text: StrippedOptionalText = None
-    services: ServicesField = []
-    settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
-    modalities: ModalitiesField = []
-    # Required min-1 on the wire. No default; every PA post must declare
-    # at least one bucket explicitly.
-    age_groups: RequiredAgeGroupsField
-    # Required min-1 on the wire. Defaults to `["en"]` so the form's
-    # "submit with defaults" case still validates.
-    languages: RequiredLanguagesField = ["en"]
-    # Genders this practice serves. Optional; empty = "no restriction
-    # stated" / serves any. Multi-checkbox on the wire.
-    genders: GendersField = []
 
 
 class ProgramIntakeCreate(WirePayload):
-    """Create payload for `kind='intake'`. Field set mirrors
+    """Create payload for `kind='program_intake'`. Mirrors
     :class:`ClinicianOpeningCreate` one-to-one but swaps the Clinician
     FK for a Program FK — the referrer is choosing a Program (intake door),
-    not a specific clinician."""
+    not a specific clinician. The steady-state profile lives on the
+    linked ``Program`` (#1358 PR-f sub-3)."""
 
     kind: Literal["program_intake"]
     subject: StrippedOptionalText = None
     description: TextareaOptional = None
-    referral_instructions: TextareaOptional = None
-    website: UrlOptional = None
     # FK to one of the requesting user's Programs. The form restricts the
     # dropdown to Programs owned by the user; the spec's `payload_authz_path`
     # verifies ownership at write time so a wire-level attacker can't
@@ -468,15 +447,7 @@ class ProgramIntakeCreate(WirePayload):
     program_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: StrippedOptionalText = None
-    services: ServicesField = []
-    settings: SettingsField = []
     treatment_modality: StrippedOptionalText = None
-    modalities: ModalitiesField = []
-    # Required min-1 on the wire — mirrors PA's age_groups.
-    age_groups: RequiredAgeGroupsField
-    # Required min-1 on the wire — mirrors PA's languages.
-    languages: RequiredLanguagesField = ["en"]
-    genders: GendersField = []
 
 
 PostCreate = Annotated[
@@ -566,8 +537,6 @@ class ClinicianOpeningUpdate(PartialUpdate):
     kind: Literal["clinician_opening"]
     subject: StrippedOptionalText = None
     description: TextareaOptional = None
-    referral_instructions: TextareaOptional = None
-    website: UrlOptional = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `clinician_id` from it (and re-checks ownership of the
     # resolved clinician) in `_assert_post_payload_authz`.
@@ -578,21 +547,7 @@ class ClinicianOpeningUpdate(PartialUpdate):
     clinician_id: uuid.UUID | None = None
     desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
-    # `None` = leave unchanged; `min_length=1` rejects an explicit `[]`.
-    # Clearing services entirely is intentionally not supported on PA —
-    # the wire invariant is min-1.
-    services: RequiredServicesField | None = None
-    settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
-    modalities: ModalitiesField | None = None
-    age_groups: RequiredAgeGroupsField | None = None
-    # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
-    # mirroring `services`. Clearing the list is intentionally not
-    # supported.
-    languages: RequiredLanguagesField | None = None
-    # `None` = leave unchanged; `[]` is allowed (clear the list to
-    # "no restriction stated").
-    genders: GendersField | None = None
 
 
 class ProgramIntakeUpdate(PartialUpdate):
@@ -601,21 +556,13 @@ class ProgramIntakeUpdate(PartialUpdate):
     kind: Literal["program_intake"]
     subject: StrippedOptionalText = None
     description: TextareaOptional = None
-    referral_instructions: TextareaOptional = None
-    website: UrlOptional = None
     # FK to a Program owned by the requesting user. `None` = leave
     # unchanged. The spec's `payload_authz_path` verifies ownership on
     # update too — repointing at an unowned Program is 403.
     program_id: uuid.UUID | None = None
     desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
-    services: RequiredServicesField | None = None
-    settings: RequiredSettingsField | None = None
     treatment_modality: StrippedOptionalText = None
-    modalities: ModalitiesField | None = None
-    age_groups: RequiredAgeGroupsField | None = None
-    languages: RequiredLanguagesField | None = None
-    genders: GendersField | None = None
 
 
 PostUpdate = Annotated[
@@ -674,39 +621,23 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["clinician_opening"]
     subject: str | None = None
     description: str | None = None
-    referral_instructions: str | None = None
-    website: str | None = None
     # Audit row records the FK, not the dereferenced practice fields —
     # standard pattern for relational audit snapshots.
     clinician_id: uuid.UUID
     clinician_affiliation_id: uuid.UUID | None = None
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
-    services: ServicesField = []
-    settings: SettingsField = []
     treatment_modality: str | None = None
-    modalities: ModalitiesField = []
-    age_groups: AgeGroupsField = []
-    languages: LanguagesField = []
-    genders: GendersField = []
 
 
 class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["program_intake"]
     subject: str | None = None
     description: str | None = None
-    referral_instructions: str | None = None
-    website: str | None = None
     program_id: uuid.UUID
     desired_times: DesiredTimesField = []
     schedule_text: str | None = None
-    services: ServicesField = []
-    settings: SettingsField = []
     treatment_modality: str | None = None
-    modalities: ModalitiesField = []
-    age_groups: AgeGroupsField = []
-    languages: LanguagesField = []
-    genders: GendersField = []
 
 
 PostAuditSnapshot = Annotated[

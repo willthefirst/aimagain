@@ -10,10 +10,16 @@ _TABLE = "opening_details"
 class OpeningDetail(Base):
     """1:1 detail row for posts of kind = 'clinician_opening'.
 
-    Per-announcement fields live here. Practice-role attributes (location,
-    insurance, modality) are on the linked `Clinician`'s primary
-    `ClinicianAffiliation`; this row carries only fields that are per-announcement,
-    not steady-state practice properties.
+    After #1358 PR-f sub-3 this row is **thin by design**: it carries only
+    per-announcement attributes (``desired_times`` / ``schedule_text`` /
+    ``subject`` / ``description`` / ``treatment_modality``) plus the two
+    context FKs (``clinician_id``, ``clinician_affiliation_id``). The
+    steady-state practice profile (services, settings, modalities,
+    age_groups, genders, languages, website, referral_instructions) lives
+    on the linked ``ClinicianAffiliation`` (and ``languages`` on the
+    linked ``Clinician``) — see
+    [`../clinician_affiliations/README.md`](../clinician_affiliations/README.md)
+    for the migration history.
     """
 
     __tablename__ = _TABLE
@@ -36,20 +42,13 @@ class OpeningDetail(Base):
     )
     schedule_text = Column(Text, nullable=True)
 
-    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    # Per-announcement free-text overrides. ``treatment_modality`` is the
+    # one-string scalar companion to the steady-state ``modalities`` list
+    # (kept here because some announcements name a single targeted
+    # modality that's not part of the affiliation's standing list).
     treatment_modality = Column(Text, nullable=True)
-    modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
-    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    languages = Column(
-        JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
-    )
-    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-
     subject = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
-    referral_instructions = Column(Text, nullable=True)
-    website = Column(Text, nullable=True)
 
     # Context: the specific `ClinicianAffiliation` this opening is offered
     # under. A clinician who affiliates with several orgs posts an opening

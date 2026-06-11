@@ -552,16 +552,6 @@ def test_post_create_dispatches_opening():
     # `sliding_scale` / `payment_situation` / `cost` on the wire.
 
 
-@pytest.mark.parametrize(
-    "token",
-    ["group_therapy", "family_therapy", "couples_therapy"],
-)
-def test_post_create_opening_accepts_new_services_tokens(token):
-    """The three service tokens added in #440 validate on PA Create."""
-    p = post_create_adapter.validate_python(opening_payload(services=[token]))
-    assert p.services == [token]
-
-
 def test_post_create_opening_accepts_schedule_text():
     """`schedule_text` is the free-text companion to `desired_times` for
     cohort dates / fixed program hours (#442)."""
@@ -581,12 +571,6 @@ def test_post_update_opening_accepts_schedule_text_only():
         {"kind": "clinician_opening", "schedule_text": "New cohort starts Jun 1"}
     )
     assert p.schedule_text == "New cohort starts Jun 1"
-
-
-def test_post_create_opening_accepts_day_program_setting():
-    """`day_program` setting added in #440 for program-style posts."""
-    p = post_create_adapter.validate_python(opening_payload(settings=["day_program"]))
-    assert p.settings == ["day_program"]
 
 
 @pytest.mark.parametrize(
@@ -619,80 +603,12 @@ def test_post_create_referral_rejects_retired_in_network_token():
         post_create_adapter.validate_python(referral_payload(insurance="in_network"))
 
 
-def test_post_create_opening_default_languages():
-    """`languages` defaults to ['en'] — keeps the submit-with-defaults case
-    valid even though the field is required min-1 (#425)."""
+def test_post_create_opening_requires_clinician_affiliation_id():
+    """The picker submits `clinician_affiliation_id`; `clinician_id` is
+    server-derived from it. The affiliation FK is the only required
+    wire field on the thin opening shape (#1358 PR-f sub-3)."""
     payload = opening_payload()
-    payload.pop("languages")
-    p = post_create_adapter.validate_python(payload)
-    assert p.languages == ["en"]
-
-
-def test_post_create_opening_accepts_multiple_languages():
-    p = post_create_adapter.validate_python(opening_payload(languages=["en", "es"]))
-    assert p.languages == ["en", "es"]
-
-
-def test_post_create_opening_rejects_empty_languages():
-    """`languages` is required min-1; an empty list 422s, mirroring services."""
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(languages=[]))
-
-
-def test_post_create_opening_rejects_unknown_language_token():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(languages=["xx"]))
-
-
-def test_post_create_opening_accepts_multiple_age_groups():
-    """`age_groups` accepts a multi-bucket list — Katie Reeves spans 3
-    buckets, that's the whole point of #430."""
-    p = post_create_adapter.validate_python(
-        opening_payload(
-            age_groups=["adolescents_14_18", "young_adults_19_24", "adults_25_64"]
-        )
-    )
-    assert p.age_groups == [
-        "adolescents_14_18",
-        "young_adults_19_24",
-        "adults_25_64",
-    ]
-
-
-def test_post_create_opening_rejects_empty_age_groups():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(age_groups=[]))
-
-
-def test_post_create_opening_rejects_unknown_age_group_token():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            opening_payload(age_groups=["not_a_bucket"])
-        )
-
-
-def test_post_update_opening_accepts_age_groups_only():
-    p = post_update_adapter.validate_python(
-        {
-            "kind": "clinician_opening",
-            "age_groups": ["young_adults_19_24", "adults_25_64"],
-        }
-    )
-    assert p.age_groups == ["young_adults_19_24", "adults_25_64"]
-
-
-@pytest.mark.parametrize(
-    "missing_field",
-    [
-        # The picker submits this; `clinician_id` is now server-derived
-        # from it, so the affiliation id is the required wire field.
-        "clinician_affiliation_id",
-        "age_groups",
-    ],
-)
-def test_post_create_opening_requires_required_fields(missing_field):
-    payload = opening_payload()
-    payload.pop(missing_field)
+    payload.pop("clinician_affiliation_id")
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(payload)
 
@@ -709,42 +625,27 @@ def test_post_create_rejects_cross_kind_field_bleed():
         post_create_adapter.validate_python(opening_payload(location_in_person="yes"))
 
 
-def test_post_create_opening_accepts_free_text_fields():
-    """`description`, `referral_instructions`, `website` round-trip through
-    the Create schema."""
+def test_post_create_opening_accepts_description():
+    """`description` is the announcement-core free-text field on the
+    thin opening shape; `referral_instructions` / `website` moved to
+    the affiliation in #1358 PR-f sub-3."""
     p = post_create_adapter.validate_python(
-        opening_payload(
-            description="Lead narrative pitch.",
-            referral_instructions="Email the intake coordinator.",
-            website="example.com",
-        )
+        opening_payload(description="Lead narrative pitch.")
     )
     assert p.description == "Lead narrative pitch."
-    assert p.referral_instructions == "Email the intake coordinator."
-    assert p.website == "example.com"
 
 
-def test_post_create_opening_free_text_fields_default_none():
-    """All three new fields are optional; absent → None."""
+def test_post_create_opening_description_defaults_none():
+    """`description` is optional; absent → None."""
     payload = opening_payload()
-    for field in ("description", "referral_instructions", "website"):
-        payload.pop(field, None)
+    payload.pop("description", None)
     p = post_create_adapter.validate_python(payload)
     assert p.description is None
-    assert p.referral_instructions is None
-    assert p.website is None
 
 
-def test_post_create_opening_strips_free_text_whitespace():
-    p = post_create_adapter.validate_python(
-        opening_payload(
-            description="  trim me  ",
-            referral_instructions="   ",
-        )
-    )
+def test_post_create_opening_strips_description_whitespace():
+    p = post_create_adapter.validate_python(opening_payload(description="  trim me  "))
     assert p.description == "trim me"
-    # Whitespace-only collapses to None per StrippedOptionalText.
-    assert p.referral_instructions is None
 
 
 def test_post_update_opening_accepts_description_only():
@@ -954,9 +855,8 @@ def test_post_update_desired_times_rejects_unknown_token(kind):
 
 # --- services multi-select ----------------------------------------------
 #
-# Same shape as `desired_times` (scalar coercion + Literal vocabulary) on
-# both kinds, plus a min-1 invariant on `opening` that the
-# `RequiredServicesField` annotation enforces on Create and Update.
+# After #1358 PR-f sub-3, `services` is a referral-only wire field — on
+# the offering side it moved to ``ClinicianAffiliation`` / ``Program``.
 
 
 def test_post_create_referral_services_defaults_to_empty_list():
@@ -967,70 +867,29 @@ def test_post_create_referral_services_defaults_to_empty_list():
     assert p.services == []
 
 
-@pytest.mark.parametrize(
-    "payload_factory",
-    [referral_payload, opening_payload],
-)
-def test_post_create_services_accepts_subset(payload_factory):
+def test_post_create_referral_services_accepts_subset():
     p = post_create_adapter.validate_python(
-        payload_factory(services=["evaluation", "psychotherapy"])
+        referral_payload(services=["evaluation", "psychotherapy"])
     )
     assert p.services == ["evaluation", "psychotherapy"]
 
 
-@pytest.mark.parametrize(
-    "payload_factory",
-    [referral_payload, opening_payload],
-)
-def test_post_create_services_coerces_scalar_to_singleton_list(payload_factory):
+def test_post_create_referral_services_coerces_scalar_to_singleton_list():
     """Same json-enc 1-checkbox-collapses-to-scalar story as `desired_times`
     — the shared `_scalar_to_list` BeforeValidator handles it."""
-    p = post_create_adapter.validate_python(payload_factory(services="evaluation"))
+    p = post_create_adapter.validate_python(referral_payload(services="evaluation"))
     assert p.services == ["evaluation"]
 
 
-@pytest.mark.parametrize(
-    "payload_factory",
-    [referral_payload, opening_payload],
-)
-def test_post_create_services_rejects_unknown_token(payload_factory):
+def test_post_create_referral_services_rejects_unknown_token():
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(payload_factory(services=["telekinesis"]))
+        post_create_adapter.validate_python(referral_payload(services=["telekinesis"]))
 
 
-def test_post_create_opening_services_accepts_empty_list():
-    """PA's `services` was required-min-1; #433 relaxed to optional. An
-    explicit `[]` validates."""
-    p = post_create_adapter.validate_python(opening_payload(services=[]))
-    assert p.services == []
-
-
-def test_post_create_opening_services_absent_defaults_empty():
-    """Omitting `services` entirely on PA falls back to `[]` per #433."""
-    payload = opening_payload()
-    payload.pop("services")
-    p = post_create_adapter.validate_python(payload)
-    assert p.services == []
-
-
-def test_post_create_opening_accepts_omitted_optional_fields():
-    """`services` and `settings` are optional on PA Create (#433) — omitting
-    them defaults to `[]`. (Practice/location/session fields moved to
-    Clinician per #448 and are no longer wire fields on PA.)"""
-    payload = opening_payload()
-    for field in ("services", "settings"):
-        payload.pop(field, None)
-    p = post_create_adapter.validate_python(payload)
-    assert p.services == []
-    assert p.settings == []
-
-
-@pytest.mark.parametrize(
-    "kind",
-    ["referral", "clinician_opening"],
-)
-def test_post_update_services_coerces_scalar_to_singleton_list(kind):
-    p = post_update_adapter.validate_python({"kind": kind, "services": "evaluation"})
+def test_post_update_referral_services_coerces_scalar_to_singleton_list():
+    p = post_update_adapter.validate_python(
+        {"kind": "referral", "services": "evaluation"}
+    )
     assert p.services == ["evaluation"]
 
 
@@ -1041,29 +900,11 @@ def test_post_update_referral_services_accepts_empty_list():
     assert p.services == []
 
 
-def test_post_update_opening_services_rejects_empty_list():
-    """PA preserves the min-1 invariant on PATCH: explicit `[]` 422s; `None`
-    (leave-unchanged) is the supported way to not mutate the field."""
+def test_post_update_referral_services_rejects_unknown_token():
     with pytest.raises(ValidationError):
         post_update_adapter.validate_python(
-            {"kind": "clinician_opening", "services": []}
+            {"kind": "referral", "services": ["telekinesis"]}
         )
-
-
-def test_post_update_opening_services_accepts_non_empty_list():
-    p = post_update_adapter.validate_python(
-        {"kind": "clinician_opening", "services": ["psychotherapy"]}
-    )
-    assert p.services == ["psychotherapy"]
-
-
-@pytest.mark.parametrize(
-    "kind",
-    ["referral", "clinician_opening"],
-)
-def test_post_update_services_rejects_unknown_token(kind):
-    with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": kind, "services": ["telekinesis"]})
 
 
 # Label/icon coverage for every vocabulary — including the multi-attribute
