@@ -1,4 +1,8 @@
-from src.domain.logic.clinicians.handlers import handle_list_clinician_licensures
+from src.domain.logic.clinicians.handlers import (
+    handle_list_clinician_certifications,
+    handle_list_clinician_educations,
+    handle_list_clinician_licensures,
+)
 from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.domain.specs.clinician_affiliation import (  # noqa: F401
     CLINICIAN_AFFILIATION_ENTITY,
@@ -22,15 +26,18 @@ router = register_entity(CLINICIAN_ENTITY)
 # spec's module-load side effect (registration), and the parent
 # mount picks them up automatically.
 #
-# `clinician_licensure.list` is the bespoke handler: it loads the parent
-# clinician and returns its eager-loaded `clinician.licensures`. The
-# default `make_list_handler` would route through `handle_list` which
-# needs a `list_licensures(clinician_id=...)` repo method we don't have.
-# form_new and form_edit auto-bind to the factory makers.
+# Bespoke list handlers for the canonical-pattern credentials: each
+# loads the parent clinician and returns its eager-loaded credential
+# list. The default `make_list_handler` would route through
+# `handle_list` which needs a `list_<collection>(<parent_id>=...)`
+# repo method we don't have for credentials. form_new and form_edit
+# auto-bind to the factory makers.
 mount_entity(
     router,
     CLINICIAN_ENTITY,
     handlers={
         "clinician_licensure.list": handle_list_clinician_licensures,
+        "clinician_education.list": handle_list_clinician_educations,
+        "clinician_certification.list": handle_list_clinician_certifications,
     },
 )
