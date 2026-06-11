@@ -1628,18 +1628,17 @@ async def test_clinician_edit_form_renders_matching_dimension_fields(
     logged_in_user: User,
 ):
     """`GET /clinicians/{id}/form` renders the person-level matching-
-    dimension fields the schema-reconciliation work added (#1358 PR-a/c):
+    dimension fields the schema-reconciliation work added (#1358 PR-a/c/f):
 
     * `affirming_identities` — multi-checkbox sourced from
       `AFFIRMING_IDENTITIES` (clinician's self-claim, symmetric to the
       Referral form's request-side mirror).
+    * `languages` — multi-checkbox sourced from `LANGUAGES`. Person-level
+      (#1358 PR-f); the model column server-defaults to ``["en"]`` so a
+      freshly-created clinician renders with English pre-checked.
     * `clinical_niches` — free-form comma-separated tag input,
       mirroring the splitter pattern PR #1403 introduced on the
       Referral form.
-
-    `languages` (#1358 PR-f) is intentionally not on the edit form yet
-    — `ClinicianUpdate` doesn't accept it; the column reads through
-    the detail page only until the schema is extended.
     """
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
@@ -1661,6 +1660,17 @@ async def test_clinician_edit_form_renders_matching_dimension_fields(
         is not None
     ), "affirming_identities is missing the `lgbtq` option"
 
+    # languages — same multi_select_field shape as affirming_identities.
+    # English ("en") is in `LANGUAGES`; the model server-default
+    # of `["en"]` makes it pre-checked on a fresh row.
+    lang_group = tree.css_first('div[role="group"]#languages')
+    assert lang_group is not None, "no languages checkbox group"
+    en_box = tree.css_first('input[type="checkbox"][name="languages"][value="en"]')
+    assert en_box is not None, "languages is missing the `en` option"
+    assert (
+        "checked" in en_box.attributes
+    ), "languages[en] should be pre-checked on a freshly-created clinician"
+
     # clinical_niches — text input under the staging name
     # `_clinical_niches_input`; the inline splitter script rewrites it
     # to repeated hidden `clinical_niches` inputs on submit.
@@ -1678,14 +1688,15 @@ async def test_clinician_edit_form_prefills_matching_dimension_fields(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The edit form pre-checks any stored affirming-identity tokens
-    and pre-populates the clinical-niches text input with a comma-
-    joined view of the persisted tags. Asserts the round-trip-display
-    path matches what the form would have accepted on submit."""
+    """The edit form pre-checks any stored affirming-identity / language
+    tokens and pre-populates the clinical-niches text input with a
+    comma-joined view of the persisted tags. Asserts the round-trip-
+    display path matches what the form would have accepted on submit."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
         user_id=logged_in_user.id,
         affirming_identities=["lgbtq", "trans"],
+        languages=["en", "es", "zh"],
         clinical_niches=["DGBI", "ADHD in women"],
     )
 
@@ -1703,6 +1714,14 @@ async def test_clinician_edit_form_prefills_matching_dimension_fields(
             "checked" in box.attributes
         ), f"affirming_identities[{tok}] should be pre-checked on edit"
 
+    # All three stored languages are pre-checked.
+    for tok in ("en", "es", "zh"):
+        box = tree.css_first(f'input[type="checkbox"][name="languages"][value="{tok}"]')
+        assert box is not None, f"languages option {tok!r} missing"
+        assert (
+            "checked" in box.attributes
+        ), f"languages[{tok}] should be pre-checked on edit"
+
     # The clinical_niches text input is pre-populated with a comma-
     # joined view of the persisted tags. Order matches storage order.
     niches_input = tree.css_first('input[name="_clinical_niches_input"]')
@@ -1717,11 +1736,13 @@ async def test_patch_clinician_persists_matching_dimensions_round_trip(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """End-to-end: PATCH `/clinicians/{id}` with affirming_identities
-    + clinical_niches persists the values, and the detail page (`GET
-    /clinicians/{id}`) renders the row labels back. Pins the wire
-    shape the splitter script synthesizes (repeated `clinical_niches`
-    pairs) and the partial-update semantics of `ClinicianUpdate`."""
+    """End-to-end: PATCH `/clinicians/{id}` with affirming_identities,
+    languages, and clinical_niches persists the values, and the detail
+    page (`GET /clinicians/{id}`) renders the row labels back. Pins the
+    wire shape the splitter script synthesizes (repeated `clinical_niches`
+    pairs), the repeated-key shape multi-checkbox fields use for
+    `affirming_identities` / `languages`, and the partial-update
+    semantics of `ClinicianUpdate`."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -1738,6 +1759,8 @@ async def test_patch_clinician_persists_matching_dimensions_round_trip(
             [
                 ("affirming_identities", "lgbtq"),
                 ("affirming_identities", "neurodiversity"),
+                ("languages", "en"),
+                ("languages", "es"),
                 ("clinical_niches", "DGBI"),
                 ("clinical_niches", "ADHD in women"),
             ]
@@ -1749,6 +1772,7 @@ async def test_patch_clinician_persists_matching_dimensions_round_trip(
     async with db_test_session_manager() as session:
         row = await session.get(Clinician, clinician_id)
         assert list(row.affirming_identities) == ["lgbtq", "neurodiversity"]
+        assert list(row.languages) == ["en", "es"]
         assert list(row.clinical_niches) == ["DGBI", "ADHD in women"]
 
     detail = await authenticated_client.get(f"/clinicians/{clinician_id}")
@@ -1757,6 +1781,7 @@ async def test_patch_clinician_persists_matching_dimensions_round_trip(
     # Section labels (the row's `<dt>` text) — label-lookup wins, raw
     # tokens shouldn't appear.
     assert "Affirming identities" in body
+    assert "Languages" in body
     assert "Clinical niches" in body
     # Free-form niches render verbatim.
     assert "DGBI" in body
@@ -1770,10 +1795,12 @@ async def test_clinician_detail_renders_matching_dimension_rows(
 ):
     """The clinician detail page (`/clinicians/{id}`) surfaces each
     person-level matching-dimension row when the row has values for it.
-    `languages` (#1358 PR-f) renders here as a read-only display row
-    (the column is on the model; the wire schema for editing isn't
-    extended yet). Display labels (`AFFIRMING_IDENTITY_LABELS` /
-    `LANGUAGE_LABELS`) are looked up; free-form `clinical_niches`
+    `languages` (#1358 PR-f) is now editable via the form (the round-
+    trip is asserted in
+    :func:`test_patch_clinician_persists_matching_dimensions_round_trip`)
+    but the detail page renders it as a labeled row identically to the
+    affirming-identities row. Display labels (`AFFIRMING_IDENTITY_LABELS`
+    / `LANGUAGE_LABELS`) are looked up; free-form `clinical_niches`
     renders verbatim."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager,
