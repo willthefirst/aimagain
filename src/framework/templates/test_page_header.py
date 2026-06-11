@@ -1,12 +1,12 @@
 """Tests for the unified page-header band (``_shared/_page_header.html``).
 
 The band is the single fixed top-chrome element: primary nav + breadcrumb
-slot + toolbar slot + one boundary ``<hr>``. These tests render the generic
-view-type templates (which compose the band via ``base.html``) and pin the
-band's structure — the toolbar ``<h1>`` and breadcrumb live *inside*
-``header.page-header``, the breadcrumb row is reserved with a placeholder on
-list pages (so the rule sits at a constant Y), and exactly one ``<hr>``
-exists (in the band, none in ``<main>``).
+slot + toolbar slot, with a ``border-bottom`` boundary on ``.page-header``.
+These tests render the generic view-type templates (which compose the band
+via ``base.html``) and pin the band's structure — the toolbar ``<h1>`` and
+breadcrumb live *inside* ``header.page-header``, the breadcrumb row is
+reserved with a placeholder on list pages (so the boundary sits at a
+constant Y), and no ``<hr>`` lives in the band or in ``<main>``.
 
 A second group pins the CSS rules the constant-boundary + no-wrap
 guarantees depend on, mirroring the regex-against-``framework.css`` style in
@@ -110,18 +110,16 @@ def test_list_reserves_breadcrumb_row_with_hidden_placeholder() -> None:
     assert tree.css_first("header.page-header div.toolbar h1") is not None
 
 
-def test_band_owns_the_single_boundary_rule_and_main_has_none() -> None:
-    """Exactly one `<hr>` exists and it lives in the band; `<main>` has
-    none. The toolbar macro no longer emits its own separator — the band
-    owns the single divider."""
+def test_band_owns_the_single_boundary_and_no_hr_anywhere() -> None:
+    """No `<hr>` lives in the band or in `<main>` — the divider is the
+    `border-bottom` on `.page-header` itself (pinned via CSS regex below)."""
     env = _make_env()
     _add_child(env, "stub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "stub.html"))
 
     band = tree.css_first("header.page-header")
     assert band is not None
-    assert len(band.css("hr")) == 1
-    assert band.css_first("hr") is not None
+    assert len(band.css("hr")) == 0
 
     main = tree.css_first("main")
     assert main is not None
@@ -210,6 +208,10 @@ def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:
     assert re.search(
         r"\.page-header-crumb-placeholder\s*\{[^}]*visibility:\s*hidden", css, re.DOTALL
     ), ".page-header-crumb-placeholder must reserve its row via `visibility: hidden`"
+
+    assert re.search(
+        r"\.page-header\s*\{[^}]*border-bottom:\s*1px\s+solid", css, re.DOTALL
+    ), ".page-header must own the single divider via `border-bottom`"
 
     # The action-row reserve: a hidden button sharing the H1's grid cell.
     # Both the H1 and the reserve must be pinned to row 1 / col 1 so the

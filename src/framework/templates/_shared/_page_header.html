@@ -1,12 +1,12 @@
 {# Unified page-header band — the app's permanent top chrome.
 
 Renders one `<header class="container page-header">` whose rows, top to
-bottom, are: primary nav → breadcrumb slot → page-title/toolbar slot →
-a single `<hr>` boundary. The rule sits at the
-same Y on every app page at a given screen size: the breadcrumb row is
-reserved with an invisible intrinsic-height placeholder when a page has
-no real breadcrumb (list pages), so a list page's rule lines up with a
-detail page's. The reserved height is content-derived (a real
+bottom, are: primary nav → breadcrumb slot → page-title/toolbar slot.
+The band's `border-bottom` is the page's one horizontal boundary and
+sits at the same Y on every app page at a given screen size: the
+breadcrumb row is reserved with an invisible intrinsic-height
+placeholder when a page has no real breadcrumb (list pages), so a list
+page's boundary lines up with a detail page's. The reserved height is content-derived (a real
 back-affordance shape, hidden via `visibility: hidden`), never pinned
 with a CSS size unit — so it changes across screen sizes but is
 identical across pages at one size.
@@ -18,11 +18,11 @@ inherits the caller's context, so `_on_home` / `_on_posts` /
 `_on_profile` / `is_authenticated` resolve normally. `_on_home` marks
 the brand logo with `aria-current="page"` when the viewer is on /home.
 
-The band's lower rows (breadcrumb + toolbar + rule) render only when
-there's app chrome to show — any breadcrumb or toolbar content, or an
+The band's lower rows (breadcrumb + toolbar) render only when there's
+app chrome to show — any breadcrumb or toolbar content, or an
 authenticated viewer. Anonymous public pages (landing, the `/auth/*`
-flow) thus keep their bare brand nav with no rule, while every
-authenticated app page gets the full constant-boundary band.
+flow) thus keep their bare brand nav, while every authenticated app
+page gets the full constant-boundary band.
 
 Required context (set by `base.html` before the include):
   _breadcrumb_html — rendered `{% block breadcrumb %}` output (may be empty)
@@ -80,6 +80,5 @@ and the constant-boundary rationale (one source of truth).
       {%- endif %}
     </div>
     {{ _toolbar_html }}
-    <hr />
   {%- endif %}
 </header>

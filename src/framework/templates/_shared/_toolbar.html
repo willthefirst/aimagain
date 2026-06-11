@@ -1,9 +1,9 @@
 {# Top-of-page zone bar primitive.
 
 Every page renders one toolbar strip above its content. The
-single boundary `<hr>` below the toolbar is owned by the
-page-header band (`_shared/_page_header.html`), not this macro —
-the macro emits only the `<div class="toolbar">` row. The row
+boundary below the toolbar is the `border-bottom` on the
+page-header band (`_shared/_page_header.html`), not anything this
+macro emits — the macro emits only the `<div class="toolbar">` row. The row
 carries up to two things, left-to-right:
 
   Heading (`<h1>`) — the page title. Required arg. Lives in the
