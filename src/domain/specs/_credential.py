@@ -27,6 +27,19 @@ from src.framework.dispatch.entity_spec import (
 
 _DEFAULT_CREDENTIAL_ROUTES: RouteSet = RouteSet(create=True, update=True, delete=True)
 
+# The canonical resource pattern: dedicated list / form_new / form_edit
+# pages on top of the CRUD trio. Once every credential is converted
+# this becomes the factory default and `_DEFAULT_CREDENTIAL_ROUTES`
+# disappears.
+CANONICAL_CREDENTIAL_ROUTES: RouteSet = RouteSet(
+    list=True,
+    create=True,
+    update=True,
+    delete=True,
+    form_new=True,
+    form_edit=True,
+)
+
 
 def make_clinician_credential_entity(
     *,

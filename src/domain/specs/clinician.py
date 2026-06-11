@@ -299,7 +299,9 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
         # of `GET /clinicians/{id}/<sub>`).
         #
         # Converted (mounted via the sub-resource's own EntitySpec):
-        #   - clinician_licensure
+        #   - clinician_licensure (PR 2)
+        #   - clinician_education (PR 3)
+        #   - clinician_certification (PR 3)
         #
         # Pending conversion (still mounted here):
         RelatedListSubresource(
@@ -308,22 +310,6 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
             handler_path=(
                 "src.domain.logic.clinicians.handlers."
                 "handle_list_clinician_affiliations"
-            ),
-        ),
-        RelatedListSubresource(
-            child_spec=_clinician_educations_child,
-            template="clinicians/educations_list.html",
-            handler_path=(
-                "src.domain.logic.clinicians.handlers."
-                "handle_list_clinician_educations"
-            ),
-        ),
-        RelatedListSubresource(
-            child_spec=_clinician_certifications_child,
-            template="clinicians/certifications_list.html",
-            handler_path=(
-                "src.domain.logic.clinicians.handlers."
-                "handle_list_clinician_certifications"
             ),
         ),
     ),

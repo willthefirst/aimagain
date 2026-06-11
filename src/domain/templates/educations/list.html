@@ -1,0 +1,24 @@
+{# `/clinicians/{clinician_id}/educations` — canonical sub-resource
+   list. See `certifications/list.html` and `licensures/list.html`
+   for the shape.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/_credential_list.html" import credential_list -%}
+{%- from "_shared/_credential_row.html" import credential_row -%}
+{% block resource_label %}Education{% endblock %}
+{% block actions %}
+  <li>
+    <a href="{{ entity_url('clinician', id=clinician.id) }}/educations/form"
+       role="button">Create education</a>
+  </li>
+{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(edu) credential_list(rows, "No education entries yet.") %}
+      {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
+            [edu.institution, edu.month_completed],
+            href=entity_url('clinician', id=clinician.id) ~ "/educations/" ~ edu.id|string ~ "/form",
+      ) }}
+    {% endcall %}
+  </section>
+{% endblock %}

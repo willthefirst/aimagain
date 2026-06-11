@@ -16,6 +16,8 @@ from tests.helpers import (
     clinician_payload,
     create_test_user,
     make_clinician,
+    make_clinician_certification,
+    make_clinician_education,
     make_clinician_licensure,
     make_clinician_with_org,
     make_organization_row,
@@ -1362,6 +1364,124 @@ async def test_clinician_edit_form_has_no_inline_subresource_ui(
 
 
 # --- Education / certification happy paths ------------------------------
+
+
+async def test_get_education_new_form_renders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Canonical create-form page for educations (PR 3 conversion)."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/educations/form"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    add_form = tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/educations"]')
+    assert add_form is not None
+    assert add_form.css_first('select[name="education_type"]') is not None
+
+
+async def test_get_education_edit_form_renders_with_prefilled_values(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Edit form prefills the institution + delete sits in actions."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+    education = make_clinician_education(
+        clinician_id=clinician_id, institution="Test University"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(education)
+        await session.refresh(education)
+    edu_id = education.id
+
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/educations/{edu_id}/form"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    edit_form = tree.css_first(
+        f'form[hx-patch="/clinicians/{clinician_id}/educations/{edu_id}"]'
+    )
+    assert edit_form is not None
+    institution = edit_form.css_first('input[name="institution"]')
+    assert institution is not None
+    assert institution.attributes.get("value") == "Test University"
+    delete = tree.css_first(
+        f'button[hx-delete="/clinicians/{clinician_id}/educations/{edu_id}"]'
+    )
+    assert delete is not None
+
+
+async def test_get_certification_new_form_renders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Canonical create-form page for certifications (PR 3 conversion)."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/certifications/form"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    add_form = tree.css_first(
+        f'form[hx-post="/clinicians/{clinician_id}/certifications"]'
+    )
+    assert add_form is not None
+    assert add_form.css_first('select[name="certification_type"]') is not None
+
+
+async def test_get_certification_edit_form_renders_with_prefilled_values(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Edit form prefills the certifying_body + delete sits in actions."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+    certification = make_clinician_certification(
+        clinician_id=clinician_id, certifying_body="Test Board"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(certification)
+        await session.refresh(certification)
+    cert_id = certification.id
+
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/certifications/{cert_id}/form"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    edit_form = tree.css_first(
+        f'form[hx-patch="/clinicians/{clinician_id}/certifications/{cert_id}"]'
+    )
+    assert edit_form is not None
+    body = edit_form.css_first('input[name="certifying_body"]')
+    assert body is not None
+    assert body.attributes.get("value") == "Test Board"
+    delete = tree.css_first(
+        f'button[hx-delete="/clinicians/{clinician_id}/certifications/{cert_id}"]'
+    )
+    assert delete is not None
 
 
 # --- Create form page (GET /clinicians/form) ----------------------
