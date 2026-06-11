@@ -247,6 +247,38 @@ def test_view_passes_through_optional_cost_and_npi():
     assert v["npi"] == "1234567890"
 
 
+def test_view_matching_dimensions_default_empty_when_unset():
+    """Person-level matching-dimension lists (#1358 PR-a/c/f) come back
+    as empty lists when the clinician stub doesn't carry them, so the
+    detail-page facts block can iterate them uniformly via
+    ``{% if view.x %}`` without nullability handling. ``languages`` on
+    a real (flushed) clinician defaults to ``["en"]`` at the model
+    layer; the SimpleNamespace stub here doesn't carry the attribute,
+    matching the "older row without the column" path."""
+    v = clinician_card_view(_stub_clinician())
+    assert v["affirming_identities"] == []
+    assert v["clinical_niches"] == []
+    assert v["languages"] == []
+
+
+def test_view_matching_dimensions_round_trip():
+    """When the clinician carries matching-dimension tokens, the view-
+    model surfaces them as plain Python lists so the facts block can
+    label-lookup (``AFFIRMING_IDENTITY_LABELS``, ``LANGUAGE_LABELS``)
+    and join. ``clinical_niches`` is free-form so values pass through
+    unchanged."""
+    v = clinician_card_view(
+        _stub_clinician(
+            affirming_identities=["lgbtq", "trans"],
+            clinical_niches=["DGBI", "ADHD in women"],
+            languages=["en", "zh"],
+        )
+    )
+    assert v["affirming_identities"] == ["lgbtq", "trans"]
+    assert v["clinical_niches"] == ["DGBI", "ADHD in women"]
+    assert v["languages"] == ["en", "zh"]
+
+
 def test_view_returns_empty_list_for_missing_credentials():
     """The template iterates `view.licensures / educations / certifications`
     via `{% for ... %}`; empty lists render nothing without needing a
