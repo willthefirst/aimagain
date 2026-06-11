@@ -1,0 +1,31 @@
+{# The one icon + text-label pair.
+
+`icon_label(icon, label)` renders a Lucide glyph immediately adjacent
+to a text label — no whitespace text-node between them. The CSS rule
+`[class^="icon-"]` in `base.html` carries the only gap
+(`margin-inline-end: 0.25em`); a stray whitespace text-node would
+compound on top of it and visibly double the space.
+
+Why a macro for two tags: djlint's auto-formatter splits long start
+tags across lines and inserts a newline+indent between the icon and
+its label, which then renders as whitespace. The single djlint-off
+marker below is the one escape hatch for this pattern repo-wide.
+Every other site uses this macro, enforced by
+`scripts/dev/template_icon_label_check.py`.
+
+`icon` is the Lucide glyph name without the `icon-` prefix (lock,
+map-pin, chevron-left). `label` is plain text or a Jinja expression.
+If the label needs richer markup (a span wrapper, conditional
+content), inline the icon+wrapper flush by hand and wrap in
+djlint-off/djlint-on markers — the lint allows that escape when the
+markers are present, but defaults to forbidding raw icon+text.
+
+Example (curly-comment braces written as Unicode here so this very
+docstring doesn't self-close; in real templates use the ASCII form):
+
+    ｛% from "_shared/icon_label.html" import icon_label %｝
+    <span>｛｛ icon_label("map-pin", "San Francisco, CA") ｝｝</span>
+#}
+{% macro icon_label(icon, label) -%}
+  {# djlint:off #}<i class="icon-{{ icon }}" aria-hidden="true"></i>{{ label }}{# djlint:on #}
+{%- endmacro %}

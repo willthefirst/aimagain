@@ -2,6 +2,7 @@
 {%- from "_shared/actions.html" import actions, favorite_toggle -%}
 {%- from "_shared/_locked.html" import locked_name -%}
 {%- from "_shared/_picker.html" import picker -%}
+{%- from "_shared/icon_label.html" import icon_label -%}
 {%- set view = clinician_card_view(clinician) -%}
 {# When the viewer lacks provider-network access and isn't the owner,
    redact identifying fields per the `_clinician_card.html` /
@@ -29,11 +30,11 @@
   {% if not _redacted %}
     {% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
     {%- if verification_status == "verified" %}
-      <small><i class="icon-shield-check"></i>Verified</small>
+      <small>{{ icon_label('shield-check', 'Verified') }}</small>
     {%- elif verification_status == "needs_review" %}
-      <small><i class="icon-shield-alert"></i>Needs review</small>
+      <small>{{ icon_label('shield-alert', 'Needs review') }}</small>
     {%- elif verification_status == "failed" %}
-      <small><i class="icon-shield-x"></i>Verification failed</small>
+      <small>{{ icon_label('shield-x', 'Verification failed') }}</small>
     {%- endif %}
   {% endif %}
 {% endblock %}

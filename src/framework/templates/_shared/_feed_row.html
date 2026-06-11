@@ -1,4 +1,5 @@
 {%- from "_shared/_locked.html" import locked_name -%}
+{%- from "_shared/icon_label.html" import icon_label -%}
 {# Feed-row macro — renders a single clickable row for the home feed and
    browse list views.
 
@@ -73,7 +74,7 @@ under the "Feed rows" section. #}
 {%- if view.in_person == "yes" -%}{%- set _ = _mod.append("In-person") -%}{%- endif -%}
 {%- if view.virtual == "yes" -%}{%- set _ = _mod.append("Telehealth") -%}{%- endif -%}
 {%- if _mod -%}
-<span><i class="icon-monitor"></i>{{ _mod | join(" · ") }}</span>
+<span>{{ icon_label("monitor", _mod | join(" · ") ) }}</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.settings -%}
@@ -99,11 +100,11 @@ under the "Feed rows" section. #}
 {% endif -%}
 </span>
 {%- elif view.accepts_in_network -%}
-<span><i class="icon-shield"></i>In-network</span>
+<span>{{ icon_label('shield', 'In-network') }}</span>
 {%- elif view.accepts_out_of_network_superbill -%}
-<span><i class="icon-shield"></i>Out-of-network</span>
+<span>{{ icon_label('shield', 'Out-of-network') }}</span>
 {%- elif view.accepts_private_pay -%}
-<span><i class="icon-shield"></i>Private pay</span>
+<span>{{ icon_label('shield', 'Private pay') }}</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.in_network_carriers -%}
@@ -117,9 +118,9 @@ under the "Feed rows" section. #}
 {% endif -%}
 </span>
 {%- elif view.accepts_out_of_network -%}
-<span><i class="icon-shield"></i>Out-of-network</span>
+<span>{{ icon_label('shield', 'Out-of-network') }}</span>
 {%- elif view.sliding_scale -%}
-<span><i class="icon-shield"></i>Sliding scale</span>
+<span>{{ icon_label('shield', 'Sliding scale') }}</span>
 {%- endif -%}
 {%- endif -%}
 </div>

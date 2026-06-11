@@ -428,6 +428,10 @@ class QualityCommands:
                 [sys.executable, "scripts/dev/template_component_check.py"],
             ),
             (
+                "🔖 Checking templates for raw icon-adjacent text...",
+                [sys.executable, "scripts/dev/template_icon_label_check.py"],
+            ),
+            (
                 "🤝 Checking contract-form coverage...",
                 [sys.executable, "scripts/dev/contract_form_coverage_check.py"],
             ),

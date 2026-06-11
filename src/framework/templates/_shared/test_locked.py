@@ -113,6 +113,14 @@ def test_locked_action_always_has_lock_icon() -> None:
     assert button.css_first("i.icon-lock") is not None
 
 
+def test_locked_action_label_is_flush_against_icon() -> None:
+    """Regression: the icon-label gap is owned by CSS `margin-inline-end`. A
+    stray whitespace text-node between ``</i>`` and the label compounds on top
+    of it and visibly doubles the gap. Pin the flush adjacency."""
+    html = _render_action("REASON_NOT_A_VERIFIED_PROVIDER", "+ Post a referral")
+    assert "</i>+ Post a referral" in html
+
+
 def test_locked_action_extra_class_appended_to_outline() -> None:
     html = _render_action(
         "REASON_NOT_A_VERIFIED_PROVIDER", "Email", extra_class="secondary"
@@ -164,6 +172,12 @@ def test_locked_link_has_lock_icon() -> None:
     a = HTMLParser(html).css_first("a.locked-link")
     assert a is not None
     assert a.css_first("i.icon-lock") is not None
+
+
+def test_locked_link_label_is_flush_against_icon() -> None:
+    """Regression: see ``test_locked_action_label_is_flush_against_icon``."""
+    html = _render_link("REASON_NOT_A_VERIFIED_PROVIDER", "View full profile")
+    assert "</i>View full profile" in html
 
 
 def test_locked_link_has_no_href() -> None:
