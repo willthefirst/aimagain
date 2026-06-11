@@ -2,8 +2,10 @@
 
 ``entity_form`` is the canonical ``<form hx-{method}="{url}">`` wrapper
 that every top-level entity create/edit form composes (per #1193's
-component-library rule). Sub-resource add forms use ``inline_add_form``
-instead — different shape, different macro.
+component-library rule). Sub-resource add forms on the clinician
+credential list pages use the same macro — wrapped in
+``<section class="entity-form-page">`` so the entity-form subgrid
+alignment applies the same way it does on the chrome-supplied wrapper.
 """
 
 from __future__ import annotations
