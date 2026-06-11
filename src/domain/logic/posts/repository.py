@@ -59,9 +59,10 @@ class PostRepository(BaseRepository):
       this filter is active).
     * ``modality`` (Choice, multi) — ``modalities`` JSON-array contains
       check across all three detail tables.
-    * ``insurance`` (Choice, multi) — ``insurance_carrier`` exact match
-      on ``ReferralDetail`` OR ``in_network_carriers`` JSON-contains on
-      linked ``ClinicianAffiliation``.
+    * ``insurance`` (Choice, multi) — ``insurance_carriers`` JSON-array
+      contains check on ``ReferralDetail`` OR ``in_network_carriers``
+      JSON-contains on linked ``ClinicianAffiliation`` (#1358 PR-e —
+      both sides are now JSON arrays of `INSURANCE_CARRIERS` tokens).
 
     Empty / absent filter values short-circuit (no WHERE clause), so
     URL params that aren't set carry no SQL cost. AND-combined across
@@ -213,7 +214,7 @@ class PostRepository(BaseRepository):
                 token = f'%"{v}"%'
                 clauses.append(
                     or_(
-                        ReferralDetail.insurance_carrier == v,
+                        ReferralDetail.insurance_carriers.like(token),
                         ClinicianAffiliation.in_network_carriers.like(token),
                     )
                 )

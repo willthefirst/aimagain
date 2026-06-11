@@ -152,62 +152,70 @@ async def test_create_post_persists_parent_and_referral_detail(
         assert detail_row.description == "needs placement"
 
 
-async def test_referral_persists_network_preference_and_carrier(
+async def test_referral_persists_payment_paths_and_carriers(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Both insurance fields round-trip through the detail row.
-    `network_preference` is required (CHECK against NETWORK_PREFERENCES);
-    `insurance_carrier` is nullable — null is the expected shape when the
-    referrer says 'no preference' / patient is self-pay."""
+    """All four payment-path columns round-trip through the detail row
+    (#1358 PR-e). The three booleans are NOT NULL with server-side
+    default `false`; `insurance_carriers` is NOT NULL JSON with
+    server-side default `[]`."""
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
         repo = BaseRepository(session)
-        with_carrier = await _create_post(
+        in_network = await _create_post(
             repo,
             Post(kind="referral", owner_id=owner.id),
             make_referral_detail(
                 description="cigna patient",
-                network_preference="in_network_preferred",
-                insurance_carrier="cigna",
+                accepts_in_network=True,
+                accepts_out_of_network_superbill=False,
+                accepts_private_pay=True,
+                insurance_carriers=["cigna"],
             ),
         )
-        no_carrier = await _create_post(
+        private_pay_only = await _create_post(
             repo,
             Post(kind="referral", owner_id=owner.id),
             make_referral_detail(
                 description="self-pay patient",
-                network_preference="no_preference",
-                insurance_carrier=None,
+                accepts_in_network=False,
+                accepts_out_of_network_superbill=False,
+                accepts_private_pay=True,
+                insurance_carriers=[],
             ),
         )
         await session.commit()
-        with_id = with_carrier.id
-        no_id = no_carrier.id
+        in_id = in_network.id
+        pp_id = private_pay_only.id
 
     async with db_test_session_manager() as session:
-        with_row = (
+        in_row = (
             (
                 await session.execute(
-                    select(ReferralDetail).filter(ReferralDetail.post_id == with_id)
+                    select(ReferralDetail).filter(ReferralDetail.post_id == in_id)
                 )
             )
             .scalars()
             .first()
         )
-        no_row = (
+        pp_row = (
             (
                 await session.execute(
-                    select(ReferralDetail).filter(ReferralDetail.post_id == no_id)
+                    select(ReferralDetail).filter(ReferralDetail.post_id == pp_id)
                 )
             )
             .scalars()
             .first()
         )
-        assert with_row.network_preference == "in_network_preferred"
-        assert with_row.insurance_carrier == "cigna"
-        assert no_row.network_preference == "no_preference"
-        assert no_row.insurance_carrier is None
+        assert in_row.accepts_in_network is True
+        assert in_row.accepts_out_of_network_superbill is False
+        assert in_row.accepts_private_pay is True
+        assert in_row.insurance_carriers == ["cigna"]
+        assert pp_row.accepts_in_network is False
+        assert pp_row.accepts_out_of_network_superbill is False
+        assert pp_row.accepts_private_pay is True
+        assert pp_row.insurance_carriers == []
 
 
 async def test_update_post_writes_to_referral_detail(

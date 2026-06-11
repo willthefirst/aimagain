@@ -2,13 +2,14 @@
 
 The listing row in `src/domain/templates/posts/_item.html` needs a single
 4-state "insurance posture" axis to render as one icon badge. The two
-kinds model the underlying data asymmetrically:
+kinds model the underlying data with parallel shapes:
 
-  * `referral` — `network_preference` enum
-    (`in_network_required` / `in_network_preferred` / `no_preference`)
-    paired with a nullable `insurance_carrier`. The posture is derived
-    from `network_preference` alone — the carrier doesn't change the
-    badge.
+  * `referral` — three independent payment-path booleans
+    (`accepts_in_network` / `accepts_out_of_network_superbill` /
+    `accepts_private_pay`) plus an `insurance_carriers` JSON list
+    of `INSURANCE_CARRIERS` tokens (#1358 PR-e). The posture is
+    derived from the booleans in priority order: in-network →
+    out-of-network → private-pay → please_contact (none set).
   * `opening` → linked `Clinician` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
@@ -83,16 +84,17 @@ def insurance_posture_for_post(post) -> str | None:
         detail = getattr(post, "referral_detail", None)
         if detail is None:
             return None
-        # Map the referrer's posture to the unified posture vocabulary.
-        # The mapping mirrors the alembic migration that backfilled the
-        # old `insurance` column (in_network → required, out_of_network
-        # → preferred, self_pay_only → no_preference); the read path
-        # inverts that to recover the original posture display.
-        return {
-            "in_network_required": "in_network",
-            "in_network_preferred": "out_of_network",
-            "no_preference": "self_pay",
-        }.get(detail.network_preference)
+        # Map the payment-path booleans to the unified posture vocab in
+        # priority order: in-network > out-of-network > private-pay >
+        # please_contact (none set). Priority matches the provider-side
+        # collapse below — in-network is the loudest signal.
+        if getattr(detail, "accepts_in_network", False):
+            return "in_network"
+        if getattr(detail, "accepts_out_of_network_superbill", False):
+            return "out_of_network"
+        if getattr(detail, "accepts_private_pay", False):
+            return "self_pay"
+        return "please_contact"
     if kind == "clinician_opening":
         detail = getattr(post, "opening_detail", None)
         clinician = getattr(detail, "clinician", None) if detail is not None else None
@@ -248,8 +250,11 @@ def post_card_view(post) -> dict[str, Any]:
             ``None``.
         sliding_scale / cost: PA-only fields from the linked Clinician;
             ``None`` for other kinds.
-        network_preference / insurance_carrier: CR-only raw enum
-            values from the detail row; ``None`` for other kinds.
+        accepts_in_network / accepts_out_of_network_superbill /
+        accepts_private_pay: CR-only payment-path booleans from the
+            detail row; ``None`` for other kinds.
+        insurance_carriers: CR-only list of carrier tokens; empty list
+            for CR with no carriers specified, ``[]`` for other kinds.
         in_network_carriers / accepts_out_of_network: PA-only raw
             values from the linked Clinician. ``in_network_carriers``
             comes back as an empty list when unset, matching the
@@ -287,8 +292,10 @@ def post_card_view(post) -> dict[str, Any]:
         "full_address": None,
         "sliding_scale": None,
         "cost": None,
-        "network_preference": None,
-        "insurance_carrier": None,
+        "accepts_in_network": None,
+        "accepts_out_of_network_superbill": None,
+        "accepts_private_pay": None,
+        "insurance_carriers": [],
         "in_network_carriers": [],
         "accepts_out_of_network": None,
         "referral": None,
@@ -322,8 +329,12 @@ def post_card_view(post) -> dict[str, Any]:
                 getattr(d, "location_state", None),
                 getattr(d, "location_zip", None),
             ),
-            network_preference=getattr(d, "network_preference", None),
-            insurance_carrier=getattr(d, "insurance_carrier", None),
+            accepts_in_network=getattr(d, "accepts_in_network", None),
+            accepts_out_of_network_superbill=getattr(
+                d, "accepts_out_of_network_superbill", None
+            ),
+            accepts_private_pay=getattr(d, "accepts_private_pay", None),
+            insurance_carriers=list(getattr(d, "insurance_carriers", None) or []),
         )
         return base
 
@@ -459,8 +470,8 @@ def post_row_summary(post) -> str:
     Used by the home-page "My active posts" widget and the list-page row
     view. Returns a " · "-joined string of the post's key facts: the
     free-text description plus the one or two most differentiating
-    metadata signals (insurance carrier + city for referrals; settings +
-    sliding-scale flag for openings).
+    metadata signals (first insurance carrier + city for referrals;
+    settings + sliding-scale flag for openings).
 
     Truncates description to 100 chars so rows stay single-line on typical
     screens; metadata appended after the truncation so the separators
@@ -478,9 +489,9 @@ def post_row_summary(post) -> str:
             parts.append(desc[:100])
         else:
             parts.append(referral_headline(d))
-        carrier = getattr(d, "insurance_carrier", None)
-        if carrier:
-            parts.append(INSURANCE_CARRIER_LABELS.get(carrier, carrier))
+        carriers = list(getattr(d, "insurance_carriers", None) or [])
+        if carriers:
+            parts.append(INSURANCE_CARRIER_LABELS.get(carriers[0], carriers[0]))
         city = getattr(d, "location_city", None)
         if city:
             parts.append(city)

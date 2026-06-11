@@ -14,7 +14,6 @@ from .enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
-    NETWORK_PREFERENCES,
     US_STATES,
 )
 from .favorites.user_favorite import UserFavorite
@@ -43,7 +42,6 @@ __all__ = [
     "ReferralDetail",
     "INSURANCE_CARRIERS",
     "LOCATION_AVAILABILITY_OPTIONS",
-    "NETWORK_PREFERENCES",
     "OrgRepresentation",
     "Organization",
     "POST_KIND_BY_DETAIL_MODEL",

@@ -16,11 +16,6 @@ from src.domain.models import enums as e
 MIGRATED_VALUES = {
     e.LocationAvailability: ("yes", "no", "please_contact"),
     e.Language: ("en", "es", "zh", "yue", "vi", "tl", "ko", "ru"),
-    e.NetworkPreference: (
-        "in_network_required",
-        "in_network_preferred",
-        "no_preference",
-    ),
     e.InsuranceCarrier: (
         "aetna",
         "anthem_bcbs",
@@ -174,8 +169,6 @@ ALIAS_BINDINGS = [
     (e.LOCATION_AVAILABILITY_LABELS, e.LocationAvailability, "labels"),
     (e.LANGUAGES, e.Language, "values"),
     (e.LANGUAGE_LABELS, e.Language, "labels"),
-    (e.NETWORK_PREFERENCES, e.NetworkPreference, "values"),
-    (e.NETWORK_PREFERENCE_LABELS, e.NetworkPreference, "labels"),
     (e.INSURANCE_CARRIERS, e.InsuranceCarrier, "values"),
     (e.INSURANCE_CARRIER_LABELS, e.InsuranceCarrier, "labels"),
     (e.REFERRAL_SERVICES, e.ReferralService, "values"),

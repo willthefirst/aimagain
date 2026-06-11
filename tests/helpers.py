@@ -82,8 +82,14 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "services": [],
     "treatment_modality": None,
     "modalities": [],
-    "network_preference": "in_network_required",
-    "insurance_carrier": None,
+    # Payment paths (#1358 PR-e). Three independent booleans + a
+    # carrier list. Default emulates the most common corpus shape
+    # ("in-network preferred, Aetna patient") so existing tests
+    # that don't override get a representative referral.
+    "accepts_in_network": True,
+    "accepts_out_of_network_superbill": False,
+    "accepts_private_pay": False,
+    "insurance_carriers": [],
     # Default to "no preference stated" — most tests don't care about
     # affirming-identity match; tests that do override.
     "affirming_identities": [],
