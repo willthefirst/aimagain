@@ -2090,11 +2090,15 @@ async def test_get_clinician_licensures_renders_existing_rows(
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/licensures")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # The whole row is a link to the edit page.
-    row_link = tree.css_first(
-        f'a.credential-row-link[href="/clinicians/{clinician_id}/licensures/{lic_id}/form"]'
+    # The row renders as a `_shared/_card.html` article whose headline
+    # link points at the edit page — same vocabulary every top-level
+    # list page uses.
+    row = tree.css_first(f'article[data-row-id="{lic_id}"]')
+    assert row is not None
+    headline_link = row.css_first(
+        f'h3 a[href="/clinicians/{clinician_id}/licensures/{lic_id}/form"]'
     )
-    assert row_link is not None
+    assert headline_link is not None
     # Toolbar carries the "Create licensure" link to the new-form page.
     create_link = tree.css_first(
         f'a[href="/clinicians/{clinician_id}/licensures/form"][role="button"]'

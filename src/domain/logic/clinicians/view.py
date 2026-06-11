@@ -213,8 +213,8 @@ def clinician_card_view(clinician) -> dict[str, Any]:
             empty list here would only happen on a stub or unflushed
             row.
         licensures / educations / certifications: pass-through ORM
-            collections (the template iterates them via the existing
-            ``credential_row`` partial; no shape change).
+            collections (the canonical sub-resource list pages render
+            them as `_shared/_card.html` articles; no shape change).
         affiliations: list of per-affiliation dicts (one per row in
             ``clinician.clinician_affiliations``) shaped by
             :func:`affiliation_card_view`. The detail page renders one

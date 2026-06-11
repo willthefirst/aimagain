@@ -1,10 +1,11 @@
 {# `/clinicians/{clinician_id}/educations` — canonical sub-resource
-   list. See `certifications/list.html` and `licensures/list.html`
-   for the shape.
+   list. See `licensures/list.html` for the card-pattern rationale
+   shared across all four clinician sub-resource lists.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_credential_list.html" import credential_list -%}
-{%- from "_shared/_credential_row.html" import credential_row -%}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Education{% endblock %}
 {% block actions %}
   <li>
@@ -12,13 +13,23 @@
        role="button">Create education</a>
   </li>
 {% endblock %}
+{%- macro education_card(edu) %}
+  {%- set subtitle %}
+    {%- if edu.institution %}<span>{{ edu.institution }}</span>{%- endif %}
+  {%- endset %}
+  {%- call card(
+    id=edu.id,
+    headline_url=entity_url('clinician', id=clinician.id) ~ "/educations/" ~ edu.id|string ~ "/form",
+    headline=EDUCATION_TYPES_LABELS[edu.education_type],
+    subtitle=subtitle | trim) -%}
+    {%- if edu.month_completed -%}
+      {%- call facts_block() %}
+        {{ fact('month_completed', 'Completed', edu.month_completed) }}
+      {%- endcall %}
+    {%- endif %}
+  {%- endcall %}
+{%- endmacro %}
 {% block list_body %}
-  <section>
-    {% call(edu) credential_list(rows, "No education entries yet.") %}
-      {{ credential_row(EDUCATION_TYPES_LABELS[edu.education_type],
-            [edu.institution, edu.month_completed],
-            href=entity_url('clinician', id=clinician.id) ~ "/educations/" ~ edu.id|string ~ "/form",
-      ) }}
-    {% endcall %}
-  </section>
+  {{ item_list(rows, education_card, "educations-list",
+    empty_msg="No education entries yet.") }}
 {% endblock %}

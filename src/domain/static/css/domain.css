@@ -42,49 +42,6 @@
 .entity-form-page input[name="treatment_modality"] {
   max-width: 20rem;
 }
-/* Credential rows (clinician licensures / education / certifications)
-   render as flat rows inside an outer `<section>` (edit or
-   detail), so a card-on-card pattern would read as visual
-   noise. The row's vocabulary is just a stacked
-   `<strong>` + muted `<small>` on the left, optional Delete on
-   the right, with a hairline divider between entries. */
-.credential-list {
-  display: flex;
-  flex-direction: column;
-  margin-block: var(--pico-spacing);
-}
-.credential-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-block: 0.5rem;
-}
-.credential-row + .credential-row {
-  border-top: 1px solid var(--pico-muted-border-color);
-}
-.credential-row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-}
-.credential-row-text > small {
-  color: var(--pico-muted-color);
-}
-.credential-row > button { margin: 0; flex: 0 0 auto; }
-/* When the row is the whole-row navigation link variant (`href=` on
-   the macro), strip Pico's default link chrome so the row reads as
-   a tappable region rather than inline text. The hairline divider +
-   the muted small still come through; the `<strong>` stays bold but
-   in body color. */
-.credential-row-link {
-  color: inherit;
-  text-decoration: none;
-}
-.credential-row-link:hover {
-  background: var(--pico-card-sectioning-background-color);
-}
 /* Compact post-rows table — kind badge column and meta columns.
    Pico's table defaults supply row dividers and cell padding;
    these two rules handle only what Pico can't infer semantically:
