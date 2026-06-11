@@ -38,7 +38,7 @@ Downgrade drops the new columns. Any data the backfill copied into
 them is lost — that's intentional for a pure additive forward step.
 
 Revision ID: e3e0a73e9bc5
-Revises: ee1a1aca3db2
+Revises: bf122208871b
 Create Date: 2026-06-10 20:43:13.634480
 
 """
@@ -51,7 +51,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "e3e0a73e9bc5"
-down_revision: Union[str, None] = "ee1a1aca3db2"
+down_revision: Union[str, None] = "bf122208871b"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
