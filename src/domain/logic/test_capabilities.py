@@ -542,34 +542,54 @@ def test_reason_meta_covers_every_reason_constant_with_nonempty_copy():
         assert meta.fix_label, f"REASON {reason!r} has empty fix_label"
 
 
-# ---------- leaf factories ------------------------------------------------
+# ---------- LEAVES registry & registered leaves ---------------------------
 #
-# Each leaf is the SOT for one fact's `(label_active, label_done,
-# fix_url)` triple. Pinning them here catches drift the moment a second
-# capability tree starts composing the same leaves — if `check_network`
-# and a later `check_*` ever rendered "Verify email" with different copy
-# or a different fix URL, *one* of them is wrong.
+# Each leaf in the `LEAVES` registry is the SOT for one fact's
+# `(label_active, label_done, fix_url)` triple plus its predicate.
+# Pinning them here catches drift the moment a second capability tree
+# composes the same leaf — if two capabilities ever rendered the email
+# step with different copy or a different fix URL, *one* of them would
+# be wrong. The registry membership tests also guard the DAG's node
+# table: a missed registration breaks `LEAVES.all()` and any future
+# introspection that depends on it.
+
+
+def test_leaves_registry_names_are_stable():
+    """The leaf names are the addresses other code references — pin
+    them so a rename surfaces here rather than in a silent miss at
+    `LEAVES.get(...)`."""
+    names = {leaf.name for leaf in capabilities.LEAVES.all()}
+    assert names == {
+        "email_verified",
+        "clinician_verified",
+        "org_rep_any",
+        "owns_program",
+    }
 
 
 def test_email_leaf_canonical_shape():
-    leaf = capabilities._email_leaf(_user(is_verified=False))
-    assert leaf.label_active == "Verify your email"
-    assert leaf.label_done == "Email verified"
-    assert leaf.fix_url == "/users/me/email/form"
-    assert leaf.met is False
+    leaf = capabilities.LEAVES.get("email_verified")
+    assert leaf is capabilities.EMAIL_LEAF
+    cond = leaf.evaluate(_user(is_verified=False))
+    assert cond.label_active == "Verify your email"
+    assert cond.label_done == "Email verified"
+    assert cond.fix_url == "/users/me/email/form"
+    assert cond.met is False
 
 
 def test_email_leaf_met_tracks_email_verified():
-    assert capabilities._email_leaf(_user(is_verified=True)).met is True
-    assert capabilities._email_leaf(None).met is False
+    assert capabilities.EMAIL_LEAF.evaluate(_user(is_verified=True)).met is True
+    assert capabilities.EMAIL_LEAF.evaluate(None).met is False
 
 
 def test_clinician_verified_leaf_canonical_shape():
-    leaf = capabilities._clinician_verified_leaf(_user(is_verified=True))
-    assert leaf.label_active == "Verify a clinician"
-    assert leaf.label_done == "Clinician verified"
-    assert leaf.fix_url == "/clinicians/form"
-    assert leaf.met is False
+    leaf = capabilities.LEAVES.get("clinician_verified")
+    assert leaf is capabilities.CLINICIAN_VERIFIED_LEAF
+    cond = leaf.evaluate(_user(is_verified=True))
+    assert cond.label_active == "Verify a clinician"
+    assert cond.label_done == "Clinician verified"
+    assert cond.fix_url == "/clinicians/form"
+    assert cond.met is False
 
 
 def test_clinician_verified_leaf_met_with_verified_clinician():
@@ -577,15 +597,17 @@ def test_clinician_verified_leaf_met_with_verified_clinician():
         is_verified=True,
         clinicians=[_clinician(npi="1234567890", clinician_verified=True)],
     )
-    assert capabilities._clinician_verified_leaf(user).met is True
+    assert capabilities.CLINICIAN_VERIFIED_LEAF.evaluate(user).met is True
 
 
 def test_org_rep_any_leaf_canonical_shape():
-    leaf = capabilities._org_rep_any_leaf(_user(is_verified=True))
-    assert leaf.label_active == "Verify your organization"
-    assert leaf.label_done == "Organization verified"
-    assert leaf.fix_url == "/organizations/form"
-    assert leaf.met is False
+    leaf = capabilities.LEAVES.get("org_rep_any")
+    assert leaf is capabilities.ORG_REP_ANY_LEAF
+    cond = leaf.evaluate(_user(is_verified=True))
+    assert cond.label_active == "Verify your organization"
+    assert cond.label_done == "Organization verified"
+    assert cond.fix_url == "/organizations/form"
+    assert cond.met is False
 
 
 def test_org_rep_any_leaf_met_with_verified_rep():
@@ -594,20 +616,29 @@ def test_org_rep_any_leaf_met_with_verified_rep():
         is_verified=True,
         org_representations=[_rep(org_id=org.id, authority_status="verified")],
     )
-    assert capabilities._org_rep_any_leaf(user).met is True
+    assert capabilities.ORG_REP_ANY_LEAF.evaluate(user).met is True
 
 
 def test_owns_program_leaf_canonical_shape():
-    leaf = capabilities._owns_program_leaf(_user(is_verified=True))
-    assert leaf.label_active == "Add a program"
-    assert leaf.label_done == "Program added"
-    assert leaf.fix_url == "/programs/form"
-    assert leaf.met is False
+    leaf = capabilities.LEAVES.get("owns_program")
+    assert leaf is capabilities.OWNS_PROGRAM_LEAF
+    cond = leaf.evaluate(_user(is_verified=True))
+    assert cond.label_active == "Add a program"
+    assert cond.label_done == "Program added"
+    assert cond.fix_url == "/programs/form"
+    assert cond.met is False
 
 
 def test_owns_program_leaf_met_with_any_program():
     user = _user(is_verified=True, programs=[SimpleNamespace(id=uuid4())])
-    assert capabilities._owns_program_leaf(user).met is True
+    assert capabilities.OWNS_PROGRAM_LEAF.evaluate(user).met is True
+
+
+def test_owns_program_predicate_handles_anon():
+    """The `owns_program` predicate (the bare boolean function, not the
+    Leaf wrapper) tolerates `None` so it can be called outside the
+    leaf-evaluation path without a guard."""
+    assert capabilities.owns_program(None) is False
 
 
 # ---------- check_network -------------------------------------------

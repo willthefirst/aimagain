@@ -28,12 +28,22 @@ SQLAlchemy rows. Templates and routes both call into the same surface,
 so a visible affordance and its server-side gate can't disagree.
 
 Capability trees compose from a small vocabulary of reusable leaves
-(`_email_leaf`, `_clinician_verified_leaf`, `_org_rep_any_leaf`) — each
-the single source of truth for that leaf's `(label_active, label_done,
-fix_url)` triple. New `check_*` functions should build their tree from
-existing leaf factories rather than re-declaring inline `Condition`
-nodes, so the locked-affordance copy and deep-link for a given fact
-stay identical across every capability that references it.
+held in the `LEAVES` registry (`EMAIL_LEAF`, `CLINICIAN_VERIFIED_LEAF`,
+`ORG_REP_ANY_LEAF`, `OWNS_PROGRAM_LEAF`). Each `Leaf` is the single
+source of truth for its `(label_active, label_done, fix_url)` triple
+and predicate; capability `check_*` functions compose trees by calling
+`leaf.evaluate(actor)` rather than re-declaring `Condition` nodes
+inline. The framework's `LeafRegistry` (see
+`src/framework/access/capabilities/capabilities.py`) is the DAG node
+table — `LEAVES.all()` is the introspection surface for "every fact
+this app gates on".
+
+To add a new entity-dependency leaf:
+
+1. Write the boolean predicate (`def has_X(actor) -> bool`).
+2. Construct a `Leaf` with its labels, fix URL, and the predicate.
+3. Register it: `X_LEAF = LEAVES.register(Leaf(...))`.
+4. Reference `X_LEAF.evaluate(user)` from the relevant capability tree.
 
 Fix URLs (`fix_url_for`, `reason_meta`) point at `/users/me` and its
 subresource paths — the profile hub at `/profile` has been removed.
@@ -53,6 +63,8 @@ from src.framework.access.capabilities.capabilities import (  # noqa: F401
     CapabilityCheck,
     Condition,
     Gate,
+    Leaf,
+    LeafRegistry,
 )
 from src.framework.dispatch.entity_spec import ReadPolicy
 
@@ -216,64 +228,70 @@ def any_org_rep_verified(user: Any) -> bool:
     return bool(_verified_active_reps(user))
 
 
-# ── Leaf factories ────────────────────────────────────────────────────────
-#
-# Each capability tree composes the same small vocabulary of boolean
-# leaves: "email verified", "Claim A holder", "Claim B holder for some
-# org". The factories below are the single source of truth for each
-# leaf's `(label_active, label_done, fix_url)` triple — so when a
-# second capability check reuses a leaf, the locked-affordance copy
-# and the deep-link can't drift between them.
-#
-# Naming convention: `_<predicate>_leaf(user) -> Condition`. They are
-# module-private; the public surface stays the top-level predicates
-# (`email_verified` / `clinician_verified` / `any_org_rep_verified`)
-# and the `check_*` functions that compose leaves into trees.
-
-
-def _email_leaf(user: Any) -> Condition:
-    return Condition(
-        label_active="Verify your email",
-        label_done="Email verified",
-        met=email_verified(user),
-        fix_url="/users/me/email/form",
-    )
-
-
-def _clinician_verified_leaf(user: Any) -> Condition:
-    clinicians = getattr(user, "clinicians", None) or ()
-    return Condition(
-        label_active="Verify a clinician",
-        label_done="Clinician verified",
-        met=any(getattr(c, "clinician_verified", False) for c in clinicians),
-        fix_url="/clinicians/form",
-    )
-
-
-def _org_rep_any_leaf(user: Any) -> Condition:
-    return Condition(
-        label_active="Verify your organization",
-        label_done="Organization verified",
-        met=bool(_verified_active_reps(user)),
-        fix_url="/organizations/form",
-    )
-
-
-def _owns_program_leaf(user: Any) -> Condition:
-    """Does the user own at least one `Program`? The `User.programs`
-    relationship (selectin) is the source of truth; the create flow at
-    `/programs/form` is what changes it. Note this leaf doesn't filter
+def owns_program(user: Any) -> bool:
+    """True iff the user owns at least one `Program`. Reads the
+    `User.programs` selectin relationship; the create flow at
+    `/programs/form` is what flips this bit. Note: this doesn't filter
     by the program's org being verified — the per-row write gate in
     `_assert_post_payload_capability` re-checks `org_rep_verified` for
     the specific program's org at create time, so the picker only needs
     the "has any program" shape here."""
-    programs = getattr(user, "programs", None) or ()
-    return Condition(
+    if user is None:
+        return False
+    return bool(getattr(user, "programs", None) or ())
+
+
+# ── Leaf registry ─────────────────────────────────────────────────────────
+#
+# `LEAVES` is the DAG's node table. Each registered `Leaf` is the single
+# source of truth for one fact's `(label_active, label_done, fix_url)`
+# and predicate; capability `check_*` functions compose trees by
+# calling `LEAF.evaluate(user)` rather than re-declaring inline
+# `Condition` blocks. Re-registering a name raises (the framework
+# enforces insert-once), so a typo or accidental re-import can't
+# shadow an existing fact.
+
+LEAVES = LeafRegistry()
+
+EMAIL_LEAF = LEAVES.register(
+    Leaf(
+        name="email_verified",
+        label_active="Verify your email",
+        label_done="Email verified",
+        fix_url="/users/me/email/form",
+        predicate=email_verified,
+    )
+)
+
+CLINICIAN_VERIFIED_LEAF = LEAVES.register(
+    Leaf(
+        name="clinician_verified",
+        label_active="Verify a clinician",
+        label_done="Clinician verified",
+        fix_url="/clinicians/form",
+        predicate=clinician_verified,
+    )
+)
+
+ORG_REP_ANY_LEAF = LEAVES.register(
+    Leaf(
+        name="org_rep_any",
+        label_active="Verify your organization",
+        label_done="Organization verified",
+        fix_url="/organizations/form",
+        predicate=any_org_rep_verified,
+    )
+)
+
+OWNS_PROGRAM_LEAF = LEAVES.register(
+    Leaf(
+        name="owns_program",
         label_active="Add a program",
         label_done="Program added",
-        met=bool(programs),
         fix_url="/programs/form",
+        predicate=owns_program,
     )
+)
 
 
 def check_network(user: Any) -> CapabilityCheck:
@@ -290,13 +308,13 @@ def check_network(user: Any) -> CapabilityCheck:
             label_active="Provider network",
             label_done="Provider network",
             children=(
-                _email_leaf(user),
+                EMAIL_LEAF.evaluate(user),
                 Gate(
                     label_active="Verify a clinician or organization",
                     label_done="Clinician or organization verified",
                     children=(
-                        _clinician_verified_leaf(user),
-                        _org_rep_any_leaf(user),
+                        CLINICIAN_VERIFIED_LEAF.evaluate(user),
+                        ORG_REP_ANY_LEAF.evaluate(user),
                     ),
                 ),
             ),
@@ -325,9 +343,9 @@ def check_program_intake(user: Any) -> CapabilityCheck:
             label_active="Program intake",
             label_done="Program intake",
             children=(
-                _email_leaf(user),
-                _org_rep_any_leaf(user),
-                _owns_program_leaf(user),
+                EMAIL_LEAF.evaluate(user),
+                ORG_REP_ANY_LEAF.evaluate(user),
+                OWNS_PROGRAM_LEAF.evaluate(user),
             ),
         ),
     )
