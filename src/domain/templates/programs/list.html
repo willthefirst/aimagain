@@ -1,6 +1,6 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
-{%- from "_shared/sections.html" import fact -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_locked.html" import entity_link -%}
 {% block actions %}
@@ -18,12 +18,10 @@
     headline_url=entity_url('program', id=program.id),
     headline=program.name,
     subtitle=subtitle) -%}
-    <section class="entity-facts">
-      <dl>
-        {%- call fact('organization', 'Organization') %}{{ entity_link('organization', program.organization.name, id=program.org_id) }}
-        {% endcall %}
-      </dl>
-    </section>
+    {%- call facts_block() %}
+      {%- call fact('organization', 'Organization') %}{{ entity_link('organization', program.organization.name, id=program.org_id) }}
+      {% endcall %}
+    {%- endcall %}
   {%- endcall %}
 {%- endmacro %}
 {% block list_body %}
