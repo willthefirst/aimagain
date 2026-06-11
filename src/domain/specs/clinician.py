@@ -292,25 +292,12 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
                 "src.domain.logic.posts.handlers.handle_list_clinician_referrals"
             ),
         ),
-        # Sub-resource list pages. Each is being converted to the
-        # canonical resource pattern one at a time — when a sub-resource
-        # opts into `list=True` on its own EntitySpec, the
-        # `RelatedListSubresource` entry below is removed (no double-mount
-        # of `GET /clinicians/{id}/<sub>`).
-        #
-        # Converted (mounted via the sub-resource's own EntitySpec):
-        #   - clinician_licensure (PR 2)
-        #   - clinician_education (PR 3)
-        #   - clinician_certification (PR 3)
-        #
-        # Pending conversion (still mounted here):
-        RelatedListSubresource(
-            child_spec=_clinician_affiliations_child,
-            template="clinicians/clinician_affiliations_list.html",
-            handler_path=(
-                "src.domain.logic.clinicians.handlers."
-                "handle_list_clinician_affiliations"
-            ),
-        ),
+        # All four clinician sub-resources have been converted to the
+        # canonical resource pattern (PRs 2/3/4) — each spec opts into
+        # `list=True` on its own EntitySpec and mounts via parent-aware
+        # `mount_list` / `mount_form`. Only the Post-related lists
+        # remain on this surface (openings + referrals — those are
+        # cross-cluster joins between Clinician and Post and not
+        # candidates for the canonical resource pattern).
     ),
 )

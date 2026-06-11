@@ -2086,15 +2086,46 @@ async def test_get_clinician_licensures_renders_existing_rows(
     )
 
 
-async def test_get_clinician_affiliations_carries_org_picker(
+async def test_get_clinician_affiliations_list_is_readonly_canonical_shape(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The affiliations list's inline add-practice form needs an Org
-    `<select>` populated with the viewer's owned Orgs. The handler pulls
-    `orgs` into context the same way the clinician edit page's
-    `form_extras` does."""
+    """After PR 4's canonical-pattern conversion, the affiliations list
+    page has no inline add form and no per-row delete button — same
+    shape as the credential lists. Create lives in the toolbar; Delete
+    moves to the row's edit page."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/clinician_affiliations"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # No inline add form.
+    assert (
+        tree.css_first(
+            f'form[hx-post="/clinicians/{clinician_id}/clinician_affiliations"]'
+        )
+        is None
+    )
+    # Toolbar carries Create.
+    create_link = tree.css_first(
+        f'a[href="/clinicians/{clinician_id}/clinician_affiliations/form"][role="button"]'
+    )
+    assert create_link is not None
+
+
+async def test_get_clinician_affiliation_new_form_carries_org_picker(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The dedicated affiliation create-form page renders the Org picker
+    populated with the viewer's owned Orgs. Plumbed through the spec's
+    `form_extras_path` → `clinician_form_extras` (shared with the
+    clinician edit page so the same orgs surface in both places)."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -2102,7 +2133,7 @@ async def test_get_clinician_affiliations_carries_org_picker(
         db_test_session_manager, owner_id=logged_in_user.id, name="My Practice LLC"
     )
     response = await authenticated_client.get(
-        f"/clinicians/{clinician_id}/clinician_affiliations"
+        f"/clinicians/{clinician_id}/clinician_affiliations/form"
     )
     assert response.status_code == 200
     tree = HTMLParser(response.text)

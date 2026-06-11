@@ -1,0 +1,11 @@
+{# `/clinicians/{clinician_id}/clinician_affiliations/form` — canonical create form. #}
+{% extends "views/form_new.html" %}
+{%- from "clinician_affiliations/_form_affiliation.html" import affiliation_form with context -%}
+{% block resource_label %}Practices{% endblock %}
+{% block form_content %}
+  {{ affiliation_form(resource_url,
+    "post",
+    "Create practice",
+    cancel_url=resource_url,
+    orgs=orgs) }}
+{% endblock %}

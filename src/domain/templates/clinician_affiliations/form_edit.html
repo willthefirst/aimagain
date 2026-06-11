@@ -1,0 +1,17 @@
+{# `/clinicians/{clinician_id}/clinician_affiliations/{aff_id}/form` — canonical edit form. #}
+{% extends "views/form_edit.html" %}
+{%- from "clinician_affiliations/_form_affiliation.html" import affiliation_form with context -%}
+{% block resource_label %}Practices{% endblock %}
+{% block current_label %}
+  {{ clinician_affiliation.org.name if clinician_affiliation.org else "Solo practice" }}
+{% endblock %}
+{% block form_content %}
+  {{ affiliation_form(resource_detail_url,
+    "patch",
+    "Save practice",
+    cancel_url=resource_url,
+    orgs=orgs,
+    delete_url=resource_detail_url,
+    delete_confirm="Remove this practice?",
+    current=clinician_affiliation) }}
+{% endblock %}
