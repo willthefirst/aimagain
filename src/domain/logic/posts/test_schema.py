@@ -232,6 +232,41 @@ def test_post_create_referral_rejects_unknown_affirming_identity():
         )
 
 
+def test_post_create_referral_defaults_acceptable_license_types_to_empty_list():
+    """`acceptable_license_types` is optional on the wire; empty list is
+    the default (no constraint — any license class accepted)."""
+    payload = referral_payload()
+    payload.pop("acceptable_license_types", None)
+    p = post_create_adapter.validate_python(payload)
+    assert p.acceptable_license_types == []
+
+
+def test_post_create_referral_accepts_acceptable_license_types_list():
+    """The "psychiatrist OR PMHNP" disjunction the corpus surfaces lands
+    as a two-element list — the wire model accepts multi-select directly."""
+    p = post_create_adapter.validate_python(
+        referral_payload(acceptable_license_types=["md", "pmhnp"])
+    )
+    assert p.acceptable_license_types == ["md", "pmhnp"]
+
+
+def test_post_create_referral_coerces_scalar_license_type_to_list():
+    """HTML form checkbox single-value submits land as a bare string;
+    `scalar_to_list` normalizes to a one-element list before the
+    `Literal[*LICENSE_TYPES]` per-member check."""
+    p = post_create_adapter.validate_python(
+        referral_payload(acceptable_license_types="lcsw")
+    )
+    assert p.acceptable_license_types == ["lcsw"]
+
+
+def test_post_create_referral_rejects_unknown_license_type():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            referral_payload(acceptable_license_types=["not_a_real_license"])
+        )
+
+
 def test_post_create_referral_rejects_invalid_zip():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(referral_payload(location_zip="abc"))

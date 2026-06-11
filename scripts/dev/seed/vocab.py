@@ -726,6 +726,7 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,
     "affirming_identities": AFFIRMING_IDENTITIES,
+    "acceptable_license_types": LICENSE_TYPES,
     "flags": (  # Verification.flags — free-form bag of strings
         "name_mismatch",
         "nppes_inactive",
