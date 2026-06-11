@@ -23,8 +23,8 @@ The columns `services` / `settings` / `modalities` / `age_groups` / `genders` / 
 
 The PR-f refactor is shipping in three sub-PRs:
 
-1. **Add the columns + backfill** (this PR, `e3e0a73e9bc5` + `f3c128112fa7`). The columns exist with defaults; the data migration copies values from the most-recent `OpeningDetail` attached to each affiliation. Reads and writes still go to `OpeningDetail`.
-2. *(Pending)* **Flip reads + dual-write.** The view layer and forms read from the new home; writes go to both rows so a rollback to sub-PR 1 stays safe.
+1. **Add the columns + backfill** (`e3e0a73e9bc5` + `f3c128112fa7`). The columns exist with defaults; the data migration copies values from the most-recent `OpeningDetail` attached to each affiliation. Reads and writes still go to `OpeningDetail`.
+2. **Flip reads + dual-write** (this PR). The view layer (`src/domain/logic/posts/view.py`) reads steady-state fields from this affiliation row (with fallback to the detail row's column when the affiliation has an empty value — the dual-write safety net); the list filters (`PostRepository.list_posts`) OR the affiliation column with the detail-row column. `PostRepository` overrides `create_polymorphic` / `patch` to mirror any non-empty steady-state field from a freshly-created or patched `OpeningDetail` onto this row, keeping the two homes consistent until sub-PR 3 drops the detail-row columns.
 3. *(Pending)* **Drop the columns from `OpeningDetail`.** `OpeningDetail` collapses to the announcement core (`desired_times`, `schedule_text`, optional per-announcement overrides, capacity, pointer to the affiliation).
 
 `languages` is *not* in this set on the affiliation — it moves to `Clinician` (a person attribute, invariant across affiliations). See [`../clinicians/README.md`](../clinicians/README.md).
