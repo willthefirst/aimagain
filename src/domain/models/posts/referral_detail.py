@@ -70,6 +70,16 @@ class ReferralDetail(LocationMixin, Base):
     treatment_modality = Column(Text, nullable=True)
     modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
 
+    # Affirming-identity request constraints — symmetric to
+    # `Clinician.affirming_identities`. JSON list of `AffirmingIdentity`
+    # tokens; empty array means "none stated" (no preference). Vocabulary
+    # check happens on the wire (Pydantic `Literal[*AFFIRMING_IDENTITIES]`);
+    # no SQL CHECK against JSON array members, same pattern as `services`
+    # / `age_groups` above.
+    affirming_identities = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+
     # Section 5 — insurance. Split into two concerns: `network_preference`
     # is the referrer's posture (mandatory / preferred / indifferent) and
     # is always set; `insurance_carrier` is the patient's actual carrier

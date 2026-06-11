@@ -140,6 +140,13 @@ MIGRATED_VALUES = {
         "admin_review",
     ),
     e.AuthorityStatus: ("pending", "verified", "rejected"),
+    e.AffirmingIdentity: (
+        "lgbtq",
+        "trans",
+        "poly",
+        "neurodiversity",
+        "liberation_oriented",
+    ),
     e.ClientAgeGroup: (
         "children_0_5",
         "children_6_10",
@@ -201,6 +208,8 @@ ALIAS_BINDINGS = [
     (e.AUTHORITY_METHOD_LABELS, e.AuthorityMethod, "labels"),
     (e.AUTHORITY_STATUSES, e.AuthorityStatus, "values"),
     (e.AUTHORITY_STATUS_LABELS, e.AuthorityStatus, "labels"),
+    (e.AFFIRMING_IDENTITIES, e.AffirmingIdentity, "values"),
+    (e.AFFIRMING_IDENTITY_LABELS, e.AffirmingIdentity, "labels"),
     # Multi-attribute vocabularies — the standard-kind aliases still bind to
     # `.values()` / `.labels()` / `.icons()`; the extra-attribute derivations
     # (`*_BY_KEY`, `*_SINGULAR`, `*_SHORT_LABELS`, composite slots) are pinned

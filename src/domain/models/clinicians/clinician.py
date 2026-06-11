@@ -1,6 +1,15 @@
 from functools import partial
 
-from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, Column, ForeignKey, Text
+from sqlalchemy import (
+    JSON,
+    TIMESTAMP,
+    Boolean,
+    CheckConstraint,
+    Column,
+    ForeignKey,
+    Text,
+    text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -58,6 +67,16 @@ class Clinician(BaseModel):
     npi = Column(Text, nullable=True)
     first_name = Column(Text, nullable=False)
     last_name = Column(Text, nullable=False)
+
+    # Affirming-identity claims (who the clinician *is* — invariant across
+    # affiliations, like credentials). JSON list of `AffirmingIdentity`
+    # tokens; empty array means "none stated". Vocabulary check happens on
+    # the wire (Pydantic `Literal[*AFFIRMING_IDENTITIES]`); no SQL CHECK
+    # against JSON array members, same pattern as `in_network_carriers` on
+    # `ClinicianAffiliation`.
+    affirming_identities = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
 
     # NPPES Type-1 match state. Source-of-truth field for Claim A: the
     # `verifications` table is the event log; this column is the cache

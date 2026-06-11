@@ -377,6 +377,33 @@ INSURANCE_POSTURES: Final[tuple[str, ...]] = InsurancePosture.values()
 INSURANCE_POSTURE_LABELS: Final[dict[str, str]] = InsurancePosture.labels()
 
 
+# Affirming-identity vocabulary. Symmetric between the request and provider
+# sides of a referral: a `ReferralDetail.affirming_identities` expresses
+# the referrer's request (e.g. "queer-affirming please") and a
+# `Clinician.affirming_identities` claims an affordance the clinician
+# *is* (person-level, invariant across affiliations — moves with the
+# person, like credentials, not with a practice posture). Both columns
+# are JSON arrays of these tokens; an empty array means "none stated"
+# on either side.
+#
+# Vocabulary derived from the email corpus surfaced in #1355: ~40% of
+# referrals and ~40% of broadcasts cite at least one of these.
+# `liberation_oriented` is the corpus shorthand for "non-shaming /
+# warmth-first / power-aware" framing that providers self-describe with;
+# it's the umbrella that lets us avoid a long tail of single-mention
+# tokens on day one.
+class AffirmingIdentity(LabeledChoice):
+    lgbtq = "lgbtq", "LGBTQ-affirming"
+    trans = "trans", "Trans-affirming"
+    poly = "poly", "Poly-affirming"
+    neurodiversity = "neurodiversity", "Neurodiversity-affirming"
+    liberation_oriented = "liberation_oriented", "Liberation-oriented"
+
+
+AFFIRMING_IDENTITIES: Final[tuple[str, ...]] = AffirmingIdentity.values()
+AFFIRMING_IDENTITY_LABELS: Final[dict[str, str]] = AffirmingIdentity.labels()
+
+
 class LicenseType(LabeledChoice):
     lcsw = "lcsw", "Licensed Clinical Social Worker (LCSW)"
     lpc = "lpc", "Licensed Professional Counselor (LPC)"
