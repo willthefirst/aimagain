@@ -436,6 +436,10 @@ class QualityCommands:
                 [sys.executable, "scripts/dev/contract_form_coverage_check.py"],
             ),
             (
+                "🧭 Checking EntitySpec route grammar...",
+                [sys.executable, "scripts/dev/spec_route_grammar_check.py"],
+            ),
+            (
                 "🌱 Checking seed generator coverage...",
                 [sys.executable, "-m", "scripts.dev.seed.lint_coverage"],
             ),

@@ -13,6 +13,7 @@ import pytest
 from src.framework.dispatch.entity_spec import EntitySpec, QueryParam, RouteSet
 from src.framework.dispatch.mounts.conftest import (
     FixtureRow,
+    child_spec,
     make_audit,
     top_level_spec,
 )
@@ -361,3 +362,68 @@ def test_make_list_handler_signature_includes_filters_and_repos():
     assert "requesting_user" in names
     assert "side_repo" in names
     assert handler.__name__ == "_handle_list_widget"
+
+
+# --- Parent-owned list (subentity) ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_handle_list_parent_owned_threads_parent_id_into_bespoke_method():
+    """For a parent-owned spec, ``handle_list`` threads ``parent_id`` into
+    the bespoke ``list_<collection>(**kwargs)`` call under the parent's
+    ``id_param``. The bespoke method owns the actual scoping query."""
+    spec = child_spec()
+    parent_uuid = uuid4()
+    captured: dict = {}
+
+    class _Repo:
+        async def list_widget_parts(self, **kwargs):
+            captured["kwargs"] = kwargs
+            return []
+
+    await handle_list(
+        spec,
+        request=_request_stub(),
+        repo=_Repo(),
+        requesting_user=None,
+        filter_values={},
+        parent_id=parent_uuid,
+    )
+
+    # Parent's id_param key lands in kwargs alongside the pagination kwargs.
+    assert captured["kwargs"]["parent_id"] == parent_uuid
+    assert captured["kwargs"]["offset"] == 0
+    assert captured["kwargs"]["limit"] == 16
+
+
+@pytest.mark.asyncio
+async def test_handle_list_parent_owned_without_bespoke_method_raises():
+    """A parent-owned spec without a bespoke ``list_<collection>`` method
+    can't fall through to ``list_default`` — that method has no concept
+    of parent-id scoping and would silently return ALL rows across all
+    parents. Surface the misconfig at request time."""
+    spec = child_spec()
+
+    class _DefaultOnlyRepo:
+        async def list_default(self, *args, **kwargs):  # pragma: no cover
+            return []
+
+    with pytest.raises(ValueError, match="list_widget_parts"):
+        await handle_list(
+            spec,
+            request=_request_stub(),
+            repo=_DefaultOnlyRepo(),
+            requesting_user=None,
+            filter_values={},
+            parent_id=uuid4(),
+        )
+
+
+def test_make_list_handler_signature_includes_parent_id_for_parent_owned_spec():
+    """``include_parent_id`` is on ``_LIST_SHAPE`` — the synthesized
+    handler binds ``<parent>_id`` as a path param so FastAPI dependency
+    injection forwards the URL segment into the call."""
+    spec = child_spec()
+    handler = make_list_handler(spec)
+    names = list(inspect.signature(handler).parameters)
+    assert "parent_id" in names  # parent spec uses id_param="parent_id"
