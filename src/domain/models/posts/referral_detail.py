@@ -80,6 +80,18 @@ class ReferralDetail(LocationMixin, Base):
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
 
+    # License-class constraint on the referred provider. JSON list of
+    # `LicenseType` tokens; empty array means "no constraint" (any license
+    # class accepted). The corpus has recurring "psychiatrist OR PMHNP"
+    # disjunctions that `services` can't express — `medication_management`
+    # could be delivered by a PCP, PA, or non-psychiatric NP. License-class
+    # is the cleaner cut. Same wire-side vocabulary check pattern as
+    # `services` / `affirming_identities` — `Literal[*LICENSE_TYPES]` on
+    # the Pydantic schema, no SQL CHECK against JSON array members.
+    acceptable_license_types = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
+
     # Section 5 — insurance. Split into two concerns: `network_preference`
     # is the referrer's posture (mandatory / preferred / indifferent) and
     # is always set; `insurance_carrier` is the patient's actual carrier

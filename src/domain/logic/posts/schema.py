@@ -61,6 +61,7 @@ from src.domain.models.enums import (
     GENDERS,
     INSURANCE_CARRIERS,
     LANGUAGES,
+    LICENSE_TYPES,
     LOCATION_AVAILABILITY_OPTIONS,
     NETWORK_PREFERENCES,
     REFERRAL_SERVICES,
@@ -153,6 +154,14 @@ ModalitiesField = Annotated[
 AffirmingIdentitiesField = Annotated[
     list[Literal[*AFFIRMING_IDENTITIES]], BeforeValidator(scalar_to_list)
 ]
+# `referral.acceptable_license_types` — license-class disjunction on the
+# referred provider ("psychiatrist OR PMHNP"). Multi-checkbox on the wire;
+# empty list = "no constraint" (any license class). `LicenseType` already
+# exists in `enums.py` — referral request reuses the same vocabulary
+# `ClinicianLicensure.license_type` writes from.
+AcceptableLicenseTypesField = Annotated[
+    list[Literal[*LICENSE_TYPES]], BeforeValidator(scalar_to_list)
+]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -226,6 +235,10 @@ class ReferralRead(_PostReadBase):
     # Affirming-identity request constraints. JSON list of
     # `AFFIRMING_IDENTITIES` tokens; empty list = "no preference stated".
     affirming_identities: AffirmingIdentitiesField = []
+    # License-class constraint on the referred provider. JSON list of
+    # `LICENSE_TYPES` tokens; empty list = "no constraint" (any license
+    # class accepted).
+    acceptable_license_types: AcceptableLicenseTypesField = []
     # FK to the Clinician the submitting user designated as referrer.
     # Nullable on the read side — rows created before this field existed
     # will have None here.
@@ -347,6 +360,9 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # Affirming-identity request constraints. Multi-checkbox on the wire;
     # empty list = "no preference stated" (the default).
     affirming_identities: AffirmingIdentitiesField = []
+    # License-class disjunction on the referred provider. Multi-checkbox
+    # on the wire; empty list = "no constraint" (the default).
+    acceptable_license_types: AcceptableLicenseTypesField = []
     # Context: which ClinicianAffiliation the referring clinician acts
     # under. This is what the form's practice picker submits (one option
     # per affiliation). Required on new referrals. The server resolves
@@ -491,6 +507,10 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # PATCH replaces the whole list — partial add/remove is intentionally
     # out of scope, matching `desired_times` / `services` semantics.
     affirming_identities: AffirmingIdentitiesField | None = None
+    # `None` = leave unchanged; `[]` = clear constraint (any license class).
+    # List-valued PATCH replaces the whole list, matching `services` /
+    # `affirming_identities` semantics.
+    acceptable_license_types: AcceptableLicenseTypesField | None = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `referring_clinician_id` from it (and re-checks
     # ownership of the resolved clinician) in `_assert_post_payload_authz`.
@@ -599,6 +619,7 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     network_preference: Literal[*NETWORK_PREFERENCES]
     insurance_carrier: OptionalInsuranceCarrier = None
     affirming_identities: AffirmingIdentitiesField = []
+    acceptable_license_types: AcceptableLicenseTypesField = []
     referring_clinician_id: uuid.UUID | None = None
     clinician_affiliation_id: uuid.UUID | None = None
 
