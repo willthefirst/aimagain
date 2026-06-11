@@ -29,9 +29,15 @@ from src.domain.logic.value_objects.location import (
     LocationPartial,
 )
 from src.domain.models.enums import (
+    CLIENT_AGE_GROUPS,
+    GENDERS,
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
+    REFERRAL_SERVICES,
+    TREATMENT_MODALITIES,
+    TREATMENT_SETTINGS,
 )
+from src.framework.rendering.form_fields import HtmlTextarea, HtmlUrl
 from src.framework.schema_validators import (
     PartialUpdate,
     ReadProjection,
@@ -43,6 +49,29 @@ from src.framework.schema_validators import (
 InNetworkCarriersField = Annotated[
     list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(scalar_to_list)
 ]
+
+# Steady-state-profile multi-select aliases (#1358 PR-f). Same shape as
+# the aliases in `programs/schema.py`: a `Literal[*TUPLE]` layered over
+# the shared `scalar_to_list` coercion so a 1-checkbox-checked form post
+# still validates. `languages` is deliberately NOT here — it's
+# person-level on `Clinician`, not per-affiliation (see the model
+# docstring on `ClinicianAffiliation`).
+_ServicesField = Annotated[
+    list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
+]
+_SettingsField = Annotated[
+    list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(scalar_to_list)
+]
+_ModalitiesField = Annotated[
+    list[Literal[*TREATMENT_MODALITIES]], BeforeValidator(scalar_to_list)
+]
+_AgeGroupsField = Annotated[
+    list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(scalar_to_list)
+]
+_GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
+# Free-text fields, same idiom as `programs/schema.py`.
+_WebsiteField = Annotated[StrippedOptionalText, HtmlUrl()]
+_ReferralInstructionsField = Annotated[StrippedOptionalText, HtmlTextarea()]
 
 
 class ClinicianAffiliationRead(FlatLocationSchema, ReadProjection):
@@ -76,6 +105,20 @@ class ClinicianAffiliationRead(FlatLocationSchema, ReadProjection):
     in_network_carriers: list[str] = []
     sliding_scale: bool
     cost: str | None = None
+    # Steady-state practice profile (#1358 PR-f). Empty list = "no
+    # value provided"; mirrors how the program schemas default these.
+    services: _ServicesField = []
+    settings: _SettingsField = []
+    modalities: _ModalitiesField = []
+    age_groups: _AgeGroupsField = []
+    genders: _GendersField = []
+    website: str | None = None
+    referral_instructions: str | None = None
+    # Denormalized "accepting new patients" cache (#1358 PR-f). The
+    # OpeningDetail lifecycle handlers toggle this; the wire surface
+    # exposes it as a Read field so directory list/filter UI can show
+    # one column without joining.
+    currently_accepting_new_patients: bool = False
 
 
 class ClinicianAffiliationCreate(FlatLocationSchema, WirePayload):
@@ -100,6 +143,17 @@ class ClinicianAffiliationCreate(FlatLocationSchema, WirePayload):
     in_network_carriers: InNetworkCarriersField = []
     sliding_scale: bool = False
     cost: StrippedOptionalText = None
+    # Steady-state practice profile (#1358 PR-f). Empty list = "no
+    # value provided"; mirrors `ProgramCreate`. `currently_accepting_new_patients`
+    # is server-managed (toggled by OpeningDetail lifecycle handlers)
+    # and intentionally not on Create.
+    services: _ServicesField = []
+    settings: _SettingsField = []
+    modalities: _ModalitiesField = []
+    age_groups: _AgeGroupsField = []
+    genders: _GendersField = []
+    website: _WebsiteField = None
+    referral_instructions: _ReferralInstructionsField = None
 
 
 class ClinicianAffiliationUpdate(FlatLocationSchema, PartialUpdate):
@@ -113,3 +167,15 @@ class ClinicianAffiliationUpdate(FlatLocationSchema, PartialUpdate):
     in_network_carriers: InNetworkCarriersField | None = None
     sliding_scale: bool | None = None
     cost: StrippedOptionalText = None
+    # Steady-state practice profile (#1358 PR-f). List-valued PATCH
+    # replaces the whole list; `None` = leave unchanged; `[]` = clear.
+    # `currently_accepting_new_patients` is denormalized cache state,
+    # mutated server-side by OpeningDetail lifecycle handlers — not on
+    # the PATCH surface.
+    services: _ServicesField | None = None
+    settings: _SettingsField | None = None
+    modalities: _ModalitiesField | None = None
+    age_groups: _AgeGroupsField | None = None
+    genders: _GendersField | None = None
+    website: _WebsiteField = None
+    referral_instructions: _ReferralInstructionsField = None

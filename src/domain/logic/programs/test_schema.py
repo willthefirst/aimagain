@@ -169,3 +169,66 @@ def test_update_accepts_empty_list_to_clear():
 def test_update_rejects_unknown_modality():
     with pytest.raises(ValidationError):
         ProgramUpdate(modalities=["not_a_modality"])
+
+
+# --- Languages (#1358 PR-f, parent-schema extension) --------------------
+
+
+def test_create_defaults_languages_to_english():
+    """`languages` defaults to `["en"]`, matching the column's
+    server-side default and the prior `OpeningDetail` default."""
+    payload = ProgramCreate(**_create_kwargs())
+    assert payload.languages == ["en"]
+
+
+def test_create_accepts_explicit_languages():
+    payload = ProgramCreate(**_create_kwargs(languages=["en", "es"]))
+    assert payload.languages == ["en", "es"]
+
+
+def test_create_normalizes_scalar_language_to_list():
+    payload = ProgramCreate(**_create_kwargs(languages="es"))
+    assert payload.languages == ["es"]
+
+
+def test_create_rejects_unknown_language():
+    with pytest.raises(ValidationError):
+        ProgramCreate(**_create_kwargs(languages=["not_a_real_language"]))
+
+
+def test_update_accepts_languages_patch():
+    payload = ProgramUpdate(languages=["en", "es"])
+    assert payload.languages == ["en", "es"]
+
+
+def test_update_accepts_empty_languages_to_clear():
+    """`[]` clears the language list; `None` (omitted) leaves unchanged."""
+    payload = ProgramUpdate(languages=[])
+    assert payload.languages == []
+
+
+def test_update_rejects_unknown_language():
+    with pytest.raises(ValidationError):
+        ProgramUpdate(languages=["not_a_real_language"])
+
+
+def test_read_defaults_languages_to_english():
+    """A Program row with no explicit `languages` reads as `["en"]`."""
+    from datetime import datetime, timezone
+
+    from src.domain.logic.programs.schema import ProgramRead
+
+    now = datetime.now(timezone.utc)
+    p = ProgramRead.model_validate(
+        {
+            "id": uuid.uuid4(),
+            "owner_id": uuid.uuid4(),
+            "org_id": uuid.uuid4(),
+            "org_name": "Sunrise",
+            "name": "RISE IOP",
+            "accepting_referrals": True,
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
+    assert p.languages == ["en"]
