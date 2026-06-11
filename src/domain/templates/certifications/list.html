@@ -1,0 +1,26 @@
+{# `/clinicians/{clinician_id}/certifications` — canonical sub-resource
+   list. Read-only; toolbar carries the create CTA; rows are whole-row
+   navigation links to the edit page. Per-row Delete moves to the edit
+   page's actions cluster (strict canonical, matching licensures /
+   organizations / clinicians / programs).
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/_credential_list.html" import credential_list -%}
+{%- from "_shared/_credential_row.html" import credential_row -%}
+{% block resource_label %}Certifications{% endblock %}
+{% block actions %}
+  <li>
+    <a href="{{ entity_url('clinician', id=clinician.id) }}/certifications/form"
+       role="button">Create certification</a>
+  </li>
+{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(cert) credential_list(rows, "No certifications yet.") %}
+      {{ credential_row(CERTIFICATION_TYPES_LABELS[cert.certification_type],
+            [cert.certifying_body, ("Expires " ~ cert.expiration_date) if cert.expiration_date else None],
+      href=entity_url('clinician', id=clinician.id) ~ "/certifications/" ~ cert.id|string ~ "/form",
+      ) }}
+    {% endcall %}
+  </section>
+{% endblock %}

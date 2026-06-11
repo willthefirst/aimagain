@@ -26,10 +26,13 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.models import ClinicianLicensure
 from src.domain.models.enums import LICENSE_TYPES, LICENSE_TYPES_LABELS, US_STATES
-from src.domain.specs._credential import make_clinician_credential_entity
+from src.domain.specs._credential import (
+    CANONICAL_CREDENTIAL_ROUTES,
+    make_clinician_credential_entity,
+)
 from src.domain.specs.clinician import _clinician_licensures_list_redirect
 from src.framework.audit.core import AuditAction
-from src.framework.dispatch.entity_spec import EntitySpec, RouteSet, StateAxis
+from src.framework.dispatch.entity_spec import EntitySpec, StateAxis
 
 
 class _LicenseAttestationBody(BaseModel):
@@ -71,14 +74,7 @@ LICENSURE_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     # double-mount; the bespoke handle_list_clinician_licensures handler
     # is wired through `mount_entity`'s owned_handlers in
     # `src/domain/routes/clinicians.py`.
-    routes=RouteSet(
-        list=True,
-        create=True,
-        update=True,
-        delete=True,
-        form_new=True,
-        form_edit=True,
-    ),
+    routes=CANONICAL_CREDENTIAL_ROUTES,
     # The list / form templates reference the license-type tuple +
     # labels and US_STATES. Surfacing them via static_context (instead
     # of Jinja globals) keeps the spec the single source of truth for

@@ -1,0 +1,38 @@
+{# Shared form-body macro for certification create + edit.
+
+   Renders the three certification fields inside `entity_form` + a
+   `form_section` legend. Imported by `form_new.html` and
+   `form_edit.html`. Centralizing the field list keeps create and
+   edit forms structurally identical and prevents drift.
+
+   Args:
+     action_url, method, submit_label, cancel_url, delete_url,
+     delete_confirm, current — same contract as
+     `licensures/_form_licensure.html::licensure_form`. See that
+     macro's docstring for the full surface.
+#}
+{%- from "_shared/form_fields.html" import text_field, select_field, form_section with context -%}
+{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/actions.html" import actions -%}
+{% macro certification_form(action_url, method, submit_label, cancel_url, delete_url=None, delete_confirm=None, current=None) -%}
+  <div class="entity-form-page">
+    {% call entity_form(action_url, method=method) %}
+      {% call form_section(submit_label) %}
+        {{ select_field("certification_type", "Certification type", CERTIFICATION_TYPES,
+                labels=CERTIFICATION_TYPES_LABELS,
+                current=(current.certification_type if current else None) ,
+        placeholder=true) }}
+        {{ text_field("certifying_body", "Certifying body",
+                current=(current.certifying_body if current else None) ,
+        maxlength=200) }}
+        {{ text_field("expiration_date", "Expiration date",
+                current=(current.expiration_date if current else None) ,
+        required=false, type="date") }}
+      {% endcall %}
+      {{ actions(submit_label,
+            cancel_url=cancel_url,
+            delete_url=delete_url,
+            delete_confirm=delete_confirm) }}
+    {% endcall %}
+  </div>
+{%- endmacro %}
