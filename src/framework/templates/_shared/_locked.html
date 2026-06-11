@@ -36,24 +36,19 @@
    Copy lives in `src/domain/logic/capabilities.py` — never inline here.
    CSS lives in `src/framework/static/css/framework.css` under "Locked
 affordances". JS lives inline in `src/framework/templates/base.html`. #}
+{% from "_shared/icon_label.html" import icon_label %}
 {% macro locked_action(reason, label, extra_class=none) -%}
   {%- set _cls = "outline " ~ extra_class if extra_class else "outline" -%}
   <button type="button"
           class="{{ _cls }}"
           aria-disabled="true"
-          data-locked-cta="{{ reason }}">
-    <i class="icon-lock" aria-hidden="true"></i>
-    {{ label }}
-  </button>
+          data-locked-cta="{{ reason }}">{{ icon_label("lock", label) }}</button>
 {%- endmacro %}
 {% macro locked_link(reason, label) -%}
   <a class="locked-link"
      aria-disabled="true"
      tabindex="0"
-     data-locked-cta="{{ reason }}">
-    <i class="icon-lock" aria-hidden="true"></i>
-    {{ label }}
-  </a>
+     data-locked-cta="{{ reason }}">{{ icon_label("lock", label) }}</a>
 {%- endmacro %}
 {% macro entity_link(name, label, href=none, id=none) -%}
   {%- set _reason = entity_lock_reason(name) -%}
@@ -66,7 +61,7 @@ affordances". JS lives inline in `src/framework/templates/base.html`. #}
 {% macro locked_name(placeholder) -%}
   <button class="locked-ghost-btn"
           data-locked-cta="{{ capabilities.REASON_NOT_A_VERIFIED_PROVIDER }}">
-    <i class="icon-lock" aria-hidden="true"></i>{{ placeholder }}
+    {{ icon_label("lock", placeholder) }}
   </button>
 {%- endmacro %}
 {% macro locked_field(reason) -%}

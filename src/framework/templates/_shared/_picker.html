@@ -33,13 +33,12 @@ Each option is a dict with keys:
                  capability the viewer doesn't yet hold (e.g.
                  program-intake on /posts/form for a non-org-rep user).
 #}
+{% from "_shared/icon_label.html" import icon_label %}
 {%- macro picker(options) -%}
   {%- for opt in options %}
     {%- if opt.selected %}
       <article class="picker-option" aria-current="page">
-        <h2>
-          <i class="icon-check"></i> {{ opt.heading }}
-        </h2>
+        <h2>{{ icon_label("check", opt.heading) }}</h2>
         <p>{{ opt.description }}</p>
       </article>
     {%- elif opt.locked_reason %}
@@ -48,9 +47,7 @@ Each option is a dict with keys:
           <a class="locked-link"
              aria-disabled="true"
              tabindex="0"
-             data-locked-cta="{{ opt.locked_reason }}">
-            <i class="icon-lock" aria-hidden="true"></i> {{ opt.heading }}
-          </a>
+             data-locked-cta="{{ opt.locked_reason }}">{{ icon_label("lock", opt.heading) }}</a>
         </h2>
         <p>{{ opt.description }}</p>
       </article>
