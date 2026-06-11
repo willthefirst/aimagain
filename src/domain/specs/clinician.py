@@ -292,25 +292,22 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
                 "src.domain.logic.posts.handlers.handle_list_clinician_referrals"
             ),
         ),
-        # Four sub-resource list pages — the picker landing on
-        # `/clinicians/{id}` (PR-2) deep-links into each of these. Each
-        # page renders the existing inline add-form + per-row delete
-        # affordances for that sub-resource, surfaced from the
-        # clinician edit page (which moves to person-level-only in PR-2).
+        # Sub-resource list pages. Each is being converted to the
+        # canonical resource pattern one at a time — when a sub-resource
+        # opts into `list=True` on its own EntitySpec, the
+        # `RelatedListSubresource` entry below is removed (no double-mount
+        # of `GET /clinicians/{id}/<sub>`).
+        #
+        # Converted (mounted via the sub-resource's own EntitySpec):
+        #   - clinician_licensure
+        #
+        # Pending conversion (still mounted here):
         RelatedListSubresource(
             child_spec=_clinician_affiliations_child,
             template="clinicians/clinician_affiliations_list.html",
             handler_path=(
                 "src.domain.logic.clinicians.handlers."
                 "handle_list_clinician_affiliations"
-            ),
-        ),
-        RelatedListSubresource(
-            child_spec=_clinician_licensures_child,
-            template="clinicians/licensures_list.html",
-            handler_path=(
-                "src.domain.logic.clinicians.handlers."
-                "handle_list_clinician_licensures"
             ),
         ),
         RelatedListSubresource(

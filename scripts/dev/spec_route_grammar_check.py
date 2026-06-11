@@ -47,10 +47,12 @@ from dataclasses import dataclass
 # PR for that resource ships.
 ALLOWLIST: frozenset[str] = frozenset(
     {
-        # The four clinician sub-resources predate parent-aware
-        # mount_list / mount_form. Conversion PRs land one at a time
-        # off the framework-prep PR that adds parent-aware support.
-        "clinician_licensure",
+        # The remaining three clinician sub-resources predate parent-aware
+        # mount_list / mount_form. Conversion PRs land one at a time off
+        # the framework-prep PR that adds parent-aware support. The
+        # licensure conversion landed first; cert+edu come next (they
+        # share `make_clinician_credential_entity`); affiliations land
+        # last (different spec shape).
         "clinician_education",
         "clinician_certification",
         "clinician_affiliation",

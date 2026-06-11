@@ -25,6 +25,8 @@ from src.framework.dispatch.entity_spec import (
     StateAxis,
 )
 
+_DEFAULT_CREDENTIAL_ROUTES: RouteSet = RouteSet(create=True, update=True, delete=True)
+
 
 def make_clinician_credential_entity(
     *,
@@ -38,6 +40,8 @@ def make_clinician_credential_entity(
     update_adapter: type[BaseModel] | TypeAdapter,
     mutation_redirect: Callable[..., str],
     state_axes: tuple[StateAxis, ...] = (),
+    routes: RouteSet = _DEFAULT_CREDENTIAL_ROUTES,
+    static_context: dict | None = None,
 ) -> EntitySpec:
     """Build a credential-subentity `EntitySpec` from its varying pieces.
 
@@ -61,6 +65,15 @@ def make_clinician_credential_entity(
     other two credentials pass `()`. This is the parent-owned
     subentity surface that landed when `mount_state_axis` gained
     `spec.parent`-aware mounting.
+
+    `routes` defaults to ``RouteSet(create=True, update=True, delete=True)``
+    — the minimal subrow-CRUD shape the credential trio shipped on.
+    Pass an expanded ``RouteSet`` (e.g. with ``list=True, form_new=True,
+    form_edit=True``) for credentials that have been converted to the
+    canonical resource pattern (dedicated list + form pages instead of
+    inline forms on the parent's edit page). The conversion lands one
+    credential at a time; the expanded shape becomes the default once
+    every credential has been converted.
     """
 
     return EntitySpec(
@@ -78,14 +91,24 @@ def make_clinician_credential_entity(
         create_adapter=create_adapter,
         update_adapter=update_adapter,
         read_schema=read_schema,
-        # Subrow CRUD only. The parent CLINICIAN_ENTITY now owns a
-        # `RelatedListSubresource` per credential type (#1336) — the
-        # list page is mounted there, not here.
-        routes=RouteSet(create=True, update=True, delete=True),
+        # Default: subrow CRUD only — the parent CLINICIAN_ENTITY owns
+        # a `RelatedListSubresource` per credential type (#1336) and
+        # mounts the list page there. Credentials converted to the
+        # canonical resource pattern pass an expanded ``routes=`` with
+        # ``list=True, form_new=True, form_edit=True`` and the parent's
+        # ``RelatedListSubresource`` entry for them is removed (no
+        # double-mount).
+        routes=routes,
         # Sub-row mutations send HTMX clients back to the sub-resource's
         # own list page so the user keeps managing in place.
         create_redirect=mutation_redirect,
         update_redirect=mutation_redirect,
         delete_redirect=mutation_redirect,
+        # Per-credential template constants (controlled vocabularies,
+        # state lists). Each credential's create/edit/list templates
+        # reference its own type tuple + labels and US_STATES; merging
+        # them onto the spec's static_context means the templates don't
+        # depend on Jinja-global injection.
+        static_context=static_context or {},
         state_axes=state_axes,
     )
