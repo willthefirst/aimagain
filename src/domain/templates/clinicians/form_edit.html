@@ -35,17 +35,17 @@
       {{ text_field("last_name", "Last name", current=clinician.last_name, maxlength=120) }}
       {{ text_field("npi", "NPI", current=clinician.npi, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
-    {# Person-level matching-dimension fields (#1358 PR-a/c). Symmetric
+    {# Person-level matching-dimension fields (#1358 PR-a/c/f). Symmetric
        to the referral request side (`ReferralDetail.affirming_identities`
-       / `clinical_niches` — see `posts/_form_referral.html`). Both
+       / `clinical_niches` — see `posts/_form_referral.html`). All three
        move with the person across affiliations, the same way
-       credentials do. `languages` (#1358 PR-f) is on the model and
-       displayed on the detail page, but is intentionally NOT in this
-       form yet — `ClinicianUpdate` does not currently accept
-       `languages`; adding it requires a schema patch tracked outside
-       this PR. #}
-    {% call form_section("Affirming identities & niches") %}
+       credentials do. `languages` (#1358 PR-f) became editable here
+       once `ClinicianUpdate` was extended to accept it; the model
+       column defaults to ``["en"]`` so a brand-new clinician renders
+       with English pre-checked. #}
+    {% call form_section("Affirming identities, languages & niches") %}
       {{ multi_select_field("affirming_identities", "Affirming identities", AFFIRMING_IDENTITIES, labels=AFFIRMING_IDENTITY_LABELS, current=clinician.affirming_identities, required=false, help=select_all_help() ) }}
+      {{ multi_select_field("languages", "Languages", LANGUAGES, labels=LANGUAGE_LABELS, current=clinician.languages, required=false, help=select_all_help() ) }}
       {# Clinical-niche tags (#1358 PR-c). Free-form `list[str]` on the
          wire — the niche vocabulary is too open-ended to commit to a
          closed enum on day one. UI is a single comma-separated text
