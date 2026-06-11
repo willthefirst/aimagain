@@ -86,12 +86,24 @@ under the "Feed rows" section. #}
 </span>
 {%- endif -%}
 {%- endif -%}
-{# Item 3 ── Insurance #}
+{# Item 3 ── Insurance (#1358 PR-e — three independent payment paths) #}
 {%- if post.kind == "referral" -%}
-{%- if view.insurance_carrier -%}
-<span><i class="icon-shield"></i>{{ INSURANCE_CARRIER_LABELS[view.insurance_carrier] }}</span>
-{%- elif view.network_preference == "no_preference" -%}
-<span><i class="icon-shield"></i>No insurance req.</span>
+{%- if view.insurance_carriers -%}
+<span><i class="icon-shield"></i>
+{%- for c in view.insurance_carriers[:2] -%}
+{%- if not loop.first %},
+{% endif -%}
+{{ INSURANCE_CARRIER_LABELS[c] }}
+{%- endfor -%}
+{%- if view.insurance_carriers | length > 2 %} +{{ view.insurance_carriers | length - 2 }}
+{% endif -%}
+</span>
+{%- elif view.accepts_in_network -%}
+<span><i class="icon-shield"></i>In-network</span>
+{%- elif view.accepts_out_of_network_superbill -%}
+<span><i class="icon-shield"></i>Out-of-network</span>
+{%- elif view.accepts_private_pay -%}
+<span><i class="icon-shield"></i>Private pay</span>
 {%- endif -%}
 {%- else -%}
 {%- if view.in_network_carriers -%}

@@ -33,9 +33,9 @@ Two modes:
     PLUS the detail-only rows: practice link (PA) / program link
     (program), organization link (PA + program — clickable jump to
     `/organizations/{id}`), full address line, desired times,
-    schedule notes (PA/program), network preference + insurance
-    carrier (CR), sliding scale + cost (PA). Languages always render
-    in expanded mode (the English-only suppression is a list-density
+    schedule notes (PA/program), payment paths + insurance carriers
+    (CR), sliding scale + cost (PA). Languages always render in
+    expanded mode (the English-only suppression is a list-density
     concern; on detail the row is welcome). Gender for CR is also
     shown in expanded mode — the headline still carries it but the
     detail page is detail-y enough to repeat it as a labeled row.
@@ -50,7 +50,7 @@ for CR), so the kind-aware label only appears in expanded mode for CR.
 Reads from `view` (the `post_card_view` dict). Display-label dicts
 (`CLIENT_AGE_GROUP_LABELS`, `GENDER_LABELS`, `LANGUAGE_LABELS`,
 `INSURANCE_POSTURE_LABELS`, `LOCATION_AVAILABILITY_LABELS`,
-`INSURANCE_CARRIER_LABELS`, `NETWORK_PREFERENCE_LABELS`,
+`INSURANCE_CARRIER_LABELS`,
 `DESIRED_TIME_SLOT_LABELS`, `REFERRAL_SERVICE_LABELS`,
 `TREATMENT_SETTINGS_LABELS`) are Jinja globals. #}
 {%- from "_shared/sections.html" import fact, facts_block as _facts_wrapper -%}
@@ -178,14 +178,24 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                       {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
                     {%- endif %}
                     {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
-                      {%- if view.network_preference %}
-                        {{ fact('network_preference', 'Network preference', NETWORK_PREFERENCE_LABELS[view.network_preference], icon='shield') }}
-                      {%- endif %}
-                      {%- if view.insurance_carrier and view.network_preference and view.network_preference != "no_preference" %}
-                        {{ fact('insurance_carrier', 'Insurance carrier', INSURANCE_CARRIER_LABELS[view.insurance_carrier], icon='shield') }}
-                      {%- endif %}
-                      {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
-                        {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
-                        {%- endif %}
-                      {%- endcall %}
-                    {%- endmacro %}
+                      {#- Payment paths (#1358 PR-e). Each of the three
+                          accepted-path booleans renders as its own row
+                          when true; the carrier list shows under in-
+                          network when set. Multiple rows are normal —
+                          a referral that accepts both in-network and
+                          private pay surfaces two rows. -#}
+                      {%- if view.accepts_in_network %}{{ fact('accepts_in_network', 'In-network', 'Yes', icon='shield') }}{%- endif %}
+                        {%- if view.insurance_carriers %}
+                          {%- set _carrier_labels = [] -%}
+                          {%- for c in view.insurance_carriers -%}{%- set _ = _carrier_labels.append(INSURANCE_CARRIER_LABELS[c]) -%}{%- endfor -%}
+                            {{ fact('insurance_carriers', 'Insurance carriers', _carrier_labels | join(", ") , icon='shield') }}
+                          {%- endif %}
+                          {%- if view.accepts_out_of_network_superbill %}
+                            {{ fact('accepts_out_of_network_superbill', 'Out-of-network (superbill)', 'Yes', icon='shield') }}
+                          {%- endif %}
+                          {%- if view.accepts_private_pay %}{{ fact('accepts_private_pay', 'Private pay', 'Yes', icon='shield') }}{%- endif %}
+                            {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
+                              {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
+                              {%- endif %}
+                            {%- endcall %}
+                          {%- endmacro %}

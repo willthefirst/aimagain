@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import JSON, Column, ForeignKey, Text, text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -9,9 +9,7 @@ from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import (
     GENDERS,
-    INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
-    NETWORK_PREFERENCES,
     US_STATES,
     named_check_in,
 )
@@ -33,8 +31,6 @@ class ReferralDetail(LocationMixin, Base):
         _ck("location_state", US_STATES),
         _ck("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
         _ck("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("insurance_carrier", INSURANCE_CARRIERS),
-        _ck("network_preference", NETWORK_PREFERENCES),
         _ck("gender", GENDERS),
     )
 
@@ -104,15 +100,52 @@ class ReferralDetail(LocationMixin, Base):
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
 
-    # Section 5 — insurance. Split into two concerns: `network_preference`
-    # is the referrer's posture (mandatory / preferred / indifferent) and
-    # is always set; `insurance_carrier` is the patient's actual carrier
-    # and is nullable (null = self-pay / unknown / no carrier, which is
-    # the natural shape when network_preference='no_preference').
-    network_preference = Column(
-        Text, nullable=False, server_default=text("'no_preference'")
+    # Section 5 — payment paths (#1358 PR-e). Three independent booleans
+    # the corpus consistently distinguishes — "Anthem PPO; private pay
+    # okay" combines two. Each path is independent: a single referral
+    # may accept any subset of them, and not all subsets imply each
+    # other (an in-network-only referrer may decline both OON-superbill
+    # and private pay).
+    #
+    #   * ``accepts_in_network`` — the patient has a carrier and wants
+    #     the provider to bill it directly. Paired with
+    #     ``insurance_carriers`` (multi-select; empty array allowed when
+    #     the carrier is undecided / "any" / TBD).
+    #   * ``accepts_out_of_network_superbill`` — the provider is OON
+    #     but a superbill is acceptable for the patient to seek
+    #     reimbursement.
+    #   * ``accepts_private_pay`` — the patient is willing to pay
+    #     out-of-pocket with no insurance involvement.
+    #
+    # All three default to ``False`` server-side; at least one is
+    # expected to be true in practice, but the schema doesn't enforce
+    # that (a "no preference stated" form-submission with all three
+    # false is shape-valid). The unified ``INSURANCE_POSTURES`` view
+    # collapse (in ``src/domain/logic/posts/view.py``) prioritizes
+    # in-network → out-of-network → private-pay → please_contact when
+    # none is set.
+    accepts_in_network = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
     )
-    insurance_carrier = Column(Text, nullable=True)
+    accepts_out_of_network_superbill = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )
+    accepts_private_pay = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )
+    # JSON array of `InsuranceCarrier` tokens; empty array means "no
+    # carrier specified" (which is the natural shape when
+    # ``accepts_in_network`` is false, but also valid when in-network is
+    # accepted with no specific carrier preference). Vocabulary check
+    # happens on the wire (Pydantic ``Literal[*INSURANCE_CARRIERS]``);
+    # no SQL CHECK against JSON array members — same pattern as
+    # ``services`` / ``age_groups`` above and
+    # ``ClinicianAffiliation.in_network_carriers`` on the provider side.
+    # The asymmetry between request-side scalar and provider-side list
+    # is now fixed: both ends model the same shape.
+    insurance_carriers = Column(
+        JSON, nullable=False, server_default=text("'[]'"), default=list
+    )
 
     # Section 6 — referring clinician. FK to the Clinician row the
     # submitting user designates as the referrer. Nullable so existing

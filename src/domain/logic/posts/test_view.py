@@ -15,12 +15,20 @@ from src.domain.logic.posts.view import (
 )
 
 
-def _cr_post(network_preference: str, insurance_carrier: str | None = None):
+def _cr_post(
+    *,
+    accepts_in_network: bool = False,
+    accepts_out_of_network_superbill: bool = False,
+    accepts_private_pay: bool = False,
+    insurance_carriers: list[str] | None = None,
+):
     return SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
-            network_preference=network_preference,
-            insurance_carrier=insurance_carrier,
+            accepts_in_network=accepts_in_network,
+            accepts_out_of_network_superbill=accepts_out_of_network_superbill,
+            accepts_private_pay=accepts_private_pay,
+            insurance_carriers=insurance_carriers or [],
         ),
     )
 
@@ -38,21 +46,32 @@ def _pa_post(**clinician_attrs):
     )
 
 
-@pytest.mark.parametrize(
-    "storage,expected",
-    [
-        ("in_network_required", "in_network"),
-        ("in_network_preferred", "out_of_network"),
-        ("no_preference", "self_pay"),
-    ],
-)
-def test_cr_posture_maps_each_network_preference(storage, expected):
-    """`network_preference` collapses to one of the unified
-    `INSURANCE_POSTURES` values for the listing-row badge. The carrier
-    is irrelevant to the posture — same posture whether it's set or
-    null."""
-    assert insurance_posture_for_post(_cr_post(storage)) == expected
-    assert insurance_posture_for_post(_cr_post(storage, "cigna")) == expected
+def test_cr_posture_prefers_in_network():
+    """In-network is the highest-signal payment-path; show it even when
+    OON-superbill and private-pay are also accepted (#1358 PR-e)."""
+    post = _cr_post(
+        accepts_in_network=True,
+        accepts_out_of_network_superbill=True,
+        accepts_private_pay=True,
+    )
+    assert insurance_posture_for_post(post) == "in_network"
+    # Carrier presence is irrelevant to the posture — same answer with
+    # or without `insurance_carriers`.
+    post_with_carrier = _cr_post(accepts_in_network=True, insurance_carriers=["cigna"])
+    assert insurance_posture_for_post(post_with_carrier) == "in_network"
+
+
+def test_cr_posture_falls_back_to_oon_then_private_pay_then_contact():
+    """Priority order: in-network > out-of-network-superbill >
+    private-pay > please_contact (none set)."""
+    assert (
+        insurance_posture_for_post(_cr_post(accepts_out_of_network_superbill=True))
+        == "out_of_network"
+    )
+    assert insurance_posture_for_post(_cr_post(accepts_private_pay=True)) == "self_pay"
+    # All three booleans false → the referral states no preference;
+    # the row macro surfaces the "Contact" glyph.
+    assert insurance_posture_for_post(_cr_post()) == "please_contact"
 
 
 def test_pa_posture_prefers_in_network_when_set():
@@ -157,8 +176,10 @@ def _make_cr_post(**detail_overrides):
         description="Looking for a therapist who takes BCBS.",
         services=["psychotherapy", "medication_management"],
         treatment_modality="CBT",
-        network_preference="in_network_required",
-        insurance_carrier="bcbs",
+        accepts_in_network=True,
+        accepts_out_of_network_superbill=False,
+        accepts_private_pay=False,
+        insurance_carriers=["anthem_bcbs"],
     )
     defaults.update(detail_overrides)
     return SimpleNamespace(
@@ -301,11 +322,14 @@ def test_view_cr_full_address_composes_city_state_zip():
 
 
 def test_view_cr_cr_only_fields_set_pa_only_fields_none():
-    """CR populates `network_preference` / `insurance_carrier`; the
-    PA-only fields stay at their None/empty defaults."""
+    """CR populates payment-paths booleans + `insurance_carriers`
+    (#1358 PR-e); the PA-only fields stay at their None/empty
+    defaults."""
     v = post_card_view(_make_cr_post())
-    assert v["network_preference"] == "in_network_required"
-    assert v["insurance_carrier"] == "bcbs"
+    assert v["accepts_in_network"] is True
+    assert v["accepts_out_of_network_superbill"] is False
+    assert v["accepts_private_pay"] is False
+    assert v["insurance_carriers"] == ["anthem_bcbs"]
     assert v["sliding_scale"] is None
     assert v["cost"] is None
     assert v["in_network_carriers"] == []
@@ -673,12 +697,14 @@ def test_poster_name_referral_none_when_clinician_has_no_name():
 
 
 def test_row_summary_referral_description_carrier_city():
-    """Primary path: description + carrier label + city joined with ' · '."""
+    """Primary path: description + first carrier label + city joined
+    with ' · ' (#1358 PR-e — `insurance_carriers` is a list; the
+    row summary picks the first to fit the single-line layout)."""
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
             description="Complex PTSD, seeking weekly EMDR",
-            insurance_carrier="aetna",
+            insurance_carriers=["aetna"],
             location_city="Berkeley",
             age_groups=["adults_25_64"],
             gender="female",
@@ -690,12 +716,13 @@ def test_row_summary_referral_description_carrier_city():
 
 
 def test_row_summary_referral_no_carrier_no_city():
-    """When carrier and city are absent only the description is returned."""
+    """When carriers list is empty and city is absent only the
+    description is returned."""
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
             description="Needs a therapist",
-            insurance_carrier=None,
+            insurance_carriers=[],
             location_city=None,
             age_groups=["adults_25_64"],
             gender="male",
@@ -710,7 +737,7 @@ def test_row_summary_referral_no_description_falls_back_to_headline():
         kind="referral",
         referral_detail=SimpleNamespace(
             description=None,
-            insurance_carrier=None,
+            insurance_carriers=[],
             location_city=None,
             age_groups=["adults_25_64"],
             gender="male",
@@ -726,7 +753,7 @@ def test_row_summary_referral_truncates_long_description():
         kind="referral",
         referral_detail=SimpleNamespace(
             description=long_desc,
-            insurance_carrier=None,
+            insurance_carriers=[],
             location_city=None,
             age_groups=["adults_25_64"],
             gender=None,

@@ -63,7 +63,6 @@ from src.domain.models.enums import (
     LANGUAGES,
     LICENSE_TYPES,
     LOCATION_AVAILABILITY_OPTIONS,
-    NETWORK_PREFERENCES,
     REFERRAL_SERVICES,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
@@ -105,8 +104,13 @@ def _empty_to_none(v):
     return v
 
 
-OptionalInsuranceCarrier = Annotated[
-    Literal[*INSURANCE_CARRIERS] | None, BeforeValidator(_empty_to_none)
+# `ReferralDetail.insurance_carriers` — multi-select on the wire.
+# Empty list (the default) means "no carrier specified", which is the
+# natural shape when only ``accepts_private_pay`` is true on a referral.
+# Symmetric to ``ClinicianAffiliation.in_network_carriers`` on the
+# provider side — both ends now model the same shape (#1358 PR-e).
+InsuranceCarriersField = Annotated[
+    list[Literal[*INSURANCE_CARRIERS]], BeforeValidator(scalar_to_list)
 ]
 
 
@@ -238,9 +242,16 @@ class ReferralRead(_PostReadBase):
     services: ServicesField = []
     treatment_modality: str | None = None
     modalities: ModalitiesField = []
-    # See :class:`ReferralCreate` for the carrier/preference split.
-    network_preference: Literal[*NETWORK_PREFERENCES]
-    insurance_carrier: OptionalInsuranceCarrier = None
+    # Payment paths — three independent booleans the corpus treats as
+    # non-mutually-exclusive (#1358 PR-e). See :class:`ReferralCreate`
+    # for the full rationale.
+    accepts_in_network: bool = False
+    accepts_out_of_network_superbill: bool = False
+    accepts_private_pay: bool = False
+    # Multi-select of `InsuranceCarrier` tokens — empty list = "no
+    # carrier specified" (the typical shape when only private-pay is
+    # accepted). Symmetric to `ClinicianAffiliation.in_network_carriers`.
+    insurance_carriers: InsuranceCarriersField = []
     # Affirming-identity request constraints. JSON list of
     # `AFFIRMING_IDENTITIES` tokens; empty list = "no preference stated".
     affirming_identities: AffirmingIdentitiesField = []
@@ -359,16 +370,18 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     services: ServicesField = []
     treatment_modality: StrippedOptionalText = None
     modalities: ModalitiesField = []
-    # `network_preference` is the referrer's posture toward in-network
-    # match (required). `insurance_carrier` is the patient's actual
-    # carrier (nullable — null means self-pay / unknown / no carrier,
-    # which is the natural shape when network_preference='no_preference').
-    # No cross-field validator yet: the form hides the carrier control
-    # when 'no_preference' is selected, so the data-shape stays clean in
-    # practice; tightening this to a server-side invariant is a separate
-    # decision.
-    network_preference: Literal[*NETWORK_PREFERENCES]
-    insurance_carrier: OptionalInsuranceCarrier = None
+    # Payment paths (#1358 PR-e). Three independent booleans the corpus
+    # consistently distinguishes — "Anthem PPO; private pay okay"
+    # combines two. Not mutually exclusive; default all-false is
+    # shape-valid (some referrers genuinely leave it blank) but the form
+    # encourages picking at least one. Empty `insurance_carriers` is
+    # legal even when `accepts_in_network` is true (the patient may
+    # have a carrier they're trying to identify, or accept any
+    # carrier the provider takes).
+    accepts_in_network: bool = False
+    accepts_out_of_network_superbill: bool = False
+    accepts_private_pay: bool = False
+    insurance_carriers: InsuranceCarriersField = []
     # Affirming-identity request constraints. Multi-checkbox on the wire;
     # empty list = "no preference stated" (the default).
     affirming_identities: AffirmingIdentitiesField = []
@@ -515,11 +528,16 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     services: ServicesField | None = None
     treatment_modality: StrippedOptionalText = None
     modalities: ModalitiesField | None = None
-    # `None` = leave unchanged; any enum value sets it. Clearing the
-    # carrier back to NULL via PATCH is not supported today (matches the
-    # repo's "None means leave unchanged" semantic for optional fields).
-    network_preference: Literal[*NETWORK_PREFERENCES] | None = None
-    insurance_carrier: OptionalInsuranceCarrier = None
+    # `None` = leave unchanged; any bool sets the flag (#1358 PR-e).
+    # The three payment paths are independent — a PATCH may flip just
+    # one or any subset without disturbing the others.
+    accepts_in_network: bool | None = None
+    accepts_out_of_network_superbill: bool | None = None
+    accepts_private_pay: bool | None = None
+    # `None` = leave unchanged; `[]` = clear all carriers. List-valued
+    # PATCH replaces the whole list — partial add/remove is intentionally
+    # out of scope, matching `services` / `affirming_identities`.
+    insurance_carriers: InsuranceCarriersField | None = None
     # `None` = leave unchanged; `[]` = clear all claims. List-valued
     # PATCH replaces the whole list — partial add/remove is intentionally
     # out of scope, matching `desired_times` / `services` semantics.
@@ -636,8 +654,10 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     services: ServicesField = []
     treatment_modality: str | None = None
     modalities: ModalitiesField = []
-    network_preference: Literal[*NETWORK_PREFERENCES]
-    insurance_carrier: OptionalInsuranceCarrier = None
+    accepts_in_network: bool = False
+    accepts_out_of_network_superbill: bool = False
+    accepts_private_pay: bool = False
+    insurance_carriers: InsuranceCarriersField = []
     affirming_identities: AffirmingIdentitiesField = []
     acceptable_license_types: AcceptableLicenseTypesField = []
     clinical_niches: ClinicalNichesField = []

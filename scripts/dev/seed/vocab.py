@@ -744,6 +744,10 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "desired_times": DESIRED_TIME_SLOTS,
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,
+    # `ReferralDetail.insurance_carriers` — request-side carrier
+    # multi-select (#1358 PR-e). Symmetric vocab to
+    # `in_network_carriers` on the provider side.
+    "insurance_carriers": INSURANCE_CARRIERS,
     "affirming_identities": AFFIRMING_IDENTITIES,
     "acceptable_license_types": LICENSE_TYPES,
     # Free-form on the wire — the seed subset above is realism only,
