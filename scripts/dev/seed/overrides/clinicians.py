@@ -20,9 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.models import Clinician, ClinicianAffiliation, Organization, User
 from src.domain.models.enums import (
+    CLIENT_AGE_GROUPS,
+    GENDERS,
     INSURANCE_CARRIERS,
+    LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     NPI_MATCH_STATUSES,
+    REFERRAL_SERVICES,
+    TREATMENT_MODALITIES,
+    TREATMENT_SETTINGS,
     US_STATES,
 )
 
@@ -53,6 +59,18 @@ async def generate_clinicians(
             if clinician_verified
             else None
         )
+        # `languages` is the new person-level home for the field that
+        # used to live on `OpeningDetail` (#1358 PR-f sub-1). Index-
+        # driven round-robin (no rng draw, see same pattern in
+        # `_affiliation_kwargs` below) so the shared seed RNG sequence
+        # is unperturbed — that sequence drives downstream coverage
+        # tests. Half the rows get a single language, half get two —
+        # both monolingual and multilingual read paths exercised.
+        languages = (
+            [LANGUAGES[i % len(LANGUAGES)], LANGUAGES[(i + 1) % len(LANGUAGES)]]
+            if i % 2 == 0
+            else [LANGUAGES[i % len(LANGUAGES)]]
+        )
         row = Clinician(
             id=cid,
             owner_id=users[i % len(users)].id,
@@ -60,6 +78,7 @@ async def generate_clinicians(
             npi=(None if rng.bool(0.4) else COLUMN_VOCAB["npi"](rng, i)),
             first_name=COLUMN_VOCAB["first_name"](rng, i),
             last_name=COLUMN_VOCAB["last_name"](rng, i),
+            languages=languages,
             npi_match_status=match_status,
             npi_verified_at=verified_ts,
             clinician_verified=clinician_verified,
@@ -100,6 +119,41 @@ def _affiliation_kwargs(rng: SeededRandom, index: int) -> dict:
         ),
         "sliding_scale": rng.bool(0.3),
         "cost": (None if rng.bool(0.6) else COLUMN_VOCAB["cost"](rng, index)),
+        # ---- Steady-state profile (added #1358 PR-f sub-1) ----
+        # These columns are the new per-affiliation home for fields
+        # that used to live on `OpeningDetail`. Use **index-driven
+        # round-robin** rather than `rng.*` calls so adding these
+        # fields does not perturb the shared seed RNG sequence —
+        # that sequence drives downstream coverage tests (notably
+        # `clinician_affiliations.location_state` round-robin via
+        # `test_enum_coverage_for_every_check_constraint`). Index-
+        # driven also makes the seeded shape stable as new fields
+        # are added later in the chain.
+        "services": [REFERRAL_SERVICES[index % len(REFERRAL_SERVICES)]],
+        "settings": (
+            []
+            if index % 5 == 0
+            else [TREATMENT_SETTINGS[index % len(TREATMENT_SETTINGS)]]
+        ),
+        "modalities": (
+            []
+            if index % 6 == 0
+            else [TREATMENT_MODALITIES[index % len(TREATMENT_MODALITIES)]]
+        ),
+        "age_groups": [CLIENT_AGE_GROUPS[index % len(CLIENT_AGE_GROUPS)]],
+        "genders": ([] if index % 5 == 0 else [GENDERS[index % len(GENDERS)]]),
+        "website": (
+            None if index % 3 == 0 else f"https://example.com/clinician/{index}"
+        ),
+        "referral_instructions": (
+            None
+            if index % 4 == 0
+            else COLUMN_VOCAB["referral_instructions"](rng, index)
+        ),
+        # `currently_accepting_new_patients` defaults to False on the
+        # column; lifecycle code (sub-PR 2/3) flips it. Seeding a mix
+        # exercises the directory filter today.
+        "currently_accepting_new_patients": index % 2 == 0,
     }
 
 

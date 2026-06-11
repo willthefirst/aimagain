@@ -1,6 +1,6 @@
 from functools import partial
 
-from sqlalchemy import Boolean, Column, Date, ForeignKey, Text, text
+from sqlalchemy import JSON, Boolean, Column, Date, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -73,6 +73,55 @@ class Program(BaseModel):
     # for boolean posture columns (e.g. Clinician.accepts_out_of_network).
     accepting_referrals = Column(
         Boolean, nullable=False, server_default=text("1"), default=True
+    )
+
+    # ----------------------------------------------------------------
+    # Steady-state Program profile (#1358 PR-f, sub-PR 1).
+    #
+    # Symmetric to the new columns on `ClinicianAffiliation` — see
+    # `models/clinician_affiliations/clinician_affiliation.py` for the
+    # full design rationale. These are the new home for fields that
+    # previously lived on `IntakeDetail` (the per-announcement row for
+    # a program). A Program's services / settings / modalities / age
+    # groups / genders / languages / website / referral_instructions
+    # don't change every time the Program reposts an intake window —
+    # they're steady-state attributes of the offering itself.
+    #
+    # Sub-PR 1 is purely additive: columns added with empty defaults,
+    # backfilled from any existing IntakeDetail rows attached to this
+    # Program. Reads still come from IntakeDetail; writes still go to
+    # IntakeDetail. Sub-PR 2 flips reads + dual-writes; sub-PR 3
+    # removes the columns from IntakeDetail.
+    #
+    # `languages` lands here (and not only on Clinician) because a
+    # Program is the offering, not a person — the Program's stated
+    # language coverage is a property of the *program*, distinct from
+    # whichever individual clinician picks up the case.
+    # ----------------------------------------------------------------
+    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    modalities = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    languages = Column(
+        JSON,
+        nullable=False,
+        server_default=text("'[\"en\"]'"),
+        default=lambda: ["en"],
+    )
+    website = Column(Text, nullable=True)
+    referral_instructions = Column(Text, nullable=True)
+
+    # Denormalized accepting-new-patients flag — same role as the
+    # column of the same name on `ClinicianAffiliation`. Distinct from
+    # `accepting_referrals` above: `accepting_referrals` is the
+    # operator's standing posture ("we generally take referrals"),
+    # while `currently_accepting_new_patients` is the cached "we have
+    # an active IntakeDetail right now" signal toggled by the
+    # OpeningDetail/IntakeDetail lifecycle. Today it defaults to False
+    # and stays untouched until sub-PR 2 / 3 wire the toggle.
+    currently_accepting_new_patients = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
     )
 
     @property
