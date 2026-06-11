@@ -73,6 +73,18 @@
   color: var(--pico-muted-color);
 }
 .credential-row > button { margin: 0; flex: 0 0 auto; }
+/* When the row is the whole-row navigation link variant (`href=` on
+   the macro), strip Pico's default link chrome so the row reads as
+   a tappable region rather than inline text. The hairline divider +
+   the muted small still come through; the `<strong>` stays bold but
+   in body color. */
+.credential-row-link {
+  color: inherit;
+  text-decoration: none;
+}
+.credential-row-link:hover {
+  background: var(--pico-card-sectioning-background-color);
+}
 /* Compact post-rows table — kind badge column and meta columns.
    Pico's table defaults supply row dividers and cell padding;
    these two rules handle only what Pico can't infer semantically:

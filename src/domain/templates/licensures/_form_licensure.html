@@ -1,0 +1,62 @@
+{# Shared form-body macro for licensure create + edit.
+
+   Renders the four licensure fields inside `entity_form` + a
+   `form_section` legend. Imported by `form_new.html` (kind="create"),
+   `form_edit.html` (kind="edit"), and the error-rerender fragments
+   for both. Centralizing the field list keeps the create and edit
+   forms structurally identical and prevents drift.
+
+   Args:
+     action_url — the POST or PATCH target. Create posts to
+       `/clinicians/{id}/licensures`; edit patches to
+       `/clinicians/{id}/licensures/{lic_id}`.
+     method — "post" (create) or "patch" (edit).
+     submit_label — the action cluster's primary button label.
+     cancel_url — the action cluster's Cancel link target (back to
+       the list page).
+     delete_url — optional; when set on the edit page, renders Delete
+       in the action cluster.
+     delete_confirm — required when `delete_url` is set.
+     attest_url — optional; when set on the edit page (and the row
+       hasn't been attested already), renders the "Attest active"
+       button in the action cluster. The state-axis PUT target.
+     current — optional; on edit, the loaded licensure row used to
+       prefill field values. Create passes None.
+
+   `with context` is required so the form_fields macros auto-resolve
+   `form_errors` / `form_values` on the rerender path.
+#}
+{%- from "_shared/form_fields.html" import text_field, select_field, form_section with context -%}
+{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/actions.html" import actions, confirm_action_button -%}
+{% macro licensure_form(action_url, method, submit_label, cancel_url, delete_url=None, delete_confirm=None, attest_url=None, current=None) -%}
+  <div class="entity-form-page">
+    {% call entity_form(action_url, method=method) %}
+      {% call form_section(submit_label) %}
+        {{ select_field("license_type", "License type", LICENSE_TYPES,
+                labels=LICENSE_TYPES_LABELS,
+                current=(current.license_type if current else None) ,
+        placeholder=true) }}
+        {{ text_field("license_number", "License number",
+                current=(current.license_number if current else None) ,
+        maxlength=120) }}
+        {{ select_field("issuing_state", "Issuing state", US_STATES,
+                current=(current.issuing_state if current else None) ,
+        placeholder=true) }}
+        {{ text_field("expiration_date", "Expiration date",
+                current=(current.expiration_date if current else None) ,
+        required=false, type="date") }}
+      {% endcall %}
+      {{ actions(submit_label,
+            cancel_url=cancel_url,
+            delete_url=delete_url,
+            delete_confirm=delete_confirm) }}
+      {%- if attest_url %}
+        {{ confirm_action_button("put", attest_url,
+                "Attest that this license is currently active and in good standing?",
+                "Attest active",
+                hx_vals='{"attested": true}') }}
+      {%- endif %}
+    {% endcall %}
+  </div>
+{%- endmacro %}

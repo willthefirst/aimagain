@@ -19,6 +19,7 @@ from src.framework.dispatch.mounts._common import (
     call_handler_with,
     parent_path_param_pairs,
     path_segments_under_router,
+    subresource_breadcrumb_items,
 )
 from src.framework.dispatch.mounts._spec import QueryParam, ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
@@ -71,9 +72,53 @@ def mount_form(
     parent_id_names = tuple(p[0] for p in parent_path_param_pairs(spec))
     path_param_names = parent_id_names + ((id_param,) if on_existing else ())
 
+    # Parent-owned breadcrumb plumbing (mirrors mount_related_list). The
+    # form chrome's default breadcrumb assumes the entity is registered
+    # under its own URL (`breadcrumb_entity_item(entity_name)` → `/<col>`),
+    # which is wrong for a parent-owned spec (its URL is rooted at the
+    # parent). When the parent declares `display_label_fn`, fetch the
+    # parent row at request time and inject `_breadcrumb_items` so the
+    # chrome uses the multi-segment chain instead.
+    _parent_entity_spec = (
+        getattr(spec.parent, "entity_spec", None) if spec.parent else None
+    )
+    _parent_label_fn = (
+        _parent_entity_spec.display_label_fn
+        if _parent_entity_spec is not None
+        else None
+    )
+    _need_parent_repo = _parent_label_fn is not None
+    _parent_repo_dep = spec.parent.repo_dep if _need_parent_repo else None
+    _extra_static_deps: tuple[tuple[str, Any], ...] = (
+        (("__parent_repo__", _parent_repo_dep),) if _need_parent_repo else ()
+    )
+
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
         context = await call_handler_with(handler, handler_kwarg_names, kwargs)
+        if _parent_label_fn is not None and spec.parent is not None:
+            parent_id_value = kwargs[spec.parent.id_param]
+            parent_repo = kwargs["__parent_repo__"]
+            parent_row = await parent_repo.get_by_model_id(
+                _parent_entity_spec.model, parent_id_value
+            )
+            if parent_row is not None:
+                parent_collection = _parent_entity_spec.url_collection
+                # The "current page" segment is the form heading
+                # (`create_heading` / `edit_heading`). Fall back to the
+                # spec's collection label if the handler didn't set one.
+                heading = (
+                    context.get("create_heading")
+                    or context.get("edit_heading")
+                    or spec.collection.capitalize()
+                )
+                context["_breadcrumb_items"] = subresource_breadcrumb_items(
+                    parent_spec=_parent_entity_spec,
+                    parent_row=parent_row,
+                    parent_path=f"/{parent_collection}/{parent_id_value}",
+                    child_label=heading,
+                    viewer=kwargs.get("requesting_user"),
+                )
         # Resolve template: handler context > per-mount kwarg > spec field.
         # `pop` so the template name doesn't leak into the rendered context.
         resolved_template = (
@@ -100,6 +145,7 @@ def mount_form(
             user_dep=spec.read_user_dep,
             query_params=query_params,
             path_param_names=path_param_names,
+            extra_static_deps=_extra_static_deps,
         ),
         response_builder=response_builder,
     )
@@ -130,7 +176,17 @@ async def handle_get_edit_form(
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
     assert_kind_lock(spec, target)
     if spec.write_authz is not None:
-        spec.write_authz(target, requesting_user, action=f"edit this {spec.name}")
+        # Parent-owned specs run write_authz against the parent row (the
+        # owner-check target is the parent — same shape as handle_update /
+        # handle_delete / handle_create). For top-level specs the target
+        # is the row itself.
+        if spec.parent is not None and parent_id is not None:
+            parent = await repo.get_by_model_id(spec.parent.model, parent_id)
+            if parent is None:
+                raise NotFoundError(detail=f"{spec.parent.name.capitalize()} not found")
+            spec.write_authz(parent, requesting_user, action=f"edit this {spec.name}")
+        else:
+            spec.write_authz(target, requesting_user, action=f"edit this {spec.name}")
 
     # `edit_heading` mirrors `create_heading` in `handle_get_new_form`:
     # one funnel for the H1 string so the page H1 can't drift from the

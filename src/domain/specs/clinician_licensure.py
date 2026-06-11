@@ -25,10 +25,11 @@ from src.domain.logic.clinicians.schema import (
     ClinicianLicensureUpdate,
 )
 from src.domain.models import ClinicianLicensure
+from src.domain.models.enums import LICENSE_TYPES, LICENSE_TYPES_LABELS, US_STATES
 from src.domain.specs._credential import make_clinician_credential_entity
 from src.domain.specs.clinician import _clinician_licensures_list_redirect
 from src.framework.audit.core import AuditAction
-from src.framework.dispatch.entity_spec import EntitySpec, StateAxis
+from src.framework.dispatch.entity_spec import EntitySpec, RouteSet, StateAxis
 
 
 class _LicenseAttestationBody(BaseModel):
@@ -61,6 +62,32 @@ LICENSURE_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
     create_adapter=ClinicianLicensureCreate,
     update_adapter=ClinicianLicensureUpdate,
     mutation_redirect=_clinician_licensures_list_redirect,
+    # Licensure is the first credential converted to the canonical
+    # resource pattern: dedicated list at /clinicians/{id}/licensures
+    # with a "Create licensure" toolbar action, dedicated create-form
+    # at /licensures/form, and dedicated edit-form at /licensures/{id}/form
+    # with Delete + Attest active in the actions cluster. The list page's
+    # `RelatedListSubresource` on CLINICIAN_ENTITY is removed to avoid
+    # double-mount; the bespoke handle_list_clinician_licensures handler
+    # is wired through `mount_entity`'s owned_handlers in
+    # `src/domain/routes/clinicians.py`.
+    routes=RouteSet(
+        list=True,
+        create=True,
+        update=True,
+        delete=True,
+        form_new=True,
+        form_edit=True,
+    ),
+    # The list / form templates reference the license-type tuple +
+    # labels and US_STATES. Surfacing them via static_context (instead
+    # of Jinja globals) keeps the spec the single source of truth for
+    # what the licensure templates see.
+    static_context={
+        "LICENSE_TYPES": LICENSE_TYPES,
+        "LICENSE_TYPES_LABELS": LICENSE_TYPES_LABELS,
+        "US_STATES": US_STATES,
+    },
     state_axes=(
         StateAxis(
             name="attestation",

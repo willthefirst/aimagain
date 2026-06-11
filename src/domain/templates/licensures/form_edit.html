@@ -1,0 +1,25 @@
+{# `/clinicians/{clinician_id}/licensures/{licensure_id}/form` — canonical
+   edit form.
+
+   Delete + Attest active live on this page (strict canonical pattern:
+   the list page is read-only, per-row affordances live on the row's
+   own edit page). Attest active is only rendered when the row hasn't
+   already been attested in its current cycle (`attested_active=False`)
+   — otherwise the button is a no-op confusable.
+#}
+{% extends "views/form_edit.html" %}
+{%- from "licensures/_form_licensure.html" import licensure_form with context -%}
+{% block resource_label %}Licensures{% endblock %}
+{% block current_label %}{{ LICENSE_TYPES_LABELS[clinician_licensure.license_type] }}{% endblock %}
+{% block form_content %}
+  {%- set list_url = resource_url -%}
+  {%- set attest_url = (resource_detail_url ~ "/attestation") if not clinician_licensure.attested_active else None -%}
+  {{ licensure_form(resource_detail_url,
+    "patch",
+    "Save licensure",
+    cancel_url=list_url,
+    delete_url=resource_detail_url,
+    delete_confirm="Remove this licensure?",
+    attest_url=attest_url,
+    current=clinician_licensure) }}
+{% endblock %}

@@ -1,0 +1,30 @@
+{# `/clinicians/{clinician_id}/licensures` — canonical sub-resource list.
+
+   First credential migrated to the canonical resource pattern: the
+   list page is read-only (no inline add form, no per-row affordances).
+   "Create licensure" lives in the toolbar; clicking a row opens the
+   edit page where Delete + Attest active live.
+
+   Breadcrumb is auto-injected by `mount_entity` / the parent-aware
+   `mount_list` because `CLINICIAN_ENTITY.display_label_fn` is set.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/_credential_list.html" import credential_list -%}
+{%- from "_shared/_credential_row.html" import credential_row -%}
+{% block resource_label %}Licensures{% endblock %}
+{% block actions %}
+  <li>
+    <a href="{{ entity_url('clinician', id=clinician.id) }}/licensures/form"
+       role="button">Create licensure</a>
+  </li>
+{% endblock %}
+{% block list_body %}
+  <section>
+    {% call(lic) credential_list(rows, "No licensures yet.") %}
+      {{ credential_row(LICENSE_TYPES_LABELS[lic.license_type],
+            ["#" ~ lic.license_number, lic.issuing_state, ("Expires " ~ lic.expiration_date) if lic.expiration_date else None, lic.status | title],
+      href=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/form",
+      ) }}
+    {% endcall %}
+  </section>
+{% endblock %}
