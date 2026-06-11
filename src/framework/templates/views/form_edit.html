@@ -54,20 +54,28 @@ Child contract:
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {% block breadcrumb %}
-  {%- set _label_override %}
-    {% block resource_label %}{% endblock %}
-  {% endset -%}
-  {%- set current %}
-    {% block current_label %}{% endblock %}
-  {% endset -%}
-  {# Collection segment goes through `breadcrumb_entity_item` so the
-     lock_reason is always populated. The second (current-row) segment
-     is a literal href — no lock there because the back target is the
-     row the user just came from. #}
-  {{ breadcrumb([
-    breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
-  (current | trim, resource_detail_url, none),
-  ]) }}
+  {%- if _breadcrumb_items is defined %}
+    {# Parent-owned specs (sub-resources nested under a parent URL)
+       inject `_breadcrumb_items` from `handle_get_edit_form` — same
+       chain mount_related_list / mount_form-with-parent emits,
+       terminated with the current row's label. #}
+    {{ breadcrumb(_breadcrumb_items) }}
+  {%- else %}
+    {%- set _label_override %}
+      {% block resource_label %}{% endblock %}
+    {% endset -%}
+    {%- set current %}
+      {% block current_label %}{% endblock %}
+    {% endset -%}
+    {# Collection segment goes through `breadcrumb_entity_item` so the
+       lock_reason is always populated. The second (current-row) segment
+       is a literal href — no lock there because the back target is the
+       row the user just came from. #}
+    {{ breadcrumb([
+        breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+    (current | trim, resource_detail_url, none),
+    ]) }}
+  {%- endif %}
 {% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading=edit_heading) %}

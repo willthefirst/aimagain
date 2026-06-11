@@ -43,16 +43,24 @@ as a second crumb between collection and the H1).
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {% block breadcrumb %}
-  {%- set _label_override %}
-    {% block resource_label %}{% endblock %}
-  {% endset -%}
-  {# Collection-back tuple flows through `breadcrumb_entity_item` so the
-     lock_reason third element is always populated — clicking `< Clinicians`
-     from `/clinicians/form` opens the network-unverified popover instead
-     of a 403. See `route_urls.breadcrumb_entity_item`. #}
-  {{ breadcrumb([
-    breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
-  ]) }}
+  {%- if _breadcrumb_items is defined %}
+    {# Parent-owned specs (sub-resources nested under a parent URL)
+       inject `_breadcrumb_items` from `handle_get_new_form` — the same
+       3-step chain mount_related_list emits, terminated with the
+       "Create <noun>" segment. See `subresource_breadcrumb_items`. #}
+    {{ breadcrumb(_breadcrumb_items) }}
+  {%- else %}
+    {%- set _label_override %}
+      {% block resource_label %}{% endblock %}
+    {% endset -%}
+    {# Collection-back tuple flows through `breadcrumb_entity_item` so the
+       lock_reason third element is always populated — clicking `< Clinicians`
+       from `/clinicians/form` opens the network-unverified popover instead
+       of a 403. See `route_urls.breadcrumb_entity_item`. #}
+    {{ breadcrumb([
+        breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+    ]) }}
+  {%- endif %}
 {% endblock %}
 {% block toolbar %}
   {% call page_toolbar(heading=create_heading) %}

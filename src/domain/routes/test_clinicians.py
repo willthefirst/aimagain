@@ -968,6 +968,80 @@ async def test_delete_clinician_returns_204(
 # --- Licensure sub-resource ---------------------------------------------
 
 
+async def test_get_licensure_new_form_renders(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /clinicians/{id}/licensures/form` is the canonical create-form
+    page (mounted via parent-aware `mount_form` after the canonical-pattern
+    conversion). The rendered form POSTs to the collection URL."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/licensures/form"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    add_form = tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/licensures"]')
+    assert add_form is not None
+    assert add_form.css_first('select[name="license_type"]') is not None
+
+
+async def test_get_licensure_edit_form_renders_with_prefilled_values(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /clinicians/{id}/licensures/{lic_id}/form` is the canonical
+    edit-form page; renders with the licensure's current values prefilled,
+    and the Delete + Attest active affordances live in the actions
+    cluster (strict canonical — no per-row buttons on the list page)."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+    clinician_id = await _clinician_id_for(db_test_session_manager, clinician_id)
+    licensure = make_clinician_licensure(
+        clinician_id=clinician_id,
+        license_type="lcsw",
+        license_number="L-2025",
+        issuing_state="CA",
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
+        await session.refresh(licensure)
+    lic_id = licensure.id
+
+    response = await authenticated_client.get(
+        f"/clinicians/{clinician_id}/licensures/{lic_id}/form"
+    )
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # Form patches to the resource detail URL.
+    edit_form = tree.css_first(
+        f'form[hx-patch="/clinicians/{clinician_id}/licensures/{lic_id}"]'
+    )
+    assert edit_form is not None
+    # License number prefilled.
+    number_input = edit_form.css_first('input[name="license_number"]')
+    assert number_input is not None
+    assert number_input.attributes.get("value") == "L-2025"
+    # Delete sits in the actions cluster.
+    delete = tree.css_first(
+        f'button[hx-delete="/clinicians/{clinician_id}/licensures/{lic_id}"]'
+    )
+    assert delete is not None
+    # Attest active lives here when the row hasn't been attested yet.
+    attest = tree.css_first(
+        f'button[hx-put="/clinicians/{clinician_id}/licensures/{lic_id}/attestation"]'
+    )
+    assert attest is not None
+
+
 async def test_patch_licensure_updates_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -1849,9 +1923,10 @@ async def test_get_clinician_licensures_renders_existing_rows(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """An existing licensure on the clinician renders as a `.credential-row`
-    on the dedicated list page, with a delete button pointing at the
-    standard `DELETE /clinicians/{id}/licensures/{lic_id}` URL."""
+    """An existing licensure renders as a whole-row navigation link to its
+    edit page on the canonical sub-resource list page. No inline add form
+    or per-row delete button — those live in the toolbar and on the edit
+    page respectively after the canonical-pattern conversion."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -1868,14 +1943,27 @@ async def test_get_clinician_licensures_renders_existing_rows(
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/licensures")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    delete = tree.css_first(
-        f'button[hx-delete="/clinicians/{clinician_id}/licensures/{lic_id}"]'
+    # The whole row is a link to the edit page.
+    row_link = tree.css_first(
+        f'a.credential-row-link[href="/clinicians/{clinician_id}/licensures/{lic_id}/form"]'
     )
-    assert delete is not None
-    # Inline add-form posts to the same collection URL.
-    add_form = tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/licensures"]')
-    assert add_form is not None
-    assert add_form.css_first('select[name="license_type"]') is not None
+    assert row_link is not None
+    # Toolbar carries the "Create licensure" link to the new-form page.
+    create_link = tree.css_first(
+        f'a[href="/clinicians/{clinician_id}/licensures/form"][role="button"]'
+    )
+    assert create_link is not None
+    # No inline add form on the canonical list page.
+    assert (
+        tree.css_first(f'form[hx-post="/clinicians/{clinician_id}/licensures"]') is None
+    )
+    # No per-row delete button — Delete moves to the edit page's actions.
+    assert (
+        tree.css_first(
+            f'button[hx-delete="/clinicians/{clinician_id}/licensures/{lic_id}"]'
+        )
+        is None
+    )
 
 
 async def test_get_clinician_affiliations_carries_org_picker(
