@@ -18,10 +18,10 @@ Layout:
   └──────────────────────────────────────────────┘
 
 The card uses Pico's `<article>` defaults for chrome (background,
-border, rounded corners, tinted header/footer bands) plus
-`class="entity-card"` for the domain-wide convention. The body and
-optional footer are caller-provided via `{% call %}` — no separate
-"with footer" macro variant.
+border, rounded corners, tinted header/footer bands). Tests select
+rows by `article[data-row-id="…"]`. The body and optional footer
+are caller-provided via `{% call %}` — no separate "with footer"
+macro variant.
 
 Args
 ----
@@ -56,8 +56,7 @@ caller body — Pico will tint it automatically.
    `<a>` — used by redacted list cards where the H3 carries a
    `locked_name(...)` button instead of a navigable link. #}
 {% macro card(id, headline_url, headline, subtitle=None, data_kind=None) -%}
-  <article class="entity-card"
-           data-row-id="{{ id }}"
+  <article data-row-id="{{ id }}"
            {% if data_kind %}data-kind="{{ data_kind }}"{% endif %}>
     <header>
       <h3>
