@@ -87,6 +87,9 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     # Default to "no preference stated" — most tests don't care about
     # affirming-identity match; tests that do override.
     "affirming_identities": [],
+    # Default to "no constraint" — most tests don't care about
+    # license-class restriction; tests that do override.
+    "acceptable_license_types": [],
     # FK fields: always None here. Add stub string UUIDs to _REFERRAL_WIRE_DEFAULTS instead.
     "referring_clinician_id": None,
 }
