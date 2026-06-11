@@ -1,5 +1,5 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import form_section, text_field, checkbox_field -%}
+{%- from "_shared/form_fields.html" import form_section, text_field -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import npi_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -11,11 +11,6 @@
       {{ text_field("name", "Name", current=organization.name, maxlength=200) }}
       {{ text_field("npi", "NPI", current=organization.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
-    {% if current_user and current_user.is_superuser %}
-      {% call form_section("Demo") %}
-        {{ checkbox_field("is_demo", "Demo organization (bypasses real NPI verification)", current=organization.is_demo, required=false) }}
-      {% endcall %}
-    {% endif %}
     {{ actions("Save changes",
         cancel_url=entity_url('organization', id=organization.id) ,
     delete_url=entity_url('organization', id=organization.id),
