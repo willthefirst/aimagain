@@ -342,19 +342,10 @@ async def test_logout_success(authenticated_client: AsyncClient):
     assert me_response_after.text == user_email_html
 
 
-async def test_authenticated_page_has_sign_out_affordance(
-    authenticated_client: AsyncClient,
-):
-    """Any authenticated page must expose the sign-out endpoint in the
-    header chrome so the user can end their session within 2 clicks.
-    Sign-out is a plain `<a hx-post="/auth/sign-out">` in the primary
-    nav row; the route returns `HX-Redirect` and HTMX handles the
-    full-page navigation to `/auth/login`."""
-    response = await authenticated_client.get(
-        "/users/me", headers={"Accept": "text/html"}
-    )
-    assert response.status_code == 200
-    assert 'hx-post="/auth/sign-out"' in response.text
+# The "authenticated pages expose the header sign-out affordance" check
+# now lives in test_users.test_get_users_me_renders_authenticated_self_view
+# alongside the rest of the /users/me chrome assertions — every test that
+# rendered this page with this fixture share one request there.
 
 
 async def test_forgot_password_request(test_client: AsyncClient, logged_in_user: User):
