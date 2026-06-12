@@ -42,11 +42,15 @@ Shared infrastructure:
 
 - `_spec.py` — `QueryParam` and `ResourceSpec` dataclasses + the
   module-private `_UNSET` sentinel used by `QueryParam.required()`.
-- `_synth.py` — `synthesize_route_fn`, `SynthOptions`, `MountError`,
-  and the type-inspection helpers. Every per-verb mount calls
+- `_synth.py` — `synthesize_route_fn`, `synthesize_alias_route_fn`,
+  `SynthOptions`, `MountError`, and the type-inspection helpers. Every
+  per-verb mount calls
   `synthesize_route_fn(handler=…, spec=…, options=…, response_builder=…)`
   to turn the handler's typed signature into a FastAPI-visible route
-  function.
+  function. `synthesize_alias_route_fn` is the single producer of the
+  `singleton_alias` route shape (literal `/<alias>` segment that
+  derives the resource id from a session dep instead of the URL) used
+  by `mount_detail` and `mount_related_list`.
 - `_common.py` — small helpers shared across the per-verb modules:
   `path_segments_under_router`, `parent_path_param_pairs`,
   `walk_parent_chain`, `normalize_filters`, `resolve_dotted_path`,

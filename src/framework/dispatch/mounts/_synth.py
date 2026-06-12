@@ -299,3 +299,61 @@ def synthesize_route_fn(
 
     _route.__signature__ = inspect.Signature(parameters=synth_params)  # type: ignore[attr-defined]
     return _route
+
+
+def synthesize_alias_route_fn(
+    *,
+    handler: Callable[..., Any],
+    spec: ResourceSpec,
+    response_builder: Callable[..., Awaitable[Any]],
+    singleton_alias: tuple[str, Callable[..., Any]],
+    id_param: str,
+    extra_static_deps: tuple[tuple[str, Callable[..., Any]], ...] = (),
+) -> Callable[..., Any]:
+    """Build a route fn for a literal-segment alias (e.g. `/users/me`)
+    that derives the resource id from the session-resolved user.
+
+    Wraps the primary route's ``response_builder`` so the session user's
+    id lands under ``id_param`` and the user itself under
+    ``requesting_user`` before delegation. Both `mount_detail` and
+    `mount_related_list` accept ``singleton_alias=("me",
+    current_active_user)``; this helper is the single producer of the
+    alias-mount shape so the kwarg-swap closure and the
+    ``__session_user__`` Depends wiring live in one place.
+
+    The caller registers the returned route_fn under whatever path it
+    wants (`/{alias_segment}` for `mount_detail`,
+    `/{alias_segment}/{child.collection}` for `mount_related_list`).
+
+    ``id_param`` is the kwarg name the response_builder reads the id
+    under — `spec.id_param` for `mount_detail`, the parent's
+    `id_param` for `mount_related_list` (the URL would have carried it
+    as a path segment in the non-alias form).
+
+    ``extra_static_deps`` composes with the `__session_user__` Depends
+    that this helper always injects — e.g. `mount_related_list` adds
+    the parent-repo dep its breadcrumb plumbing needs.
+    """
+    _alias_segment, session_dep = singleton_alias
+
+    async def alias_response_builder(*, handler, handler_kwarg_names, kwargs):
+        session_user = kwargs["__session_user__"]
+        kwargs = {
+            **kwargs,
+            id_param: session_user.id,
+            "requesting_user": session_user,
+        }
+        return await response_builder(
+            handler=handler, handler_kwarg_names=handler_kwarg_names, kwargs=kwargs
+        )
+
+    return synthesize_route_fn(
+        handler=handler,
+        spec=spec,
+        options=SynthOptions(
+            user_dep=None,  # session_dep supplies the user; don't double-inject
+            handler_supplied_names=(id_param, "requesting_user"),
+            extra_static_deps=(("__session_user__", session_dep),) + extra_static_deps,
+        ),
+        response_builder=alias_response_builder,
+    )
