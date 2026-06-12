@@ -10,7 +10,7 @@ kinds model the underlying data with parallel shapes:
     of `INSURANCE_CARRIERS` tokens (#1358 PR-e). The posture is
     derived from the booleans in priority order: in-network →
     out-of-network → private-pay → please_contact (none set).
-  * `opening` → linked `Clinician` — the
+  * `opening` → linked `ClinicianAffiliation` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
 
@@ -31,7 +31,10 @@ Genders that don't slot in naturally — `prefer_not_to_say`,
 card (`_item.html`) and the detail page (`detail.html`) read from. Each
 kind's underlying detail relationship has a different field set and
 naming — CR holds its own (city, state, zip) location and a single
-gender; PA reads location and insurance from the linked Clinician;
+gender; PA reads location and insurance from the linked
+ClinicianAffiliation (the practice the opening announces, NOT the
+clinician's primary-affiliation proxies — a multi-affiliation
+clinician's opening must show the posting practice's facts);
 program reads identity from the linked Program. The function collapses
 those three shapes into one flat dict so templates iterate over keys
 rather than branching on `post.kind`. Values that don't apply to a
@@ -107,14 +110,20 @@ def insurance_posture_for_post(post) -> str | None:
         return "please_contact"
     if kind == "clinician_opening":
         detail = getattr(post, "opening_detail", None)
-        clinician = getattr(detail, "clinician", None) if detail is not None else None
-        if clinician is None:
+        affiliation = (
+            getattr(detail, "clinician_affiliation", None)
+            if detail is not None
+            else None
+        )
+        if affiliation is None:
             return None
-        if clinician.in_network_carriers:
+        if getattr(affiliation, "in_network_carriers", None):
             return "in_network"
-        if clinician.accepts_out_of_network:
+        if getattr(affiliation, "accepts_out_of_network", None):
             return "out_of_network"
-        if clinician.sliding_scale or clinician.cost:
+        if getattr(affiliation, "sliding_scale", None) or getattr(
+            affiliation, "cost", None
+        ):
             return "self_pay"
         return "please_contact"
     if kind == "program_intake":
@@ -253,8 +262,9 @@ def post_card_view(post) -> dict[str, Any]:
         in_person / virtual: the post's in-person/virtual posture as
             `LOCATION_AVAILABILITY_OPTIONS` values. CR reads them off
             its own detail row; PA reads them from the linked
-            Clinician's session-availability fields. Program has no
-            in-person/virtual posture and returns ``None`` for both.
+            ClinicianAffiliation's session-availability fields. Program
+            has no in-person/virtual posture and returns ``None`` for
+            both.
         services / settings: raw enum lists. PA + program carry
             ``settings``; CR's ``settings`` is empty.
         ages / languages / genders: raw enum lists. CR's single
@@ -267,8 +277,8 @@ def post_card_view(post) -> dict[str, Any]:
             ``insurance_posture_for_post`` returns.
         treatment_modality: free-text modality string or ``None``.
         location_chunk: ``{city, state, zip}`` for CR (from the
-            detail row) and PA (from the linked Clinician) — the
-            demographics-column icon-only row both render. ``None``
+            detail row) and PA (from the linked ClinicianAffiliation) —
+            the demographics-column icon-only row both render. ``None``
             for program (no location of its own; ``state_preference``
             still surfaces via ``header_state``).
         description: free-text description or ``None``. CR's
@@ -278,22 +288,22 @@ def post_card_view(post) -> dict[str, Any]:
             for CR.
         desired_times: raw enum list of desired-time slots; empty if
             unset.
-        practice_link: ``{id, name}`` of PA's linked Clinician's org;
-            ``None`` for other kinds.
+        practice_link: ``{id, name}`` — the linked Clinician's id with
+            the affiliation's org name; ``None`` for other kinds.
         program_link: ``{id, name}`` of program's linked Program;
             ``None`` for other kinds.
         organization_link: ``{id, name}`` of the post's owning
-            Organization (PA reads through ``clinician.org``; program
-            intake reads through ``program.organization``). ``None``
-            for referral (CR has no org linkage in the model). The
-            facts block renders this as a clickable link so any post
+            Organization (PA reads through ``clinician_affiliation.org``;
+            program intake reads through ``program.organization``).
+            ``None`` for referral (CR has no org linkage in the model).
+            The facts block renders this as a clickable link so any post
             is one click from its org's detail page.
         full_address: ``"City, ST ZIP"`` string for the detail page's
             expanded location row. CR reads from its own location;
-            PA reads from the linked Clinician; program returns
-            ``None``.
-        sliding_scale / cost: PA-only fields from the linked Clinician;
-            ``None`` for other kinds.
+            PA reads from the linked ClinicianAffiliation; program
+            returns ``None``.
+        sliding_scale / cost: PA-only fields from the linked
+            ClinicianAffiliation; ``None`` for other kinds.
         accepts_in_network / accepts_out_of_network_superbill /
         accepts_private_pay: CR-only payment-path booleans from the
             detail row; ``None`` for other kinds.
@@ -305,7 +315,8 @@ def post_card_view(post) -> dict[str, Any]:
             empty list both for CR with none specified and for other
             kinds, so templates iterate uniformly via ``{% if view.x %}``.
         in_network_carriers / accepts_out_of_network: PA-only raw
-            values from the linked Clinician. ``in_network_carriers``
+            values from the linked ClinicianAffiliation.
+            ``in_network_carriers``
             comes back as an empty list when unset, matching the
             list/iteration convention; ``accepts_out_of_network`` is
             ``None`` for other kinds.
@@ -407,68 +418,57 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         _forward_detail_passthrough(base, d)
         p = getattr(d, "clinician", None)
-        # #1358 PR-f sub-3: steady-state profile fields read exclusively
-        # from the linked ClinicianAffiliation (and `languages` from the
-        # linked Clinician). The detail row no longer carries these
-        # columns.
+        # Practice-role facts (org, location, sessions, payment) read
+        # from the affiliation the opening announces — NOT through the
+        # Clinician's primary-affiliation proxy properties, which would
+        # show the wrong practice for a multi-affiliation clinician.
+        # `languages` stays person-level on the Clinician (#1358 PR-f
+        # sub-3 dropped the detail-row columns for all of these).
         affiliation = getattr(d, "clinician_affiliation", None)
         for view_key, attr in _OPENING_AFFILIATION_FIELDS:
             base[view_key] = _read_list(affiliation, attr)
         base["languages"] = _read_list(p, "languages")
         _website = _read_scalar(affiliation, "website")
         _instructions = _read_scalar(affiliation, "referral_instructions")
+        _org = _read_scalar(affiliation, "org")
+        _org_name = getattr(_org, "name", None) if _org else None
         _fn = getattr(p, "first_name", None) if p else None
         _ln = getattr(p, "last_name", None) if p else None
         base.update(
             poster_name=" ".join(filter(None, [_fn, _ln])) or None,
-            headline=(p.org.name if p and getattr(p, "org", None) else None),
+            headline=_org_name,
             # `header_state` stays None — opening's location lives in
             # the demographics column via `location_chunk` (same row
             # treatment as referral). Both kinds match on where
             # location surfaces, so the list card's header line stays
             # uncluttered for both.
             header_state=None,
-            location_chunk=(
-                _location_chunk(
-                    getattr(p, "location_city", None),
-                    getattr(p, "location_state", None),
-                    getattr(p, "location_zip", None),
-                )
-                if p
-                else None
+            location_chunk=_location_chunk(
+                _read_scalar(affiliation, "location_city"),
+                _read_scalar(affiliation, "location_state"),
+                _read_scalar(affiliation, "location_zip"),
             ),
-            in_person=(getattr(p, "in_person_sessions", None) if p else None),
-            virtual=(getattr(p, "virtual_sessions", None) if p else None),
+            in_person=_read_scalar(affiliation, "in_person_sessions"),
+            virtual=_read_scalar(affiliation, "virtual_sessions"),
             practice_link=(
-                {"id": p.id, "name": p.org.name}
-                if p and getattr(p, "org", None) and getattr(p, "id", None)
+                {"id": p.id, "name": _org_name}
+                if _org_name and p and getattr(p, "id", None)
                 else None
             ),
             organization_link=(
-                {"id": p.org.id, "name": p.org.name}
-                if p
-                and getattr(p, "org", None)
-                and getattr(p.org, "id", None)
-                and getattr(p.org, "name", None)
+                {"id": _org.id, "name": _org_name}
+                if _org and getattr(_org, "id", None) and _org_name
                 else None
             ),
-            full_address=(
-                full_address(
-                    getattr(p, "location_city", None),
-                    getattr(p, "location_state", None),
-                    getattr(p, "location_zip", None),
-                )
-                if p
-                else None
+            full_address=full_address(
+                _read_scalar(affiliation, "location_city"),
+                _read_scalar(affiliation, "location_state"),
+                _read_scalar(affiliation, "location_zip"),
             ),
-            sliding_scale=(getattr(p, "sliding_scale", None) if p else None),
-            cost=(getattr(p, "cost", None) if p else None),
-            in_network_carriers=(
-                list(getattr(p, "in_network_carriers", None) or []) if p else []
-            ),
-            accepts_out_of_network=(
-                getattr(p, "accepts_out_of_network", None) if p else None
-            ),
+            sliding_scale=_read_scalar(affiliation, "sliding_scale"),
+            cost=_read_scalar(affiliation, "cost"),
+            in_network_carriers=_read_list(affiliation, "in_network_carriers"),
+            accepts_out_of_network=_read_scalar(affiliation, "accepts_out_of_network"),
             referral=_referral_or_none(_website, _instructions),
         )
         return base
@@ -576,7 +576,6 @@ def post_row_summary(post) -> str:
         d = getattr(post, "opening_detail", None)
         if d is None:
             return "Opening"
-        p = getattr(d, "clinician", None)
         affiliation = getattr(d, "clinician_affiliation", None)
         parts = []
         desc = getattr(d, "description", None)
@@ -595,7 +594,7 @@ def post_row_summary(post) -> str:
         settings = _read_list(affiliation, "settings")
         if settings:
             parts.append(TREATMENT_SETTINGS_LABELS.get(settings[0], settings[0]))
-        if p and getattr(p, "sliding_scale", None):
+        if _read_scalar(affiliation, "sliding_scale"):
             parts.append("sliding scale")
         return " · ".join(parts) if parts else "Opening"
 
@@ -652,13 +651,9 @@ def post_feed_headline(post) -> str:
             return "Opening"
         if subject := getattr(d, "subject", None):
             return subject
-        p = getattr(d, "clinician", None)
         affiliation = getattr(d, "clinician_affiliation", None)
-        practice = (
-            p.org.name
-            if p and getattr(p, "org", None) and getattr(p.org, "name", None)
-            else "Opening"
-        )
+        _org = _read_scalar(affiliation, "org")
+        practice = (getattr(_org, "name", None) if _org else None) or "Opening"
         # #1358 PR-f — services/settings read from the linked
         # ClinicianAffiliation.
         services = _read_list(affiliation, "services")
