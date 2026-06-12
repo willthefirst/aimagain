@@ -6,12 +6,18 @@
    in via a subsequent edit.
 
    Args:
-     action_url, method, heading, cancel_url, delete_url,
-     delete_confirm, current — same contract as
-     `licensures/_form_licensure.html::licensure_form`. The
-     affiliation form's per-section legends are static ("Practice",
-     "Services offered", etc.); `heading` here only feeds the create
-     submit button — edit inherits the framework default.
+     action_url — POST (create) or PATCH (edit) target.
+     method — "post" / "patch". Drives the submit-button label: create
+       reuses `heading`; edit inherits the framework default
+       ("Save changes") from `actions(...)`.
+     heading — the create submit-button text. Edit ignores it (uses
+       the framework default).
+     cancel_url — the action cluster's Cancel link target.
+     delete_url — optional; when set on the edit page, renders Delete
+       in the action cluster.
+     delete_confirm — required when `delete_url` is set.
+     current — optional; on edit, the loaded affiliation row used to
+       prefill field values. Create passes None.
      orgs — list of organizations for the picker. Required (the
      handler injects it via context).
 #}

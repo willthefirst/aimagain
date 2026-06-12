@@ -71,3 +71,35 @@ caller body — Pico will tint it automatically.
     {{ caller() }}
   </article>
 {%- endmacro %}
+{% from "_shared/sections.html" import fact, facts_block %}
+{# Subresource card — declarative wrapper around `card` for the
+   clinician credential lists (certifications, licensures, educations)
+   and any future subresource that follows the headline + subtitle +
+   short fact-list shape. Caller provides:
+
+     - `id`, `headline_url`, `headline` — same as `card`.
+     - `subtitle_parts` — iterable of strings. Falsy entries are
+       skipped; the rest wrap in `<span>` so the `.meta` CSS rule
+       joins them with " · ". Pass `["Active", lic.issuing_state]`.
+     - `facts` — iterable of `(key, label, value)` triples. Triples
+       whose `value` is falsy are skipped. Rendered inside a single
+       `facts_block`; an all-empty list emits no block at all.
+
+   A card that needs richer fact rows (links, multi-element values,
+   icons, dt classes) outgrows this macro — compose `card` +
+   `facts_block` + `fact` directly. #}
+{% macro subresource_card(id, headline_url, headline, subtitle_parts=None, facts=None) -%}
+  {%- set parts = (subtitle_parts or []) | select | list -%}
+  {%- set subtitle %}
+    {%- for part in parts %}<span>{{ part }}</span>{%- endfor %}
+  {%- endset %}
+  {%- set rows = (facts or []) | rejectattr(2, 'sameas', none) | list -%}
+  {%- set rows = rows | rejectattr(2, 'equalto', '') | list -%}
+  {%- call card(id=id, headline_url=headline_url, headline=headline, subtitle=subtitle | trim or none) -%}
+    {%- if rows -%}
+      {%- call facts_block() %}
+        {%- for key, label, value in rows %}{{ fact(key, label, value) }}{%- endfor %}
+        {%- endcall %}
+      {%- endif %}
+    {%- endcall %}
+  {%- endmacro %}

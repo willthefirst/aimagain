@@ -184,6 +184,9 @@ async def handle_get_edit_form(
         "resource_url": url_for_spec(spec, parent_id=parent_id),
         "resource_detail_url": url_for_spec(spec, id=target.id, parent_id=parent_id),
     }
+    # Mirror of the create-form branch — see `handle_get_new_form`.
+    if spec.templates.form_partial is not None:
+        context["form_partial"] = spec.templates.form_partial
     # Spec-declared constants (enum labels, schema classes the form
     # references, etc.) — same merge precedence as detail/list.
     if spec.static_context:
@@ -279,6 +282,11 @@ async def handle_get_new_form(
         "create_heading": create_label_for(spec, kind=kind),
         "resource_url": url_for_spec(spec, parent_id=parent_id),
     }
+    # Spec-driven form pages (cert / lic / edu): the view template's
+    # `form_content` block does `{% include form_partial %}`, so the path
+    # has to be in context for the lookup to resolve at render time.
+    if spec.templates.form_partial is not None:
+        context["form_partial"] = spec.templates.form_partial
     if spec.static_context:
         context.update(spec.static_context)
     if spec.discriminator is not None:

@@ -38,4 +38,5 @@ EDUCATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
         "EDUCATION_TYPES": EDUCATION_TYPES,
         "EDUCATION_TYPES_LABELS": EDUCATION_TYPES_LABELS,
     },
+    form_partial="educations/_form_education.html",
 )

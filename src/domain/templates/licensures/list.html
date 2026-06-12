@@ -13,9 +13,8 @@
    `mount_list` because `CLINICIAN_ENTITY.display_label_fn` is set.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_card.html" import subresource_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Licensures{% endblock %}
 {% block actions %}
   <li>
@@ -24,22 +23,16 @@
   </li>
 {% endblock %}
 {%- macro licensure_card(lic) %}
-  {%- set subtitle %}
-    <span>{{ lic.issuing_state }}</span>
-    <span>{{ lic.status | title }}</span>
-  {%- endset %}
-  {%- call card(
-    id=lic.id,
+  {{ subresource_card(id=lic.id,
     headline_url=entity_url('clinician', id=clinician.id) ~ "/licensures/" ~ lic.id|string ~ "/form",
-    headline=LICENSE_TYPES_LABELS[lic.license_type],
-    subtitle=subtitle) -%}
-    {%- call facts_block() %}
-      {{ fact('license_number', 'License #', "#" ~ lic.license_number) }}
-      {%- if lic.expiration_date -%}{{ fact('expiration_date', 'Expires', lic.expiration_date) }}{%- endif %}
-      {%- endcall %}
-    {%- endcall %}
-  {%- endmacro %}
-  {% block list_body %}
-    {{ item_list(rows, licensure_card, "licensures-list",
-        empty_msg="No licensures yet.") }}
-  {% endblock %}
+  headline=LICENSE_TYPES_LABELS[lic.license_type],
+  subtitle_parts=[lic.issuing_state, lic.status | title],
+  facts=[
+  ('license_number', 'License #', "#" ~ lic.license_number),
+  ('expiration_date', 'Expires', lic.expiration_date),
+  ]) }}
+{%- endmacro %}
+{% block list_body %}
+  {{ item_list(rows, licensure_card, "licensures-list",
+    empty_msg="No licensures yet.") }}
+{% endblock %}

@@ -3,9 +3,8 @@
    shared across all four clinician sub-resource lists.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_card.html" import subresource_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Certifications{% endblock %}
 {% block actions %}
   <li>
@@ -14,20 +13,11 @@
   </li>
 {% endblock %}
 {%- macro certification_card(cert) %}
-  {%- set subtitle %}
-    {%- if cert.certifying_body %}<span>{{ cert.certifying_body }}</span>{%- endif %}
-  {%- endset %}
-  {%- call card(
-    id=cert.id,
+  {{ subresource_card(id=cert.id,
     headline_url=entity_url('clinician', id=clinician.id) ~ "/certifications/" ~ cert.id|string ~ "/form",
-    headline=CERTIFICATION_TYPES_LABELS[cert.certification_type],
-    subtitle=subtitle | trim) -%}
-    {%- if cert.expiration_date -%}
-      {%- call facts_block() %}
-        {{ fact('expiration_date', 'Expires', cert.expiration_date) }}
-      {%- endcall %}
-    {%- endif %}
-  {%- endcall %}
+  headline=CERTIFICATION_TYPES_LABELS[cert.certification_type],
+  subtitle_parts=[cert.certifying_body],
+  facts=[('expiration_date', 'Expires', cert.expiration_date)]) }}
 {%- endmacro %}
 {% block list_body %}
   {{ item_list(rows, certification_card, "certifications-list",

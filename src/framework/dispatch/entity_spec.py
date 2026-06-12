@@ -133,6 +133,19 @@ class Templates:
     form_new: str | None = None
     form_edit: str | None = None
     search: str | None = None
+    # Path to a per-entity form-body partial included by the spec-driven
+    # `views/subresource_form_{new,edit}.html` view templates. The view
+    # template renders its `form_content` block as
+    # `{% include form_partial %}`; the partial reads context vars
+    # (`resource_url`, `create_heading` / `edit_heading`,
+    # `resource_detail_url`, the spec-named row on edit) directly instead
+    # of being imported as a macro. Set this on owned-subentity specs
+    # whose form pages would otherwise repeat the same `extends` +
+    # `from import` + `form_content` wrapper across two per-entity files;
+    # the clinician credential trio (certifications / licensures /
+    # educations) is the canonical case. Leave `None` for entities whose
+    # form pages need a bespoke wrapper (e.g. polymorphic posts).
+    form_partial: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1093,6 +1106,12 @@ class EntitySpec:
             "form_new": self.templates.form_new,
             "form_edit": self.templates.form_edit,
             "search": self.templates.search,
+            # `form_partial` is independent of the verb-default convention
+            # below — it's a per-entity declaration the spec carries
+            # verbatim into the resolved Templates. Without this key the
+            # `Templates(**resolved)` rebuild a few lines down would drop
+            # the spec-declared form_partial back to None.
+            "form_partial": self.templates.form_partial,
         }
         for verb in ("list", "detail", "form_new", "form_edit"):
             if resolved[verb] is None and getattr(self.routes, verb, False):

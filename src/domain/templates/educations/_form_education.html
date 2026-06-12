@@ -1,29 +1,29 @@
-{# Shared form-body macro for education create + edit. See
-   `licensures/_form_licensure.html::licensure_form` docstring for
-   the full surface; this is the credential-specific field list.
+{# Education create/edit form body. See licensure partial for the
+   full surface contract.
 #}
 {%- from "_shared/form_fields.html" import text_field, select_field, form_section with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/actions.html" import actions -%}
-{% macro education_form(action_url, method, heading, cancel_url, delete_url=None, delete_confirm=None, current=None) -%}
-  <div class="entity-form-page">
-    {% call entity_form(action_url, method=method) %}
-      {% call form_section(heading) %}
-        {{ select_field("education_type", "Education type", EDUCATION_TYPES,
-                labels=EDUCATION_TYPES_LABELS,
-                current=(current.education_type if current else None) ,
-        placeholder=true) }}
-        {{ text_field("institution", "Institution",
-                current=(current.institution if current else None) ,
-        maxlength=200) }}
-        {{ text_field("month_completed", "Month completed",
-                current=(current.month_completed if current else None) ,
-        required=false, type="month") }}
-      {% endcall %}
-      {{ actions(heading if method == "post" else none,
-            cancel_url=cancel_url,
-            delete_url=delete_url,
-            delete_confirm=delete_confirm) }}
-    {% endcall %}
-  </div>
-{%- endmacro %}
+{%- set is_edit = edit_heading is defined -%}
+{%- set current = clinician_education if is_edit else none -%}
+{%- set action_url = resource_detail_url if is_edit else resource_url -%}
+{%- set method = "patch" if is_edit else "post" -%}
+{%- set heading = edit_heading if is_edit else create_heading -%}
+{% call entity_form(action_url, method=method) %}
+  {% call form_section(heading) %}
+    {{ select_field("education_type", "Education type", EDUCATION_TYPES,
+        labels=EDUCATION_TYPES_LABELS,
+        current=(current.education_type if current else None) ,
+    placeholder=true) }}
+    {{ text_field("institution", "Institution",
+        current=(current.institution if current else None) ,
+    maxlength=200) }}
+    {{ text_field("month_completed", "Month completed",
+        current=(current.month_completed if current else None) ,
+    required=false, type="month") }}
+  {% endcall %}
+  {{ actions(heading if not is_edit else none,
+    cancel_url=resource_url,
+    delete_url=(resource_detail_url if is_edit else none) ,
+  delete_confirm=("Remove this education entry?" if is_edit else none)) }}
+{% endcall %}
