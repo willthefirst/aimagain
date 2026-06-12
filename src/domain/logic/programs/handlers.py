@@ -5,24 +5,25 @@ Two callables, mirroring :mod:`src.domain.logic.clinicians.handlers`:
 * :func:`program_form_extras` — driven by
   ``PROGRAM_ENTITY.form_extras_path``. Loads the requesting user's
   visible Organizations into the form context so the create / edit
-  form can render an Org-picker scoped to Orgs the user owns.
+  form can render an Org-picker scoped to Orgs the user owns. On
+  edit, re-includes the row's currently-attached Org when it would
+  otherwise be missing from the visible set.
 * :func:`_assert_program_payload_org_ownership` — driven by
   ``PROGRAM_ENTITY.payload_authz_path``. Wire-side authorization on
   the cross-entity FK: the user may only attach a Program to an Org
   they own (superusers bypass; nonexistent Org → 404 with no info
-  leak about other users' Org ids).
+  leak about other users' Org ids). Built from
+  :func:`~src.framework.access.authz.authz.make_fk_ownership_payload_authz`
+  — the per-entity wrapper is now a one-line factory call.
 
 No bespoke CRUD handlers — the framework's factory-built
 ``handle_create`` / ``handle_update`` / etc. consume both hooks via
 the spec's dotted-path declarations, so the route file is a single
-:func:`mount_entity` call (the conformance check for the framework
-generalizations from PRs #534 + #535).
+:func:`mount_entity` call.
 """
 
 import logging
 from typing import Any
-
-from pydantic import BaseModel
 
 from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.models import (
@@ -30,31 +31,24 @@ from src.domain.models import (
     Program,
     User,
 )
-from src.framework.access.authz.authz import assert_fk_ownership, list_visible_to
-from src.framework.http.exceptions import ForbiddenError, NotFoundError  # noqa: F401
+from src.framework.access.authz.authz import (
+    list_picker_options_for,
+    make_fk_ownership_payload_authz,
+)
 
 logger = logging.getLogger(__name__)
 
 
-async def _assert_program_payload_org_ownership(
-    *,
-    payload: BaseModel,
-    requesting_user: User,
-    organization_repo: OrganizationRepository,
-) -> None:
-    """`PROGRAM_ENTITY.payload_authz_path` target — thin wrapper around
-    the framework's generic FK-ownership assertion. Keeps the dotted-
-    path on the spec stable while the rule lives in one framework spot.
-    """
-    await assert_fk_ownership(
-        payload=payload,
-        attr="org_id",
-        requesting_user=requesting_user,
-        parent_repo=organization_repo,
-        parent_model=Organization,
-        parent_noun="Organization",
-        child_noun="Program",
-    )
+# `PROGRAM_ENTITY.payload_authz_path` target — see the factory's docstring
+# for the contract. Module-level binding so the spec's dotted import
+# resolves.
+_assert_program_payload_org_ownership = make_fk_ownership_payload_authz(
+    attr="org_id",
+    parent_model=Organization,
+    parent_noun="Organization",
+    child_noun="Program",
+    parent_repo_kwarg="organization_repo",
+)
 
 
 async def program_form_extras(
@@ -79,15 +73,15 @@ async def program_form_extras(
     attached Org is still included in the dropdown so the form
     doesn't silently drop the FK on submit. The user can still
     re-point at any other Org they own; they just can't pretend the
-    current attachment doesn't exist.
+    current attachment doesn't exist. The framework helper
+    `list_picker_options_for` owns this re-include rule for every
+    parent-Org picker.
     """
-    orgs = await list_visible_to(organization_repo, requesting_user, Organization)
-    if target is not None:
-        org_ids = {o.id for o in orgs}
-        if target.org_id not in org_ids:
-            attached = await organization_repo.get_by_model_id(
-                Organization, target.org_id
-            )
-            if attached is not None:
-                orgs = [*orgs, attached]
-    return {"organizations": orgs}
+    return {
+        "organizations": await list_picker_options_for(
+            organization_repo,
+            requesting_user,
+            Organization,
+            attached_id=target.org_id if target is not None else None,
+        )
+    }

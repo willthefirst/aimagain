@@ -4,11 +4,13 @@ asserting forms wrap them so `write_authz` (raising) and `can_write`
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from src.framework.http.exceptions import ForbiddenError
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel
+
     from src.framework.access.actor.actor import Actor
 
 
@@ -124,6 +126,40 @@ async def list_visible_to(repo, user: "Actor", model, *, owner_attr: str = "owne
     return list(await repo.list_for_user(user.id))
 
 
+async def list_picker_options_for(
+    repo,
+    requesting_user: "Actor",
+    model,
+    *,
+    attached_id=None,
+    owner_attr: str = "owner_id",
+):
+    """Return picker options for a form field, with the attached row
+    re-included when it would otherwise be missing.
+
+    Generalization of `list_visible_to` for edit forms whose row is
+    attached to a parent the requesting user no longer owns (ownership
+    transferred, viewer is a superuser editing someone else's row,
+    etc.). Without re-inclusion, a `<select>` rendered from the visible
+    set would silently drop the FK on submit; the framework's
+    `payload_authz` still gates whether the user may *change* the FK,
+    but the picker shouldn't pretend the current attachment doesn't
+    exist.
+
+    `attached_id=None` → equivalent to `list_visible_to` (create-form,
+    or an edit-form whose attachment is already in the visible set).
+    """
+    visible = await list_visible_to(repo, requesting_user, model, owner_attr=owner_attr)
+    if attached_id is None:
+        return visible
+    if any(getattr(row, "id", None) == attached_id for row in visible):
+        return visible
+    attached = await repo.get_by_model_id(model, attached_id)
+    if attached is None:
+        return visible
+    return [*visible, attached]
+
+
 async def assert_fk_ownership(
     *,
     payload,
@@ -163,3 +199,46 @@ async def assert_fk_ownership(
         raise ForbiddenError(
             detail=f"You may only attach a {child_noun} to a {parent_noun} you own"
         )
+
+
+def make_fk_ownership_payload_authz(
+    *,
+    attr: str,
+    parent_model,
+    parent_noun: str,
+    child_noun: str,
+    parent_repo_kwarg: str,
+) -> Callable[..., Awaitable[None]]:
+    """Build the `payload_authz` callable an `EntitySpec` references via
+    `payload_authz_path`.
+
+    Closes over the four nouns/columns that distinguish the per-entity
+    FK-ownership rule and returns an async hook with the framework-
+    expected signature (``async def hook(*, payload, requesting_user,
+    **typed_repos) -> None``). `parent_repo_kwarg` names the kwarg the
+    framework injects from `payload_authz_repos` (e.g.
+    ``"organization_repo"``).
+
+    Replaces the per-entity ``_assert_<x>_payload_org_ownership``
+    wrappers that used to exist solely to give the spec's
+    ``payload_authz_path`` a dotted target. The result is module-level
+    bound (so the dotted path resolves) but declarative.
+    """
+
+    async def _payload_authz(
+        *,
+        payload: "BaseModel",
+        requesting_user: "Actor",
+        **typed_repos: Any,
+    ) -> None:
+        await assert_fk_ownership(
+            payload=payload,
+            attr=attr,
+            requesting_user=requesting_user,
+            parent_repo=typed_repos[parent_repo_kwarg],
+            parent_model=parent_model,
+            parent_noun=parent_noun,
+            child_noun=child_noun,
+        )
+
+    return _payload_authz
