@@ -17,10 +17,12 @@ Field order:
   3. Client demographics — age, language, gender
   4. Client location — where / what format
   5. Availability — when (split from location; parallels opening/intake)
-  6. Services needed — what kind of help
-  7. Insurance — three independent payment-path booleans + carrier list
-     (`accepts_in_network` / `accepts_out_of_network_superbill` /
-     `accepts_private_pay`; per-corpus they are non-mutually-exclusive)
+  6. Provider sought — services / modalities / acceptable license classes
+  7. Client's coverage — three independent payment-path booleans + carrier
+     list (`accepts_in_network` / `accepts_out_of_network_superbill` /
+     `accepts_private_pay`; per-corpus they are non-mutually-exclusive).
+     These describe the *client's* insurance situation, not the
+     referrer's.
   8. Subject — optional, auto-generates; last because most users skip it
 
 The `desired_times` checkbox grid sends form-encoded data with multiple
@@ -79,14 +81,14 @@ which FastAPI/Pydantic parses as a list.
     <div id="clinical-niches-hidden" hidden></div>
     {% call form_section("Client demographics") %}
       {{ field_for(schema, "age_groups", "Age groups", current=d.age_groups if d else None, help=select_all_help() ) }}
-      {{ field_for(schema, "languages", "Languages spoken", current=d.languages if d else None) }}
+      {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
       {{ select_field("gender", "Gender", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None) }}
       {# Affirming-identity request constraints (#1358 PR-a). Symmetric
          to `Clinician.affirming_identities` — the referrer states the
          affordances the client needs, the clinician claims the ones
          they offer. Empty selection = "no preference stated", which is
          the schema default. #}
-      {{ multi_select_field("affirming_identities", "Affirming identities", AFFIRMING_IDENTITIES, labels=AFFIRMING_IDENTITY_LABELS, current=d.affirming_identities if d else None, required=false, help=select_all_help() ) }}
+      {{ multi_select_field("affirming_identities", "Affirming identities", AFFIRMING_IDENTITIES, labels=AFFIRMING_IDENTITY_LABELS, current=d.affirming_identities if d else None, required=false, help="Affordances the client needs — select all that apply.") }}
     {% endcall %}
     {% call form_section("Client location") %}
       {{ text_field("location_city", "City", current=d.location_city if d else None) }}
@@ -98,7 +100,7 @@ which FastAPI/Pydantic parses as a list.
     {% call form_section("Availability") %}
       {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
     {% endcall %}
-    {% call form_section("Services needed") %}
+    {% call form_section("Provider sought") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
       {# License-class disjunction on the referred provider (#1358 PR-b).
@@ -116,8 +118,8 @@ which FastAPI/Pydantic parses as a list.
      network is true). A tiny inline script (below) hides the carrier
      multi-select when none of the three checkboxes is "accepts in-
      network", so the form still reads one-thought-per-row. #}
-    {% call form_section("Insurance") %}
-      {{ checkbox_field("accepts_in_network", "In-network — bill the patient's carrier", current=(d.accepts_in_network if d else False) ) }}
+    {% call form_section("Client's coverage") %}
+      {{ checkbox_field("accepts_in_network", "In-network — bill the client's carrier", current=(d.accepts_in_network if d else False) ) }}
       {{ checkbox_field("accepts_out_of_network_superbill", "Out-of-network with superbill", current=(d.accepts_out_of_network_superbill if d else False) ) }}
       {{ checkbox_field("accepts_private_pay", "Private pay (out of pocket)", current=(d.accepts_private_pay if d else False) ) }}
       <div id="insurance-carriers-wrap"

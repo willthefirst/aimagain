@@ -29,6 +29,7 @@ the linked Program — see `src/domain/models/programs/README.md`.
 
 Field order:
   1. Which program — establishes context for the whole form
+     (followed by a read-only preview of that program's profile)
   2. About — description (free-text announcement copy)
   3. Availability — desired times / schedule notes
   4. Subject — optional, auto-generates; last because most users skip it
@@ -43,6 +44,9 @@ Field order:
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/sections.html" import facts_block as profile_facts_block -%}
+{%- from "_shared/_program_facts.html" import program_facts -%}
 {%- macro intake_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.intake_detail if post else None -%}
   {# `error_swap=True` lights up the response-targets attrs that swap a
@@ -60,16 +64,57 @@ Field order:
       {%- set _programs.opts = _programs.opts + [(p.id, p.name ~ ' · ' ~ p.organization.name)] -%}
     {%- endfor -%}
     {{ composite_select_field("program_id", "Which program?", _programs.opts, current=d.program_id if d else None) }}
-    {# About: free-text announcement copy. Other steady-state profile
+    {# Read-only preview of the steady-state program profile that renders
+     alongside this intake on its detail page — the same `program_facts`
+     rows the program detail page and the post detail show. One card per
+     program is pre-rendered; the script below reveals the one matching
+     the picker so the preview tracks the selection without a server
+     round-trip. The profile is edited on the program page, never on this
+     announcement form (#1358 PR-f). #}
+    {# The first card renders visible (the picker defaults to the first
+       program); the rest start `hidden` and the script toggles on
+       change, so no-JS authors still see the default program's profile. #}
+    <div class="profile-preview" data-profile-preview="program_id">
+      {%- for p in current_user.programs -%}
+        <div data-preview-for="{{ p.id }}"
+             {% if not loop.first %}hidden{% endif %}>
+          {%- call card(id="intake-preview-" ~ p.id|string,
+            headline_url=None,
+            headline="Shown with this intake",
+            subtitle="From " ~ p.name ~ " · " ~ p.organization.name ~ "’s profile") %}
+            {%- call profile_facts_block() %}{{ program_facts(p) }}{%- endcall %}
+            {%- endcall %}
+          </div>
+        {%- endfor -%}
+      </div>
+      {# About: free-text announcement copy. Other steady-state profile
      fields are managed on the Program, not on the announcement. #}
-    {% call form_section("About") %}
-      {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
-    {% endcall %}
-    {% call form_section("Availability") %}
-      {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
-      {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
-    {% endcall %}
-    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
-    {{ actions(submit_label, cancel_url=cancel_url) }}
-  {%- endcall -%}
-{%- endmacro -%}
+      {% call form_section("About") %}
+        {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
+      {% endcall %}
+      {% call form_section("Availability") %}
+        {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
+        {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
+      {% endcall %}
+      {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
+      {{ actions(submit_label, cancel_url=cancel_url) }}
+    {%- endcall -%}
+    {# Reveal the preview card matching the selected program; re-sync on
+     every picker change so the author always sees the profile that will
+     accompany the intake they're posting. #}
+    <script>
+  (function () {
+    var wrap = document.querySelector('[data-profile-preview="program_id"]');
+    var select = document.querySelector('select[name="program_id"]');
+    if (!wrap || !select) return;
+    function sync() {
+      var id = select.value;
+      wrap.querySelectorAll('[data-preview-for]').forEach(function (el) {
+        el.toggleAttribute('hidden', el.getAttribute('data-preview-for') !== id);
+      });
+    }
+    select.addEventListener('change', sync);
+    sync();
+  })();
+    </script>
+  {%- endmacro -%}
