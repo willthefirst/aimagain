@@ -15,6 +15,7 @@ from fastapi import Request
 from src.framework.access.actor.actor import Actor
 from src.framework.access.authz.authz import is_admin
 from src.framework.dispatch.mounts._common import (
+    ParentBreadcrumbPlumbing,
     call_handler_with,
     parent_path_param_pairs,
     path_segments_under_router,
@@ -71,6 +72,13 @@ def mount_list(
     authenticated (e.g. clinicians). The handler should declare
     ``requesting_user: User | None`` so the synthesis can pass ``None``
     for anonymous viewers.
+
+    When the spec is parent-owned and the parent declares
+    ``display_label_fn``, the mount fetches the parent row (one PK
+    lookup) and injects ``_breadcrumb_items`` into the template context
+    so ``views/list.html`` auto-renders the ancestry chain. Same
+    handshake `mount_form` and `mount_related_list` use — see
+    `ParentBreadcrumbPlumbing` in ``_common.py``.
     """
     if spec.list_template is None:
         raise ValueError(
@@ -84,9 +92,20 @@ def mount_list(
     path = path_segments_under_router(spec, with_id=False)
     parent_id_names = tuple(p[0] for p in parent_path_param_pairs(spec))
 
+    # Parent-owned breadcrumb plumbing — see `ParentBreadcrumbPlumbing`
+    # in `_common.py`. No-op for top-level specs (top-level list pages
+    # render no breadcrumb; the global-nav tab already communicates the
+    # collection).
+    _breadcrumb = ParentBreadcrumbPlumbing.for_child_spec(spec)
+
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
         context = await call_handler_with(handler, handler_kwarg_names, kwargs)
+        await _breadcrumb.inject(
+            context=context,
+            kwargs=kwargs,
+            child_label=spec.collection.capitalize(),
+        )
         resolved_template = context.pop("template_name", None) or list_template
         return APIResponse.html_response(
             template_name=resolved_template,
@@ -103,6 +122,7 @@ def mount_list(
             user_dep=user_dep,
             query_params=query_params,
             path_param_names=parent_id_names,
+            extra_static_deps=_breadcrumb.extra_static_deps,
         ),
         response_builder=response_builder,
     )
