@@ -5,7 +5,10 @@ Used by both `posts/new_clinician_opening.html` (create) and
 
   - `hx_method`: "post" or "patch"
   - `action`: the form submit URL
-  - `submit_label`: the visible submit-button text
+  - `submit_label`: the visible submit-button text. Create callers
+    pass `entity_create_label('post', kind='clinician_opening')`;
+    edit callers omit it so `actions(...)` defaults to "Save changes"
+    (the canonical edit-button text — see `_shared/actions.html`).
   - `post`: the persisted Post (for edit) or `None` (for create)
   - `current_user`: the requesting User; the dropdown iterates
     `current_user.clinicians` and then each clinician's `.clinician_affiliations`
@@ -40,7 +43,7 @@ Field order:
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
-{%- macro opening_form(hx_method, action, submit_label, post=None, schema=None, current_user=None, cancel_url=None) -%}
+{%- macro opening_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.opening_detail if post else None -%}
   {# `error_swap=True` lights up the response-targets attrs that swap a
      422 validation re-render in place; `mount_create` and `mount_update`

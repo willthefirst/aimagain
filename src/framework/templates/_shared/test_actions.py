@@ -91,3 +91,35 @@ def test_dirty_form_script_not_emitted_in_toolbar_layout() -> None:
     appears in a ``<menu>`` toolbar, not adjacent to a ``<form>``."""
     html = _render_actions(_make_env(), cancel_url="/things/1", wrapper="toolbar")
     assert HTMLParser(html).css_first("script") is None
+
+
+# ---------------------------------------------------------------------------
+# submit_label default — the "Save changes" canonical rule
+# ---------------------------------------------------------------------------
+
+
+def test_form_layout_submit_label_defaults_to_save_changes() -> None:
+    """Per the domain templates README "every edit form uses Save changes,
+    no exceptions" — the rule is encoded as the form-layout default here.
+    Edit pages omit ``submit_label`` and inherit the canonical text;
+    Create pages pass an explicit ``entity_create_label(...)``."""
+    html = _render_actions(_make_env(), cancel_url="/things/1")
+    button = HTMLParser(html).css_first("button[type='submit']")
+    assert button is not None
+    assert button.text().strip() == "Save changes"
+
+
+def test_form_layout_explicit_submit_label_wins_over_default() -> None:
+    """Create forms still pass an explicit label and must keep it —
+    the default only fires when no label is supplied."""
+    html = _render_actions(_make_env(), submit_label="Create organization")
+    button = HTMLParser(html).css_first("button[type='submit']")
+    assert button is not None
+    assert button.text().strip() == "Create organization"
+
+
+def test_toolbar_layout_submit_label_not_defaulted() -> None:
+    """Detail-page toolbars never carry a Save button — omitting
+    ``submit_label`` must NOT inject "Save changes" in toolbar layout."""
+    html = _render_actions(_make_env(), wrapper="toolbar", edit_url="/things/1/form")
+    assert HTMLParser(html).css_first("button[type='submit']") is None

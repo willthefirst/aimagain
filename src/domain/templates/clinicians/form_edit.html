@@ -58,7 +58,7 @@
       {{ text_field("_clinical_niches_input", "Clinical niches", current=((clinician.clinical_niches | join(", ") ) if clinician.clinical_niches else None), required=false, help="Comma-separated free-form tags (e.g. \"DGBI, ADHD in women, complex trauma\").") }}
       <div id="clinical-niches-hidden" hidden></div>
     {% endcall %}
-    {{ actions("Save changes", cancel_url=entity_url('clinician', id=clinician.id) ) }}
+    {{ actions(cancel_url=entity_url('clinician', id=clinician.id) ) }}
   {% endcall %}
   <script>
   /* Clinical-niche tag splitter (#1358 PR-c). The visible input is a

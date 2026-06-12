@@ -10,5 +10,5 @@
   {% if view.header_state %}, {{ view.header_state }}{% endif %}
 {% endblock %}
 {% block form_content %}
-  {{ intake_form("patch", entity_url('post', id=post.id) , "Save changes", post=post, schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('post', id=post.id)) }}
+  {{ intake_form("patch", entity_url('post', id=post.id) , post=post, schema=intake_create_schema, current_user=current_user, cancel_url=entity_url('post', id=post.id)) }}
 {% endblock %}

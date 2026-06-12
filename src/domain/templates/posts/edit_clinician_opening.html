@@ -12,5 +12,5 @@
   {% if view.header_state %}, {{ view.header_state }}{% endif %}
 {% endblock %}
 {% block form_content %}
-  {{ opening_form("patch", entity_url('post', id=post.id) , "Save changes", post=post, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('post', id=post.id)) }}
+  {{ opening_form("patch", entity_url('post', id=post.id) , post=post, schema=opening_create_schema, current_user=current_user, cancel_url=entity_url('post', id=post.id)) }}
 {% endblock %}

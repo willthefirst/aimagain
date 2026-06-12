@@ -73,7 +73,7 @@ Fieldset-level "everything below is optional" lines (the previous `<small>Both l
 ### Buttons
 
 - **Verb-noun, sentence case.** `Create program`, `Post referral`, `Save changes`, `Send reset link`.
-- **Create / edit submit pattern.** Create forms use `entity_create_label(spec.name, kind=...)` so the submit button text matches the H1 (`Create Opening` everywhere). Edit forms use `Save changes` — every edit form, no exceptions. The structural pin lives in `entity_create_label` (see [`../../framework/templates/README.md` § "Create / filter labels"](../../framework/templates/README.md)).
+- **Create / edit submit pattern.** Create forms use `entity_create_label(spec.name, kind=...)` so the submit button text matches the H1 (`Create Opening` everywhere). Edit forms use `Save changes` — every edit form, no exceptions; this is the `actions(...)` macro's `wrapper="form"` default, so edit pages just omit `submit_label` and inherit it (pinned by `test_form_layout_submit_label_defaults_to_save_changes` in `../../framework/templates/_shared/test_actions.py`). The matching create-form structural pin lives in `entity_create_label` (see [`../../framework/templates/README.md` § "Create / filter labels"](../../framework/templates/README.md)).
 
 ### Vocabulary
 
