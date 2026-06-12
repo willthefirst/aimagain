@@ -5,8 +5,8 @@ from typing import Any, Awaitable, Callable
 from fastapi import Request
 
 from src.framework.dispatch.mounts._common import (
+    ParentBreadcrumbPlumbing,
     call_handler_with,
-    subresource_breadcrumb_items,
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
@@ -65,36 +65,20 @@ def mount_related_list(
     parent_id_param = parent_spec.id_param
     path = f"/{{{parent_id_param}}}/{child_spec.collection}"
 
-    # Resolve the parent entity spec once at mount time so the response
-    # builder closure doesn't re-check on every request.
-    _parent_entity_spec = getattr(parent_spec, "entity_spec", None)
-    _parent_label_fn = (
-        _parent_entity_spec.display_label_fn
-        if _parent_entity_spec is not None
-        else None
-    )
-    # Whether to inject an extra parent-repo dep for the breadcrumb fetch.
-    _need_parent_repo = _parent_label_fn is not None
-    _parent_repo_dep = parent_spec.repo_dep if _need_parent_repo else None
+    # Parent-owned breadcrumb plumbing — see `ParentBreadcrumbPlumbing`
+    # in `_common.py`. The parent is passed in directly here (not via
+    # `child_spec.parent`) because the same child entity can be
+    # related-listed under different parents.
+    _breadcrumb = ParentBreadcrumbPlumbing.for_parent_spec(parent_spec)
 
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
         context = await call_handler_with(handler, handler_kwarg_names, kwargs)
-        if _parent_label_fn is not None:
-            parent_id = kwargs[parent_id_param]
-            parent_repo = kwargs["__parent_repo__"]
-            parent_entity = await parent_repo.get_by_model_id(
-                _parent_entity_spec.model, parent_id
-            )
-            if parent_entity is not None:
-                collection = _parent_entity_spec.url_collection
-                context["_breadcrumb_items"] = subresource_breadcrumb_items(
-                    parent_spec=_parent_entity_spec,
-                    parent_row=parent_entity,
-                    parent_path=f"/{collection}/{parent_id}",
-                    child_label=child_spec.collection.capitalize(),
-                    viewer=kwargs.get("requesting_user"),
-                )
+        await _breadcrumb.inject(
+            context=context,
+            kwargs=kwargs,
+            child_label=child_spec.collection.capitalize(),
+        )
         return APIResponse.html_response(
             template_name=template,
             context=context,
@@ -102,9 +86,7 @@ def mount_related_list(
             current_user=kwargs.get("requesting_user"),
         )
 
-    _breadcrumb_dep: tuple[tuple[str, Any], ...] = (
-        (("__parent_repo__", _parent_repo_dep),) if _need_parent_repo else ()
-    )
+    _breadcrumb_dep = _breadcrumb.extra_static_deps
 
     # The route renders children, so the synthesis hands the handler the
     # *child's* repo under `repo`. The parent-id path param is bound by

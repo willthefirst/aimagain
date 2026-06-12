@@ -6,11 +6,13 @@ list pages carry no breadcrumb — a single-segment "Posts" trail duplicates
 what the active global-nav tab already communicates.
 
 Subresource list pages (`/users/me/favorites`, `/users/{id}/clinicians`,
-`/clinicians/{id}/openings`) get a breadcrumb automatically when the
-mount injects `_breadcrumb_items` into the context (set by
-`mount_related_list` / `mount_edge_routes` when the parent entity's spec
-declares `display_label_fn`). The breadcrumb block below renders it when
-present; templates that need a custom chain override the block as before.
+`/clinicians/{id}/openings`, `/clinicians/{id}/clinician_affiliations`)
+get a breadcrumb automatically when the mount injects
+`_breadcrumb_items` into the context (set by `mount_list`,
+`mount_related_list`, and `mount_edge_routes` when the parent entity's
+spec declares `display_label_fn`). The breadcrumb block below renders
+it when present; templates that need a custom chain override the block
+as before.
 
 Toolbar row contents (left-to-right):
   - `<h1>` heading (resource_label)
@@ -78,9 +80,10 @@ Child contract:
   Context the framework's mount helpers inject for subresource pages:
     _breadcrumb_items — list of (label, href|None) tuples; the last
                         entry's href is None (current page). Injected
-                        by `mount_related_list` and `mount_edge_routes`
-                        when the parent entity spec declares
-                        `display_label_fn`. Absent on top-level lists.
+                        by `mount_list`, `mount_related_list`, and
+                        `mount_edge_routes` when the parent entity spec
+                        declares `display_label_fn`. Absent on top-level
+                        lists.
 #}
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
