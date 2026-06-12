@@ -27,6 +27,12 @@ dev test tests/test_contract                          # explicit opt-in for cont
 
 `pytest` discovers `test_*.py` under both `tests/` and `src/` (configured via `testpaths` in `pyproject.toml`). Contract tests are excluded from the default run — see [`test_contract/README.md`](test_contract/README.md).
 
+## Auth fixture caching
+
+`authenticated_client` and `superuser_client` share a session-cached Argon2 password hash and JWT cookie. Each fixture uses a fixed user UUID (`TESTUSER_ID`, `SUPERUSER_ID`) so the JWT is identical across tests — `JWTStrategy.write_token` only reads `user.id`. Per test, the fixture inserts a verified user row directly with the cached hash and attaches the cached cookie; no `/auth/jwt/login` round-trip, no per-test Argon2 hash or verify.
+
+Tests that exercise the real login endpoint (`POST /auth/jwt/login`) still do so explicitly — see `src/domain/routes/test_auth_routes.py::test_login_success`. The cached fixture keeps every *other* test from paying Argon2's cost on the way to its own assertion.
+
 ## Database isolation
 
 `db_test_session_manager` creates an in-memory SQLite database, runs `metadata.create_all()` before each test, and drops everything after. The test engine registers a `connect` listener that runs `PRAGMA foreign_keys = ON` on every new SQLite connection — same as the production engine in [`../src/db.py`](../src/db.py). Without it, `ON DELETE CASCADE` / `ON DELETE SET NULL` are defined but silently un-enforced, and FK-dependent tests would pass for the wrong reason.
