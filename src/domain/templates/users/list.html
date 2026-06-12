@@ -1,17 +1,17 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/_locked.html" import locked_name -%}
 {# Admin actions (Deactivate / Reactivate / Delete) live ONLY on the
    user-detail page (`users/detail.html`'s toolbar), not on this list.
    Per-row commands on a card list invite mis-clicks on the wrong row,
    and the bulk-admin efficiency wasn't worth the irreversible-delete
-   risk. Admins click through to a user's detail page to act on them. #}
+   risk. Admins click through to a user's detail page to act on them.
+
+   Row-level redaction lived here previously; it's gone because the
+   repo now returns only the viewer's own row to non-admins (see
+   `UserRepository.list_users`). Superusers receive every row
+   un-redacted — they are the only viewers who see anyone else. #}
 {%- macro user_card(user) %}
-  {# Redact the username (the only identifying field surfaced in the
-     card chrome) when the viewer lacks network access and isn't this
-     user themselves. The viewer's own row always renders un-redacted. #}
-  {%- set _redacted = not can_act_as_provider and user.id != current_user_id -%}
   {%- set status_subtitle %}
     <span>
       {% if user.is_active %}
@@ -23,8 +23,8 @@
   {%- endset %}
   {%- call card(
     id=user.id,
-    headline_url=None if _redacted else entity_url('user', id=user.id),
-    headline=locked_name("J. Doe") if _redacted else user.username,
+    headline_url=entity_url('user', id=user.id),
+    headline=user.username,
     subtitle=status_subtitle) -%}
   {%- endcall %}
 {%- endmacro %}

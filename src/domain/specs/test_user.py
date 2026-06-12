@@ -8,6 +8,11 @@ axis, the clinicians related-list, the private-fields tuple, the
 `/users/me` singleton alias, and the per-viewer detail extras binding.
 """
 
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+
 from src.domain.logic.users.schema import (
     UserActivationAuditSnapshot,
     UserActivationUpdate,
@@ -16,18 +21,46 @@ from src.domain.specs.user import USER_ENTITY
 from src.framework.access.authz.authz import is_self_or_admin
 from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import ADMIN_FOR_WRITE, RelatedListSubresource
+from src.framework.http.exceptions import ForbiddenError
 
 # --- Auth deps (security-visible) ----------------------------------------
 
 
 def test_no_read_policy_user_directory_reachable_for_every_viewer():
-    """`USER_ENTITY` no longer declares `read_policy`. `/users` is
-    reachable for every authenticated viewer; the username on non-self
-    rows is replaced by `locked_name(...)` at render time when the
-    viewer lacks provider-network access (see `users/list.html` and
-    `users/detail.html`). Private fields (email, is_active) stay gated
-    by `private_field_predicate=is_self_or_admin`."""
+    """`USER_ENTITY` does not declare `read_policy`. `read_policy` is
+    type-scoped and not called from `_get_by_id`; we use the per-row
+    `detail_authz` hook instead so non-admins get 403 when targeting
+    another user's detail page.
+
+    `/users` (list) is reachable for every authenticated viewer but the
+    repo's `list_users` returns only the viewer's own row to non-admins
+    (see `UserRepository.list_users`). Private fields (email, is_active)
+    stay gated by `private_field_predicate=is_self_or_admin`."""
     assert USER_ENTITY.read_policy is None
+
+
+def test_detail_authz_allows_self():
+    """A user viewing their own detail must pass the per-row gate. The
+    self-singleton (`/users/me`) routes through the same handler, so
+    this is also what makes that path work."""
+    me = SimpleNamespace(id=uuid4(), is_superuser=False)
+    USER_ENTITY.detail_authz(me, me)  # does not raise
+
+
+def test_detail_authz_allows_admin():
+    admin = SimpleNamespace(id=uuid4(), is_superuser=True)
+    target = SimpleNamespace(id=uuid4(), is_superuser=False)
+    USER_ENTITY.detail_authz(target, admin)  # does not raise
+
+
+def test_detail_authz_blocks_non_self_non_admin():
+    """The security boundary: a regular viewer hitting another user's
+    detail page raises ForbiddenError — `handle_detail` translates it
+    to a 403 response."""
+    viewer = SimpleNamespace(id=uuid4(), is_superuser=False)
+    target = SimpleNamespace(id=uuid4(), is_superuser=False)
+    with pytest.raises(ForbiddenError):
+        USER_ENTITY.detail_authz(target, viewer)
 
 
 def test_auth_deps_is_admin_for_write():
@@ -62,11 +95,12 @@ def test_public_fields_drive_detail_projection():
 # --- List filtering ------------------------------------------------------
 
 
-def test_list_excludes_self():
-    """`/users` drops the viewer from the result set — the user-list
-    page is for *other* users. Threaded via the repo's `exclude_self`
-    kwarg by the generic `handle_list`."""
-    assert USER_ENTITY.list_exclude_self is True
+def test_list_does_not_exclude_self():
+    """The viewer's own row MUST stay in `/users` for non-admins (they
+    see only themselves). Admins see every row including their own;
+    `UserRepository.list_users` decides — not the framework's
+    `exclude_self` kwarg, which is wrong for this privacy model."""
+    assert USER_ENTITY.list_exclude_self is False
 
 
 # --- Owner-attr semantics (user-specific) --------------------------------

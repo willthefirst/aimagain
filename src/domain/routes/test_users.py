@@ -104,53 +104,70 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
 # --- Listing -------------------------------------------------------------
 
 
-async def test_list_users_empty(
-    superuser_client: AsyncClient,
-    superuser_logged_in_user: User,
+async def test_list_users_non_admin_sees_only_self(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
 ):
-    """Test GET /users returns HTML with no other users message when only logged in user exists."""
-    response = await superuser_client.get(f"/users")
+    """The privacy boundary: a non-admin viewer on `/users` sees exactly
+    their own row — every other user's username (and existence) is
+    filtered out at the repo, not redacted in the template. Enforced by
+    `UserRepository.list_users`."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+
+    response = await authenticated_client.get("/users")
 
     assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
     tree = HTMLParser(response.text)
-    assert "No users found" in tree.body.text()
+    items = tree.css("#user-list article")
+    assert len(items) == 1, "Non-admin viewer must see exactly their own row"
+    text = items[0].text()
+    assert logged_in_user.username in text
+    assert other.username not in tree.body.text()
 
 
-async def test_list_users_multiple_users(
+async def test_list_users_admin_sees_all_users_including_self(
     superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     superuser_logged_in_user: User,
 ):
-    """Test GET /users returns HTML listing multiple other users."""
+    """Superusers see every user row, including their own — the
+    administrative view. The non-admin filter in `UserRepository.list_users`
+    is bypassed for superusers."""
     user1 = create_test_user(username=f"test-user-one-{uuid.uuid4()}")
     user2 = create_test_user(username=f"test-user-two-{uuid.uuid4()}")
-
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add_all([user1, user2])
 
-    response = await superuser_client.get(f"/users")
+    response = await superuser_client.get("/users")
 
     assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-
     tree = HTMLParser(response.text)
-    user_list_items = tree.css("#user-list article")
-    assert len(user_list_items) == 2, "Expected two users in the list"
+    body_text = tree.body.text()
+    assert user1.username in body_text
+    assert user2.username in body_text
+    assert superuser_logged_in_user.username in body_text
 
-    usernames_found = {item.text() for item in user_list_items}
-    assert any(
-        user1.username in u for u in usernames_found
-    ), f"{user1.username} not found in list"
-    assert any(
-        user2.username in u for u in usernames_found
-    ), f"{user2.username} not found in list"
-    assert all(
-        superuser_logged_in_user.username not in u for u in usernames_found
-    ), "Logged in user should not be listed"
+
+async def test_list_users_empty_when_solo_admin(
+    superuser_client: AsyncClient,
+    superuser_logged_in_user: User,
+):
+    """A superuser viewing `/users` with no other rows present sees
+    exactly themselves — not the empty-state message. The empty state
+    only renders when the filter genuinely yields zero rows (which can
+    no longer happen for an authenticated viewer, since they at minimum
+    see themselves)."""
+    response = await superuser_client.get("/users")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
     assert "No users found" not in tree.body.text()
+    assert superuser_logged_in_user.username in tree.body.text()
 
 
 # --- Admin actions partial visibility ------------------------------------
@@ -215,11 +232,9 @@ async def test_get_user_detail_renders(
 ):
     """GET /users/{id} renders the detail page for an existing user.
 
-    Uses `superuser_client` so the viewer clears `can_act_as_provider`
-    via the superuser bypass — the username renders un-redacted in the
-    toolbar H1. The non-superuser non-self path (where the H1 carries
-    the `locked_name` placeholder) is pinned separately in
-    `test_get_user_detail_renders_breadcrumb_and_heading`."""
+    Uses `superuser_client` because non-admins are now denied access to
+    other users' detail pages outright (covered in
+    `test_non_admin_forbidden_on_other_user_detail`)."""
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
     async with db_test_session_manager() as session:
@@ -232,78 +247,67 @@ async def test_get_user_detail_renders(
     assert target_username in tree.body.text()
 
 
-async def test_get_user_detail_renders_breadcrumb_and_heading(
-    authenticated_client: AsyncClient,
+async def test_admin_detail_renders_breadcrumb_and_heading(
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
-    """User detail uses the consolidated chrome: a back affordance that
-    points back at the `/users` collection, and a toolbar `<h1>` that
-    carries the current user's name. The current item is NOT repeated
-    in the breadcrumb — every visible breadcrumb element is an actionable
-    link (GOV.UK pattern).
-
-    `USER_ENTITY` no longer carries a `read_policy`, so `/users` is
-    reachable for every authenticated viewer and the back affordance
-    is a plain `<a href="/users">` rather than a locked popover.
-    Non-self rows render with `locked_name` in place of the username
-    when the viewer lacks provider-network access — assertion below
-    checks the H1 carries the placeholder, not the real username.
-    """
+    """An admin viewing another user's detail page gets the canonical
+    chrome: back-link to `/users`, the target's username un-redacted in
+    the toolbar `<h1>`. Non-admins can no longer reach this page (see
+    `test_non_admin_forbidden_on_other_user_detail`), so the
+    no-popover assertion lives on the admin path."""
     target_username = f"target-{uuid.uuid4()}"
     target = create_test_user(username=target_username)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}")
+    response = await superuser_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
     assert back is not None
     label = back.css_first("span.breadcrumb-back-label")
     assert label is not None and label.text(strip=True) == "Users"
-    # Reachable: plain href, no locked-popover wiring.
     assert back.attributes.get("href") == "/users"
     assert "data-locked-cta" not in back.attributes
-    # Current item lives in the toolbar <h1>, redacted to the placeholder
-    # because `logged_in_user` lacks `can_act_as_provider` and isn't the
-    # target.
     h1 = tree.css_first("div.toolbar h1")
-    assert h1 is not None
-    assert target_username not in h1.text(strip=True)
-    assert "J. Doe" in h1.text(strip=True)
+    assert h1 is not None and target_username in h1.text(strip=True)
 
 
-async def test_detail_hides_private_fields_from_strangers(
+async def test_non_admin_forbidden_on_other_user_detail(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A non-admin viewer looking at *someone else's* profile must not
-    see email, is_active, or is_verified — those are private to the
-    user themselves and admins. The handler's projection omits the
-    fields entirely from context, so even the values can't leak via
-    a forgotten template guard."""
+    """The security boundary: a non-admin GET on another user's detail
+    page is 403. Enforced by `USER_ENTITY.detail_authz` (raising
+    `assert_self_or_admin`) inside `handle_detail`. Pin both the status
+    code and that the target's identifying fields (username, email) do
+    not appear in the 403 body."""
     target_email = f"private-{uuid.uuid4()}@example.com"
-    target = create_test_user(
-        username=f"target-{uuid.uuid4()}",
-        email=target_email,
-    )
+    target_username = f"target-{uuid.uuid4()}"
+    target = create_test_user(username=target_username, email=target_email)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
     response = await authenticated_client.get(f"/users/{target.id}")
 
+    assert response.status_code == 403
+    assert target_email not in response.text
+    assert target_username not in response.text
+
+
+async def test_self_detail_still_works(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """Non-admins must keep access to their own `/users/{own-id}` page
+    — the `detail_authz` gate permits self even without admin."""
+    response = await authenticated_client.get(f"/users/{logged_in_user.id}")
     assert response.status_code == 200
-    body = response.text
-    assert target_email not in body
-    # The labels themselves are gated, not just the values — no
-    # `<dt>Email</dt>` row should render at all.
-    assert "<dt>Email</dt>" not in body
-    assert "<dt>Active</dt>" not in body
-    assert "<dt>Verified</dt>" not in body
+    assert logged_in_user.username in response.text
 
 
 async def test_detail_hides_identity_facts_for_self(
@@ -406,38 +410,22 @@ async def test_self_detail_renders_favorites_link_in_body_not_toolbar(
     ), "Favorites link must appear in the page body for the self viewer"
 
 
-async def test_other_user_detail_hides_favorites_link(
+async def test_admin_detail_admin_actions_not_on_self_view(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Viewing someone else's profile must not expose their private
-    favorites list — the Favorites body section is self-only."""
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
+    """Admin viewing their own detail does not see admin actions —
+    they cannot deactivate / delete themselves. The companion
+    `test_detail_shows_admin_actions_for_admin` pins the inverse
+    (admin viewing someone else)."""
+    await promote_to_admin(db_test_session_manager, logged_in_user.email)
+    response = await authenticated_client.get(f"/users/{logged_in_user.id}")
     tree = HTMLParser(response.text)
-    assert tree.css_first("a[href='/users/me/favorites']") is None
-
-
-async def test_detail_hides_admin_actions_for_non_admin(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Non-admin viewing another user's detail page does not see actions."""
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    tree = HTMLParser(response.text)
-    assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is None
+    assert (
+        tree.css_first(f"button[hx-put='/users/{logged_in_user.id}/activation']")
+        is None
+    )
 
 
 async def test_detail_picker_includes_clinicians_and_organizations(
@@ -506,17 +494,19 @@ async def test_users_me_email_card_links_to_email_form(
 
 
 async def test_users_me_email_card_not_shown_for_other_users(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
-    """The Email card must NOT appear on another user's profile — self-only."""
+    """The Email card must NOT appear on another user's profile — it
+    links to `/users/me/email/form` which is self-only. Only admins
+    can reach another user's detail page now (non-admins 403), so this
+    is verified through the superuser_client path."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}")
+    response = await superuser_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     email_link = tree.css_first("article.picker-option a[href$='/email/form']")
@@ -524,18 +514,18 @@ async def test_users_me_email_card_not_shown_for_other_users(
 
 
 async def test_users_me_verification_card_not_shown_for_other_users(
-    authenticated_client: AsyncClient,
+    superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
 ):
     """The 'Verification' status card must NOT appear on other users'
-    profile pages — it is self-only."""
+    profile pages — it is self-only. Only admins can reach another
+    user's detail page now (non-admins 403)."""
     target = create_test_user(username=f"target-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
-    response = await authenticated_client.get(f"/users/{target.id}")
+    response = await superuser_client.get(f"/users/{target.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
