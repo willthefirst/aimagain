@@ -1097,8 +1097,8 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """A viewer who can't read the full feed sees the practice /
-    organization / address rows on post detail as `locked_field`
+    """A viewer who can't read the full feed sees the provider identity
+    and address rows on post detail as `locked_field` / `locked_name`
     placeholders (lock icon + fix link), not silently dropped. The real
     links + address value are NOT emitted — withholding, not CSS-hiding."""
     author = create_test_user(username=f"author-{uuid.uuid4()}")
@@ -1115,8 +1115,10 @@ async def test_detail_redacts_identity_rows_as_locked_placeholders_for_unverifie
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    # The rows still render (the viewer knows the detail exists)...
-    for fact_key in ("practice", "organization", "address"):
+    # The rows still render (the viewer knows the detail exists). The
+    # provider row carries the withheld clinician + org behind
+    # `locked_name`; the address carries a `locked_field`.
+    for fact_key in ("provider", "address"):
         dd = tree.css_first(f'div[data-fact="{fact_key}"] dd')
         assert dd is not None, f"{fact_key} row should still render when redacted"
         assert (
@@ -1172,6 +1174,12 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     rows (services, availability, insurance, website) live in the card,
     not the flat grid, so it's structurally obvious which page edits
     them."""
+    # A verified viewer so the provider identity links render un-redacted.
+    viewer_clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id, npi="1234567890"
+    )
+    viewer_clinician.npi_match_status = "matched"
+    viewer_clinician.clinician_verified = True
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     clinician = make_clinician_with_org(owner_id=author.id, practice_name="Acme Health")
     clinician.id = clinician.id or uuid.uuid4()
@@ -1185,6 +1193,7 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     post.opening_detail.schedule_text = "Mornings only"
     async with db_test_session_manager() as session:
         async with session.begin():
+            session.add(viewer_clinician)
             session.add(author)
             session.add(post)
 
@@ -1192,13 +1201,24 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    card = tree.css_first('article[data-row-id="practice-profile"]')
+    card = tree.css_first('article[data-row-id="provider-profile"]')
     assert card is not None, "owner-context card should render"
+    # The provider identity row carries the clinician (linked) followed
+    # by the org (linked) — the shared `provider_ref` denotation.
+    provider_dd = card.css_first('div[data-fact="provider"] dd')
+    assert provider_dd is not None, "provider identity row should render"
+    assert (
+        provider_dd.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
+    ), "clinician name should link to the clinician detail page"
+    assert (
+        provider_dd.css_first(f"a[href='/organizations/{clinician.org.id}']")
+        is not None
+    ), "org name should link to the organization detail page"
     # Profile rows live inside the card...
     for fact_key in ("services", "insurance", "website", "referral_instructions"):
         assert (
             card.css_first(f'div[data-fact="{fact_key}"]') is not None
-        ), f"{fact_key} should render inside the practice-profile card"
+        ), f"{fact_key} should render inside the provider-profile card"
     assert "Sliding scale" in card.text()
     # ...post-own facts live outside it, in the top facts block.
     for fact_key in ("desired_times", "schedule_notes"):
@@ -1213,7 +1233,14 @@ async def test_intake_detail_renders_program_profile_card(
     logged_in_user,
 ):
     """Intake detail renders the program's steady-state profile inside
-    the `program-profile` owner-context card via `program_facts`."""
+    the `provider-profile` owner-context card via `program_facts`, with
+    the provider identity row linking the program and its org."""
+    # A verified viewer so the provider identity links render un-redacted.
+    viewer_clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id, npi="1234567890"
+    )
+    viewer_clinician.npi_match_status = "matched"
+    viewer_clinician.clinician_verified = True
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     org = make_organization_row(owner_id=author.id, name="Acme Health")
     program = make_program(
@@ -1226,6 +1253,7 @@ async def test_intake_detail_renders_program_profile_card(
     post = _intake_post(owner_id=author.id, org_id=org.id, program=program)
     async with db_test_session_manager() as session:
         async with session.begin():
+            session.add(viewer_clinician)
             session.add(author)
             session.add(post)
 
@@ -1233,12 +1261,20 @@ async def test_intake_detail_renders_program_profile_card(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    card = tree.css_first('article[data-row-id="program-profile"]')
+    card = tree.css_first('article[data-row-id="provider-profile"]')
     assert card is not None, "program owner-context card should render"
-    for fact_key in ("program", "organization", "services", "website"):
+    provider_dd = card.css_first('div[data-fact="provider"] dd')
+    assert provider_dd is not None, "provider identity row should render"
+    assert (
+        provider_dd.css_first(f"a[href='/programs/{program.id}']") is not None
+    ), "program name should link to the program detail page"
+    assert (
+        provider_dd.css_first(f"a[href='/organizations/{org.id}']") is not None
+    ), "org name should link to the organization detail page"
+    for fact_key in ("services", "website"):
         assert (
             card.css_first(f'div[data-fact="{fact_key}"]') is not None
-        ), f"{fact_key} should render inside the program-profile card"
+        ), f"{fact_key} should render inside the provider-profile card"
 
 
 # --- POST /posts/{id}/message (in-app contact form) --------------------------

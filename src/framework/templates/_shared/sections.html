@@ -74,3 +74,16 @@ Example:
       <p>{{ empty_message }}</p>
     {% endif %}
   {%- endmacro %}
+  {# Inline middot-separated list. Wraps the caller's element children in
+   `<span class="meta">` so the `.meta > * + *::before { content: " · " }`
+   rule in `framework.css` draws the separator — callers never embed a
+   literal `·`, and dropping/hiding a child re-flows the dots for free.
+   Children must be ELEMENTS (`<a>`, `<span>`, `<button>`, …); the
+   selector is structural and skips intervening whitespace text nodes.
+
+   Example:
+     {% call meta_list() %}<a href="…">Jane Smith</a><a href="…">Acme</a>{% endcall %}
+   renders: Jane Smith · Acme #}
+  {% macro meta_list() -%}
+    <span class="meta">{{ caller() }}</span>
+  {%- endmacro %}

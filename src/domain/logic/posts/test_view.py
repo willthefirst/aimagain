@@ -1194,6 +1194,55 @@ def test_opening_practice_facts_come_from_its_affiliation_not_clinician_proxy():
     assert insurance_posture_for_post(post) == "in_network"
 
 
+# --- provider_ref: the "who's behind this post" denotation --------------
+#
+# `provider_ref` is the single source for the hyperlinked "<name> · <org>"
+# the detail card and the feed byline both render. These pin the per-kind
+# shape so the macro can rely on it.
+
+
+def test_provider_ref_opening_is_clinician_then_org():
+    v = post_card_view(_make_pa_post())
+    assert v["provider_ref"] == {
+        "name": "Jane Smith",
+        "entity": "clinician",
+        "id": "prov-1",
+        "org": {"id": "org-1", "name": "Acme Counseling"},
+    }
+
+
+def test_provider_ref_opening_solo_clinician_has_no_org():
+    """A sole-proprietor clinician (affiliation with no org) yields
+    ``org=None`` — the macro then renders just the linked name."""
+    v = post_card_view(_make_pa_post(org=None))
+    assert v["provider_ref"]["entity"] == "clinician"
+    assert v["provider_ref"]["name"] == "Jane Smith"
+    assert v["provider_ref"]["id"] == "prov-1"
+    assert v["provider_ref"]["org"] is None
+
+
+def test_provider_ref_intake_is_program_then_org():
+    v = post_card_view(_make_program_post())
+    assert v["provider_ref"] == {
+        "name": "RISE IOP",
+        "entity": "program",
+        "id": "prog-1",
+        "org": {"id": "org-h", "name": "Acme Health"},
+    }
+
+
+def test_provider_ref_referral_is_name_only():
+    """A referral byline has no linkable provider entity — name only,
+    so the macro renders plain text (no anchor)."""
+    v = post_card_view(_make_cr_post())
+    assert v["provider_ref"] == {
+        "name": "Carlos Rivera",
+        "entity": None,
+        "id": None,
+        "org": None,
+    }
+
+
 def test_intake_reads_services_from_program():
     """Intake reads steady-state from the linked ``Program``."""
     post = _make_program_post()
