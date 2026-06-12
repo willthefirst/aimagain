@@ -69,6 +69,24 @@ def forbid_self_action(target, actor: Actor, *, detail: str) -> None:
         raise ForbiddenError(detail=detail)
 
 
+def assert_self_or_admin(
+    target,
+    actor: Actor,
+    *,
+    action: str = "view this resource",
+) -> None:
+    """Raise `ForbiddenError` unless `actor` is `target` or a superuser.
+
+    Asserting wrapper over `is_self_or_admin` — for user-shaped resources
+    where the row *is* the user (not an FK to one). `action` is
+    interpolated: ``"Only the user themselves or an admin can {action}"``.
+    """
+    if not is_self_or_admin(actor, target):
+        raise ForbiddenError(
+            detail=f"Only the user themselves or an admin can {action}"
+        )
+
+
 def assert_owner_or_admin(
     obj,
     user: Actor,

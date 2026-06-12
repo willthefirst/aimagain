@@ -386,6 +386,20 @@ class EntitySpec:
     # row UUID, not a user id) so the flag is a no-op.
     delete_forbid_self: bool = False
 
+    # Detail-page per-row read gate ------------------------------------
+    # Optional raising callable invoked by `handle_detail` after the
+    # target row is loaded: `detail_authz(target, requesting_user)`. It
+    # MUST raise (typically `ForbiddenError`) when the viewer may not see
+    # this specific row. `read_policy` is type-scoped and (by design) not
+    # called from `_get_by_id` (see `BaseRepository._check_read`);
+    # `detail_authz` is the per-row complement, evaluated at the route
+    # layer once the target is in hand. Meaningful for entities whose
+    # detail pages reveal info that is private *between* rows of the
+    # same kind (e.g. one user can't see another user's detail), and the
+    # singleton-alias (`/users/me`) path skips it because the wrapper
+    # already resolves the target to the session user.
+    detail_authz: Callable[[Any, Any], None] | None = None
+
     # List-page filters --------------------------------------------------
     # Each entry is either a raw ``QueryParam`` (URL-only declaration)
     # or a ``Filter`` (URL + UI metadata for the dedicated

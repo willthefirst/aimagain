@@ -18,7 +18,7 @@ from src.framework.dispatch.mounts.conftest import (
     top_level_spec,
 )
 from src.framework.dispatch.mounts.detail import handle_detail, make_detail_handler
-from src.framework.http.exceptions import NotFoundError
+from src.framework.http.exceptions import ForbiddenError, NotFoundError
 
 
 def _request_stub():
@@ -69,6 +69,74 @@ async def test_detail_top_level_happy_path():
     assert context["widget"] is target
     assert context["current_user"] is user
     assert "can_edit" not in context  # no can_write declared
+
+
+@pytest.mark.asyncio
+async def test_detail_authz_runs_after_load_and_blocks_unauthorized():
+    """`spec.detail_authz`, when set, is invoked with `(target, requesting_user)`
+    after `repo.get_by_model_id` returns. Raising propagates out of
+    `handle_detail` — the route layer translates to the HTTP status. Pins the
+    contract that gates user-shaped detail pages (`USER_ENTITY.detail_authz`)."""
+
+    def _only_self(target, actor):
+        if actor is None or actor.id != target.id:
+            raise ForbiddenError(detail="not you")
+
+    spec = EntitySpec(
+        name="widget",
+        url_collection="widgets",
+        id_param="widget_id",
+        model=FixtureRow,
+        detail_authz=_only_self,
+        audit=make_audit(),
+    )
+    target_id = uuid4()
+    target = FixtureRow(id=target_id)
+    repo = FakeRepo()
+    repo.seed(FixtureRow, target)
+    self_viewer = make_user(id_=target_id)
+    stranger = make_user()
+
+    # Self passes — handler returns the context dict.
+    ctx = await handle_detail(
+        spec,
+        request=_request_stub(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=self_viewer,
+    )
+    assert ctx["widget"] is target
+
+    with pytest.raises(ForbiddenError):
+        await handle_detail(
+            spec,
+            request=_request_stub(),
+            target_id=target_id,
+            repo=repo,
+            requesting_user=stranger,
+        )
+
+
+@pytest.mark.asyncio
+async def test_detail_no_authz_set_skips_the_check():
+    """The hook is optional — specs without `detail_authz` render normally
+    (no extra dep wiring, no per-row check). Default for owned resources
+    where the route-level read dep is the only gate."""
+    spec = top_level_spec(write_authz=None)
+    assert spec.detail_authz is None
+    target_id = uuid4()
+    target = FixtureRow(id=target_id)
+    repo = FakeRepo()
+    repo.seed(FixtureRow, target)
+    # Any viewer reaches the target.
+    ctx = await handle_detail(
+        spec,
+        request=_request_stub(),
+        target_id=target_id,
+        repo=repo,
+        requesting_user=make_user(),
+    )
+    assert ctx["widget"] is target
 
 
 @pytest.mark.asyncio

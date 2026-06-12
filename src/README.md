@@ -41,7 +41,7 @@ domain/templates/<entity>/     ← Jinja templates
 A spec is read at three sites:
 
 1. **Route mounting** — `mount_entity(router, USER_ENTITY, handlers={...})` reads `routes`, `state_axes`, `subresources`, `auth_deps`, `auth_policy`, `audit`, etc. and binds the right `mount_*` helper for each opted-in verb.
-2. **Generic handlers** — `handle_create(spec)` / `handle_update` / `handle_delete` / `handle_detail` / `handle_list` in `framework/dispatch/handlers.py` consult `spec.audit`, `spec.write_authz`, `spec.model`, `spec.list_exclude_self`, `spec.parent`, etc. for the framework-owned work.
+2. **Generic handlers** — `handle_create(spec)` / `handle_update` / `handle_delete` / `handle_detail` / `handle_list` in `framework/dispatch/handlers.py` consult `spec.audit`, `spec.write_authz`, `spec.model`, `spec.list_exclude_self`, `spec.detail_authz`, `spec.parent`, etc. for the framework-owned work.
 3. **Bespoke handlers** — domain handlers (e.g. `handle_set_user_activation` in `domain/logic/users/handlers.py`) read `USER_ENTITY.state_axis("activation").action`, `USER_ENTITY.audit.type`, etc. so per-handler audit/state declarations stay in one place.
 
 ## Adding a new domain entity

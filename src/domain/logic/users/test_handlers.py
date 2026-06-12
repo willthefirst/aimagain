@@ -22,6 +22,7 @@ from src.domain.logic.users.repository import UserRepository
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
 from src.framework.dispatch.mounts.detail import handle_detail
+from src.framework.http.exceptions import ForbiddenError
 from tests.helpers import create_test_user
 
 pytestmark = pytest.mark.asyncio
@@ -46,30 +47,27 @@ async def _seed_user(
 # --- Projection invariant on handle_get_user_detail ----------------------
 
 
-async def test_get_user_detail_excludes_private_fields_from_stranger(
+async def test_get_user_detail_forbids_stranger(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """A non-self, non-admin viewer sees only public fields (id, username)."""
+    """A non-self, non-admin viewer is denied at the handler boundary —
+    `USER_ENTITY.detail_authz` raises before the projection runs, so no
+    private fields can leak even via an accidentally-removed template
+    guard. The detail page is private between users now."""
     target = await _seed_user(db_test_session_manager)
     stranger = await _seed_user(db_test_session_manager)
 
     async with db_test_session_manager() as session:
-        context = await handle_detail(
-            USER_ENTITY,
-            request=_fake_request(),
-            target_id=target.id,
-            repo=UserRepository(session),
-            requesting_user=stranger,
-            extras=user_detail_extras,
-            extra_kwargs={"clinician_repo": ClinicianRepository(session)},
-        )
-
-    target_view = context["target_user"]
-    assert set(target_view.keys()) == {"id", "username"}
-    assert "email" not in target_view
-    assert "is_active" not in target_view
-    assert "is_verified" not in target_view
-    assert context["can_view_private"] is False
+        with pytest.raises(ForbiddenError):
+            await handle_detail(
+                USER_ENTITY,
+                request=_fake_request(),
+                target_id=target.id,
+                repo=UserRepository(session),
+                requesting_user=stranger,
+                extras=user_detail_extras,
+                extra_kwargs={"clinician_repo": ClinicianRepository(session)},
+            )
 
 
 async def test_get_user_detail_includes_private_fields_for_self(

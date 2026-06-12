@@ -137,6 +137,8 @@ async def handle_detail(
     if target is None:
         raise NotFoundError(detail=f"{spec.name.capitalize()} not found")
     assert_kind_lock(spec, target)
+    if spec.detail_authz is not None:
+        spec.detail_authz(target, requesting_user)
 
     from src.framework.rendering.route_urls import url_for_spec
 
