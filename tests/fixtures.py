@@ -1,18 +1,33 @@
+import uuid
 from typing import Any, AsyncGenerator
 
 import pytest
 from asyncstdlib import anext
 from fastapi import Depends, FastAPI
 from fastapi_users.db import SQLAlchemyUserDatabase
+from fastapi_users.password import PasswordHelper
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from src.auth_config import get_strategy
 from src.db import get_db_session, get_user_db
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import User, metadata
 from src.framework.rendering.templating import templates
 from src.main import app
+
+# Session-cached auth constants. We pay Argon2 + JWT generation once per
+# pytest session instead of per test. The DB schema is session-scoped but
+# rows are wiped per test (see `_db_schema` / `db_test_session_manager`),
+# so the user row is re-inserted each test — but with the pre-hashed
+# password and pre-generated cookie, no Argon2 or `/auth/jwt/login`
+# round-trip is needed.
+TESTUSER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+SUPERUSER_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
+TESTUSER_EMAIL = "testuser@example.com"
+SUPERUSER_EMAIL = "superuser@example.com"
+_PASSWORD_HELPER = PasswordHelper()
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -137,39 +152,75 @@ async def create_test_user(
                 await user_manager_gen.aclose()
 
 
+@pytest.fixture(scope="session")
+def _cached_password_hash() -> str:
+    """Argon2 is intentionally slow (~50-100ms). Hash once per session
+    and reuse the digest for every fixture-built user row."""
+    return _PASSWORD_HELPER.hash("password123")
+
+
+async def _write_token_for(user_id: uuid.UUID) -> str:
+    """Build the JWT for a fixed UUID. `write_token` only reads `.id`,
+    so a transient `User` stub suffices — we don't touch the DB."""
+    stub = User(id=user_id)
+    return await get_strategy().write_token(stub)
+
+
+@pytest.fixture(scope="session")
+async def _testuser_cookie_value() -> str:
+    return await _write_token_for(TESTUSER_ID)
+
+
+@pytest.fixture(scope="session")
+async def _superuser_cookie_value() -> str:
+    return await _write_token_for(SUPERUSER_ID)
+
+
+async def _insert_user_row(
+    session_maker: async_sessionmaker[AsyncSession],
+    *,
+    user_id: uuid.UUID,
+    email: str,
+    username: str,
+    hashed_password: str,
+    is_superuser: bool = False,
+) -> None:
+    """Insert a verified user row directly. Bypasses
+    `user_manager.create` (which re-hashes the password). The
+    `on_after_register` hook in dev only sets `is_verified=True` — we
+    set it inline here."""
+    async with session_maker() as session:
+        session.add(
+            User(
+                id=user_id,
+                email=email,
+                username=username,
+                hashed_password=hashed_password,
+                is_active=True,
+                is_verified=True,
+                is_superuser=is_superuser,
+            )
+        )
+        await session.commit()
+
+
 @pytest.fixture(scope="function")
 async def authenticated_client(
     test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     test_app: FastAPI,
+    _cached_password_hash: str,
+    _testuser_cookie_value: str,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from src.auth_config import get_user_manager
-
-    user_data = UserCreate(
-        email="testuser@example.com",
-        password="password123",
+    await _insert_user_row(
+        db_test_session_manager,
+        user_id=TESTUSER_ID,
+        email=TESTUSER_EMAIL,
         username="testuser",
+        hashed_password=_cached_password_hash,
     )
-    user_manager_dependency = test_app.dependency_overrides.get(
-        get_user_db, get_user_db
-    )
-
-    await create_test_user(db_test_session_manager, user_data, get_user_manager)
-
-    login_data = {
-        # fastapi-users uses email as the OAuth2 "username" field.
-        "username": user_data.email,
-        "password": user_data.password,
-    }
-    res = await test_client.post("/auth/jwt/login", data=login_data)
-
-    cookie = res.headers["Set-Cookie"]
-    access_token = cookie.split(";")[0].split("=")[1]
-
-    test_client.headers["Cookie"] = f"fastapiusersauth={access_token}"
-
+    test_client.headers["Cookie"] = f"fastapiusersauth={_testuser_cookie_value}"
     yield test_client
-
     del test_client.headers["Cookie"]
 
 
@@ -178,29 +229,18 @@ async def superuser_client(
     test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     test_app: FastAPI,
+    _cached_password_hash: str,
+    _superuser_cookie_value: str,
 ) -> AsyncGenerator[AsyncClient, None]:
-    from src.auth_config import get_user_manager
-
-    user_data = UserCreate(
-        email="superuser@example.com",
-        password="password123",
+    await _insert_user_row(
+        db_test_session_manager,
+        user_id=SUPERUSER_ID,
+        email=SUPERUSER_EMAIL,
         username="superuser",
+        hashed_password=_cached_password_hash,
         is_superuser=True,
     )
-
-    await create_test_user(db_test_session_manager, user_data, get_user_manager)
-
-    login_data = {
-        "username": user_data.email,
-        "password": user_data.password,
-    }
-    res = await test_client.post("/auth/jwt/login", data=login_data)
-
-    cookie = res.headers["Set-Cookie"]
-    access_token = cookie.split(";")[0].split("=")[1]
-
-    test_client.headers["Cookie"] = f"fastapiusersauth={access_token}"
-
+    test_client.headers["Cookie"] = f"fastapiusersauth={_superuser_cookie_value}"
     yield test_client
 
     del test_client.headers["Cookie"]
