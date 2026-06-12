@@ -6,9 +6,12 @@
    in via a subsequent edit.
 
    Args:
-     action_url, method, submit_label, cancel_url, delete_url,
+     action_url, method, heading, cancel_url, delete_url,
      delete_confirm, current — same contract as
-     `licensures/_form_licensure.html::licensure_form`.
+     `licensures/_form_licensure.html::licensure_form`. The
+     affiliation form's per-section legends are static ("Practice",
+     "Services offered", etc.); `heading` here only feeds the create
+     submit button — edit inherits the framework default.
      orgs — list of organizations for the picker. Required (the
      handler injects it via context).
 #}
@@ -27,7 +30,7 @@
    cache toggled by the OpeningDetail lifecycle (see the schema docstring
    and `src/domain/models/clinician_affiliations/README.md#steady-state-profile-1358-pr-f`).
    `languages` is also NOT here — it's person-level on `Clinician`. #}
-{% macro affiliation_form(action_url, method, submit_label, cancel_url, orgs, delete_url=None, delete_confirm=None, current=None) -%}
+{% macro affiliation_form(action_url, method, heading, cancel_url, orgs, delete_url=None, delete_confirm=None, current=None) -%}
   <div class="entity-form-page">
     {% call entity_form(action_url, method=method) %}
       {% call form_section("Practice") %}
@@ -98,7 +101,7 @@
                 required=false,
                 current=(current.referral_instructions if current else None) ) }}
       {% endcall %}
-      {{ actions(submit_label,
+      {{ actions(heading if method == "post" else none,
             cancel_url=cancel_url,
             delete_url=delete_url,
             delete_confirm=delete_confirm) }}

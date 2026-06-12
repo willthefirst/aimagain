@@ -5,10 +5,10 @@
 {%- from "_shared/form_fields.html" import text_field, select_field, form_section with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/actions.html" import actions -%}
-{% macro education_form(action_url, method, submit_label, cancel_url, delete_url=None, delete_confirm=None, current=None) -%}
+{% macro education_form(action_url, method, heading, cancel_url, delete_url=None, delete_confirm=None, current=None) -%}
   <div class="entity-form-page">
     {% call entity_form(action_url, method=method) %}
-      {% call form_section(submit_label) %}
+      {% call form_section(heading) %}
         {{ select_field("education_type", "Education type", EDUCATION_TYPES,
                 labels=EDUCATION_TYPES_LABELS,
                 current=(current.education_type if current else None) ,
@@ -20,7 +20,7 @@
                 current=(current.month_completed if current else None) ,
         required=false, type="month") }}
       {% endcall %}
-      {{ actions(submit_label,
+      {{ actions(heading if method == "post" else none,
             cancel_url=cancel_url,
             delete_url=delete_url,
             delete_confirm=delete_confirm) }}

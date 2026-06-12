@@ -14,9 +14,12 @@
 {% block form_content %}
   {%- set list_url = resource_url -%}
   {%- set attest_url = (resource_detail_url ~ "/attestation") if not clinician_licensure.attested_active else None -%}
+  {# Submit button inherits "Save changes" from `actions()`'s component-
+     library default; `edit_heading` ("Edit licensure") feeds the
+     form-section legend only. #}
   {{ licensure_form(resource_detail_url,
     "patch",
-    "Save licensure",
+    edit_heading,
     cancel_url=list_url,
     delete_url=resource_detail_url,
     delete_confirm="Remove this licensure?",

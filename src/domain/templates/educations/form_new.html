@@ -5,6 +5,6 @@
 {% block form_content %}
   {{ education_form(resource_url,
     "post",
-    entity_create_label('clinician_education') ,
-  cancel_url=resource_url) }}
+    create_heading,
+    cancel_url=resource_url) }}
 {% endblock %}

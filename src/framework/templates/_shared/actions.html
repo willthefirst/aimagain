@@ -52,7 +52,11 @@ Cancel = neutral, Edit = secondary, Delete = destructive); change the
 class on one line here and every callsite updates.
 
 Slot semantics:
-  - `submit_label` — Save button text. Form layout only.
+  - `submit_label` — Save button text. Form layout only. Defaults to
+    `"Save changes"` (the canonical edit-button label per the domain
+    templates README) when omitted; create forms pass an explicit
+    `"Create <noun>"` from `entity_create_label(...)`. Toolbar layout
+    suppresses the button when `submit_label` is omitted.
   - `cancel_url` — neutral outline Cancel link. Form layout only.
   - `edit_url` + `edit_label` — secondary outline Edit link. Mainly
     toolbar, but valid in form layout too.
@@ -89,12 +93,19 @@ Examples:
   wrapper="form"
   ) -%}
   {%- set is_toolbar = wrapper == "toolbar" -%}
+  {# Component-library default: every form-layout submit button reads
+     "Save changes" unless the caller passes an explicit label (Create
+     forms pass `entity_create_label(...)`). The toolbar wrapper is used
+     for detail-page action menus that never carry a Save, so the
+     default is form-only — toolbar callers still get no button when
+     they omit `submit_label`. #}
+  {%- set _resolved_submit_label = submit_label if submit_label else (none if is_toolbar else "Save changes") -%}
   {%- if not is_toolbar %}<div class="form-actions">{% endif %}
-    {%- if submit_label %}
+    {%- if _resolved_submit_label %}
       {%- if is_toolbar %}
         <li>
         {% endif -%}
-        <button type="submit">{{ submit_label }}</button>
+        <button type="submit">{{ _resolved_submit_label }}</button>
         {%- if is_toolbar %}</li>{% endif %}
     {%- endif %}
     {%- if edit_url %}
