@@ -7,6 +7,7 @@ import pytest
 
 from src.framework.access.authz.authz import (
     assert_owner_or_admin,
+    assert_self_or_admin,
     is_admin,
     is_owner,
     is_owner_or_admin,
@@ -162,3 +163,27 @@ def test_custom_action_in_message():
     with pytest.raises(ForbiddenError) as excinfo:
         assert_owner_or_admin(obj, u, action="delete this widget")
     assert "delete this widget" in str(excinfo.value.detail)
+
+
+# --- assert_self_or_admin (composes is_self_or_admin) ----------------------
+
+
+def test_assert_self_passes():
+    u = _user()
+    assert_self_or_admin(u, u)
+
+
+def test_assert_admin_passes_even_if_not_self():
+    admin = _user(is_superuser=True)
+    target = _user()
+    assert_self_or_admin(target, admin)
+
+
+def test_assert_stranger_raises():
+    actor = _user()
+    target = _user()
+    with pytest.raises(ForbiddenError) as excinfo:
+        assert_self_or_admin(target, actor, action="view this profile")
+    assert "Only the user themselves or an admin can view this profile" in str(
+        excinfo.value.detail
+    )

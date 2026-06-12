@@ -28,7 +28,7 @@ from src.domain.logic.users.schema import (
 )
 from src.domain.models import User
 from src.domain.specs.clinician import CLINICIAN_ENTITY
-from src.framework.access.authz.authz import is_self_or_admin
+from src.framework.access.authz.authz import assert_self_or_admin, is_self_or_admin
 from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import (
     ADMIN_FOR_WRITE,
@@ -56,15 +56,22 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     display_label_fn=lambda u: u.username,
     repo_dep=get_user_repository,
     auth_deps=ADMIN_FOR_WRITE,
-    # No `read_policy`: directory reachable by any authenticated viewer.
-    # The viewer's own row renders un-redacted; others have identifying
-    # rows replaced with locked placeholders at render time when the
-    # viewer lacks provider-network access.
+    # Privacy boundary: non-admins may only see their own user row. The
+    # detail page is gated per-row via `detail_authz` (403 for non-self,
+    # non-admin viewers); the list is filtered at the repo so non-admins
+    # get exactly `[viewer]` back from `list_users` (see `UserRepository`).
+    # `read_policy` would be wrong here — it's type-scoped and not called
+    # from `_get_by_id`, so it can't gate the detail page.
+    detail_authz=lambda target, actor: assert_self_or_admin(
+        target, actor, action="view this user"
+    ),
     audit_snapshot=UserAuditSnapshot,
     private_fields=("email", "is_active"),
     private_field_predicate=is_self_or_admin,
     public_fields=("id", "username"),
-    list_exclude_self=True,
+    # Do not exclude self: non-admins now see ONLY self, and admins see all.
+    # The viewer's own row must remain in the list for non-admin viewers.
+    list_exclude_self=False,
     list_order_by=User.username,
     routes=RouteSet(list=True, detail=True, delete=True),
     # The user-list page is for *other* users; admins can't delete their
