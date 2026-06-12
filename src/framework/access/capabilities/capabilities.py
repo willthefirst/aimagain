@@ -28,7 +28,6 @@ the tree value types, and the route-mount plumbing.
 
 from __future__ import annotations
 
-import dataclasses
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -86,19 +85,21 @@ class Gate:
 class CapabilityCheck:
     """Evaluated capability tree for a specific user.
 
-    When `bypass` is True (set by the framework for superusers), `granted`
-    returns True regardless of the tree's met state. The tree itself is
-    preserved so templates can still show the real requirement state.
+    `granted` is the tree's own met state — there is no out-of-band
+    override flag. Administrative overrides (superuser) are modeled
+    INSIDE the tree by the domain: the check composes an OR `Gate`
+    whose extra child is the override condition, so the detail page
+    shows *why* access is granted instead of contradicting an unmet
+    tree (see `_superuser_gate` in `src/domain/logic/capabilities.py`).
     """
 
     name: str
     tree: Any  # Condition | Bundle | Gate
     description: str | None = None
-    bypass: bool = False
 
     @property
     def granted(self) -> bool:
-        return self.bypass or self.tree.met
+        return self.tree.met
 
 
 @dataclass(frozen=True)
@@ -230,9 +231,14 @@ def mount_capability_routes(
         returns 404 for unknown names.
 
     ``checks`` is a ``dict[str, Callable]`` mapping capability name to a
-    single-arg predicate ``(user) -> CapabilityCheck``. The framework
-    calls each predicate with the current active user and passes the
-    result to the template; it never inspects the returned tree itself.
+    single-arg predicate ``(user) -> CapabilityCheck | None``. The
+    framework calls each predicate with the current active user and
+    passes the result to the template; it never inspects the returned
+    tree itself. A predicate may return ``None`` to declare the
+    capability *not applicable* to this user — it is omitted from the
+    list page and its detail page 404s, exactly like an unknown name.
+    The domain uses this for operational capabilities (superuser) that
+    should never be advertised to users who don't hold them.
 
     Template context keys:
       - index: ``capabilities_url``
@@ -261,12 +267,11 @@ def mount_capability_routes(
         request: Request,
         user: Any = Depends(current_active_user),
     ):
-        evaluated = {name: fn(user) for name, fn in checks.items()}
-        if user.is_superuser:
-            evaluated = {
-                name: dataclasses.replace(check, bypass=True)
-                for name, check in evaluated.items()
-            }
+        evaluated = {
+            name: check
+            for name, fn in checks.items()
+            if (check := fn(user)) is not None
+        }
         return APIResponse.html_response(
             template_name=capabilities_list_template,
             context={
@@ -288,8 +293,10 @@ def mount_capability_routes(
         if fn is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         check = fn(user)
-        if user.is_superuser:
-            check = dataclasses.replace(check, bypass=True)
+        if check is None:
+            # Not applicable to this user (e.g. the superuser capability
+            # for a non-superuser) — indistinguishable from unknown.
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         return APIResponse.html_response(
             template_name=detail_template,
             context={

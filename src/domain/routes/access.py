@@ -18,6 +18,10 @@ access_router = APIRouter(prefix="/users/me/access", tags=["access"])
 _CHECKS = {
     "provider-network": capabilities.check_provider_identity,
     "program-intake": capabilities.check_program_intake,
+    # Visible only to superusers — `check_superuser` returns None for
+    # everyone else, which the framework omits from the list and 404s
+    # on the detail page.
+    "superuser": capabilities.check_superuser,
 }
 
 mount_capability_routes(access_router, _CHECKS)

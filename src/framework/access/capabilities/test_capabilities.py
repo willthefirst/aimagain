@@ -113,26 +113,24 @@ def test_capability_check_granted_uses_gate_met():
     assert CapabilityCheck(name="x", tree=tree_fail).granted is False
 
 
-def test_capability_check_bypass_defaults_false():
-    assert CapabilityCheck(name="x", tree=_unmet()).bypass is False
+def test_capability_check_has_no_out_of_band_override():
+    """`granted` is exactly the tree's met state — no bypass field.
+    Administrative overrides are modeled INSIDE the tree by the domain
+    (an OR `Gate` with the override condition), so the rendered tree
+    can never contradict the granted verdict."""
+    assert CapabilityCheck(name="x", tree=_met()).granted is True
+    assert CapabilityCheck(name="x", tree=_unmet()).granted is False
+    assert not hasattr(CapabilityCheck(name="x", tree=_met()), "bypass")
 
 
-def test_capability_check_bypass_overrides_unmet_tree():
-    """bypass=True grants access even when every condition is unmet."""
-    check = CapabilityCheck(name="x", tree=_unmet(), bypass=True)
+def test_override_modeled_as_gate_grants_with_unmet_requirements():
+    """The in-tree override shape: Gate(requirements, override). An unmet
+    requirements bundle with a met override condition grants — and the
+    tree itself shows why."""
+    tree = Gate(label_active="cap", label_done="cap", children=(_unmet(), _met()))
+    check = CapabilityCheck(name="x", tree=tree)
     assert check.granted is True
-
-
-def test_capability_check_bypass_preserves_tree():
-    """The tree's own met state is unchanged when bypass is set — templates
-    can still render the real requirement state."""
-    check = CapabilityCheck(name="x", tree=_unmet(), bypass=True)
-    assert check.tree.met is False
-
-
-def test_capability_check_bypass_false_still_uses_tree():
-    assert CapabilityCheck(name="x", tree=_met(), bypass=False).granted is True
-    assert CapabilityCheck(name="x", tree=_unmet(), bypass=False).granted is False
+    assert check.tree.children[0].met is False  # real requirements still unmet
 
 
 # ---------- nested tree evaluation ----------------------------------------
