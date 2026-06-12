@@ -154,14 +154,6 @@ def _location_chunk(
     return {"city": city, "state": state, "zip": zip_code}
 
 
-def _referral_or_none(website: str | None, instructions: str | None) -> dict | None:
-    """Bundle the optional PA/program "how to refer" fields. Either
-    being set lights up the section; both being empty means no section."""
-    if not (website or instructions):
-        return None
-    return {"website": website, "instructions": instructions}
-
-
 # Fields copied straight off the kind's detail row with no transform, as
 # `view_key -> detail_attribute`. `_forward_detail_passthrough` applies these
 # for every kind before its per-kind block fills in computed/relational fields.
@@ -296,14 +288,12 @@ def post_card_view(post) -> dict[str, Any]:
             Organization (PA reads through ``clinician_affiliation.org``;
             program intake reads through ``program.organization``).
             ``None`` for referral (CR has no org linkage in the model).
-            The facts block renders this as a clickable link so any post
-            is one click from its org's detail page.
+            The owner-context card renders this as a clickable link so
+            any post is one click from its org's detail page.
         full_address: ``"City, ST ZIP"`` string for the detail page's
             expanded location row. CR reads from its own location;
             PA reads from the linked ClinicianAffiliation; program
             returns ``None``.
-        sliding_scale / cost: PA-only fields from the linked
-            ClinicianAffiliation; ``None`` for other kinds.
         accepts_in_network / accepts_out_of_network_superbill /
         accepts_private_pay: CR-only payment-path booleans from the
             detail row; ``None`` for other kinds.
@@ -314,15 +304,17 @@ def post_card_view(post) -> dict[str, Any]:
             Raw token lists (free-form `str` for `clinical_niches`);
             empty list both for CR with none specified and for other
             kinds, so templates iterate uniformly via ``{% if view.x %}``.
-        in_network_carriers / accepts_out_of_network: PA-only raw
-            values from the linked ClinicianAffiliation.
-            ``in_network_carriers``
-            comes back as an empty list when unset, matching the
-            list/iteration convention; ``accepts_out_of_network`` is
-            ``None`` for other kinds.
-        referral: ``{website, instructions}`` when either is set
-            (PA/program "how to refer" section); ``None`` when both
-            empty or for CR.
+        in_network_carriers / accepts_out_of_network / sliding_scale:
+            PA-only raw values from the linked ClinicianAffiliation,
+            consumed by the feed-row meta strip (``_feed_row.html``).
+            ``in_network_carriers`` comes back as an empty list when
+            unset; the other two are ``None`` for other kinds.
+
+    PA ``cost`` and the "how to refer" pair (website, referral
+    instructions) are NOT view-model keys — the detail page's
+    owner-context card renders them straight off the linked
+    ``ClinicianAffiliation`` / ``Program`` via the shared
+    ``affiliation_facts`` / ``program_facts`` macros.
     """
     kind = getattr(post, "kind", None)
     base: dict[str, Any] = {
@@ -351,7 +343,6 @@ def post_card_view(post) -> dict[str, Any]:
         "organization_link": None,
         "full_address": None,
         "sliding_scale": None,
-        "cost": None,
         "accepts_in_network": None,
         "accepts_out_of_network_superbill": None,
         "accepts_private_pay": None,
@@ -364,7 +355,6 @@ def post_card_view(post) -> dict[str, Any]:
         "affirming_identities": [],
         "acceptable_license_types": [],
         "clinical_niches": [],
-        "referral": None,
     }
 
     if kind == "referral":
@@ -418,8 +408,8 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         _forward_detail_passthrough(base, d)
         p = getattr(d, "clinician", None)
-        # Practice-role facts (org, location, sessions, payment) read
-        # from the affiliation the opening announces — NOT through the
+        # Practice-role facts (org, location, sessions) read from the
+        # affiliation the opening announces — NOT through the
         # Clinician's primary-affiliation proxy properties, which would
         # show the wrong practice for a multi-affiliation clinician.
         # `languages` stays person-level on the Clinician (#1358 PR-f
@@ -428,8 +418,6 @@ def post_card_view(post) -> dict[str, Any]:
         for view_key, attr in _OPENING_AFFILIATION_FIELDS:
             base[view_key] = _read_list(affiliation, attr)
         base["languages"] = _read_list(p, "languages")
-        _website = _read_scalar(affiliation, "website")
-        _instructions = _read_scalar(affiliation, "referral_instructions")
         _org = _read_scalar(affiliation, "org")
         _org_name = getattr(_org, "name", None) if _org else None
         _fn = getattr(p, "first_name", None) if p else None
@@ -465,11 +453,11 @@ def post_card_view(post) -> dict[str, Any]:
                 _read_scalar(affiliation, "location_state"),
                 _read_scalar(affiliation, "location_zip"),
             ),
+            # Feed-row meta strip (`_feed_row.html`) reads these three
+            # for the opening insurance chunk.
             sliding_scale=_read_scalar(affiliation, "sliding_scale"),
-            cost=_read_scalar(affiliation, "cost"),
             in_network_carriers=_read_list(affiliation, "in_network_carriers"),
             accepts_out_of_network=_read_scalar(affiliation, "accepts_out_of_network"),
-            referral=_referral_or_none(_website, _instructions),
         )
         return base
 
@@ -486,8 +474,6 @@ def post_card_view(post) -> dict[str, Any]:
         # Clinician).
         for view_key, attr in _INTAKE_PROGRAM_LIST_FIELDS:
             base[view_key] = _read_list(prog, attr)
-        _website = _read_scalar(prog, "website")
-        _instructions = _read_scalar(prog, "referral_instructions")
         base.update(
             poster_name=(getattr(_prog_org, "name", None) if _prog_org else None),
             headline=(getattr(prog, "name", None) if prog else None),
@@ -508,7 +494,6 @@ def post_card_view(post) -> dict[str, Any]:
                 and getattr(prog.organization, "name", None)
                 else None
             ),
-            referral=_referral_or_none(_website, _instructions),
         )
         return base
 
