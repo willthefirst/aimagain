@@ -67,6 +67,11 @@ def _opening_post(
     post = Post(kind="clinician_opening", owner_id=owner_id)
     detail = make_opening_detail(clinician_id=clinician.id)
     detail.clinician = clinician
+    # Wire the affiliation the opening announces — production posts
+    # always carry it (`_resolve_affiliation_context`), and the view
+    # reads practice facts (org, location, payment) from here, not
+    # through the clinician's primary-affiliation proxies.
+    detail.clinician_affiliation = clinician.primary_clinician_affiliation
     post.opening_detail = detail
     return post
 
