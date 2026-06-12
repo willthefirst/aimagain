@@ -371,27 +371,16 @@ def test_view_cr_full_address_composes_city_state_zip():
 
 def test_view_cr_cr_only_fields_set_pa_only_fields_none():
     """CR populates payment-paths booleans + `insurance_carriers`
-    (#1358 PR-e); the PA-only fields stay at their None/empty
-    defaults."""
+    (#1358 PR-e); the link keys (PA/program identity) stay at their
+    None defaults."""
     v = post_card_view(_make_cr_post())
     assert v["accepts_in_network"] is True
     assert v["accepts_out_of_network_superbill"] is False
     assert v["accepts_private_pay"] is False
     assert v["insurance_carriers"] == ["anthem_bcbs"]
-    assert v["sliding_scale"] is None
-    assert v["cost"] is None
-    assert v["in_network_carriers"] == []
-    assert v["accepts_out_of_network"] is None
     assert v["practice_link"] is None
     assert v["program_link"] is None
     assert v["organization_link"] is None
-
-
-def test_view_cr_no_referral_section():
-    """CR has no `website` / `referral_instructions` fields. The
-    detail page's "How to refer" section is PA/program-only."""
-    v = post_card_view(_make_cr_post())
-    assert v["referral"] is None
 
 
 def test_view_cr_subject_when_set():
@@ -494,31 +483,22 @@ def test_view_pa_full_address_from_affiliation():
     assert v["full_address"] == "Brooklyn, NY 11201"
 
 
-def test_view_pa_insurance_fields_from_affiliation():
+def test_view_pa_feed_insurance_fields_from_affiliation():
+    """The feed-row meta strip reads these three keys for the opening
+    insurance chunk; they come from the linked affiliation. `cost` is
+    deliberately NOT a view key — only the detail page shows it, via
+    `affiliation_facts`."""
     v = post_card_view(_make_pa_post())
     assert v["in_network_carriers"] == ["aetna"]
     assert v["accepts_out_of_network"] is False
     assert v["sliding_scale"] is True
-    assert v["cost"] == "$150/session"
+    assert "cost" not in v
 
 
 def test_view_pa_settings_populated_genders_as_list():
     v = post_card_view(_make_pa_post())
     assert v["settings"] == ["individual"]
     assert v["genders"] == ["female", "non_binary"]
-
-
-def test_view_pa_referral_set_when_either_field_present():
-    v = post_card_view(_make_pa_post())
-    assert v["referral"] == {
-        "website": "https://example.com",
-        "instructions": "Email intake@example.com",
-    }
-
-
-def test_view_pa_referral_none_when_both_empty():
-    v = post_card_view(_make_pa_post(website=None, referral_instructions=None))
-    assert v["referral"] is None
 
 
 def test_view_pa_subject_when_set():
@@ -679,7 +659,6 @@ def test_view_pa_missing_clinician_returns_partial_view():
     assert v["full_address"] is None
     assert v["practice_link"] is None
     assert v["organization_link"] is None
-    assert v["sliding_scale"] is None
     # Affiliation-sourced profile still populates so the card can render
     # whatever it can.
     assert v["services"] == ["psychotherapy"]
@@ -888,9 +867,8 @@ def test_row_summary_opening_no_sliding_scale():
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             description="Accepting new clients",
-            clinician=SimpleNamespace(sliding_scale=False),
             clinician_affiliation=SimpleNamespace(
-                settings=[], age_groups=[], services=[]
+                settings=[], age_groups=[], services=[], sliding_scale=False
             ),
         ),
     )
@@ -1155,6 +1133,28 @@ def test_opening_reads_services_from_affiliation():
     assert v["services"] == ["medication_management", "group_therapy"]
 
 
+def test_opening_no_affiliation_yields_empty_lists():
+    """No ``clinician_affiliation`` relationship loaded at all → the
+    steady-state fields read as empty (no detail-row fallback after
+    sub-3)."""
+    post = _make_pa_post()
+    post.opening_detail.clinician_affiliation = None
+    v = post_card_view(post)
+    assert v["services"] == []
+    assert v["settings"] == []
+    assert v["genders"] == []
+
+
+def test_opening_reads_languages_from_clinician_not_affiliation():
+    """``languages`` is person-level on the opening side (#1358):
+    it lives on ``Clinician``, not ``ClinicianAffiliation``. Pin
+    that the view reads it through the clinician relationship."""
+    post = _make_pa_post()
+    post.opening_detail.clinician.languages = ["en", "zh"]
+    v = post_card_view(post)
+    assert v["languages"] == ["en", "zh"]
+
+
 def test_opening_practice_facts_come_from_its_affiliation_not_clinician_proxy():
     """Regression: a multi-affiliation clinician's `Clinician` model
     exposes primary-affiliation proxy properties (`location_city`,
@@ -1163,7 +1163,7 @@ def test_opening_practice_facts_come_from_its_affiliation_not_clinician_proxy():
     view must read them from `opening_detail.clinician_affiliation` —
     never through the clinician proxies. The clinician stub here
     carries the conflicting primary-practice values; none of them may
-    leak into the view."""
+    leak into the view (or the posture helper)."""
     post = _make_pa_post()
     # The clinician's primary affiliation (proxied on the model) is a
     # DIFFERENT practice than the one this opening announces.
@@ -1191,54 +1191,7 @@ def test_opening_practice_facts_come_from_its_affiliation_not_clinician_proxy():
     assert v["full_address"] == "Brooklyn, NY 11201"
     assert v["in_person"] == "yes"
     assert v["virtual"] == "please_contact"
-    assert v["in_network_carriers"] == ["aetna"]
-    assert v["accepts_out_of_network"] is False
-    assert v["sliding_scale"] is True
-    assert v["cost"] == "$150/session"
     assert insurance_posture_for_post(post) == "in_network"
-
-
-def test_opening_no_affiliation_yields_empty_lists():
-    """No ``clinician_affiliation`` relationship loaded at all → the
-    steady-state fields read as empty (no detail-row fallback after
-    sub-3)."""
-    post = _make_pa_post()
-    post.opening_detail.clinician_affiliation = None
-    v = post_card_view(post)
-    assert v["services"] == []
-    assert v["settings"] == []
-    assert v["genders"] == []
-
-
-def test_opening_reads_languages_from_clinician_not_affiliation():
-    """``languages`` is person-level on the opening side (#1358):
-    it lives on ``Clinician``, not ``ClinicianAffiliation``. Pin
-    that the view reads it through the clinician relationship."""
-    post = _make_pa_post()
-    post.opening_detail.clinician.languages = ["en", "zh"]
-    v = post_card_view(post)
-    assert v["languages"] == ["en", "zh"]
-
-
-def test_opening_reads_referral_section_from_affiliation():
-    """``website`` / ``referral_instructions`` are read from the linked
-    affiliation. The bundled ``view.referral`` section reads from the
-    new home."""
-    post = _make_pa_post()
-    post.opening_detail.clinician_affiliation = SimpleNamespace(
-        services=[],
-        settings=[],
-        modalities=[],
-        age_groups=[],
-        genders=[],
-        website="https://affiliation.example",
-        referral_instructions="NEW",
-    )
-    v = post_card_view(post)
-    assert v["referral"] == {
-        "website": "https://affiliation.example",
-        "instructions": "NEW",
-    }
 
 
 def test_intake_reads_services_from_program():

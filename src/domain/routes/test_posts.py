@@ -1045,6 +1045,86 @@ async def test_detail_shows_identity_rows_for_verified_viewer(
     assert tree.css_first("button.locked-ghost-btn") is None
 
 
+async def test_opening_detail_splits_post_facts_from_practice_profile_card(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Opening detail renders the post's own facts (desired times,
+    schedule notes) in the top facts block and the steady-state practice
+    profile inside the `practice-profile` owner-context card — profile
+    rows (services, availability, insurance, website) live in the card,
+    not the flat grid, so it's structurally obvious which page edits
+    them."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    clinician = make_clinician_with_org(owner_id=author.id, practice_name="Acme Health")
+    clinician.id = clinician.id or uuid.uuid4()
+    aff = clinician.primary_clinician_affiliation
+    aff.services = ["psychotherapy"]
+    aff.sliding_scale = True
+    aff.website = "https://acme.example.com"
+    aff.referral_instructions = "Email intake@acme.example.com."
+    post = _opening_post(owner_id=author.id, clinician=clinician)
+    post.opening_detail.desired_times = ["weekday_morning"]
+    post.opening_detail.schedule_text = "Mornings only"
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    card = tree.css_first('article[data-row-id="practice-profile"]')
+    assert card is not None, "owner-context card should render"
+    # Profile rows live inside the card...
+    for fact_key in ("services", "insurance", "website", "referral_instructions"):
+        assert (
+            card.css_first(f'div[data-fact="{fact_key}"]') is not None
+        ), f"{fact_key} should render inside the practice-profile card"
+    assert "Sliding scale" in card.text()
+    # ...post-own facts live outside it, in the top facts block.
+    for fact_key in ("desired_times", "schedule_notes"):
+        row = tree.css_first(f'div[data-fact="{fact_key}"]')
+        assert row is not None, f"{fact_key} should render on the detail page"
+    assert card.css_first('div[data-fact="desired_times"]') is None
+
+
+async def test_intake_detail_renders_program_profile_card(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Intake detail renders the program's steady-state profile inside
+    the `program-profile` owner-context card via `program_facts`."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    org = make_organization_row(owner_id=author.id, name="Acme Health")
+    program = make_program(
+        owner_id=author.id,
+        org_id=org.id,
+        services=["group_therapy"],
+        website="https://riseiop.example.com",
+    )
+    program.organization = org
+    post = _intake_post(owner_id=author.id, org_id=org.id, program=program)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    card = tree.css_first('article[data-row-id="program-profile"]')
+    assert card is not None, "program owner-context card should render"
+    for fact_key in ("program", "organization", "services", "website"):
+        assert (
+            card.css_first(f'div[data-fact="{fact_key}"]') is not None
+        ), f"{fact_key} should render inside the program-profile card"
+
+
 # --- POST /posts/{id}/message (in-app contact form) --------------------------
 
 
