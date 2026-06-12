@@ -51,3 +51,28 @@ def test_redirects_target_sub_resource_list(entity, _stem):
     assert entity.create_redirect(clinician_id="abc-123") == target
     assert entity.update_redirect(clinician_id="abc-123") == target
     assert entity.delete_redirect(clinician_id="abc-123") == target
+
+
+@pytest.mark.parametrize("entity,_stem", CREDENTIALS)
+def test_form_pages_point_at_subresource_view_templates(entity, _stem):
+    """Each credential's create/edit form template points at the
+    framework's spec-driven sub-resource view chrome (which renders
+    `templates.form_partial` inside the standard form-page wrapper)
+    rather than a per-entity ``<collection>/form_{new,edit}.html``
+    wrapper file. The convention-default would have set those to
+    ``"<collection>/form_new.html"`` — the assertion catches a future
+    regression where the credential factory accidentally goes back to
+    requiring per-entity wrappers."""
+    assert entity.templates.form_new == "views/subresource_form_new.html"
+    assert entity.templates.form_edit == "views/subresource_form_edit.html"
+
+
+@pytest.mark.parametrize("entity,_stem", CREDENTIALS)
+def test_form_partial_points_at_the_per_entity_partial(entity, _stem):
+    """The credential factory threads `form_partial` through into
+    `templates.form_partial` — the path that `views/subresource_form_*`
+    `{% include %}`s at render time. Pinning the value here catches a
+    regression where the factory drops it (e.g. the
+    `__post_init__` rebuild skipping the field again)."""
+    expected = f"{entity.url_collection}/_form_{_stem}.html"
+    assert entity.templates.form_partial == expected

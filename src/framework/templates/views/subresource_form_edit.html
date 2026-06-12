@@ -1,0 +1,19 @@
+{# Spec-driven edit-form view chrome for owned subentities.
+
+Edit-side companion to `views/subresource_form_new.html`. Extends
+`views/form_edit.html` and `{% include form_partial %}`s into the
+`form_content` block.
+
+The `current_label` block is intentionally left as inherited (empty);
+parent-owned specs auto-inject `_breadcrumb_items` via the framework's
+display-label machinery, so the breadcrumb chrome bypasses the
+`{% block current_label %}` path entirely (see `views/form_edit.html`'s
+breadcrumb block).
+
+Inherits every required context key from `views/form_edit.html`
+(`edit_heading`, `entity_name`, `resource_detail_url`).
+#}
+{% extends "views/form_edit.html" %}
+{% block form_content %}
+  {% include form_partial %}
+{% endblock %}

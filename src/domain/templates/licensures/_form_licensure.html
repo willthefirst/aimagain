@@ -1,68 +1,58 @@
-{# Shared form-body macro for licensure create + edit.
+{# Licensure create/edit form body.
 
-   Renders the four licensure fields inside `entity_form` + a
-   `form_section` legend. Imported by `form_new.html` (kind="create"),
-   `form_edit.html` (kind="edit"), and the error-rerender fragments
-   for both. Centralizing the field list keeps the create and edit
-   forms structurally identical and prevents drift.
+   Included by `views/subresource_form_{new,edit}.html` via
+   `spec.templates.form_partial`. The partial reads context vars
+   directly (`resource_url`, `create_heading`/`edit_heading`,
+   `resource_detail_url`, `clinician_licensure` on edit) instead of
+   being imported as a macro. Create-vs-edit branches off
+   `edit_heading is defined`.
 
-   Args:
-     action_url — the POST or PATCH target. Create posts to
-       `/clinicians/{id}/licensures`; edit patches to
-       `/clinicians/{id}/licensures/{lic_id}`.
-     method — "post" (create) or "patch" (edit). Drives the submit
-       button label: create reuses `heading`; edit inherits the
-       framework-default `"Save changes"` from `actions(...)`.
-     heading — the form-section `<legend>` text (mirrors the page
-       H1: `create_heading` on create, `edit_heading` on edit).
-     cancel_url — the action cluster's Cancel link target (back to
-       the list page).
-     delete_url — optional; when set on the edit page, renders Delete
-       in the action cluster.
-     delete_confirm — required when `delete_url` is set.
-     attest_url — optional; when set on the edit page (and the row
-       hasn't been attested already), renders the "Attest active"
-       button in the action cluster. The state-axis PUT target.
-     current — optional; on edit, the loaded licensure row used to
-       prefill field values. Create passes None.
+   Attest active button (edit-only, only when the row hasn't been
+   attested in its current cycle) is rendered inline at the bottom of
+   the form. The state-axis PUT target is derived from
+   `resource_detail_url` + `/attestation`.
 
-   `with context` is required so the form_fields macros auto-resolve
-   `form_errors` / `form_values` on the rerender path.
+   `with context` on the form_fields import is required so the field
+   macros auto-resolve `form_errors` / `form_values` on the rerender
+   path (cert/lic/edu don't opt into form_error_render today, but the
+   pattern is preserved for symmetry with other CRUD forms).
 #}
 {%- from "_shared/form_fields.html" import text_field, select_field, form_section with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/actions.html" import actions, confirm_action_button -%}
-{% macro licensure_form(action_url, method, heading, cancel_url, delete_url=None, delete_confirm=None, attest_url=None, current=None) -%}
-  <div class="entity-form-page">
-    {% call entity_form(action_url, method=method) %}
-      {% call form_section(heading) %}
-        {{ select_field("license_type", "License type", LICENSE_TYPES,
-                labels=LICENSE_TYPES_LABELS,
-                current=(current.license_type if current else None) ,
-        placeholder=true) }}
-        {{ text_field("license_number", "License number",
-                current=(current.license_number if current else None) ,
-        maxlength=120) }}
-        {{ select_field("issuing_state", "Issuing state", US_STATES,
-                current=(current.issuing_state if current else None) ,
-        placeholder=true) }}
-        {{ text_field("expiration_date", "Expiration date",
-                current=(current.expiration_date if current else None) ,
-        required=false, type="date") }}
-      {% endcall %}
-      {# Create reuses `heading` as the submit label ("Create licensure");
-         edit passes nothing and inherits the framework default
-         ("Save changes") from `actions(...)`. #}
-      {{ actions(heading if method == "post" else none,
-            cancel_url=cancel_url,
-            delete_url=delete_url,
-            delete_confirm=delete_confirm) }}
-      {%- if attest_url %}
-        {{ confirm_action_button("put", attest_url,
-                "Attest that this license is currently active and in good standing?",
-                "Attest active",
-                hx_vals='{"attested": true}') }}
-      {%- endif %}
-    {% endcall %}
-  </div>
-{%- endmacro %}
+{%- set is_edit = edit_heading is defined -%}
+{%- set current = clinician_licensure if is_edit else none -%}
+{%- set action_url = resource_detail_url if is_edit else resource_url -%}
+{%- set method = "patch" if is_edit else "post" -%}
+{%- set heading = edit_heading if is_edit else create_heading -%}
+{%- set attest_url = (resource_detail_url ~ "/attestation") if (current and not current.attested_active) else none -%}
+{% call entity_form(action_url, method=method) %}
+  {% call form_section(heading) %}
+    {{ select_field("license_type", "License type", LICENSE_TYPES,
+        labels=LICENSE_TYPES_LABELS,
+        current=(current.license_type if current else None) ,
+    placeholder=true) }}
+    {{ text_field("license_number", "License number",
+        current=(current.license_number if current else None) ,
+    maxlength=120) }}
+    {{ select_field("issuing_state", "Issuing state", US_STATES,
+        current=(current.issuing_state if current else None) ,
+    placeholder=true) }}
+    {{ text_field("expiration_date", "Expiration date",
+        current=(current.expiration_date if current else None) ,
+    required=false, type="date") }}
+  {% endcall %}
+  {# Create reuses `heading` as the submit label ("Create licensure");
+     edit passes nothing and inherits the framework default
+     ("Save changes") from `actions(...)`. #}
+  {{ actions(heading if not is_edit else none,
+    cancel_url=resource_url,
+    delete_url=(resource_detail_url if is_edit else none) ,
+  delete_confirm=("Remove this licensure?" if is_edit else none)) }}
+  {%- if attest_url %}
+    {{ confirm_action_button("put", attest_url,
+        "Attest that this license is currently active and in good standing?",
+        "Attest active",
+        hx_vals='{"attested": true}') }}
+  {%- endif %}
+{% endcall %}

@@ -23,6 +23,7 @@ from src.framework.dispatch.entity_spec import (
     EntitySpec,
     RouteSet,
     StateAxis,
+    Templates,
 )
 
 _DEFAULT_CREDENTIAL_ROUTES: RouteSet = RouteSet(create=True, update=True, delete=True)
@@ -56,6 +57,7 @@ def make_clinician_credential_entity(
     state_axes: tuple[StateAxis, ...] = (),
     routes: RouteSet = _DEFAULT_CREDENTIAL_ROUTES,
     static_context: dict | None = None,
+    form_partial: str | None = None,
 ) -> EntitySpec:
     """Build a credential-subentity `EntitySpec` from its varying pieces.
 
@@ -88,6 +90,16 @@ def make_clinician_credential_entity(
     inline forms on the parent's edit page). The conversion lands one
     credential at a time; the expanded shape becomes the default once
     every credential has been converted.
+
+    `form_partial` is the path to the credential's per-entity form-body
+    partial (e.g. ``"licensures/_form_licensure.html"``). When set, the
+    factory points ``templates.form_new`` / ``templates.form_edit`` at
+    the framework's spec-driven view templates
+    (``views/subresource_form_{new,edit}.html``) — those render the
+    partial inside the existing form-page chrome, so the credential
+    doesn't need per-entity ``form_new.html`` / ``form_edit.html``
+    wrapper files. Leave ``None`` to keep the convention default (each
+    credential's own ``<collection>/form_{new,edit}.html``).
     """
 
     return EntitySpec(
@@ -131,4 +143,17 @@ def make_clinician_credential_entity(
         # depend on Jinja-global injection.
         static_context=static_context or {},
         state_axes=state_axes,
+        # When the credential declares a form partial, point the form
+        # view templates at the framework's spec-driven chrome — the
+        # `_credential.py` factory absorbs the per-entity wrapper files
+        # (form_new.html / form_edit.html) for the trio.
+        templates=(
+            Templates(
+                form_new="views/subresource_form_new.html",
+                form_edit="views/subresource_form_edit.html",
+                form_partial=form_partial,
+            )
+            if form_partial is not None
+            else Templates()
+        ),
     )

@@ -1,0 +1,18 @@
+{# Spec-driven create-form view chrome for owned subentities.
+
+Extends `views/form_new.html` and renders the spec's `form_partial`
+inside the `form_content` block — so a sub-resource whose form fields
+already live in a `_form_<entity>.html` partial doesn't need its own
+`form_new.html` wrapper file. The handler injects `form_partial`
+into context from `spec.templates.form_partial`; the partial reads
+context vars (`resource_url`, `create_heading`) directly instead of
+being imported as a macro.
+
+The clinician credentials (`certifications`, `licensures`,
+`educations`) all point at this template. Inherits every required
+context key from `views/form_new.html` (`create_heading`, `entity_name`).
+#}
+{% extends "views/form_new.html" %}
+{% block form_content %}
+  {% include form_partial %}
+{% endblock %}
