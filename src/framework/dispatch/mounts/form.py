@@ -15,11 +15,11 @@ from pydantic import BaseModel  # noqa: F401 — re-exported for test compat
 
 from src.framework.access.actor.actor import Actor
 from src.framework.dispatch.mounts._common import (
+    ParentBreadcrumbPlumbing,
     assert_kind_lock,
     call_handler_with,
     parent_path_param_pairs,
     path_segments_under_router,
-    subresource_breadcrumb_items,
 )
 from src.framework.dispatch.mounts._spec import QueryParam, ResourceSpec
 from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
@@ -72,53 +72,22 @@ def mount_form(
     parent_id_names = tuple(p[0] for p in parent_path_param_pairs(spec))
     path_param_names = parent_id_names + ((id_param,) if on_existing else ())
 
-    # Parent-owned breadcrumb plumbing (mirrors mount_related_list). The
-    # form chrome's default breadcrumb assumes the entity is registered
-    # under its own URL (`breadcrumb_entity_item(entity_name)` → `/<col>`),
-    # which is wrong for a parent-owned spec (its URL is rooted at the
-    # parent). When the parent declares `display_label_fn`, fetch the
-    # parent row at request time and inject `_breadcrumb_items` so the
-    # chrome uses the multi-segment chain instead.
-    _parent_entity_spec = (
-        getattr(spec.parent, "entity_spec", None) if spec.parent else None
-    )
-    _parent_label_fn = (
-        _parent_entity_spec.display_label_fn
-        if _parent_entity_spec is not None
-        else None
-    )
-    _need_parent_repo = _parent_label_fn is not None
-    _parent_repo_dep = spec.parent.repo_dep if _need_parent_repo else None
-    _extra_static_deps: tuple[tuple[str, Any], ...] = (
-        (("__parent_repo__", _parent_repo_dep),) if _need_parent_repo else ()
-    )
+    # Parent-owned breadcrumb plumbing — see `ParentBreadcrumbPlumbing`
+    # in `_common.py`. No-op for top-level specs.
+    _breadcrumb = ParentBreadcrumbPlumbing.for_child_spec(spec)
 
     async def response_builder(*, handler, handler_kwarg_names, kwargs):
         request: Request = kwargs["request"]
         context = await call_handler_with(handler, handler_kwarg_names, kwargs)
-        if _parent_label_fn is not None and spec.parent is not None:
-            parent_id_value = kwargs[spec.parent.id_param]
-            parent_repo = kwargs["__parent_repo__"]
-            parent_row = await parent_repo.get_by_model_id(
-                _parent_entity_spec.model, parent_id_value
-            )
-            if parent_row is not None:
-                parent_collection = _parent_entity_spec.url_collection
-                # The "current page" segment is the form heading
-                # (`create_heading` / `edit_heading`). Fall back to the
-                # spec's collection label if the handler didn't set one.
-                heading = (
-                    context.get("create_heading")
-                    or context.get("edit_heading")
-                    or spec.collection.capitalize()
-                )
-                context["_breadcrumb_items"] = subresource_breadcrumb_items(
-                    parent_spec=_parent_entity_spec,
-                    parent_row=parent_row,
-                    parent_path=f"/{parent_collection}/{parent_id_value}",
-                    child_label=heading,
-                    viewer=kwargs.get("requesting_user"),
-                )
+        # The "current page" segment is the form heading
+        # (`create_heading` / `edit_heading`). Fall back to the spec's
+        # collection label if the handler didn't set one.
+        heading = (
+            context.get("create_heading")
+            or context.get("edit_heading")
+            or spec.collection.capitalize()
+        )
+        await _breadcrumb.inject(context=context, kwargs=kwargs, child_label=heading)
         # Resolve template: handler context > per-mount kwarg > spec field.
         # `pop` so the template name doesn't leak into the rendered context.
         resolved_template = (
@@ -145,7 +114,7 @@ def mount_form(
             user_dep=spec.read_user_dep,
             query_params=query_params,
             path_param_names=path_param_names,
-            extra_static_deps=_extra_static_deps,
+            extra_static_deps=_breadcrumb.extra_static_deps,
         ),
         response_builder=response_builder,
     )

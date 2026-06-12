@@ -313,3 +313,108 @@ def subresource_breadcrumb_items(
         (parent_label_fn(parent_row), parent_path, None),
         (child_label, None, None),
     ]
+
+
+class ParentBreadcrumbPlumbing:
+    """Mount-time resolver + request-time injector for the parent-owned
+    `_breadcrumb_items` handshake.
+
+    Every per-verb mount that renders an HTML page for a parent-owned
+    spec needs the same two pieces:
+
+      1. At mount time, declare a static dep that resolves the parent's
+         repo (so the synthesis layer can inject it as a route param).
+      2. At request time, fetch the parent row by id and call
+         `subresource_breadcrumb_items` to build the chain, then stuff
+         the result under `_breadcrumb_items` so the view-type chrome
+         templates (`list.html`, `form_edit.html`, `form_new.html`)
+         pick it up via their `{% if _breadcrumb_items is defined %}`
+         branch.
+
+    Both pieces gate on the parent declaring `display_label_fn` — that
+    field is the opt-in. A parent without it falls back to the
+    single-segment chrome breadcrumb every top-level page renders.
+
+    Two constructors cover the two call shapes in the codebase:
+
+      - `for_child_spec(child)` reads `child.parent` — used by
+        `mount_form` and `mount_list` (the parent ResourceSpec is on
+        the child spec).
+      - `for_parent_spec(parent)` takes the parent directly — used by
+        `mount_related_list` (the parent comes in as a separate kwarg
+        because the same child entity can be related-listed under
+        different parents).
+
+    `mount_edge_routes` uses a different shape (the "parent" is the
+    relation's `from_entity`, and the parent row is the requesting user
+    itself with no PK lookup) and doesn't share this helper.
+    """
+
+    def __init__(self, parent_spec: ResourceSpec | None) -> None:
+        self._parent_spec = parent_spec
+
+    @classmethod
+    def for_child_spec(cls, child_spec: ResourceSpec) -> "ParentBreadcrumbPlumbing":
+        return cls(child_spec.parent)
+
+    @classmethod
+    def for_parent_spec(cls, parent_spec: ResourceSpec) -> "ParentBreadcrumbPlumbing":
+        return cls(parent_spec)
+
+    @property
+    def parent_entity_spec(self) -> "EntitySpec | None":
+        """The parent's `EntitySpec`, or `None` when no parent is set or
+        the parent has no `display_label_fn` (the opt-in gate)."""
+        if self._parent_spec is None:
+            return None
+        es = getattr(self._parent_spec, "entity_spec", None)
+        if es is None or es.display_label_fn is None:
+            return None
+        return es
+
+    @property
+    def active(self) -> bool:
+        return self.parent_entity_spec is not None
+
+    @property
+    def extra_static_deps(self) -> tuple[tuple[str, Any], ...]:
+        """Extra `(kwarg_name, Depends)` pairs for `SynthOptions` so the
+        parent-row fetch has a repo to call. Empty when inactive — no
+        unused deps land on the route signature."""
+        if not self.active:
+            return ()
+        assert self._parent_spec is not None  # active implies parent set
+        return (("__parent_repo__", self._parent_spec.repo_dep),)
+
+    async def inject(
+        self,
+        *,
+        context: dict[str, Any],
+        kwargs: dict[str, Any],
+        child_label: str,
+    ) -> None:
+        """Build `_breadcrumb_items` from the parent row and stuff it
+        into `context`. No-op when inactive (no parent, or parent has
+        no `display_label_fn`) or when the parent row can't be found
+        (the route's handler will have its own 404 path; the breadcrumb
+        chain is best-effort, not load-bearing)."""
+        if not self.active:
+            return
+        parent_entity_spec = self.parent_entity_spec
+        assert parent_entity_spec is not None
+        assert self._parent_spec is not None
+        parent_id = kwargs[self._parent_spec.id_param]
+        parent_repo = kwargs["__parent_repo__"]
+        parent_row = await parent_repo.get_by_model_id(
+            parent_entity_spec.model, parent_id
+        )
+        if parent_row is None:
+            return
+        collection = parent_entity_spec.url_collection
+        context["_breadcrumb_items"] = subresource_breadcrumb_items(
+            parent_spec=parent_entity_spec,
+            parent_row=parent_row,
+            parent_path=f"/{collection}/{parent_id}",
+            child_label=child_label,
+            viewer=kwargs.get("requesting_user"),
+        )

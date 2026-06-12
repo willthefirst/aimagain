@@ -52,12 +52,15 @@ Shared infrastructure:
   `walk_parent_chain`, `normalize_filters`, `resolve_dotted_path`,
   `resolve_handler`, `resolve_spec_bound_handler`,
   `call_handler_with`, `owned_factory_makers`, the
-  `TOP_LEVEL_AUTO_BIND_VERBS` constant, and
-  `subresource_breadcrumb_items` — the single producer of the 3-step
-  `_breadcrumb_items` injected by `mount_related_list` and
-  `mount_edge_routes` (collection → parent row → child label, with
-  the collection segment's lock reason sourced from
-  `entity_lock_reason(parent_spec.name, viewer)`).
+  `TOP_LEVEL_AUTO_BIND_VERBS` constant, `subresource_breadcrumb_items`
+  (the single producer of the 3-step `_breadcrumb_items` —
+  collection → parent row → child label, with the collection segment's
+  lock reason sourced from `entity_lock_reason(parent_spec.name,
+  viewer)`), and `ParentBreadcrumbPlumbing` (the single handshake
+  that wires `_breadcrumb_items` into each parent-owned mount —
+  `mount_list`, `mount_form`, `mount_related_list`). `mount_edge_routes`
+  emits the same shape via a different code path because its parent
+  row is the requesting user with no PK lookup.
 
 ## Dependency direction
 
