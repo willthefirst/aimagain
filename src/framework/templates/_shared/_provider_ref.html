@@ -1,0 +1,41 @@
+{# `provider_ref(ref, redacted=False)` — the canonical "who's behind
+   this post" denotation, rendered identically on the post detail card
+   and the feed byline (the single home for the format + the links).
+
+   `ref` is the `view.provider_ref` dict from `post_card_view`:
+   `{name, entity, id, org}` where `entity` is `"clinician"` /
+   `"program"` / `None`, `id` is that entity's id (or `None` when the
+   reference isn't linkable, e.g. a referral byline), and `org` is
+   `{id, name}` of the owning organization or `None` (a sole-proprietor
+   clinician has no org).
+
+   Renders the canonical "<name> · <org>" shape — the same one the form
+   pickers use — via `meta_list` so the middot comes from CSS, never a
+   literal `·`. Each part links to its detail page; a sole-prop clinician
+   shows just the name; a name with no `entity`/`id` (referral) renders
+   as plain text.
+
+   When `redacted` (the viewer can't read the full feed), the name and
+   org are withheld behind `locked_name` placeholders — the row still
+   renders so the viewer knows a real value exists. Redaction is the
+   caller's decision (it passes the flag); this macro only renders. #}
+{%- from "_shared/sections.html" import meta_list -%}
+{%- from "_shared/_locked.html" import entity_link, locked_name -%}
+{% macro provider_ref(ref, redacted=False) -%}
+  {%- if ref and (ref.name or ref.id) -%}
+    {%- call meta_list() -%}
+      {%- if redacted -%}
+        {{ locked_name("Dr. J. Doe" if ref.entity == "clinician" else "Doe Health Group") }}{# title-case-ignore: placeholder name #}
+        {%- if ref.org %}{{ locked_name("Doe Health Group") }}{% endif %}
+        {# title-case-ignore: placeholder org name #}
+      {%- else -%}
+        {%- if ref.id and ref.entity -%}
+          <a href="{{ entity_url(ref.entity, id=ref.id) }}">{{ ref.name }}</a>
+        {%- else -%}
+          <span>{{ ref.name }}</span>
+        {%- endif -%}
+        {%- if ref.org %}{{ entity_link('organization', ref.org.name, id=ref.org.id) }}{% endif %}
+      {%- endif -%}
+    {%- endcall -%}
+  {%- endif -%}
+{%- endmacro %}

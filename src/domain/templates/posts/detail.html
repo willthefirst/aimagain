@@ -5,7 +5,8 @@
 {%- from "_shared/sections.html" import fact, facts_block as entity_facts -%}
 {%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
 {%- from "_shared/_program_facts.html" import program_facts -%}
-{%- from "_shared/_locked.html" import entity_link, locked_action, locked_field, locked_name -%}
+{%- from "_shared/_provider_ref.html" import provider_ref -%}
+{%- from "_shared/_locked.html" import locked_action, locked_field -%}
 {%- set view = post_card_view(post) -%}
 {% block resource_label %}Posts{% endblock %}
 {# The toolbar H1 is the subject when set; falls back to the
@@ -21,44 +22,33 @@
 {% block actions %}
   {% include "posts/_shared/_owner_actions.html" %}
 {% endblock %}
-{# Owner-context card — the steady-state profile of the practice
-   (opening) or program (intake) the post announces, rendered as a
-   visually separate read-only card below the post's own facts. The
-   profile rows come from the shared `affiliation_facts` /
-   `program_facts` row sets (the same macros the practices list and
-   program detail page compose), so a profile fact renders identically
-   on every surface and is edited in exactly one place — the
-   practice/program page the card's identity rows link to. Identity
-   rows (practice/program, organization, address) keep the same
-   `data-fact` keys and `redacted` treatment they had in the flat
-   layout: the row renders, the value is withheld via
-   `locked_name`/`locked_field`. #}
+{# Owner-context card — the steady-state profile of the provider behind
+   the post (the clinician + practice for an opening, the program for an
+   intake), rendered as a visually separate read-only card below the
+   post's own facts.
+
+   The identity row is the shared `provider_ref` denotation — the
+   canonical hyperlinked "<name> · <org>" the feed byline and form
+   pickers also use, so the format and the links live in one place. The
+   profile rows come from the shared `affiliation_facts` / `program_facts`
+   row sets (the same macros the practices list and program detail page
+   compose), so a profile fact renders identically on every surface and
+   is edited in exactly one place — the entity's own page. The `provider`
+   and `address` rows keep their `data-fact` keys and `redacted`
+   treatment: the row renders, the value is withheld via
+   `provider_ref`'s `locked_name` / `locked_field`. #}
 {%- macro owner_context(view, post, redacted) -%}
+  {%- set ctx = namespace(aff=None, prog=None) -%}
   {%- if view.kind == "clinician_opening" -%}
-    {%- set aff = post.opening_detail.clinician_affiliation -%}
-    {%- call card(id="practice-profile",
-      headline_url=None,
-      headline="About this practice",
-      subtitle="From the practice profile") %}
+    {%- set ctx.aff = post.opening_detail.clinician_affiliation -%}
+  {%- elif view.kind == "program_intake" -%}
+    {%- set ctx.prog = post.intake_detail.program -%}
+  {%- endif -%}
+  {%- if view.kind in ("clinician_opening", "program_intake") and view.provider_ref -%}
+    {%- call card(id="provider-profile", headline_url=None, headline="About this provider") %}
       {%- call entity_facts() %}
-        {%- if view.practice_link %}
-          {%- call fact('practice', 'Practice') %}
-            {% if redacted %}
-              {{ locked_name("Dr. J. Doe") }}
-            {% else %}
-              <a href="{{ entity_url('clinician', id=view.practice_link.id) }}">{{ view.practice_link.name }}</a>
-            {% endif %}
-          {% endcall %}
-        {%- endif %}
-        {%- if view.organization_link %}
-          {%- call fact('organization', 'Organization') %}
-            {% if redacted %}
-              {{ locked_name("Doe Health Group") }}{# title-case-ignore: placeholder org name #}
-            {% else %}
-              {{ entity_link('organization', view.organization_link.name, id=view.organization_link.id) }}
-            {% endif %}
-          {% endcall %}
-        {%- endif %}
+        {%- call fact('provider', 'Provider') %}{{ provider_ref(view.provider_ref, redacted=redacted) }}
+        {% endcall %}
         {%- if view.full_address %}
           {% if redacted %}
             {%- call fact('address', 'Address', icon='map-pin') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}
@@ -67,53 +57,21 @@
             {{ fact('address', 'Address', view.full_address, icon='map-pin') }}
           {% endif %}
         {%- endif %}
-        {%- if aff %}{{ affiliation_facts(aff) }}{%- endif %}
-          {%- if view.languages %}
-            {%- set langs = [] -%}
-            {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
-              {{ fact('languages', 'Languages', langs | join(", ") ) }}
-            {%- endif %}
-            {%- if aff and aff.referral_instructions %}
-              {{ fact('referral_instructions', 'Referral instructions', aff.referral_instructions) }}
-            {%- endif %}
-          {%- endcall %}
-        {%- endcall %}
-      {%- elif view.kind == "program_intake" -%}
-        {%- set prog = post.intake_detail.program -%}
-        {%- call card(id="program-profile",
-          headline_url=None,
-          headline="About this program",
-          subtitle="From the program profile") %}
-          {%- call entity_facts() %}
-            {%- if view.program_link %}
-              {%- call fact('program', 'Program') %}
-                {% if redacted %}
-                  {{ locked_name("Doe Health Group") }}{# title-case-ignore: placeholder org name #}
-                {% else %}
-                  <a href="{{ entity_url('program', id=view.program_link.id) }}">{{ view.program_link.name }}</a>
-                {% endif %}
-              {% endcall %}
-            {%- endif %}
-            {%- if view.organization_link %}
-              {%- call fact('organization', 'Organization') %}
-                {% if redacted %}
-                  {{ locked_name("Doe Health Group") }}{# title-case-ignore: placeholder org name #}
-                {% else %}
-                  {{ entity_link('organization', view.organization_link.name, id=view.organization_link.id) }}
-                {% endif %}
-              {% endcall %}
-            {%- endif %}
-            {%- if prog %}{{ program_facts(prog) }}{%- endif %}
-              {%- if view.languages %}
-                {%- set langs = [] -%}
-                {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
-                  {{ fact('languages', 'Languages', langs | join(", ") ) }}
-                {%- endif %}
-              {%- endcall %}
+        {%- if ctx.aff %}{{ affiliation_facts(ctx.aff) }}{%- endif %}
+          {%- if ctx.prog %}{{ program_facts(ctx.prog) }}{%- endif %}
+            {%- if view.languages %}
+              {%- set langs = [] -%}
+              {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
+                {{ fact('languages', 'Languages', langs | join(", ") ) }}
+              {%- endif %}
+              {%- if ctx.aff and ctx.aff.referral_instructions %}
+                {{ fact('referral_instructions', 'Referral instructions', ctx.aff.referral_instructions) }}
+              {%- endif %}
             {%- endcall %}
-          {%- endif -%}
-        {%- endmacro %}
-        {# Detail-page layout. Referral detail stays the single expanded facts
+          {%- endcall %}
+        {%- endif -%}
+      {%- endmacro %}
+      {# Detail-page layout. Referral detail stays the single expanded facts
    grid — every row there describes the client or the ask, which is
    post-own data. Opening/intake detail splits in two: the post's own
    facts (the announcement delta — desired times, schedule notes,
@@ -121,31 +79,31 @@
    in `post_card_view` (one place); every visual element reads from
    `view` (plus the linked affiliation/program model rows the shared
    facts macros render directly). #}
-        {% block content %}
-          <section data-kind="{{ post.kind }}">
-            {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
-            {%- if view.kind == "referral" %}
-              {{ facts_block(view, expanded=True, redacted=not can_act_as_provider) }}
-            {%- else %}
-              {%- if view.desired_times or view.schedule_text or view.treatment_modality %}
-                {%- call entity_facts() %}
-                  {%- if view.desired_times %}
-                    {%- set times = [] -%}
-                    {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
-                      {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
-                    {%- endif %}
-                    {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
-                      {%- if view.treatment_modality %}{{ fact('modality', 'Modality', view.treatment_modality, icon='brain') }}{%- endif %}
-                      {%- endcall %}
-                    {%- endif %}
-                    {{ owner_context(view, post, redacted=not can_act_as_provider) }}
+      {% block content %}
+        <section data-kind="{{ post.kind }}">
+          {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
+          {%- if view.kind == "referral" %}
+            {{ facts_block(view, expanded=True, redacted=not can_act_as_provider) }}
+          {%- else %}
+            {%- if view.desired_times or view.schedule_text or view.treatment_modality %}
+              {%- call entity_facts() %}
+                {%- if view.desired_times %}
+                  {%- set times = [] -%}
+                  {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
+                    {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
                   {%- endif %}
-                  <footer>
-                    {% if can_act_as_provider %}
-                      {% include "posts/_shared/_message_form.html" %}
-                    {% else %}
-                      {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
-                    {% endif %}
-                  </footer>
-                </section>
-              {% endblock %}
+                  {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
+                    {%- if view.treatment_modality %}{{ fact('modality', 'Modality', view.treatment_modality, icon='brain') }}{%- endif %}
+                    {%- endcall %}
+                  {%- endif %}
+                  {{ owner_context(view, post, redacted=not can_act_as_provider) }}
+                {%- endif %}
+                <footer>
+                  {% if can_act_as_provider %}
+                    {% include "posts/_shared/_message_form.html" %}
+                  {% else %}
+                    {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
+                  {% endif %}
+                </footer>
+              </section>
+            {% endblock %}
