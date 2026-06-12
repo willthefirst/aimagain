@@ -20,7 +20,10 @@ from src.domain.models import (
     Organization,
     User,
 )
-from src.framework.access.authz.authz import assert_fk_ownership, list_visible_to
+from src.framework.access.authz.authz import (
+    list_visible_to,
+    make_fk_ownership_payload_authz,
+)
 from src.framework.audit.repository import AuditRepository
 from src.framework.dispatch.pagination import (
     DEFAULT_PAGE_SIZE,
@@ -145,28 +148,18 @@ async def after_update_clinician_verification(
     await clinician_repo.session.refresh(row)
 
 
-async def _assert_clinician_payload_org_ownership(
-    *,
-    payload: BaseModel,
-    requesting_user: User,
-    organization_repo: OrganizationRepository,
-) -> None:
-    """Payload authz for clinician create/update.
-
-    Delegates to the framework's FK-ownership guard. Create payloads
-    never carry ``org_id`` (org assignment happens later via the
-    affiliation sub-resource); update payloads may, and `assert_fk_ownership`
-    treats a missing/None FK as a no-op.
-    """
-    await assert_fk_ownership(
-        payload=payload,
-        attr="org_id",
-        requesting_user=requesting_user,
-        parent_repo=organization_repo,
-        parent_model=Organization,
-        parent_noun="Organization",
-        child_noun="Clinician",
-    )
+# `CLINICIAN_ENTITY.payload_authz_path` target — the per-entity wrapper
+# is now a one-line factory call. Create payloads never carry `org_id`
+# (org assignment happens via the affiliation sub-resource); update
+# payloads may, and `assert_fk_ownership` (called by the factory) treats
+# a missing/None FK as a no-op.
+_assert_clinician_payload_org_ownership = make_fk_ownership_payload_authz(
+    attr="org_id",
+    parent_model=Organization,
+    parent_noun="Organization",
+    child_noun="Clinician",
+    parent_repo_kwarg="organization_repo",
+)
 
 
 async def clinician_form_extras(
