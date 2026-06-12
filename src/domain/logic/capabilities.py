@@ -29,14 +29,26 @@ so a visible affordance and its server-side gate can't disagree.
 
 Capability trees compose from a small vocabulary of reusable leaves
 held in the `LEAVES` registry (`EMAIL_LEAF`, `CLINICIAN_VERIFIED_LEAF`,
-`ORG_REP_ANY_LEAF`, `OWNS_PROGRAM_LEAF`). Each `Leaf` is the single
-source of truth for its `(label_active, label_done, fix_url)` triple
-and predicate; capability `check_*` functions compose trees by calling
-`leaf.evaluate(actor)` rather than re-declaring `Condition` nodes
-inline. The framework's `LeafRegistry` (see
+`ORG_REP_ANY_LEAF`, `OWNS_PROGRAM_LEAF`, `SUPERUSER_LEAF`). Each `Leaf`
+is the single source of truth for its `(label_active, label_done,
+fix_url)` triple and predicate; capability `check_*` functions compose
+trees by calling `leaf.evaluate(actor)` rather than re-declaring
+`Condition` nodes inline. The framework's `LeafRegistry` (see
 `src/framework/access/capabilities/capabilities.py`) is the DAG node
 table — `LEAVES.all()` is the introspection surface for "every fact
 this app gates on".
+
+**Superuser policy — superusers hold every capability.** The policy has
+one home, the `superuser(user)` predicate. Every boolean `can_*` gate
+consults it first; every tree-based `check_*` composes it via
+`_superuser_gate`, which OR-wraps the real requirement tree with a
+`Superuser` condition *only when the viewer holds it* — normal users
+never see the override branch, superusers see exactly why they're
+granted. `check_superuser` exposes the override as its own capability
+on `/users/me/access/capabilities`, again only for holders (it returns
+``None`` otherwise, which the framework treats as 404/omitted).
+Row-level admin rights (edit/delete another user's rows) are a separate
+authz axis (`src/framework/access/authz`) and are not modeled here.
 
 To add a new entity-dependency leaf:
 
@@ -160,6 +172,23 @@ class ClaimState:
     a: bool = False
     b: frozenset[UUID] = field(default_factory=frozenset)
     lapsed: tuple[str, ...] = ()
+
+
+def superuser(user: Any) -> bool:
+    """Operational override: superusers hold every capability. This is
+    the single home for that policy — every `can_*` predicate consults
+    it first, and the tree-based `check_*` functions compose it via
+    `_superuser_gate` so the capability UI shows the override as an
+    explicit OR branch instead of silently flipping `granted`.
+
+    Deliberately NOT a claim and NOT consulted by the leaf *facts*
+    (`email_verified`, `clinician_verified`, …): being a superuser
+    doesn't make your email verified — it makes the verification
+    unnecessary. Facts stay factual; only capability grants override.
+    """
+    if user is None:
+        return False
+    return bool(getattr(user, "is_superuser", False))
 
 
 def email_verified(user: Any) -> bool:
@@ -299,6 +328,40 @@ OWNS_PROGRAM_LEAF = LEAVES.register(
     )
 )
 
+SUPERUSER_LEAF = LEAVES.register(
+    Leaf(
+        name="superuser",
+        # Both label forms are nominal, not imperative — there is no
+        # self-serve path to becoming a superuser, so the leaf never
+        # renders as an actionable step. `fix_url` is empty for the same
+        # reason; the requirements renderer shows a plain label when a
+        # leaf carries no fix link.
+        label_active="Superuser",
+        label_done="Superuser",
+        fix_url="",
+        predicate=superuser,
+    )
+)
+
+
+def _superuser_gate(user: Any, tree: Any) -> Any:
+    """Wrap a capability's requirement tree in the superuser override.
+
+    For a superuser the result is ``Gate(any of: <tree>, Superuser)`` —
+    the capability detail page then shows *why* access is granted as an
+    explicit "any one of these" branch. For everyone else the tree is
+    returned unchanged: the override is an operational fact we don't
+    advertise to users who don't hold it, so their requirement view
+    stays exactly the real, actionable tree.
+    """
+    if not superuser(user):
+        return tree
+    return Gate(
+        label_active=tree.label_active,
+        label_done=tree.label_done,
+        children=(tree, SUPERUSER_LEAF.evaluate(user)),
+    )
+
 
 def check_provider_identity(user: Any) -> CapabilityCheck:
     """Structured capability check for "the user has a verified provider
@@ -317,24 +380,28 @@ def check_provider_identity(user: Any) -> CapabilityCheck:
       `_assert_post_payload_authz`; this check is for surfacing
       identity verification as the gating step in the picker UI.
 
-    Tree: email_verified AND (clinician_verified OR org_rep_verified).
+    Tree: email_verified AND (clinician_verified OR org_rep_verified),
+    OR'd with the superuser override for superusers (`_superuser_gate`).
     `ever_verified_at` retention is intentionally excluded — access
     reverts immediately when the underlying claim lapses.
     """
     return CapabilityCheck(
         name="provider-network",
         description="See full provider details and reach out directly.",
-        tree=Bundle(
-            label_active="Provider network",
-            label_done="Provider network",
-            children=(
-                EMAIL_LEAF.evaluate(user),
-                Gate(
-                    label_active="Verify a clinician or organization",
-                    label_done="Clinician or organization verified",
-                    children=(
-                        CLINICIAN_VERIFIED_LEAF.evaluate(user),
-                        ORG_REP_ANY_LEAF.evaluate(user),
+        tree=_superuser_gate(
+            user,
+            Bundle(
+                label_active="Provider network",
+                label_done="Provider network",
+                children=(
+                    EMAIL_LEAF.evaluate(user),
+                    Gate(
+                        label_active="Verify a clinician or organization",
+                        label_done="Clinician or organization verified",
+                        children=(
+                            CLINICIAN_VERIFIED_LEAF.evaluate(user),
+                            ORG_REP_ANY_LEAF.evaluate(user),
+                        ),
                     ),
                 ),
             ),
@@ -361,49 +428,67 @@ def check_program_intake(user: Any) -> CapabilityCheck:
     return CapabilityCheck(
         name="program-intake",
         description="Publish a program intake on /posts/form.",
-        tree=Bundle(
-            label_active="Program intake",
-            label_done="Program intake",
-            children=(
-                EMAIL_LEAF.evaluate(user),
-                *OWNS_PROGRAM_LEAF.evaluate_chain(user),
+        tree=_superuser_gate(
+            user,
+            Bundle(
+                label_active="Program intake",
+                label_done="Program intake",
+                children=(
+                    EMAIL_LEAF.evaluate(user),
+                    *OWNS_PROGRAM_LEAF.evaluate_chain(user),
+                ),
             ),
         ),
     )
 
 
+def check_superuser(user: Any) -> CapabilityCheck | None:
+    """The superuser override as its own capability — visible ONLY to
+    users who hold it.
+
+    Returns ``None`` for everyone else, which the capability routes
+    treat as "not applicable": omitted from the list page, 404 on the
+    detail page. Superuser is an operational fact, not a step users can
+    work toward, so advertising it to normal users would only confuse
+    the requirements view.
+    """
+    if not superuser(user):
+        return None
+    return CapabilityCheck(
+        name="superuser",
+        description="Operational override — every capability is granted.",
+        tree=Bundle(
+            label_active="Superuser",
+            label_done="Superuser",
+            children=(SUPERUSER_LEAF.evaluate(user),),
+        ),
+    )
+
+
 def can_post_program_intake_picker(user: Any) -> bool:
-    """Picker-tile gate: superuser bypass, otherwise the structured
-    check.
+    """Picker-tile gate: the boolean form of `check_program_intake`.
 
     Symmetric with `can_act_as_provider` — both are the boolean form of
     the matching `check_*` for surfaces that only need granted/not
-    (the picker tile, the locked-CTA branch). Per-row authorization on
-    the post create payload stays with
-    `can_post_program_intake(user, org)` and its caller in
+    (the picker tile, the locked-CTA branch). The superuser override is
+    inside the check's tree (`_superuser_gate`), so no separate bypass
+    is needed here. Per-row authorization on the post create payload
+    stays with `can_post_program_intake(user, org)` and its caller in
     `_assert_post_payload_capability`.
     """
-    if getattr(user, "is_superuser", False):
-        return True
     return check_program_intake(user).granted
 
 
 def can_act_as_provider(user: Any) -> bool:
-    """Feed-teaser gate: superuser bypass, otherwise delegates to
-    `check_provider_identity`.
+    """Feed-teaser gate: the boolean form of `check_provider_identity`.
 
-    Symmetric with `assert_can_act_as_provider` — both forms grant
-    superusers full read access regardless of claim state, so the
-    route-level guard and the template-level affordance can't
-    disagree about what a superuser sees. Without the bypass here,
-    a superuser navigating around would clear the route's 403 check
-    yet still see locked-popover affordances in templates that read
-    `{% if can_act_as_provider %}` or render `entity_link(...)` for
-    a gated entity — a contradictory UX where the chrome treats the
-    viewer as locked while the underlying page is open.
+    Symmetric with `assert_can_act_as_provider` — the route-level guard
+    and the template-level affordance read the same predicate, so they
+    can't disagree about what a viewer sees. The superuser override is
+    inside the check's tree (`_superuser_gate`) — superusers get full
+    read access with the grant visible as an OR branch on the
+    capability detail page, not via a side-channel bypass.
     """
-    if getattr(user, "is_superuser", False):
-        return True
     return check_provider_identity(user).granted
 
 
@@ -450,35 +535,39 @@ VERIFIED_PROVIDER_READ_POLICY: ReadPolicy = ReadPolicy(
 
 def can_post_referral(user: Any) -> bool:
     """Self-path gate: posting a referral as the owning clinician requires
-    Claim A (handoff §4.3). The org-rep authority path in
-    `_assert_post_payload_authz` bypasses this check."""
-    return clinician_verified(user)
+    Claim A (handoff §4.3) — or the superuser override. The org-rep
+    authority path in `_assert_post_payload_authz` bypasses this check."""
+    return superuser(user) or clinician_verified(user)
 
 
 def can_post_opening(user: Any) -> bool:
     """Self-path gate: posting a clinician opening as the owning clinician
-    requires Claim A (handoff §4.3). The org-rep authority path in
-    `_assert_post_payload_authz` bypasses this check."""
-    return clinician_verified(user)
+    requires Claim A (handoff §4.3) — or the superuser override. The
+    org-rep authority path in `_assert_post_payload_authz` bypasses this
+    check."""
+    return superuser(user) or clinician_verified(user)
 
 
 def can_message(user: Any) -> bool:
-    """Responding/messaging requires Claim A (handoff §4.3). The messages
-    cluster does not yet exist; the predicate is shipped so it can be
-    wired into route handlers the moment that cluster lands."""
-    return clinician_verified(user)
+    """Responding/messaging requires Claim A (handoff §4.3) — or the
+    superuser override. The messages cluster does not yet exist; the
+    predicate is shipped so it can be wired into route handlers the
+    moment that cluster lands."""
+    return superuser(user) or clinician_verified(user)
 
 
 def can_post_program_intake(user: Any, org: Any) -> bool:
     """Posting a program intake on behalf of an org requires Claim B for
-    that org. Placeholder: always False until OrgRepresentation lands."""
-    return org_rep_verified(user, org)
+    that org — or the superuser override."""
+    return superuser(user) or org_rep_verified(user, org)
 
 
 def can_post_org_referral(user: Any, org: Any, clinician: Any) -> bool:
     """Posting an org-attributed referral requires Claim B for the org
-    AND the target clinician must have an active ClinicianAffiliation to the org
-    (handoff §4.3 / §10.5)."""
+    AND the target clinician must have an active ClinicianAffiliation to
+    the org (handoff §4.3 / §10.5) — or the superuser override."""
+    if superuser(user):
+        return True
     if not org_rep_verified(user, org):
         return False
     org_id = getattr(org, "id", None)
@@ -496,8 +585,9 @@ def directory_listed(clinician: Any) -> bool:
 
 
 def can_save_favorite(user: Any) -> bool:
-    """Saving a favorite requires email verification only (handoff §4.3)."""
-    return email_verified(user)
+    """Saving a favorite requires email verification only (handoff §4.3)
+    — or the superuser override."""
+    return superuser(user) or email_verified(user)
 
 
 def claim_state(user: Any) -> ClaimState:

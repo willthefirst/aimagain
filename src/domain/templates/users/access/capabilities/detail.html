@@ -16,10 +16,8 @@
   {% endcall %}
 {% endblock %}
 {% block content %}
-  {% if check.bypass %}
-    <p>
-      <small>Superuser — access granted regardless of requirements below.</small>
-    </p>
-  {% endif %}
+  {# The superuser override renders as an explicit "any one of these"
+     branch inside the tree (see `_superuser_gate`) — no out-of-band
+     bypass note needed. #}
   {{ capability_requirements_panel(check.tree, check.granted, check.description) }}
 {% endblock %}
