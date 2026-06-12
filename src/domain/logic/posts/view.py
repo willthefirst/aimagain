@@ -280,6 +280,16 @@ def post_card_view(post) -> dict[str, Any]:
             for CR.
         desired_times: raw enum list of desired-time slots; empty if
             unset.
+        provider_ref: the canonical "who's behind this post" reference —
+            ``{name, entity, id, org}`` where ``entity`` is ``"clinician"``
+            (opening), ``"program"`` (intake), or ``None`` (referral, a
+            name-only reference with no detail page), ``id`` is that
+            entity's id (``None`` when unlinkable), and ``org`` is
+            ``{id, name}`` of the owning Organization or ``None`` (a
+            sole-proprietor clinician has no org). The ``provider_ref``
+            macro renders this as the hyperlinked "<name> · <org>"
+            denotation on the detail card and the feed byline — one home
+            for the format and the links across surfaces.
         practice_link: ``{id, name}`` — the linked Clinician's id with
             the affiliation's org name; ``None`` for other kinds.
         program_link: ``{id, name}`` of program's linked Program;
@@ -338,6 +348,7 @@ def post_card_view(post) -> dict[str, Any]:
         "schedule_text": None,
         "desired_times": [],
         "poster_name": None,
+        "provider_ref": None,
         "practice_link": None,
         "program_link": None,
         "organization_link": None,
@@ -367,8 +378,18 @@ def post_card_view(post) -> dict[str, Any]:
         _rc = _owner_clinicians[0] if _owner_clinicians else None
         _fn = getattr(_rc, "first_name", None) if _rc else None
         _ln = getattr(_rc, "last_name", None) if _rc else None
+        _poster = " ".join(filter(None, [_fn, _ln])) or None
         base.update(
-            poster_name=" ".join(filter(None, [_fn, _ln])) or None,
+            poster_name=_poster,
+            # Referral byline is a name-only reference — the view has no
+            # clean link to the referring clinician's detail page, so
+            # `entity`/`id` stay None and the macro renders plain text.
+            provider_ref={
+                "name": _poster,
+                "entity": None,
+                "id": None,
+                "org": None,
+            },
             headline=referral_headline(d),
             in_person=getattr(d, "location_in_person", None),
             virtual=getattr(d, "location_virtual", None),
@@ -420,10 +441,24 @@ def post_card_view(post) -> dict[str, Any]:
         base["languages"] = _read_list(p, "languages")
         _org = _read_scalar(affiliation, "org")
         _org_name = getattr(_org, "name", None) if _org else None
+        _org_ref = (
+            {"id": _org.id, "name": _org_name}
+            if _org and getattr(_org, "id", None) and _org_name
+            else None
+        )
         _fn = getattr(p, "first_name", None) if p else None
         _ln = getattr(p, "last_name", None) if p else None
+        _poster = " ".join(filter(None, [_fn, _ln])) or None
         base.update(
-            poster_name=" ".join(filter(None, [_fn, _ln])) or None,
+            poster_name=_poster,
+            # Provider reference — the clinician, linked, followed by the
+            # practice's org (sole-prop clinicians have `org=None`).
+            provider_ref={
+                "name": _poster,
+                "entity": "clinician",
+                "id": getattr(p, "id", None) if p else None,
+                "org": _org_ref,
+            },
             headline=_org_name,
             # `header_state` stays None — opening's location lives in
             # the demographics column via `location_chunk` (same row
@@ -443,11 +478,7 @@ def post_card_view(post) -> dict[str, Any]:
                 if _org_name and p and getattr(p, "id", None)
                 else None
             ),
-            organization_link=(
-                {"id": _org.id, "name": _org_name}
-                if _org and getattr(_org, "id", None) and _org_name
-                else None
-            ),
+            organization_link=_org_ref,
             full_address=full_address(
                 _read_scalar(affiliation, "location_city"),
                 _read_scalar(affiliation, "location_state"),
@@ -474,26 +505,33 @@ def post_card_view(post) -> dict[str, Any]:
         # Clinician).
         for view_key, attr in _INTAKE_PROGRAM_LIST_FIELDS:
             base[view_key] = _read_list(prog, attr)
+        _prog_name = getattr(prog, "name", None) if prog else None
+        _org_ref = (
+            {"id": _prog_org.id, "name": _prog_org.name}
+            if _prog_org
+            and getattr(_prog_org, "id", None)
+            and getattr(_prog_org, "name", None)
+            else None
+        )
         base.update(
             poster_name=(getattr(_prog_org, "name", None) if _prog_org else None),
-            headline=(getattr(prog, "name", None) if prog else None),
+            # Provider reference — the program, linked, followed by its
+            # owning org. Programs always FK to an org, so `org` is
+            # normally set.
+            provider_ref={
+                "name": _prog_name,
+                "entity": "program",
+                "id": getattr(prog, "id", None) if prog else None,
+                "org": _org_ref,
+            },
+            headline=_prog_name,
             header_state=(getattr(prog, "state_preference", None) if prog else None),
             program_link=(
                 {"id": prog.id, "name": prog.name}
-                if prog and getattr(prog, "id", None) and getattr(prog, "name", None)
+                if prog and getattr(prog, "id", None) and _prog_name
                 else None
             ),
-            organization_link=(
-                {
-                    "id": prog.organization.id,
-                    "name": prog.organization.name,
-                }
-                if prog
-                and getattr(prog, "organization", None)
-                and getattr(prog.organization, "id", None)
-                and getattr(prog.organization, "name", None)
-                else None
-            ),
+            organization_link=_org_ref,
         )
         return base
 

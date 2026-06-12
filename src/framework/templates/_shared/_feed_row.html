@@ -1,15 +1,18 @@
-{%- from "_shared/_locked.html" import locked_name -%}
 {%- from "_shared/icon_label.html" import icon_label -%}
+{%- from "_shared/_provider_ref.html" import provider_ref -%}
 {# Feed-row macro — renders a single clickable row for the home feed and
    browse list views.
 
 Layout per row:
 
-  [OPENING|INTAKE]  E. Stone · 2h ago
+  [OPENING|INTAKE]  Jane Smith · Acme Counseling · 2h ago
   Headline text that wraps freely across the full width
   City, ST · In-person · Aetna
 
-Header line — type-tag pill + poster name + timestamp, all inline.
+Header line — type-tag pill + poster identity + timestamp, all inline.
+The poster identity is the shared `provider_ref` denotation (clinician /
+program, hyperlinked, with org), withheld behind `locked_name` for
+viewers who can't read the full feed.
 Headline — full-width link, wraps naturally.
 Meta strip — location, modality, insurance (muted, small).
 
@@ -36,18 +39,12 @@ under the "Feed rows" section. #}
 <div class="post-feed-header">
 <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
 <span class="post-feed-byline">
-{%- if show_poster and post.owner -%}
-{%- if can_act_as_provider -%}
-{%- if view.poster_name -%}
-<small>{{ view.poster_name }}</small>
-{%- endif -%}
-{%- else -%}
-{%- if post.kind == "program_intake" -%}
-<small>{{ locked_name("Doe Health Group") }}</small>{# title-case-ignore: placeholder org name #}
-{%- else -%}
-<small>{{ locked_name("Dr. J. Doe") }}</small>
-{%- endif -%}
-{%- endif -%}
+{# Poster identity — the shared `provider_ref` denotation (clinician /
+   program, hyperlinked, with org), withheld behind `locked_name` for
+   viewers who can't read the full feed. Same macro the detail card uses,
+   so the byline and the card can't drift. #}
+{%- if show_poster and post.owner and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
+<small>{{ provider_ref(view.provider_ref, redacted=not can_act_as_provider) }}</small>
 {%- endif -%}
 <small>{{ post.created_at | days_ago }}</small>
 </span>
