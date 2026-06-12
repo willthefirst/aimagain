@@ -33,15 +33,15 @@ def _cr_post(
     )
 
 
-def _pa_post(**clinician_attrs):
-    clinician_attrs.setdefault("in_network_carriers", [])
-    clinician_attrs.setdefault("accepts_out_of_network", False)
-    clinician_attrs.setdefault("sliding_scale", False)
-    clinician_attrs.setdefault("cost", None)
+def _pa_post(**affiliation_attrs):
+    affiliation_attrs.setdefault("in_network_carriers", [])
+    affiliation_attrs.setdefault("accepts_out_of_network", False)
+    affiliation_attrs.setdefault("sliding_scale", False)
+    affiliation_attrs.setdefault("cost", None)
     return SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
-            clinician=SimpleNamespace(**clinician_attrs),
+            clinician_affiliation=SimpleNamespace(**affiliation_attrs),
         ),
     )
 
@@ -154,8 +154,8 @@ def test_referral_headline_falls_back_when_age_groups_empty():
 #
 # The view-model collapses three kind-specific detail shapes (CR has its
 # own location + a scalar gender; PA reads location + insurance off the
-# linked Clinician; program reads identity off the linked Program) into
-# one flat dict that templates iterate over. Tests below build a stub
+# linked ClinicianAffiliation; program reads identity off the linked
+# Program) into one flat dict that templates iterate over. Tests below build a stub
 # post per kind and pin the dict's shape end-to-end. Templates are
 # tested separately at the route level.
 
@@ -209,6 +209,19 @@ _PA_AFFILIATION_PROFILE_DEFAULTS = dict(
     modalities=[],
     website="https://example.com",
     referral_instructions="Email intake@example.com",
+    # Practice-role facts — org, location, sessions, payment — live on
+    # the affiliation the opening announces, never on the clinician
+    # (whose same-named attributes are primary-affiliation proxies).
+    org=SimpleNamespace(id="org-1", name="Acme Counseling"),
+    location_city="Brooklyn",
+    location_state="NY",
+    location_zip="11201",
+    in_person_sessions="yes",
+    virtual_sessions="please_contact",
+    in_network_carriers=["aetna"],
+    accepts_out_of_network=False,
+    sliding_scale=True,
+    cost="$150/session",
 )
 _PA_CLINICIAN_PERSON_DEFAULTS = dict(
     languages=["en"],
@@ -233,16 +246,6 @@ def _make_pa_post(*, clinician_attrs=None, **overrides):
         id="prov-1",
         first_name="Jane",
         last_name="Smith",
-        org=SimpleNamespace(id="org-1", name="Acme Counseling"),
-        location_city="Brooklyn",
-        location_state="NY",
-        location_zip="11201",
-        in_person_sessions="yes",
-        virtual_sessions="please_contact",
-        in_network_carriers=["aetna"],
-        accepts_out_of_network=False,
-        sliding_scale=True,
-        cost="$150/session",
         **_PA_CLINICIAN_PERSON_DEFAULTS,
     )
     aff = dict(**_PA_AFFILIATION_PROFILE_DEFAULTS)
@@ -463,16 +466,12 @@ def test_view_pa_headline_is_org_name_state_from_clinician():
     assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
 
 
-def test_view_pa_in_person_virtual_come_from_clinician():
-    """PA's session availability lives on the linked Clinician, not on
-    the post's detail row. The view-model normalizes both kinds onto
-    the same `in_person`/`virtual` keys so the card's modality chips
-    read from one source."""
-    v = post_card_view(
-        _make_pa_post(
-            clinician_attrs={"in_person_sessions": "no", "virtual_sessions": "yes"}
-        )
-    )
+def test_view_pa_in_person_virtual_come_from_affiliation():
+    """PA's session availability lives on the linked
+    ClinicianAffiliation, not on the post's detail row. The view-model
+    normalizes both kinds onto the same `in_person`/`virtual` keys so
+    the card's modality chips read from one source."""
+    v = post_card_view(_make_pa_post(in_person_sessions="no", virtual_sessions="yes"))
     assert v["in_person"] == "no"
     assert v["virtual"] == "yes"
 
@@ -483,18 +482,19 @@ def test_view_pa_practice_link_carries_id_and_org_name():
 
 
 def test_view_pa_organization_link_carries_org_id_and_name():
-    """Opening's org link reads through `clinician.org` so the detail
-    page's `Organization` row is a one-click jump to the owning org."""
+    """Opening's org link reads through `clinician_affiliation.org` so
+    the detail page's `Organization` row is a one-click jump to the
+    owning org."""
     v = post_card_view(_make_pa_post())
     assert v["organization_link"] == {"id": "org-1", "name": "Acme Counseling"}
 
 
-def test_view_pa_full_address_from_clinician():
+def test_view_pa_full_address_from_affiliation():
     v = post_card_view(_make_pa_post())
     assert v["full_address"] == "Brooklyn, NY 11201"
 
 
-def test_view_pa_insurance_fields_from_clinician():
+def test_view_pa_insurance_fields_from_affiliation():
     v = post_card_view(_make_pa_post())
     assert v["in_network_carriers"] == ["aetna"]
     assert v["accepts_out_of_network"] is False
@@ -658,9 +658,9 @@ def test_view_cr_missing_detail_returns_base_skeleton():
 
 def test_view_pa_missing_clinician_returns_partial_view():
     """PA's detail has a `clinician` relationship that could be None
-    in test stubs. View-model populates the announcement core and the
-    affiliation-sourced steady-state profile and leaves clinician-
-    derived fields at None."""
+    in test stubs, and the affiliation stub may be sparse. View-model
+    populates the announcement core and whatever affiliation-sourced
+    profile exists, leaving the rest at None instead of crashing."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
@@ -846,14 +846,17 @@ def test_row_summary_referral_missing_detail():
 
 def test_row_summary_opening_with_description_and_settings():
     """Opening with description + first settings label + sliding scale.
-    Settings come from the linked affiliation (#1358 PR-f sub-3)."""
+    Settings and sliding scale both come from the linked affiliation
+    (#1358 PR-f sub-3)."""
     post = SimpleNamespace(
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             description="2 slots open",
-            clinician=SimpleNamespace(sliding_scale=True),
             clinician_affiliation=SimpleNamespace(
-                settings=["outpatient"], age_groups=[], services=[]
+                settings=["outpatient"],
+                age_groups=[],
+                services=[],
+                sliding_scale=True,
             ),
         ),
     )
@@ -867,11 +870,11 @@ def test_row_summary_opening_no_description_builds_from_fields():
         kind="clinician_opening",
         opening_detail=SimpleNamespace(
             description=None,
-            clinician=SimpleNamespace(sliding_scale=False),
             clinician_affiliation=SimpleNamespace(
                 settings=[],
                 age_groups=["adults_25_64"],
                 services=["psychotherapy"],
+                sliding_scale=False,
             ),
         ),
     )
@@ -1152,6 +1155,49 @@ def test_opening_reads_services_from_affiliation():
     assert v["services"] == ["medication_management", "group_therapy"]
 
 
+def test_opening_practice_facts_come_from_its_affiliation_not_clinician_proxy():
+    """Regression: a multi-affiliation clinician's `Clinician` model
+    exposes primary-affiliation proxy properties (`location_city`,
+    `in_network_carriers`, `org`, …). An opening posted under a
+    NON-primary affiliation must show that affiliation's facts, so the
+    view must read them from `opening_detail.clinician_affiliation` —
+    never through the clinician proxies. The clinician stub here
+    carries the conflicting primary-practice values; none of them may
+    leak into the view."""
+    post = _make_pa_post()
+    # The clinician's primary affiliation (proxied on the model) is a
+    # DIFFERENT practice than the one this opening announces.
+    post.opening_detail.clinician = SimpleNamespace(
+        id="prov-1",
+        first_name="Jane",
+        last_name="Smith",
+        languages=["en"],
+        org=SimpleNamespace(id="org-OTHER", name="Primary Practice"),
+        location_city="Oakland",
+        location_state="CA",
+        location_zip="94601",
+        in_person_sessions="no",
+        virtual_sessions="no",
+        in_network_carriers=["cigna"],
+        accepts_out_of_network=True,
+        sliding_scale=False,
+        cost="$999/session",
+    )
+    v = post_card_view(post)
+    assert v["headline"] == "Acme Counseling"
+    assert v["practice_link"] == {"id": "prov-1", "name": "Acme Counseling"}
+    assert v["organization_link"] == {"id": "org-1", "name": "Acme Counseling"}
+    assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
+    assert v["full_address"] == "Brooklyn, NY 11201"
+    assert v["in_person"] == "yes"
+    assert v["virtual"] == "please_contact"
+    assert v["in_network_carriers"] == ["aetna"]
+    assert v["accepts_out_of_network"] is False
+    assert v["sliding_scale"] is True
+    assert v["cost"] == "$150/session"
+    assert insurance_posture_for_post(post) == "in_network"
+
+
 def test_opening_no_affiliation_yields_empty_lists():
     """No ``clinician_affiliation`` relationship loaded at all → the
     steady-state fields read as empty (no detail-row fallback after
@@ -1240,11 +1286,12 @@ def test_intake_no_program_yields_empty_lists():
 
 
 def test_feed_headline_opening_uses_affiliation_services():
-    """``post_feed_headline`` for openings reads ``services`` from the
-    linked affiliation."""
+    """``post_feed_headline`` for openings reads ``services`` AND the
+    practice name from the linked affiliation."""
     post = _make_pa_post()
     post.opening_detail.subject = None  # force the auto-generated branch
     post.opening_detail.clinician_affiliation = SimpleNamespace(
+        org=SimpleNamespace(id="org-1", name="Acme Counseling"),
         services=["medication_management"],
         settings=[],
         modalities=[],
