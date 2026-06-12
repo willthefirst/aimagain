@@ -121,22 +121,55 @@ async def test_capability_detail_unauthenticated_redirected(test_client: AsyncCl
     assert response.status_code != 200
 
 
-async def test_capabilities_index_superuser_shows_bypass_label(
+async def test_capabilities_index_superuser_lists_superuser_capability(
     superuser_client: AsyncClient,
 ):
-    """Superusers see 'Available (superuser)' on the capabilities list."""
+    """Superusers see the standalone `superuser` capability in the list,
+    granted — and every other capability reads Available (the override
+    is inside each tree, not a separate badge)."""
     response = await superuser_client.get("/users/me/access/capabilities")
     assert response.status_code == 200
-    assert "Available (superuser)" in response.text
+    assert "/users/me/access/capabilities/superuser" in response.text
+    assert "Available" in response.text
+    assert "Not available yet" not in response.text
 
 
-async def test_capability_detail_superuser_shows_bypass_note(
+async def test_capability_detail_superuser_shows_override_branch(
     superuser_client: AsyncClient,
 ):
-    """Superusers see a bypass note on the capability detail page."""
+    """A superuser's capability detail renders the override as an
+    explicit 'any one of these' branch with a met Superuser condition —
+    the tree explains the grant instead of contradicting it."""
     response = await superuser_client.get(
         "/users/me/access/capabilities/provider-network"
     )
     assert response.status_code == 200
+    assert "Any one of these" in response.text
     assert "Superuser" in response.text
     assert "Available" in response.text
+
+
+async def test_capabilities_index_hides_superuser_from_normal_users(
+    authenticated_client: AsyncClient,
+):
+    """The superuser capability is an operational fact — never advertised
+    to users who don't hold it. Not in the list, 404 on detail."""
+    response = await authenticated_client.get("/users/me/access/capabilities")
+    assert response.status_code == 200
+    assert "/users/me/access/capabilities/superuser" not in response.text
+    assert "Superuser" not in response.text
+
+    detail = await authenticated_client.get("/users/me/access/capabilities/superuser")
+    assert detail.status_code == 404
+
+
+async def test_capability_detail_normal_user_has_no_override_branch(
+    authenticated_client: AsyncClient,
+):
+    """A non-superuser's provider-network detail shows the plain
+    requirements tree — no Superuser condition anywhere."""
+    response = await authenticated_client.get(
+        "/users/me/access/capabilities/provider-network"
+    )
+    assert response.status_code == 200
+    assert "Superuser" not in response.text

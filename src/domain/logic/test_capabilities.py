@@ -564,6 +564,7 @@ def test_leaves_registry_names_are_stable():
         "clinician_verified",
         "org_rep_any",
         "owns_program",
+        "superuser",
     }
 
 
@@ -817,7 +818,8 @@ def test_check_program_intake_all_three_leaves_grants():
 
 def test_can_post_program_intake_picker_superuser_bypass():
     """Symmetric with `can_act_as_provider` — admins post any kind even
-    without the underlying leaves."""
+    without the underlying leaves. The grant flows through the tree's
+    `_superuser_gate` OR branch, not a side-channel short-circuit."""
     admin = _user(is_verified=False, is_superuser=True)
     assert capabilities.can_post_program_intake_picker(admin) is True
 
@@ -825,6 +827,93 @@ def test_can_post_program_intake_picker_superuser_bypass():
 def test_can_post_program_intake_picker_tracks_check():
     assert capabilities.can_post_program_intake_picker(None) is False
     assert capabilities.can_post_program_intake_picker(_intake_ready_user()) is True
+
+
+# ---------- superuser override policy --------------------------------------
+#
+# Policy: superusers hold EVERY capability (single home: the
+# `superuser(user)` predicate). The tests below are the by-construction
+# guarantee the old framework-level bypass used to provide: a new
+# capability that forgets the override fails here, not in production.
+
+
+def test_superuser_passes_every_capability_predicate():
+    """Every boolean capability gate grants a superuser with zero claims.
+    Add every new `can_*` predicate to this list — it is the coverage
+    pin for the 'superusers can do everything' policy."""
+    admin = _user(is_verified=False, is_superuser=True)
+    org = _org(org_verified=False)
+    clinician = SimpleNamespace(clinician_affiliations=())
+    assert capabilities.can_act_as_provider(admin) is True
+    assert capabilities.can_post_program_intake_picker(admin) is True
+    assert capabilities.can_post_referral(admin) is True
+    assert capabilities.can_post_opening(admin) is True
+    assert capabilities.can_message(admin) is True
+    assert capabilities.can_save_favorite(admin) is True
+    assert capabilities.can_post_program_intake(admin, org) is True
+    assert capabilities.can_post_org_referral(admin, org, clinician) is True
+
+
+def test_superuser_tree_shows_override_as_or_branch():
+    """For a superuser, each `check_*` tree is Gate(any of: requirements,
+    Superuser) — granted, with the override visible as a met condition
+    and the real requirements preserved unmet."""
+    admin = _user(is_verified=False, is_superuser=True)
+    for check_fn in (
+        capabilities.check_provider_identity,
+        capabilities.check_program_intake,
+    ):
+        check = check_fn(admin)
+        assert check.granted is True
+        assert check.tree.op == "any"
+        requirements, override = check.tree.children
+        assert requirements.met is False  # zero claims — real tree unmet
+        assert override.label_done == "Superuser"
+        assert override.met is True
+        assert override.fix_url == ""  # no self-serve path to superuser
+
+
+def test_normal_user_tree_has_no_superuser_branch():
+    """The override branch is an operational fact we don't advertise:
+    a non-superuser's tree is the plain requirements bundle (op 'all'),
+    with no Superuser condition anywhere."""
+    user = _user(is_verified=True)
+    for check_fn in (
+        capabilities.check_provider_identity,
+        capabilities.check_program_intake,
+    ):
+        tree = check_fn(user).tree
+        assert tree.op == "all"
+
+        def _labels(node):
+            yield node.label_done
+            for child in getattr(node, "children", ()) or ():
+                yield from _labels(child)
+
+        assert "Superuser" not in set(_labels(tree))
+
+
+def test_check_superuser_is_none_for_normal_users():
+    """`check_superuser` returns None for non-superusers — the framework
+    omits it from the capability list and 404s its detail page."""
+    assert capabilities.check_superuser(_user(is_verified=True)) is None
+    assert capabilities.check_superuser(None) is None
+
+
+def test_check_superuser_granted_for_superusers():
+    admin = _user(is_verified=False, is_superuser=True)
+    check = capabilities.check_superuser(admin)
+    assert check is not None
+    assert check.name == "superuser"
+    assert check.granted is True
+
+
+def test_superuser_leaf_canonical_shape():
+    leaf = capabilities.LEAVES.get("superuser")
+    assert leaf is capabilities.SUPERUSER_LEAF
+    cond = leaf.evaluate(_user(is_verified=False, is_superuser=True))
+    assert cond.met is True
+    assert cond.fix_url == ""
 
 
 # ---------- UUID type sanity for claim_state.b ----------------------------
