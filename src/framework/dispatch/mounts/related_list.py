@@ -9,7 +9,11 @@ from src.framework.dispatch.mounts._common import (
     call_handler_with,
 )
 from src.framework.dispatch.mounts._spec import ResourceSpec
-from src.framework.dispatch.mounts._synth import SynthOptions, synthesize_route_fn
+from src.framework.dispatch.mounts._synth import (
+    SynthOptions,
+    synthesize_alias_route_fn,
+    synthesize_route_fn,
+)
 from src.framework.http.responses import APIResponse
 
 
@@ -103,31 +107,14 @@ def mount_related_list(
     )
 
     if singleton_alias is not None:
-        alias_segment, session_dep = singleton_alias
-        alias_path = f"/{alias_segment}/{child_spec.collection}"
-
-        async def alias_response_builder(*, handler, handler_kwarg_names, kwargs):
-            session_user = kwargs["__session_user__"]
-            kwargs = {
-                **kwargs,
-                parent_id_param: session_user.id,
-                "requesting_user": session_user,
-            }
-            return await response_builder(
-                handler=handler, handler_kwarg_names=handler_kwarg_names, kwargs=kwargs
-            )
-
-        alias_route_fn = synthesize_route_fn(
+        alias_route_fn = synthesize_alias_route_fn(
             handler=handler,
             spec=child_spec,
-            options=SynthOptions(
-                user_dep=None,
-                handler_supplied_names=(parent_id_param, "requesting_user"),
-                extra_static_deps=(("__session_user__", session_dep),)
-                + _breadcrumb_dep,
-            ),
-            response_builder=alias_response_builder,
+            response_builder=response_builder,
+            singleton_alias=singleton_alias,
+            id_param=parent_id_param,
+            extra_static_deps=_breadcrumb_dep,
         )
-        router.get(alias_path)(alias_route_fn)
+        router.get(f"/{singleton_alias[0]}/{child_spec.collection}")(alias_route_fn)
 
     router.get(path)(route_fn)
