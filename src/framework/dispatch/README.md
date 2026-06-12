@@ -27,6 +27,7 @@ mount's query_params= tuple).
 - `redirects.py` — `Redirects` utility class with canned redirect-callable factories (`to_edit_form`, `to_detail`) for the `*_redirect` spec fields. Extracted from `entity_spec.py` to keep that file focused on the spec dataclass.
 - `mounts/` — the `mount_entity` dispatcher and the per-verb `mount_*` family, one file per verb. See [`mounts/README.md`](mounts/README.md) for the file-by-file layout. The `ResourceSpec` dataclass `mount_entity` constructs internally from the upstream `EntitySpec` lives at `mounts/_spec.py`. Per-mount docstrings document required spec fields and handler signatures. Handler synthesis infrastructure (`_FactoryShape`, shape constants, `_make_factory_handler`) lives in `mounts/_factory.py`.
 - `resource_routes.py` — re-export shim that lifts the public surface (`mount_entity`, the `mount_*` family, `ResourceSpec`, `QueryParam`, `MountError`) out of `mounts/` so external imports of `src.framework.dispatch.resource_routes` keep working.
+- `extras_factories.py` — `make_detail_extras_handler` (and future `make_*_extras_handler` siblings) that build the dotted-path target of `EntitySpec.detail_extras_path` / `form_extras_path` from a declarative tuple of `(context_key, repo_kwarg, fetch_fn)` rows. Hand-written hooks remain the right tool when the callable branches; the factory is for the pure "fetch → dict" shape.
 - `filters.py` — declarative filter types (`Filter` base, `TextFilter`, `ChoiceFilter`, `FlagFilter`) that an entity declares on `EntitySpec.filters`. Each carries both the URL contract (`name`, `annotation`, `default` — bridged to `QueryParam` via `to_query_param()` so FastAPI sees a normal `Query(...)` param) and UI metadata (`kind`, `label`, `placeholder`, `choices`, `multi`). Every declared `Filter` renders as a form control on the dedicated `/<collection>/search` page (`views/search.html`); the list-page toolbar carries only the "Filter · N" link (left) and the page-action menu (right). Active values appear as removable tags in the active-filter strip below the toolbar. Raw `QueryParam` entries on `EntitySpec.filters` still work (URL-only, no UI); `Filter` is layered on top, not a replacement.
 - `pagination.py` — `Page` snapshot dataclass + `parse_page` / `offset_for` / `paginate` / `base_query` helpers consumed by `handle_list` and the bespoke list handlers (`handle_list_my_favorites`, `handle_list_user_clinicians`). Reads `?page=N` from the request, asks the logic layer for `per_page + 1` rows, slices the probe off to compute `has_next` without a `COUNT(*)`. `DEFAULT_PAGE_SIZE = 25`; per-entity override via `EntitySpec.page_size`. The view-type template `views/list.html` renders the `_shared/pagination.html` footer automatically from the `page_meta` context var; pages where the result fits on a single page emit nothing.
 - `base_router.py` — thin `APIRouter` wrapper that applies the framework's common decorators (`handle_route_errors`, logging) and the per-entity router factory `make_entity_router(spec)`.
@@ -63,6 +64,38 @@ to any Org, but a different rule might not).
 Declaring `payload_authz_path` alongside an explicit `handlers["create"]`
 or `handlers["update"]` is rejected at mount time — the explicit
 handler would silently bypass the spec hook. Use one or the other.
+
+The common shape — "the user must own the parent row the payload's
+FK points at" — is captured by
+[`make_fk_ownership_payload_authz`](../access/authz/authz.py).
+Per-entity hooks that used to be hand-written `async def` wrappers
+around `assert_fk_ownership` are now one-line factory calls bound at
+module top level so the spec's dotted `payload_authz_path` resolves.
+Hooks that combine FK-ownership with other rules (e.g. AO name
+matching, rep-approval) stay hand-written.
+
+## Declarative extras hooks
+
+`detail_extras_path` (and the form / list variants) point at a
+callable whose body is often pure DI orchestration: call a small set
+of repo methods, return a dict for the template. That shape is
+captured by [`make_detail_extras_handler`](extras_factories.py) —
+the dotted path's target becomes a one-line factory call instead of
+an `async def`. Hand-written hooks remain appropriate when the
+callable branches on the requesting user (anonymous-viewer fallback,
+role-derived field set) or assembles return keys from non-1:1
+sources.
+
+## Picker options on form_extras hooks
+
+Form-extras hooks that populate a parent picker share a contract:
+owners see their own rows, superusers see all, and the edit path
+re-includes the currently-attached row when it would otherwise be
+missing (so a `<select>` doesn't silently drop the FK on submit when
+the attachment leaves the user's owned set). The
+[`list_picker_options_for`](../access/authz/authz.py) helper owns
+that rule; entity hooks delegate to it with `attached_id=target.<fk>
+if target else None`.
 
 ## Handler stitching
 

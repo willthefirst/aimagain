@@ -1,35 +1,35 @@
 import logging
-from typing import Any
 from uuid import UUID
 
-from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.users.repository import UserRepository
 from src.domain.logic.users.schema import UserActivationUpdate
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
 from src.framework.audit.core import record_audit
 from src.framework.audit.repository import AuditRepository
+from src.framework.dispatch.extras_factories import make_detail_extras_handler
 from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
 
 
-async def user_detail_extras(
-    *,
-    target: User,
-    clinician_repo: ClinicianRepository,
-    **_: Any,
-) -> dict[str, Any]:
-    """Per-viewer detail extras for `make_detail_handler(USER_ENTITY)`.
-
-    Fetches the clinicians the target owns. Viewer-derived flags
-    (`is_self`, `can_admin_actions`, `can_view_private`) and the
-    `target_user` projection are framework-injected by `handle_detail`
-    from `USER_ENTITY.public_fields` / `private_fields` /
-    `private_field_predicate` — defense-in-depth (a forgotten template
-    guard can re-leak; a missing dict key can't) is preserved.
-    """
-    return {"clinicians": await clinician_repo.list_for_user(target.id)}
+# `USER_ENTITY.detail_extras_path` target — fetches the clinicians the
+# target user owns and injects them under `clinicians` for the detail
+# template. Viewer-derived flags (`is_self`, `can_admin_actions`,
+# `can_view_private`) and the `target_user` projection are framework-
+# injected by `handle_detail` from `USER_ENTITY.public_fields` /
+# `private_fields` / `private_field_predicate` — defense-in-depth (a
+# forgotten template guard can re-leak; a missing dict key can't) is
+# preserved.
+user_detail_extras = make_detail_extras_handler(
+    (
+        (
+            "clinicians",
+            "clinician_repo",
+            lambda repo, target, _user: repo.list_for_user(target.id),
+        ),
+    )
+)
 
 
 async def handle_set_user_activation(
