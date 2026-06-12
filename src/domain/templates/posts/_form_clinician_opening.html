@@ -28,6 +28,7 @@ Clinician) via their own edit pages — see
 
 Field order:
   1. Which practice — establishes context for the whole form
+     (followed by a read-only preview of that practice's profile)
   2. About — description (free-text announcement copy)
   3. Availability — desired times / schedule notes
   4. Subject — optional, auto-generates; last because most users skip it
@@ -43,6 +44,9 @@ Field order:
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/sections.html" import facts_block as profile_facts_block -%}
+{%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
 {%- macro opening_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.opening_detail if post else None -%}
   {# `error_swap=True` lights up the response-targets attrs that swap a
@@ -70,17 +74,65 @@ Field order:
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Which practice?", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {# About: free-text announcement copy. Other steady-state profile
+    {# Read-only preview of the steady-state practice profile that renders
+     alongside this opening on its detail page — the same
+     `affiliation_facts` rows the practice page and the post detail show.
+     One card per affiliation is pre-rendered; the script below reveals
+     the one matching the picker so the preview tracks the selection
+     without a server round-trip. The profile is edited on the practice
+     page, never on this announcement form (#1358 PR-f). #}
+    {# The first card renders visible (the picker defaults to the first
+       affiliation via `default_first`); the rest start `hidden` and the
+       script toggles on change. So no-JS authors still see the default
+       practice's profile. #}
+    {%- set _pv = namespace(first=true) -%}
+    <div class="profile-preview"
+         data-profile-preview="clinician_affiliation_id">
+      {%- for c in current_user.clinicians -%}
+        {%- for aff in c.clinician_affiliations -%}
+          {%- set _name = (c.first_name ~ " " ~ c.last_name)|trim -%}
+          <div data-preview-for="{{ aff.id }}"
+               {% if not _pv.first %}hidden{% endif %}>
+            {%- call card(id="opening-preview-" ~ aff.id|string,
+              headline_url=None,
+              headline="Shown with this opening",
+              subtitle="From " ~ ((_name ~ " · " ~ aff.org.name) if aff.org else _name) ~ "’s profile") %}
+              {%- call profile_facts_block() %}{{ affiliation_facts(aff) }}{%- endcall %}
+              {%- endcall %}
+            </div>
+            {%- set _pv.first = false -%}
+          {%- endfor -%}
+        {%- endfor -%}
+      </div>
+      {# About: free-text announcement copy. Other steady-state profile
      fields (referral_instructions, website, services, etc.) are managed
      on the affiliation profile, not on the announcement. #}
-    {% call form_section("About") %}
-      {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
-    {% endcall %}
-    {% call form_section("Availability") %}
-      {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
-      {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
-    {% endcall %}
-    {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
-    {{ actions(submit_label, cancel_url=cancel_url) }}
-  {%- endcall -%}
-{%- endmacro -%}
+      {% call form_section("About") %}
+        {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
+      {% endcall %}
+      {% call form_section("Availability") %}
+        {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
+        {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
+      {% endcall %}
+      {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
+      {{ actions(submit_label, cancel_url=cancel_url) }}
+    {%- endcall -%}
+    {# Reveal the preview card matching the selected practice; re-sync on
+     every picker change so the author always sees the profile that will
+     accompany the opening they're posting. #}
+    <script>
+  (function () {
+    var wrap = document.querySelector('[data-profile-preview="clinician_affiliation_id"]');
+    var select = document.querySelector('select[name="clinician_affiliation_id"]');
+    if (!wrap || !select) return;
+    function sync() {
+      var id = select.value;
+      wrap.querySelectorAll('[data-preview-for]').forEach(function (el) {
+        el.toggleAttribute('hidden', el.getAttribute('data-preview-for') !== id);
+      });
+    }
+    select.addEventListener('change', sync);
+    sync();
+  })();
+    </script>
+  {%- endmacro -%}

@@ -706,6 +706,122 @@ async def test_referral_create_form_renders_matching_dimension_fields(
     ), "no #clinical-niches-hidden container for the niche splitter"
 
 
+async def test_referral_form_uses_client_oriented_section_labels(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The referral form's structured fields describe the CLIENT (the
+    person being placed), not the referrer — so the section legends and
+    labels say so. Pins the client-oriented copy introduced when the
+    referral/opening data-home split was surfaced in the UI: the payment
+    section is the client's coverage, the provider-attribute fields are
+    grouped under "Provider sought", and the languages label names the
+    client."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # Parse to text so HTML-escaped apostrophes (`&#39;`) decode.
+    page_text = tree.body.text()
+    assert "Client's coverage" in page_text
+    assert "Provider sought" in page_text
+    assert "Languages the client speaks" in page_text
+    # The checkbox still binds the same wire field; only its label changed.
+    assert "bill the client's carrier" in page_text
+    assert (
+        tree.css_first('input[name="accepts_in_network"]') is not None
+    ), "renaming the section must not drop the accepts_in_network field"
+
+
+async def test_opening_create_form_renders_practice_profile_preview(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The opening create form shows a read-only preview of the selected
+    practice's steady-state profile (the same `affiliation_facts` rows
+    the practice page and the post detail render), so the author sees the
+    full post without navigating away. The default (first) affiliation's
+    card renders visible; the picker's value drives which card the inline
+    script reveals."""
+    clinician = make_clinician_with_org(
+        owner_id=logged_in_user.id, practice_name="Acme Health"
+    )
+    clinician.id = clinician.id or uuid.uuid4()
+    aff = clinician.primary_clinician_affiliation
+    aff.services = ["psychotherapy"]
+    aff.sliding_scale = True
+    aff.website = "https://acme.example.com"
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=clinician_opening")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    wrap = tree.css_first('[data-profile-preview="clinician_affiliation_id"]')
+    assert wrap is not None, "no practice-profile preview container on the opening form"
+    card = tree.css_first(f'div[data-preview-for="{aff.id}"]')
+    assert card is not None, "no preview card for the affiliation"
+    # The default (first) affiliation's card is visible without JS.
+    assert "hidden" not in card.attributes, "first preview card should be visible"
+    # Profile rows come from the shared affiliation_facts macro.
+    assert card.css_first('div[data-fact="services"]') is not None
+    assert "Psychotherapy" in card.text()
+    assert "Sliding scale" in card.text()
+    assert "https://acme.example.com" in card.text()
+
+
+async def test_intake_create_form_renders_program_profile_preview(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The intake create form shows a read-only preview of the selected
+    program's steady-state profile via the shared `program_facts` macro.
+    Requires a verified org rep who owns a program (the
+    `check_program_intake` gate)."""
+    org = make_organization_row(owner_id=logged_in_user.id, name="Acme Health")
+    rep = OrgRepresentation(
+        user_id=logged_in_user.id,
+        org_id=org.id,
+        role="coordinator",
+        authority_method="admin_review",
+        authority_status="verified",
+    )
+    program = make_program(
+        owner_id=logged_in_user.id,
+        org_id=org.id,
+        services=["group_therapy"],
+        website="https://riseiop.example.com",
+    )
+    program.organization = org
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+            session.add(rep)
+            session.add(program)
+
+    response = await authenticated_client.get("/posts/form?kind=program_intake")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    wrap = tree.css_first('[data-profile-preview="program_id"]')
+    assert wrap is not None, "no program-profile preview container on the intake form"
+    card = tree.css_first(f'div[data-preview-for="{program.id}"]')
+    assert card is not None, "no preview card for the program"
+    assert "hidden" not in card.attributes, "first preview card should be visible"
+    assert card.css_first('div[data-fact="services"]') is not None
+    assert "Group therapy" in card.text()
+    assert "https://riseiop.example.com" in card.text()
+
+
 async def test_referral_edit_form_prefills_matching_dimension_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
