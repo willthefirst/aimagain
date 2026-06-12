@@ -18,43 +18,13 @@ pytestmark = pytest.mark.asyncio
 
 
 # --- Base template nav ---------------------------------------------------
-
-
-async def test_base_template_renders_primary_nav_when_authenticated(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """Authenticated pages render a primary nav with a brand link (the
-    logo) on the left that navigates to /home, and a <details>/<summary>
-    collapsible menu containing three destination links: Posts, Profile,
-    and Sign out. The <details> pattern supports a mobile hamburger
-    toggle at narrow widths while keeping all links visible inline on
-    desktop via CSS.
-
-    The "Create clinician" chrome CTA was removed in #697 — the
-    /users/me detail page is the discoverable entry point."""
-    response = await authenticated_client.get("/users/me")
-
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    # "Create clinician" button no longer lives in the nav (#697).
-    cta_items = tree.css("#primary-nav a[href='/clinicians/form']")
-    assert len(cta_items) == 0, "Create-clinician CTA should be removed from nav (#697)"
-    # Brand link is a direct child of the nav element, pointing at /home.
-    assert tree.css_first('#primary-nav > a[href="/home"]') is not None
-    # Profile link points at /users/me.
-    assert tree.css_first('#primary-nav a[href="/users/me"]') is not None
-    # The three authed-chrome menu destinations render in this exact order
-    # inside #nav-menu. Sign-out is the `#` placeholder href on the
-    # `<a hx-post>` that drives the HTMX POST. "Home" is the logo, not a
-    # menu item.
-    nav_items = tree.css("#nav-menu ul li a")
-    nav_hrefs = [a.attributes.get("href") for a in nav_items]
-    assert nav_hrefs == [
-        "/posts",
-        "/users/me",
-        "#",
-    ]
+#
+# The authenticated /users/me chrome (primary nav structure, profile-link
+# active state, lucide font preload, header sign-out affordance) is pinned
+# alongside the detail-page assertions in
+# `test_get_users_me_renders_authenticated_self_view` below — every
+# previously-separate test for those bits hit the same endpoint with the
+# same fixtures, so they share one render.
 
 
 async def test_primary_nav_highlights_active_section(
@@ -204,8 +174,9 @@ async def test_list_omits_admin_actions_for_admin(
     Per-row admin actions on a card list invite mis-clicks (especially
     the irreversible Delete); admins click through to a user's detail
     page to act. The detail-page toolbar is the canonical home —
-    covered by ``test_detail_shows_admin_actions_for_admin`` and
-    ``test_detail_admin_actions_render_inside_toolbar`` below.
+    covered by ``test_get_users_id_renders_admin_view_of_other_user``
+    below (which pins both that the activation button is present and
+    that it lives inside ``.toolbar``).
     """
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     other = create_test_user(username=f"target-{uuid.uuid4()}")
@@ -226,53 +197,253 @@ async def test_list_omits_admin_actions_for_admin(
 # --- Detail page ---------------------------------------------------------
 
 
-async def test_get_user_detail_renders(
+def _signout_button(tree: HTMLParser):
+    """Find the Sign out button in the toolbar action menu — keyed off
+    `hx-post="/auth/jwt/logout"` rather than text because the button
+    label is the only visible signal of the action and the test should
+    pin the wire contract (the htmx POST target), not the copy."""
+    for button in tree.css("button[hx-post]"):
+        if button.attributes.get("hx-post") == "/auth/jwt/logout":
+            return button
+    return None
+
+
+async def test_get_users_me_renders_authenticated_self_view(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    """`GET /users/me` for the signed-in user renders the canonical
+    self-view: the primary nav with brand + Posts/Profile/Sign-out
+    destinations (Profile marked aria-current), the lucide font preload
+    <link> for icon-flicker prevention, a Sign-out button in the toolbar
+    action menu (htmx POST to /auth/jwt/logout with after-request
+    redirect), a body-level Favorites link (not in the toolbar), the
+    self-only Email/Access cards, and a picker dispatching to the global
+    Clinician/Organization directories pre-filtered with `?owner=me`.
+    The page hides top-level identity facts (Email/Active/Verified dt
+    entries live on the admin path or the Email card; #597).
+
+    Consolidates 10 previously-separate tests that all rendered this
+    same response with the same fixtures (one in `test_auth_routes.py`,
+    nine here). Distinct assertion messages preserve the per-bit signal
+    on failure."""
+    response = await authenticated_client.get("/users/me")
+    assert response.status_code == 200
+    body = response.text
+    tree = HTMLParser(body)
+
+    # --- Primary nav structure (was test_base_template_renders_primary_nav_when_authenticated) ---
+    # Create-clinician CTA was removed from nav in #697.
+    assert (
+        tree.css("#primary-nav a[href='/clinicians/form']") == []
+    ), "Create-clinician CTA must be removed from nav (#697)"
+    assert (
+        tree.css_first('#primary-nav > a[href="/home"]') is not None
+    ), "brand link missing in primary nav"
+    assert (
+        tree.css_first('#primary-nav a[href="/users/me"]') is not None
+    ), "Profile link missing in primary nav"
+    nav_hrefs = [a.attributes.get("href") for a in tree.css("#nav-menu ul li a")]
+    assert nav_hrefs == [
+        "/posts",
+        "/users/me",
+        "#",
+    ], f"nav-menu hrefs unexpected: {nav_hrefs}"
+
+    # --- Profile link carries aria-current on this path
+    # (was test_primary_nav_marks_profile_active_on_users_me)
+    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
+    assert (
+        profile_link is not None
+        and profile_link.attributes.get("aria-current") == "page"
+    ), "Profile link must carry aria-current=page on /users/me"
+
+    # --- Every authenticated page exposes the header sign-out link
+    # (was test_authenticated_page_has_sign_out_affordance in
+    # test_auth_routes.py; that test also hit /users/me, so consolidated
+    # here. Header `<a hx-post="/auth/sign-out">` is distinct from the
+    # toolbar `<button hx-post="/auth/jwt/logout">` asserted below.)
+    assert (
+        'hx-post="/auth/sign-out"' in body
+    ), "every authenticated page must surface /auth/sign-out in the header chrome"
+
+    # --- Lucide font preload (was test_base_template_preloads_lucide_icon_font)
+    # The preload URL MUST match the CSS's woff2 URL exactly (including
+    # the cache-buster query) or the browser sees them as different
+    # resources and the preload is wasted.
+    preload = tree.css_first('link[rel="preload"][as="font"]')
+    assert preload is not None, "Lucide woff2 preload <link> is missing"
+    href = preload.attributes.get("href") or ""
+    assert "lucide.woff2" in href, "preload href must reference lucide.woff2"
+    assert preload.attributes.get("type") == "font/woff2"
+    # Required for cross-origin font preloads — without it, the browser
+    # fetches the font twice (once preload, once for real).
+    assert "crossorigin" in preload.attributes, "preload <link> missing crossorigin"
+    assert "?t=" in href, (
+        "preload href must include the lucide.css cache-buster query "
+        "(`?t=...`); without exact-URL match the browser issues a "
+        "second font request and the preload is wasted"
+    )
+
+    # --- Identity facts hidden on self-view
+    # (was test_detail_hides_identity_facts_for_self; #597)
+    assert "<dt>Email</dt>" not in body, "self-view must not surface Email dt"
+    assert "<dt>Active</dt>" not in body, "self-view must not surface Active dt"
+    assert "<dt>Verified</dt>" not in body, "self-view must not surface Verified dt"
+
+    # --- Sign-out button in toolbar (was test_detail_shows_signout_for_self)
+    # The htmx POST target + after-request redirect must stay in lockstep —
+    # fastapi-users' logout returns 204 with no body, so the htmx swap
+    # alone leaves the browser on /users/me.
+    button = _signout_button(tree)
+    assert button is not None, "self profile is missing the Sign out button"
+    on_after = button.attributes.get("hx-on::after-request") or ""
+    assert (
+        "window.location" in on_after
+    ), "Sign out button must redirect after the 204 logout response"
+
+    # --- Favorites link in body, not toolbar
+    # (was test_self_detail_renders_favorites_link_in_body_not_toolbar)
+    favorites_selector = "a[href='/users/me/favorites']"
+    assert (
+        tree.css_first(f".toolbar {favorites_selector}") is None
+    ), "Favorites link must not appear in the toolbar — toolbar is for Actions only"
+    assert (
+        tree.css_first(f"main {favorites_selector}") is not None
+    ), "Favorites link must appear in the page body for the self viewer"
+
+    # --- Picker cards: Clinicians + Organizations dispatched with ?owner=me
+    # (was test_detail_picker_includes_clinicians_and_organizations)
+    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
+    assert "Clinicians" in headings, "picker missing Clinicians card"
+    assert "Organizations" in headings, "picker missing Organizations card"
+    assert (
+        tree.css_first("article.picker-option a[href$='/clinicians?owner=me']")
+        is not None
+    ), "Clinicians picker card must dispatch with ?owner=me"
+    assert (
+        tree.css_first("article.picker-option a[href$='/organizations?owner=me']")
+        is not None
+    ), "Organizations picker card must dispatch with ?owner=me"
+
+    # --- Access card (was test_users_me_access_card_links_to_access_page)
+    assert "Access" in headings, "/users/me is missing the Access card"
+    assert (
+        tree.css_first("article.picker-option a[href$='/users/me/access']") is not None
+    ), "Access card is missing the link to /users/me/access"
+    assert (
+        "Network access" not in body
+    ), "capability status must not be embedded on /users/me — lives on /users/me/access"
+
+    # --- Email card (was test_users_me_email_card_links_to_email_form)
+    assert "Email" in headings, "/users/me is missing the Email card"
+    assert (
+        tree.css_first("article.picker-option a[href$='/users/me/email/form']")
+        is not None
+    ), "Email card is missing the link to /users/me/email/form"
+
+
+async def test_get_users_id_renders_admin_view_of_other_user(
     superuser_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """GET /users/{id} renders the detail page for an existing user.
+    """`GET /users/{target_id}` for an admin viewing another user renders
+    the canonical admin view: breadcrumb back to /users, target's
+    username un-redacted in the toolbar <h1>, private fields visible
+    (Email dt + the email value itself), admin activation actions
+    inside the toolbar (single instance, not duplicated), and the
+    self-only affordances suppressed: no Sign-out button, no Email
+    card (which links to /users/me — self-only), no Verification card,
+    no inline Clinicians section (removed entirely from user detail).
 
-    Uses `superuser_client` because non-admins are now denied access to
-    other users' detail pages outright (covered in
-    `test_non_admin_forbidden_on_other_user_detail`)."""
+    Consolidates 9 previously-separate tests that hit this same endpoint
+    with two admin-acquisition shapes (some used `superuser_client`
+    directly, others used `authenticated_client` +
+    `promote_to_admin(logged_in_user)`). Both shapes produce equivalent
+    admin sessions; `superuser_client` is the cleaner one."""
+    target_email = f"target-{uuid.uuid4()}@example.com"
     target_username = f"target-{uuid.uuid4()}"
-    target = create_test_user(username=target_username)
+    target = create_test_user(username=target_username, email=target_email)
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(target)
 
     response = await superuser_client.get(f"/users/{target.id}")
     assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert target_username in tree.body.text()
+    body = response.text
+    tree = HTMLParser(body)
 
-
-async def test_admin_detail_renders_breadcrumb_and_heading(
-    superuser_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """An admin viewing another user's detail page gets the canonical
-    chrome: back-link to `/users`, the target's username un-redacted in
-    the toolbar `<h1>`. Non-admins can no longer reach this page (see
-    `test_non_admin_forbidden_on_other_user_detail`), so the
-    no-popover assertion lives on the admin path."""
-    target_username = f"target-{uuid.uuid4()}"
-    target = create_test_user(username=target_username)
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await superuser_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
+    # --- Breadcrumb + heading (was test_admin_detail_renders_breadcrumb_and_heading)
     back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None
+    assert back is not None, "breadcrumb back-link missing"
     label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Users"
-    assert back.attributes.get("href") == "/users"
-    assert "data-locked-cta" not in back.attributes
+    assert (
+        label is not None and label.text(strip=True) == "Users"
+    ), "breadcrumb label must say 'Users'"
+    assert (
+        back.attributes.get("href") == "/users"
+    ), "breadcrumb href must point at /users"
+    assert (
+        "data-locked-cta" not in back.attributes
+    ), "breadcrumb back-link must not be locked"
     h1 = tree.css_first("div.toolbar h1")
-    assert h1 is not None and target_username in h1.text(strip=True)
+    assert h1 is not None and target_username in h1.text(
+        strip=True
+    ), "toolbar h1 missing target username"
+    # Body renders the target's username unredacted
+    # (was test_get_user_detail_renders)
+    assert (
+        target_username in tree.body.text()
+    ), "target username must render unredacted in the body"
+
+    # --- Private fields visible to admin
+    # (was test_detail_shows_private_fields_to_admin)
+    assert target_email in body, "admin should see target's email value"
+    assert "<dt>Email</dt>" in body, "admin should see Email dt entry"
+
+    # --- Admin activation action present, inside toolbar, not duplicated
+    # (was test_detail_shows_admin_actions_for_admin +
+    # test_detail_admin_actions_render_inside_toolbar; pins the
+    # "primary resource actions live in the toolbar" rule documented in
+    # src/framework/templates/README.md)
+    activation_selector = f"button[hx-put='/users/{target.id}/activation']"
+    assert (
+        tree.css_first(activation_selector) is not None
+    ), "admin missing activation button"
+    assert (
+        tree.css_first(f".toolbar {activation_selector}") is not None
+    ), "activation button must live inside .toolbar"
+    assert (
+        len(tree.css(activation_selector)) == 1
+    ), "activation button must render exactly once"
+
+    # --- Self-only affordances suppressed on other-user view ---
+    # Sign-out (was test_detail_omits_signout_for_other_user) — admin
+    # accidentally signing out the target is confusing, and would only
+    # nuke the admin's own session anyway (cookies are per-browser).
+    assert (
+        _signout_button(tree) is None
+    ), "Sign out button must NOT appear when viewing another user"
+
+    # Email card (was test_users_me_email_card_not_shown_for_other_users)
+    # — it links to /users/me/email/form, which is self-only.
+    assert (
+        tree.css_first("article.picker-option a[href$='/email/form']") is None
+    ), "Email card must not appear on another user's profile"
+
+    # Verification card
+    # (was test_users_me_verification_card_not_shown_for_other_users)
+    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
+    assert (
+        "Verification" not in headings
+    ), "Verification card must not appear on another user's profile"
+
+    # Inline Clinicians section
+    # (was test_detail_no_inline_clinicians_section_for_other_user) —
+    # removed entirely from the user detail page.
+    assert (
+        "Clinicians" not in headings
+    ), "no inline Clinicians section on another user's profile"
 
 
 async def test_non_admin_forbidden_on_other_user_detail(
@@ -310,106 +481,6 @@ async def test_self_detail_still_works(
     assert logged_in_user.username in response.text
 
 
-async def test_detail_hides_identity_facts_for_self(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """The user viewing their own profile (via /users/me or
-    /users/<own-id>) sees no top-level identity facts. Email lives in
-    the Email card (which links to /users/me/email/form); Active and
-    Verified are admin signals not shown on the self-view (#597).
-    Admins viewing someone else still see Email + Active (see
-    ``test_detail_shows_private_fields_to_admin``)."""
-    response = await authenticated_client.get("/users/me")
-
-    assert response.status_code == 200
-    body = response.text
-    assert "<dt>Email</dt>" not in body
-    assert "<dt>Active</dt>" not in body
-    assert "<dt>Verified</dt>" not in body
-
-
-async def test_detail_shows_private_fields_to_admin(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """An admin viewing any user's profile sees the private fields."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    target_email = f"target-{uuid.uuid4()}@example.com"
-    target = create_test_user(
-        username=f"target-{uuid.uuid4()}",
-        email=target_email,
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-
-    assert response.status_code == 200
-    body = response.text
-    assert target_email in body
-    assert "<dt>Email</dt>" in body
-
-
-async def test_detail_shows_admin_actions_for_admin(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Admin viewing another user's detail page sees the actions partial."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    tree = HTMLParser(response.text)
-    assert tree.css_first(f"button[hx-put='/users/{target.id}/activation']") is not None
-
-
-async def test_detail_admin_actions_render_inside_toolbar(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Admin actions render inside the page toolbar (not elsewhere on
-    the page). This pins the "primary resource actions live in the
-    toolbar" rule documented in `src/framework/templates/README.md`."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    tree = HTMLParser(response.text)
-    activation_selector = f"button[hx-put='/users/{target.id}/activation']"
-    assert tree.css_first(f".toolbar {activation_selector}") is not None
-    # Sanity: not duplicated anywhere else on the page.
-    assert len(tree.css(activation_selector)) == 1
-
-
-async def test_self_detail_renders_favorites_link_in_body_not_toolbar(
-    authenticated_client: AsyncClient,
-):
-    """Favorites is navigation, not an Action — the toolbar is reserved
-    for Actions (Sign out, admin Deactivate/Delete). The link to the
-    viewer's favorites list lives in the detail-page body."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    favorites_selector = "a[href='/users/me/favorites']"
-    assert tree.css_first(f".toolbar {favorites_selector}") is None, (
-        "Favorites link must not appear in the toolbar — toolbar is for " "Actions only"
-    )
-    assert (
-        tree.css_first(f"main {favorites_selector}") is not None
-    ), "Favorites link must appear in the page body for the self viewer"
-
-
 async def test_admin_detail_admin_actions_not_on_self_view(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
@@ -417,8 +488,8 @@ async def test_admin_detail_admin_actions_not_on_self_view(
 ):
     """Admin viewing their own detail does not see admin actions —
     they cannot deactivate / delete themselves. The companion
-    `test_detail_shows_admin_actions_for_admin` pins the inverse
-    (admin viewing someone else)."""
+    `test_get_users_id_renders_admin_view_of_other_user` pins the
+    inverse (admin viewing someone else)."""
     await promote_to_admin(db_test_session_manager, logged_in_user.email)
     response = await authenticated_client.get(f"/users/{logged_in_user.id}")
     tree = HTMLParser(response.text)
@@ -426,246 +497,6 @@ async def test_admin_detail_admin_actions_not_on_self_view(
         tree.css_first(f"button[hx-put='/users/{logged_in_user.id}/activation']")
         is None
     )
-
-
-async def test_detail_picker_includes_clinicians_and_organizations(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """`/users/me`'s self-only picker dispatches to the global Clinician
-    and Organization directories with `?owner=me` pre-applied so the
-    viewer lands on their own rows. Both directories are reachable for
-    every authenticated viewer (identity rows redact per-row at render
-    time); the URL filter narrows the result set to what the viewer
-    can manage."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert "Clinicians" in headings
-    assert "Organizations" in headings
-    clinicians_link = tree.css_first(
-        "article.picker-option a[href$='/clinicians?owner=me']"
-    )
-    assert clinicians_link is not None
-    orgs_link = tree.css_first(
-        "article.picker-option a[href$='/organizations?owner=me']"
-    )
-    assert orgs_link is not None
-
-
-async def test_users_me_access_card_links_to_access_page(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`GET /users/me` shows an Access card with a link to the access overview.
-    Capability status is on /users/me/access, not embedded here. Self-only."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert "Access" in headings, "/users/me is missing the Access card"
-    access_link = tree.css_first("article.picker-option a[href$='/users/me/access']")
-    assert (
-        access_link is not None
-    ), "Access card is missing the link to /users/me/access"
-    assert (
-        "Network access" not in response.text
-    ), "Capability status must not be embedded on /users/me"
-
-
-async def test_users_me_email_card_links_to_email_form(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`GET /users/me` shows an Email card with a link to /users/me/email/form
-    so users can reach the verification resend without going through the
-    capability tree. Self-only."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert "Email" in headings, "/users/me is missing the Email card"
-    email_link = tree.css_first("article.picker-option a[href$='/users/me/email/form']")
-    assert (
-        email_link is not None
-    ), "Email card is missing the link to /users/me/email/form"
-
-
-async def test_users_me_email_card_not_shown_for_other_users(
-    superuser_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """The Email card must NOT appear on another user's profile — it
-    links to `/users/me/email/form` which is self-only. Only admins
-    can reach another user's detail page now (non-admins 403), so this
-    is verified through the superuser_client path."""
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await superuser_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    email_link = tree.css_first("article.picker-option a[href$='/email/form']")
-    assert email_link is None, "Email card must not appear on another user's profile"
-
-
-async def test_users_me_verification_card_not_shown_for_other_users(
-    superuser_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """The 'Verification' status card must NOT appear on other users'
-    profile pages — it is self-only. Only admins can reach another
-    user's detail page now (non-admins 403)."""
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await superuser_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert (
-        "Verification" not in headings
-    ), "Verification card unexpectedly shown on another user's profile"
-
-
-async def test_detail_no_inline_clinicians_section_for_other_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Viewing another user's profile has no Clinicians section — it was
-    removed entirely from the user detail page."""
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert "Clinicians" not in headings
-
-
-# --- Sign out -----------------------------------------------------------
-
-
-def _signout_button(tree: HTMLParser):
-    """Find the Sign out button in the toolbar action menu — keyed off
-    `hx-post="/auth/jwt/logout"` rather than text because the button
-    label is the only visible signal of the action and the test should
-    pin the wire contract (the htmx POST target), not the copy."""
-    for button in tree.css("button[hx-post]"):
-        if button.attributes.get("hx-post") == "/auth/jwt/logout":
-            return button
-    return None
-
-
-async def test_detail_shows_signout_for_self(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`/users/me` exposes a Sign out button in the toolbar action menu
-    so a user can end their session from somewhere visible (was
-    previously only reachable by knowing the POST /auth/jwt/logout
-    endpoint exists). Pin the htmx POST target + the after-request
-    redirect hook so the button's wire behavior stays in lockstep."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    button = _signout_button(tree)
-    assert button is not None, "self profile is missing the Sign out button"
-    on_after = button.attributes.get("hx-on::after-request") or ""
-    assert "window.location" in on_after, (
-        "Sign out button must redirect after the 204 logout response — "
-        "fastapi-users' logout returns 204 with no body, so the htmx "
-        "swap alone leaves the browser on /users/me."
-    )
-
-
-async def test_detail_omits_signout_for_other_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """Viewing another user's profile (including as admin) does NOT
-    surface the Sign out button — that affordance is self-only.
-    Otherwise an admin could accidentally sign out the user they're
-    auditing, which is both confusing and would do nothing useful (the
-    admin's own session would also end since cookies are per-browser).
-    """
-    await promote_to_admin(db_test_session_manager, logged_in_user.email)
-    target = create_test_user(username=f"target-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(target)
-
-    response = await authenticated_client.get(f"/users/{target.id}")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert _signout_button(tree) is None
-
-
-# --- Chrome: font preload (icon-flicker fix) ----------------------------
-
-
-async def test_base_template_preloads_lucide_icon_font(
-    authenticated_client: AsyncClient,
-):
-    """``base.html`` emits a `<link rel="preload">` for the Lucide
-    woff2 font ahead of the stylesheet `<link>` so the icon font
-    fetch runs in parallel with the CSS fetch rather than waiting for
-    it to parse. This eliminates the icon-flicker that's otherwise
-    visible on every first paint while ``<i class="icon-x">`` elements
-    render as blank space waiting for the font.
-
-    Pin the contract: the preload URL MUST match the CSS's woff2 URL
-    *exactly* (including the cache-buster query) or the browser sees
-    them as different resources and the preload is wasted."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    preload = tree.css_first('link[rel="preload"][as="font"]')
-    assert preload is not None, "Lucide woff2 preload <link> is missing"
-    href = preload.attributes.get("href") or ""
-    assert "lucide.woff2" in href
-    assert preload.attributes.get("type") == "font/woff2"
-    # Required for cross-origin font preloads — without it, the
-    # browser fetches the font twice (once preload, once for real).
-    assert "crossorigin" in preload.attributes
-    # The companion stylesheet `<link>` references the same font URL
-    # via its `@font-face` rule; the preload's href must include the
-    # CSS's cache-buster so the browser deduplicates the requests.
-    assert "?t=" in href, (
-        "preload href must include the lucide.css cache-buster query "
-        "(`?t=...`); without exact-URL match the browser issues a "
-        "second font request and the preload is wasted"
-    )
-
-
-# --- Chrome: nav active state -------------------------------------------
-
-
-async def test_primary_nav_marks_profile_active_on_users_me(
-    authenticated_client: AsyncClient,
-):
-    """The Profile link in the primary nav points at `/users/me` and
-    carries `aria-current="page"` when the user is on it."""
-    response = await authenticated_client.get("/users/me")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
-    assert (
-        profile_link is not None
-        and profile_link.attributes.get("aria-current") == "page"
-    ), "expected Profile link to carry aria-current=page on /users/me"
 
 
 # --- Activation endpoint -------------------------------------------------
