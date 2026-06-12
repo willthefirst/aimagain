@@ -54,6 +54,14 @@ VIEW_TYPE_REQUIREMENTS: dict[str, tuple[str, ...]] = {
         "entity_name",
         "resource_detail_url",
     ),
+    # Sub-resource form templates extend their plain `form_{new,edit}.html`
+    # parent — the validator walks one `{% extends %}` hop, so rendering
+    # `views/subresource_form_new.html` directly resolves to the parent's
+    # requirements (create_heading + entity_name). The only key the
+    # subresource template adds on top is `form_partial`, which it
+    # `{% include %}`s — that's what the entries below pin against drift.
+    "views/subresource_form_new.html": ("form_partial",),
+    "views/subresource_form_edit.html": ("form_partial",),
     "views/search.html": (
         "declared_filters",
         "entity_name",

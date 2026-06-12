@@ -3,9 +3,8 @@
    shared across all four clinician sub-resource lists.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_card.html" import subresource_card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/sections.html" import fact, facts_block -%}
 {% block resource_label %}Education{% endblock %}
 {% block actions %}
   <li>
@@ -14,20 +13,11 @@
   </li>
 {% endblock %}
 {%- macro education_card(edu) %}
-  {%- set subtitle %}
-    {%- if edu.institution %}<span>{{ edu.institution }}</span>{%- endif %}
-  {%- endset %}
-  {%- call card(
-    id=edu.id,
+  {{ subresource_card(id=edu.id,
     headline_url=entity_url('clinician', id=clinician.id) ~ "/educations/" ~ edu.id|string ~ "/form",
-    headline=EDUCATION_TYPES_LABELS[edu.education_type],
-    subtitle=subtitle | trim) -%}
-    {%- if edu.month_completed -%}
-      {%- call facts_block() %}
-        {{ fact('month_completed', 'Completed', edu.month_completed) }}
-      {%- endcall %}
-    {%- endif %}
-  {%- endcall %}
+  headline=EDUCATION_TYPES_LABELS[edu.education_type],
+  subtitle_parts=[edu.institution],
+  facts=[('month_completed', 'Completed', edu.month_completed)]) }}
 {%- endmacro %}
 {% block list_body %}
   {{ item_list(rows, education_card, "educations-list",
