@@ -11,8 +11,7 @@
       {{ text_field("name", "Name", current=organization.name, maxlength=200) }}
       {{ text_field("npi", "NPI", current=organization.npi, required=false, pattern="\\d{10}", maxlength=10, help=npi_help() ) }}
     {% endcall %}
-    {{ actions("Save changes",
-        cancel_url=entity_url('organization', id=organization.id) ,
+    {{ actions(cancel_url=entity_url('organization', id=organization.id) ,
     delete_url=entity_url('organization', id=organization.id),
     delete_confirm="Delete this organization?",
     ) }}

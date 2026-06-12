@@ -46,8 +46,7 @@
       {{ url_field("website", "Website", current=program.website, required=false) }}
       {{ textarea_field("referral_instructions", "Referral instructions", current=program.referral_instructions, required=false) }}
     {% endcall %}
-    {{ actions("Save changes",
-        cancel_url=entity_url('program', id=program.id) ,
+    {{ actions(cancel_url=entity_url('program', id=program.id) ,
     delete_url=entity_url('program', id=program.id),
     delete_confirm="Delete this program?",
     ) }}

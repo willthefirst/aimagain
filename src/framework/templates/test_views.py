@@ -456,32 +456,39 @@ def test_actions_buttons_fill_row_width_on_desktop() -> None:
     )
 
 
-def test_actions_macro_supports_cancel_only_for_page_level_clusters() -> None:
-    """The `actions` macro accepts `submit_label=None` so multi-section
-    pages (e.g. `clinicians/form_edit.html`) can render a page-level
-    Cancel-only cluster without a redundant Save button. Pinned because
-    the bare `<div class="form-actions">` that used to live in that
-    template diverged from the macro's styling on the desktop width fix
-    — every cluster must route through the macro."""
+def test_actions_macro_routes_page_level_clusters_through_form_wrapper() -> None:
+    """Every form-layout cluster routes through the `actions` macro so the
+    `.form-actions` styling is consistent. Pinned because the bare
+    `<div class="form-actions">` that used to live in `clinicians/form_edit.html`
+    diverged from the macro's styling on the desktop width fix.
+
+    With the component-library default in place (`wrapper="form"` +
+    omitted `submit_label` → "Save changes"), the canonical edit cluster
+    is `actions(cancel_url=...)` — both buttons render and styling stays
+    uniform. The Cancel-only carve-out the macro used to support was
+    dropped when the README's "every edit form uses Save changes"
+    rule moved into the macro itself (see
+    `test_form_layout_submit_label_defaults_to_save_changes` in
+    `_shared/test_actions.py`)."""
     env = _make_env()
     _add_child(
         env,
         "stub.html",
         """
         {% from "_shared/actions.html" import actions %}
-        <div id="cancel-only">
+        <div id="cluster">
           {{ actions(cancel_url="/widgets/1") }}
         </div>
         """,
     )
     html = env.get_template("stub.html").render()
     tree = HTMLParser(html)
-    cluster = tree.css_first("#cancel-only .form-actions")
-    assert cluster is not None, "macro must still render `.form-actions` wrapper"
-    # No submit button when `submit_label` is omitted.
-    assert (
-        cluster.css_first("button[type='submit']") is None
-    ), "Cancel-only cluster must not render a stray Save button"
+    cluster = tree.css_first("#cluster .form-actions")
+    assert cluster is not None, "macro must render `.form-actions` wrapper"
+    # The default "Save changes" submit button renders.
+    submit = cluster.css_first("button[type='submit']")
+    assert submit is not None
+    assert submit.text().strip() == "Save changes"
     # Cancel link is present and points at the supplied URL.
     cancel = cluster.css_first("a[role='button']")
     assert cancel is not None
