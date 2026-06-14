@@ -44,13 +44,24 @@
        nav, `<main>` for the page body) to get Pico's max-width centering. #}
     <link rel="stylesheet" href="/static/fw/css/framework.css" />
     <link rel="stylesheet" href="/static/domain/css/domain.css" />
+    {# `defer` keeps the HTML parser unblocked while these scripts
+       download — they execute in document order after parsing
+       completes, just before `DOMContentLoaded`, which is the event
+       htmx wires its initial scan to. Without `defer` the head scripts
+       are render-blocking on every page; with it, first paint can
+       start while htmx + the extensions are still in-flight. Order
+       across the three is still preserved (deferred scripts execute
+       in source order), so the extensions register against htmx-core
+       before any hx-wired form fires. Pinned by `test_base_html.py`.
+       See https://developer.chrome.com/docs/performance/insights/render-blocking. #}
     <script src="https://unpkg.com/htmx.org@2.0.4"
             integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
-            crossorigin="anonymous"></script>
+            crossorigin="anonymous"
+            defer></script>
     {# htmx 2 ships extensions as separate npm packages — the in-tree
        `dist/ext/json-enc.js` is the htmx-1 build and logs a "v1 extension
        with htmx 2" console warning. Use the htmx-2 package instead. #}
-    <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js"></script>
+    <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js" defer></script>
     {# `response-targets` extension lets a form swap the response into a
        target on a 4xx response (htmx's default response handler only
        swaps on 2xx). With it, form-error rerenders can return *proper*
@@ -64,7 +75,8 @@
        behavior for forms that don't declare a 4xx target.
 
        https://htmx.org/extensions/response-targets/ #}
-    <script src="https://unpkg.com/htmx-ext-response-targets@2.0.4/response-targets.js"></script>
+    <script src="https://unpkg.com/htmx-ext-response-targets@2.0.4/response-targets.js"
+            defer></script>
     {% block head %}{% endblock %}
     {% if is_development %}
       <!-- LiveReload script for development hot reloading -->
