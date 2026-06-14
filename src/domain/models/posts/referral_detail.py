@@ -61,9 +61,11 @@ class ReferralDetail(LocationMixin, Base):
     subject = Column(Text, nullable=True)
     description = Column(Text, nullable=False)
 
-    # Section 4 — services
+    # Section 4 — services. `treatment_modality` (the free-text scalar)
+    # was dropped: the structured `modalities` enum list covers the
+    # filterable shape and the free-text `description` covers prose,
+    # so the scalar was duplicative on both axes.
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    treatment_modality = Column(Text, nullable=True)
     modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
 
     # Affirming-identity request constraints — symmetric to

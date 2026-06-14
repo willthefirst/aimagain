@@ -152,11 +152,6 @@ def test_post_update_referral_referring_clinician_id_optional():
     assert p.referring_clinician_id is None
 
 
-def test_post_create_referral_optional_fields_default_none():
-    p = post_create_adapter.validate_python(referral_payload())
-    assert p.treatment_modality is None
-
-
 def test_post_create_referral_default_languages():
     """`languages` defaults to ['en'] — keeps "submit with defaults" valid
     even though the field is required min-1 (#428)."""
@@ -194,11 +189,6 @@ def test_post_create_referral_accepts_multiple_age_groups():
 def test_post_create_referral_rejects_empty_age_groups():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(referral_payload(age_groups=[]))
-
-
-def test_post_create_referral_strips_optional_to_none():
-    p = post_create_adapter.validate_python(referral_payload(treatment_modality="   "))
-    assert p.treatment_modality is None
 
 
 def test_post_create_referral_defaults_affirming_identities_to_empty_list():

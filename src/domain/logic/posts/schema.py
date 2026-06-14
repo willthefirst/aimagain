@@ -225,7 +225,6 @@ class ReferralRead(_PostReadBase):
     subject: str | None = None
     description: str
     services: ServicesField = []
-    treatment_modality: str | None = None
     modalities: ModalitiesField = []
     # Payment paths — three independent booleans the corpus treats as
     # non-mutually-exclusive (#1358 PR-e). See :class:`ReferralCreate`
@@ -353,7 +352,6 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     subject: StrippedOptionalText = None
     description: StrippedText
     services: ServicesField = []
-    treatment_modality: StrippedOptionalText = None
     modalities: ModalitiesField = []
     # Payment paths (#1358 PR-e). Three independent booleans the corpus
     # consistently distinguishes — "Anthem PPO; private pay okay"
@@ -497,7 +495,6 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     subject: StrippedOptionalText = None
     description: StrippedText | None = None
     services: ServicesField | None = None
-    treatment_modality: StrippedOptionalText = None
     modalities: ModalitiesField | None = None
     # `None` = leave unchanged; any bool sets the flag (#1358 PR-e).
     # The three payment paths are independent — a PATCH may flip just
@@ -599,7 +596,6 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     subject: str | None = None
     description: str
     services: ServicesField = []
-    treatment_modality: str | None = None
     modalities: ModalitiesField = []
     accepts_in_network: bool = False
     accepts_out_of_network_superbill: bool = False

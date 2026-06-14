@@ -80,7 +80,6 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "gender": "prefer_not_to_say",
     "description": "needs placement",
     "services": [],
-    "treatment_modality": None,
     "modalities": [],
     # Payment paths (#1358 PR-e). Three independent booleans + a
     # carrier list. Default emulates the most common corpus shape
