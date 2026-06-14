@@ -83,12 +83,36 @@ literals. Two problems:
 
 ## Login credentials
 
-The first three seeded users are pinned identities so muscle-memory
-logins survive across runs:
+The pinned anchor accounts:
 
-  - `admin@example.com` (is_superuser=True)
-  - `alice@example.com`
-  - `bob@example.com`
+  - `admin@example.com` (`is_superuser=True`) — muscle-memory admin.
+  - Three **persona** anchors — one per auth state the rest of the
+    app branches on. The registry is the single source of truth at
+    [`src/domain/routes/dev_personas.py`](../../../src/domain/routes/dev_personas.py)
+    and the dev login dropdown
+    ([`src/domain/routes/dev_auth.py:DEV_SEED_USERS`](../../../src/domain/routes/dev_auth.py))
+    reads from it:
+
+      - `unverified@example.com` — `User.is_verified=False`, no anchor
+        Clinician.
+      - `clinician-pending@example.com` — email verified, owns a
+        Clinician with `clinician_verified=False`.
+      - `clinician-verified@example.com` — email verified, owns a
+        Clinician with `clinician_verified=True`.
 
 Password for every seeded user: `password`. Visiting
-`/dev/login-as-seed-user` (dev-only route) signs in as the admin.
+`/dev/login-as-seed-user` (dev-only route) signs in as the admin;
+`/dev/login-as?email=<addr>` (also dev-only) signs in as any seeded
+user — that's what the login-page dropdown wires up.
+
+## Dev-only magic NPI
+
+In `ENVIRONMENT=development`, submitting `0000000000` as a clinician's
+NPI short-circuits the NPPES lookup in
+[`src/domain/logic/verifications/handlers.py`](../../../src/domain/logic/verifications/handlers.py)
+and produces a synthetic "verified" Verification row against the
+clinician's own name. Lets local devs and Playwright/MCP automation
+walk the verified-clinician flow without hitting the public NPPES API.
+Never honored outside development — gated by the same
+`settings.ENVIRONMENT == "development"` check that mounts
+`/dev/login-as`.

@@ -35,16 +35,26 @@ from fastapi_users.manager import BaseUserManager
 
 from src.auth_config import auth_backend, get_strategy, get_user_manager
 from src.domain.models import User
+from src.domain.routes.dev_personas import PERSONAS
 from src.framework.config import settings
 
 router = APIRouter(tags=["dev"])
 
-# Mirrors the anchor rows in scripts/dev/seed/overrides/users.py.
 # Shown in the login-page quick-sign-in dropdown when ENVIRONMENT=development.
+#
+# Admin (superuser) plus one entry per auth-state persona from
+# ``src/domain/routes/dev_personas.py``:
+#
+# - ``unverified@example.com`` — ``User.is_verified=False``. Surfaces the
+#   "verify your email" nag banner and gates email-verified flows.
+# - ``clinician-pending@example.com`` — ``User.is_verified=True`` plus a
+#   ``Clinician`` row with ``clinician_verified=False``. Exercises the
+#   "claim NPI" path and verification-gated capabilities.
+# - ``clinician-verified@example.com`` — same as above but the linked
+#   ``Clinician`` has ``clinician_verified=True``. Full-access persona.
 DEV_SEED_USERS: list[dict[str, str]] = [
     {"email": "admin@example.com", "label": "admin (superuser)"},
-    {"email": "alice@example.com", "label": "alice"},
-    {"email": "bob@example.com", "label": "bob"},
+    *({"email": p.email, "label": p.label} for p in PERSONAS),
 ]
 
 

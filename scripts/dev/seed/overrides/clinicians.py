@@ -31,6 +31,7 @@ from src.domain.models.enums import (
     TREATMENT_SETTINGS,
     US_STATES,
 )
+from src.domain.routes.dev_personas import PERSONAS
 
 from .. import counts
 from ..generators import SeedPool
@@ -43,7 +44,14 @@ from . import register
 async def generate_clinicians(
     rng: SeededRandom, pool: SeedPool, session: AsyncSession
 ) -> list[Clinician]:
-    users: list[User] = pool.all("users")
+    all_users: list[User] = pool.all("users")
+    # Persona users are excluded from the round-robin owner pool so the
+    # only Clinician they own is the persona anchor created below — that
+    # way the capability predicates (`any(...)` over the owned set) read
+    # the persona's intended verification state instead of whatever the
+    # index-driven rotation happened to assign.
+    persona_emails = {p.email for p in PERSONAS}
+    users: list[User] = [u for u in all_users if u.email not in persona_emails]
     out: list[Clinician] = []
     for i in range(counts.CLINICIAN_COUNT):
         cid = deterministic_uuid("Clinician", i)
@@ -82,6 +90,39 @@ async def generate_clinicians(
             npi_match_status=match_status,
             npi_verified_at=verified_ts,
             clinician_verified=clinician_verified,
+            verified_at=verified_ts,
+            ever_verified_at=verified_ts,
+        )
+        await session.merge(row)
+        out.append(row)
+
+    # Persona overrides — anchor a Clinician row for each persona that
+    # declares one (`clinician_verified is not None`). Persona users
+    # are excluded from the generic round-robin above, so this anchor
+    # is the only Clinician they own. Persona registry lives in
+    # `src/domain/routes/dev_personas.py`.
+    persona_users_by_email = {u.email: u for u in all_users}
+    for persona in PERSONAS:
+        if persona.clinician_verified is None:
+            continue
+        user = persona_users_by_email.get(persona.email)
+        if user is None:
+            continue
+        verified_ts = (
+            rng.date_within_years(years_back=1, years_forward=0)
+            if persona.clinician_verified
+            else None
+        )
+        row = Clinician(
+            id=deterministic_uuid("PersonaClinician", persona.username),
+            owner_id=user.id,
+            npi=None,
+            first_name=persona.username.replace("-", " ").title(),
+            last_name="Persona",
+            languages=["en"],
+            npi_match_status="matched" if persona.clinician_verified else "none",
+            npi_verified_at=verified_ts,
+            clinician_verified=persona.clinician_verified,
             verified_at=verified_ts,
             ever_verified_at=verified_ts,
         )
