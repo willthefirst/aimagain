@@ -65,20 +65,35 @@ def _find_template(name: str) -> Path:
     )
 
 
+def _iter_mounted_routes(app_or_router):
+    """Yield each registered route, transparently flattening fastapi
+    >=0.137's ``_IncludedRouter`` markers (which replace per-route
+    expansion on ``app.routes`` with a single wrapper that points at
+    the original sub-router via ``.original_router``).
+    """
+    stack = list(getattr(app_or_router, "routes", []) or [])
+    while stack:
+        route = stack.pop()
+        original = getattr(route, "original_router", None)
+        if original is not None:
+            stack.extend(getattr(original, "routes", []) or [])
+        else:
+            yield route
+
+
 def _collect_decorated_routes() -> list[tuple[str, str, FormErrorConfig]]:
     """Walk the FastAPI app and return `(method, path, config)` for
     every route whose endpoint carries `__form_error_config__`.
 
     Importing `src.main` is the canonical entry point because it
     triggers the `entity_registry` side effects + mounts the auth
-    routes. The function walks `app.routes` and unwraps the decorator
-    chain (`@form_error_handler` sits *under* `handle_route_errors` +
-    `log_route_call`) until it finds the config.
+    routes. The walk uses `_iter_mounted_routes` so the test stays
+    stable across the fastapi 0.137 `include_router` shape change.
     """
     from src.main import app
 
     out: list[tuple[str, str, FormErrorConfig]] = []
-    for route in app.routes:
+    for route in _iter_mounted_routes(app):
         endpoint = getattr(route, "endpoint", None)
         if endpoint is None:
             continue
