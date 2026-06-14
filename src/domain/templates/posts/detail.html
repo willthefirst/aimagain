@@ -24,8 +24,9 @@
 {% endblock %}
 {# Owner-context card — the steady-state profile of the provider behind
    the post (the clinician + practice for an opening, the program for an
-   intake), rendered as a visually separate read-only card below the
-   post's own facts.
+   intake, the referring clinician + affiliation for a referral),
+   rendered as a visually separate read-only card below the post's own
+   facts.
 
    The identity row is the shared `provider_ref` denotation — the
    canonical hyperlinked "<name> · <org>" the feed byline and form
@@ -36,25 +37,31 @@
    is edited in exactly one place — the entity's own page. The `provider`
    and `address` rows keep their `data-fact` keys and `redacted`
    treatment: the row renders, the value is withheld via
-   `provider_ref`'s `locked_name` / `locked_field`. #}
+   `provider_ref`'s `locked_name` / `locked_field`. The address row reads
+   `view.owner_address` (the provider's address — distinct from
+   `view.full_address`, which is the client location for referrals). #}
 {%- macro owner_context(view, post, redacted) -%}
   {%- set ctx = namespace(aff=None, prog=None) -%}
   {%- if view.kind == "clinician_opening" -%}
     {%- set ctx.aff = post.opening_detail.clinician_affiliation -%}
   {%- elif view.kind == "program_intake" -%}
     {%- set ctx.prog = post.intake_detail.program -%}
+  {%- elif view.kind == "referral" -%}
+    {%- set ctx.aff = post.referral_detail.clinician_affiliation -%}
   {%- endif -%}
-  {%- if view.kind in ("clinician_opening", "program_intake") and view.provider_ref -%}
-    {%- call card(id="provider-profile", headline_url=None, headline="About this provider") %}
+  {%- if view.kind in ("clinician_opening", "program_intake", "referral") and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
+    {%- set card_headline = "About the referring clinician" if view.kind == "referral" else "About this provider" -%}
+    {%- call card(id="provider-profile", headline_url=None, headline=card_headline) %}
       {%- call entity_facts() %}
-        {%- call fact('provider', 'Provider') %}{{ provider_ref(view.provider_ref, redacted=redacted) }}
+        {%- set provider_label = "Referring clinician" if view.kind == "referral" else "Provider" -%}
+        {%- call fact('provider', provider_label) %}{{ provider_ref(view.provider_ref, redacted=redacted) }}
         {% endcall %}
-        {%- if view.full_address %}
+        {%- if view.owner_address %}
           {% if redacted %}
             {%- call fact('address', 'Address', icon='map-pin') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}
             {% endcall %}
           {% else %}
-            {{ fact('address', 'Address', view.full_address, icon='map-pin') }}
+            {{ fact('address', 'Address', view.owner_address, icon='map-pin') }}
           {% endif %}
         {%- endif %}
         {%- if ctx.aff %}{{ affiliation_facts(ctx.aff) }}{%- endif %}
@@ -71,10 +78,12 @@
           {%- endcall %}
         {%- endif -%}
       {%- endmacro %}
-      {# Detail-page layout. Referral detail stays the single expanded facts
-   grid — every row there describes the client or the ask, which is
-   post-own data. Opening/intake detail splits in two: the post's own
-   facts (the announcement delta — desired times, schedule notes,
+      {# Detail-page layout. Referral detail is the expanded facts grid
+   (every row describes the client or the ask) followed by the
+   owner-context card (the referring clinician + affiliation —
+   `referral_detail.referring_clinician_id` / `clinician_affiliation_id`,
+   #1454). Opening/intake detail splits the same two ways: the post's
+   own facts (the announcement delta — desired times, schedule notes,
    modality) up top, then the owner-context card. Per-kind logic lives
    in `post_card_view` (one place); every visual element reads from
    `view` (plus the linked affiliation/program model rows the shared
@@ -84,6 +93,7 @@
           {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
           {%- if view.kind == "referral" %}
             {{ facts_block(view, expanded=True, redacted=not can_act_as_provider) }}
+            {{ owner_context(view, post, redacted=not can_act_as_provider) }}
           {%- else %}
             {%- if view.desired_times or view.schedule_text or view.treatment_modality %}
               {%- call entity_facts() %}
