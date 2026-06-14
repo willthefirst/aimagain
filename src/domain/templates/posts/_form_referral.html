@@ -76,8 +76,11 @@ the script block at the bottom of this file).
       {{ text_field("location_city", "City", current=d.location_city if d else None) }}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
       {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
-      {{ select_field("location_in_person", "In-person sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_in_person if d else None, placeholder=true) }}
-      {{ select_field("location_virtual", "Virtual sessions", LOCATION_AVAILABILITY_OPTIONS, labels=LOCATION_AVAILABILITY_LABELS, current=d.location_virtual if d else None, placeholder=true) }}
+      {# Collapsed session-format picker (#1359). Previously two
+         independent `yes / no / please_contact` selects (one for
+         in-person, one for virtual); the corpus showed those collapsed
+         onto four mutually-exclusive options in practice. #}
+      {{ select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, placeholder=true) }}
       {{ multi_select_field("desired_times", "Desired session times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false, help="Select any that work; leave blank if flexible.") }}
     {% endcall %}
     {% call form_section("Client basics") %}

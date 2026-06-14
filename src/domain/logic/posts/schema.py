@@ -62,8 +62,8 @@ from src.domain.models.enums import (
     INSURANCE_CARRIERS,
     LANGUAGES,
     LICENSE_TYPES,
-    LOCATION_AVAILABILITY_OPTIONS,
     REFERRAL_SERVICES,
+    SESSION_FORMATS,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
 )
@@ -216,8 +216,11 @@ class ReferralRead(_PostReadBase):
     # produces a flat dict from the ORM, ``gather_flat_location`` nests the
     # three keys, and ``flatten_location_on_dump`` reverses on dump.
     location: Location
-    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    # `session_format` is the collapsed referral-side format axis (#1359).
+    # Replaces `location_in_person` / `location_virtual`. `view.py`
+    # back-derives the legacy `in_person`/`virtual` view keys so the
+    # cross-kind list/detail templates render unchanged.
+    session_format: Literal[*SESSION_FORMATS]
     desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
@@ -336,8 +339,9 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
 
     kind: Literal["referral"]
     location: Location
-    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    # See :class:`ReferralRead.session_format` — single mutually-exclusive
+    # axis required on create.
+    session_format: Literal[*SESSION_FORMATS]
     desired_times: DesiredTimesField = []
     # Required min-1 on the wire. Mirrors PA's `age_groups`.
     age_groups: RequiredAgeGroupsField
@@ -480,8 +484,8 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # See :class:`ReferralCreate` — flat on the wire, nested
     # value object in Python, flat on dump.
     location: LocationPartial | None = None
-    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
-    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS] | None = None
+    # `None` = leave unchanged. See :class:`ReferralRead.session_format`.
+    session_format: Literal[*SESSION_FORMATS] | None = None
     # `None` = leave unchanged (per `update_post`); `[]` = clear all
     # selections. List-valued PATCH replaces the whole list — partial
     # add/remove is intentionally out of scope.
@@ -587,8 +591,8 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     # snapshots stay flat on the wire — the serializer unrolls the nested
     # ``location`` block back to top-level keys.
     location: Location
-    location_in_person: Literal[*LOCATION_AVAILABILITY_OPTIONS]
-    location_virtual: Literal[*LOCATION_AVAILABILITY_OPTIONS]
+    # See :class:`ReferralRead.session_format`.
+    session_format: Literal[*SESSION_FORMATS]
     desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
