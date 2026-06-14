@@ -237,7 +237,6 @@ class PostRepository(BaseRepository):
             geo_clauses = [
                 ReferralDetail.location_city.ilike(needle),
                 ReferralDetail.location_state.ilike(needle),
-                ReferralDetail.location_zip.ilike(needle),
                 ClinicianAffiliation.location_city.ilike(needle),
                 ClinicianAffiliation.location_state.ilike(needle),
                 ClinicianAffiliation.location_zip.ilike(needle),

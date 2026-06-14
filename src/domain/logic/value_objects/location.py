@@ -69,6 +69,31 @@ class Location(BaseModel):
     zip: ZipText
 
 
+class ReferralLocation(BaseModel):
+    """``(city, state)`` pair — referral-side flavor.
+
+    Referrals model client location as city + state only (no ZIP).
+    Same flat-on-the-wire convention as :class:`Location`; the gather /
+    flatten helpers iterate `_LOCATION_SUBFIELDS` but only emit keys
+    that are present in the input, so a referral payload without
+    ``location_zip`` validates here (and ``extra="forbid"`` rejects
+    stray ``zip`` from any caller that smuggles one in)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    city: _CityText
+    state: Literal[*US_STATES]
+
+
+class ReferralLocationPartial(BaseModel):
+    """``(city, state)`` pair — referral-side partial-update flavor."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    city: _CityTextOptional = None
+    state: Literal[*US_STATES] | None = None
+
+
 class LocationPartial(BaseModel):
     """``(city, state, zip)`` triple — partial-update flavor.
 
