@@ -78,7 +78,23 @@ class LocationAvailability(LabeledChoice):
     please_contact = "please_contact", "Please contact"
 
 
+# Referral session-format axis. A referral describes one client; the
+# referrer picks one of four mutually-exclusive options. The matching
+# corpus said the previous two-axis shape (`location_in_person` *and*
+# `location_virtual`, each {yes, no, please_contact}) collapsed onto
+# these four combinations in practice — every meaningful answer was
+# one of "in-person only", "virtual only", "either", or "let's talk".
+# The opening / affiliation side keeps the two-axis shape because a
+# practice can legitimately offer both in independent quantities.
+class SessionFormat(LabeledChoice):
+    in_person_only = "in_person_only", "In-person only"
+    virtual_only = "virtual_only", "Virtual only"
+    either = "either", "Either in-person or virtual"
+    please_contact = "please_contact", "Please contact"
+
+
 LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = LocationAvailability.values()
+SESSION_FORMATS: Final[tuple[str, ...]] = SessionFormat.values()
 
 
 # Client age cohorts. Richer than value+label+icon: each member carries a
@@ -312,6 +328,7 @@ TREATMENT_MODALITIES: Final[tuple[str, ...]] = TreatmentModality.values()
 # abbreviation) is the right user-facing label.
 
 LOCATION_AVAILABILITY_LABELS: Final[dict[str, str]] = LocationAvailability.labels()
+SESSION_FORMAT_LABELS: Final[dict[str, str]] = SessionFormat.labels()
 # `CLIENT_AGE_GROUPS_BY_KEY` maps each value to its `ClientAgeGroup` member,
 # whose `.singular` / `.plural` / `.range` the CR headline builder reads
 # directly ("<noun> <gender> (<range>)"). The two label dicts derive the
