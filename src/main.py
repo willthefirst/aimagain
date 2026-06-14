@@ -30,10 +30,12 @@ from src.domain.routes import (
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import (
+    StaticLongCacheMiddleware,
     StaticNoCacheMiddleware,
     StripEmptyQueryParamsMiddleware,
 )
 from src.framework.http.responses import APIResponse
+from src.framework.http.static_files import MinifyingStaticFiles
 from src.framework.observability import observability
 from src.jobs.scheduler import make_scheduler, register_jobs
 
@@ -99,6 +101,20 @@ app.add_middleware(StripEmptyQueryParamsMiddleware)
 
 if settings.ENVIRONMENT == "development":
     app.add_middleware(StaticNoCacheMiddleware)
+else:
+    # Production / staging — emit far-future cache headers on versioned
+    # asset URLs and a short revalidating TTL on the rest. See the
+    # middleware docstring for the URL convention.
+    app.add_middleware(StaticLongCacheMiddleware)
+    # Compress HTML + CSS + JSON over the wire. `minimum_size=500`
+    # skips tiny responses where the gzip header itself would bloat
+    # the payload. Same content + smaller transfer = lower TTFB on
+    # every page, especially first-paint CSS (Lighthouse:
+    # "render-blocking" insight). Dev is skipped — the LiveReload
+    # snippet relies on bare HTTP/1.1 chunked frames.
+    from starlette.middleware.gzip import GZipMiddleware
+
+    app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 @app.exception_handler(HTTPException)
@@ -234,9 +250,22 @@ dev_components.mount_dev_components(app, environment=settings.ENVIRONMENT)
 # visible at the URL level — framework primitives at /static/fw/,
 # site-specific styles at /static/domain/. Both directories are under
 # src/ so the files live next to the code they describe.
-app.mount("/static/fw", StaticFiles(directory="src/framework/static"), name="static_fw")
+#
+# Production uses `MinifyingStaticFiles` so .css responses go through
+# the in-process minifier (~30% byte savings, Lighthouse: "minify-css"
+# audit). Dev keeps the bare `StaticFiles` so DevTools shows readable
+# source — the no-cache middleware above already prevents the browser
+# from stale-caching dev edits.
+_StaticFilesCls = (
+    StaticFiles if settings.ENVIRONMENT == "development" else MinifyingStaticFiles
+)
 app.mount(
-    "/static/domain", StaticFiles(directory="src/domain/static"), name="static_domain"
+    "/static/fw", _StaticFilesCls(directory="src/framework/static"), name="static_fw"
+)
+app.mount(
+    "/static/domain",
+    _StaticFilesCls(directory="src/domain/static"),
+    name="static_domain",
 )
 
 

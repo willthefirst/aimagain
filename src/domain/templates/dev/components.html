@@ -234,7 +234,7 @@ it's dev-only chrome that should never ship to production. #}
           The UI is built on <a href="https://picocss.com" target="_blank" rel="noopener">Pico.css</a> — a classless semantic CSS framework. Typography, color tokens, form elements, buttons, and spacing all come from Pico. Refer to the <a href="https://picocss.com/docs" target="_blank" rel="noopener">Pico docs</a> for the full token reference and component catalog.
         </p>
         <p>
-          Icons are from <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a>, served as a static icon font (<code>framework.css</code> loads it via <code>@font-face</code>). Use any icon with <code>&lt;i class="icon-{name}"&gt;&lt;/i&gt;</code> where <code>{name}</code> is the Lucide icon name in kebab-case. Browse the full set at <a href="https://lucide.dev/icons" target="_blank" rel="noopener">lucide.dev/icons</a>.
+          Icons are from <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a>, served as a self-hosted icon font. Only the icons referenced in templates and enums are bundled — see <code>src/framework/static/fonts/lucide-icons.css</code> for the allowlist and the per-icon "how to add one" instructions. Use a bundled icon with <code>&lt;i class="icon-{name}"&gt;&lt;/i&gt;</code> where <code>{name}</code> is the Lucide icon name in kebab-case; browse the full Lucide set at <a href="https://lucide.dev/icons" target="_blank" rel="noopener">lucide.dev/icons</a>.
         </p>
       </section>
       {# ═══════════════════════════════════════════════════════════ #}

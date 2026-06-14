@@ -1,0 +1,70 @@
+/* Self-hosted Lucide icon subset.
+ *
+ * Why a subset rather than upstream's `font/lucide.css`? The upstream
+ * file ships rules for all 1,546 Lucide icons (~12 KiB transferred,
+ * ~73 KiB unminified) — we use 30. Lighthouse flagged this file as
+ * 99% unused. By hand-curating the rules below to match what's
+ * actually referenced in templates + enums, the same file is ~1 KiB
+ * and 100% used.
+ *
+ * Why self-hosted? Same-origin lets `Cache-Control` from our static
+ * mount apply (no third-party caching variability) and removes
+ * `unpkg.com` from the render-blocking chain.
+ *
+ * Drift guardrail: `test_lucide_icon_subset.py` scans every
+ * `class="icon-NAME"` and `icon='NAME'` reference in `src/` and
+ * asserts each NAME has a matching rule below. To add an icon:
+ *   1. Look up the codepoint at
+ *      https://unpkg.com/lucide-static@0.471.0/font/lucide.css
+ *   2. Add a `.icon-NAME:before { content: "\HEX"; }` line, sorted.
+ *   3. The test now passes.
+ */
+
+@font-face {
+  font-family: "lucide";
+  src: url("./lucide.woff2") format("woff2");
+  font-display: swap;
+}
+
+[class^="icon-"], [class*=" icon-"] {
+  font-family: 'lucide' !important;
+  font-size: inherit;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-arrow-left:before      { content: "\e04c"; }
+.icon-award:before           { content: "\e053"; }
+.icon-baby:before            { content: "\e2cd"; }
+.icon-brain:before           { content: "\e3c9"; }
+.icon-calendar-clock:before  { content: "\e303"; }
+.icon-calendar-days:before   { content: "\e2b8"; }
+.icon-check:before           { content: "\e070"; }
+.icon-chevron-left:before    { content: "\e072"; }
+.icon-chevron-right:before   { content: "\e073"; }
+.icon-circle-dashed:before   { content: "\e4b4"; }
+.icon-circle-help:before     { content: "\e082"; }
+.icon-circle-x:before        { content: "\e088"; }
+.icon-heart:before           { content: "\e0f5"; }
+.icon-heart-handshake:before { content: "\e2d6"; }
+.icon-heart-pulse:before     { content: "\e371"; }
+.icon-layers:before          { content: "\e52d"; }
+.icon-lock:before            { content: "\e10e"; }
+.icon-map-pin:before         { content: "\e114"; }
+.icon-menu:before            { content: "\e118"; }
+.icon-message-circle:before  { content: "\e119"; }
+.icon-monitor:before         { content: "\e120"; }
+.icon-shield:before          { content: "\e15b"; }
+.icon-shield-alert:before    { content: "\e1fd"; }
+.icon-shield-check:before    { content: "\e1fe"; }
+.icon-shield-x:before        { content: "\e1ff"; }
+.icon-tag:before             { content: "\e182"; }
+.icon-user:before            { content: "\e19e"; }
+.icon-users:before           { content: "\e1a3"; }
+.icon-users-round:before     { content: "\e472"; }
+.icon-x:before               { content: "\e1b1"; }
+/* `x-circle` is Lucide's old name; upstream renamed to `circle-x` but
+ * `src/domain/models/enums.py` still uses the old token (see the
+ * `expired` status). Alias to the new codepoint so the glyph renders. */
+.icon-x-circle:before        { content: "\e088"; }

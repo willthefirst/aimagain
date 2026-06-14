@@ -35,6 +35,55 @@ class StaticNoCacheMiddleware:
             await self.app(scope, receive, send)
 
 
+class StaticLongCacheMiddleware:
+    """Add ``Cache-Control`` to ``/static/`` responses in production.
+
+    Lighthouse flags Starlette's bare ``StaticFiles`` (no
+    ``Cache-Control`` at all) as "Use efficient cache lifetimes" —
+    repeat visitors re-download every CSS file on every navigation.
+
+    Two TTLs, distinguished by the presence of a ``?v=`` query string:
+
+    - **Versioned URLs** (``/static/...?v=<sha>``) → 1 year + immutable.
+      The convention is that the version sentinel comes from
+      ``settings.APP_RELEASE`` via the ``static_version`` Jinja global,
+      so a deploy of a new SHA mints fresh URLs and busts the cache
+      cleanly. ``immutable`` tells the browser to skip even conditional
+      revalidation while the entry is fresh.
+    - **Unversioned URLs** → 5 min with ``must-revalidate``. Safe
+      default for hot-linked assets and for environments where
+      ``APP_RELEASE`` is empty (``static_version`` evaluates to ``""``
+      and the templates omit the ``?v=`` segment entirely). ETag-driven
+      304s still keep the wire cost near zero on repeat hits.
+
+    Mounted in production only. ``StaticNoCacheMiddleware`` covers the
+    dev-loop case.
+    """
+
+    def __init__(self, app: Callable):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not scope.get("path", "").startswith("/static/"):
+            await self.app(scope, receive, send)
+            return
+
+        is_versioned = b"v=" in scope.get("query_string", b"")
+        header_value = (
+            "public, max-age=31536000, immutable"
+            if is_versioned
+            else "public, max-age=300, must-revalidate"
+        )
+
+        async def send_with_cache(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["Cache-Control"] = header_value
+            await send(message)
+
+        await self.app(scope, receive, send_with_cache)
+
+
 class StripEmptyQueryParamsMiddleware:
     """Treat ``?key=`` (and bare ``?key``) as if the key were absent.
 
