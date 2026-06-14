@@ -45,12 +45,34 @@ def test_dev_seed_users_includes_three_persona_anchors():
 # --- mount_dev_routes: env-gated router registration --------------------
 
 
+def _mounted_paths(app: FastAPI) -> set[str | None]:
+    """Collect every registered path on ``app``, flattening
+    ``_IncludedRouter`` markers introduced by fastapi >=0.137.
+
+    Older fastapi expanded ``app.include_router(sub)`` into one
+    ``APIRoute`` per sub-route directly on ``app.routes``; newer
+    fastapi adds a single ``_IncludedRouter`` wrapper carrying the
+    original router on ``.original_router``. Walking that recursively
+    keeps the assertion stable across both shapes.
+    """
+    out: set[str | None] = set()
+    stack: list[object] = list(getattr(app, "routes", []) or [])
+    while stack:
+        route = stack.pop()
+        original = getattr(route, "original_router", None)
+        if original is not None:
+            stack.extend(getattr(original, "routes", []) or [])
+        else:
+            out.add(getattr(route, "path", None))
+    return out
+
+
 def test_mount_dev_routes_registers_when_environment_is_development():
     """A fresh app + `mount_dev_routes(env="development")` produces both
     dev routes on `app.routes`. Pins the dev-mode mount."""
     app = FastAPI()
     dev_auth.mount_dev_routes(app, environment="development")
-    paths = {getattr(r, "path", None) for r in app.routes}
+    paths = _mounted_paths(app)
     assert "/dev/login-as-seed-user" in paths
     assert "/dev/login-as" in paths
 
@@ -61,7 +83,7 @@ def test_mount_dev_routes_skips_when_environment_is_production():
     auto-login backdoor into prod."""
     app = FastAPI()
     dev_auth.mount_dev_routes(app, environment="production")
-    paths = {getattr(r, "path", None) for r in app.routes}
+    paths = _mounted_paths(app)
     assert "/dev/login-as-seed-user" not in paths
     assert "/dev/login-as" not in paths
 
@@ -73,7 +95,7 @@ def test_mount_dev_routes_skips_when_environment_is_arbitrary_other():
     app = FastAPI()
     for env in ("staging", "test", "PRODUCTION", "Development", ""):
         dev_auth.mount_dev_routes(app, environment=env)
-    paths = {getattr(r, "path", None) for r in app.routes}
+    paths = _mounted_paths(app)
     assert "/dev/login-as-seed-user" not in paths
     assert "/dev/login-as" not in paths
 
