@@ -368,6 +368,84 @@ async def test_run_raises_not_found_for_missing_clinician(
                 )
 
 
+async def test_run_short_circuits_on_dev_magic_npi(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """`ENVIRONMENT=development` + `npi=0000000000` (the magic string)
+    bypasses NPPES entirely and lands on `verified`. The mocked
+    `httpx.AsyncClient` is configured to fail any actual call so the
+    test pins "no HTTP request was made"."""
+    from src.framework.config import settings
+
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development")
+
+    clinician, _ = await _seed_clinician(
+        db_test_session_manager,
+        npi="0000000000",
+        first_name="Magic",
+        last_name="Persona",
+    )
+
+    def fail_handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(
+            "magic NPI must short-circuit before NPPES is called; "
+            f"got {request.method} {request.url}"
+        )
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(fail_handler))
+
+    async with db_test_session_manager() as session:
+        async with http:
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
+                verification_repo=VerificationRepository(session),
+                clinician_repo=ClinicianRepository(session),
+                audit_repo=AuditRepository(session),
+                http=http,
+                actor_id=None,
+            )
+
+    assert verification.status == "verified"
+    assert "dev_magic_npi" in verification.flags
+    assert verification.nppes_result == {"dev_magic_npi": True}
+
+
+async def test_run_does_not_short_circuit_on_magic_npi_outside_development(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The magic-NPI short-circuit is dev-only — even in
+    `ENVIRONMENT=production` the orchestrator must fall through to
+    NPPES. Pins the canary against the backdoor leaking into prod."""
+    from src.framework.config import settings
+
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+
+    clinician, _ = await _seed_clinician(
+        db_test_session_manager,
+        npi="0000000000",
+        first_name="Magic",
+        last_name="Persona",
+    )
+    # NPPES says "not found" for this NPI in prod.
+    http = _mock_http({"0000000000": {"results": []}})
+
+    async with db_test_session_manager() as session:
+        async with http:
+            verification = await run_clinician_verification(
+                clinician_id=clinician.id,
+                verification_repo=VerificationRepository(session),
+                clinician_repo=ClinicianRepository(session),
+                audit_repo=AuditRepository(session),
+                http=http,
+                actor_id=None,
+            )
+
+    assert verification.status == "failed"
+    assert "dev_magic_npi" not in verification.flags
+
+
 async def test_run_with_commit_false_does_not_persist_until_caller_commits(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
