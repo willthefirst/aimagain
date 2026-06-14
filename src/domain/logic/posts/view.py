@@ -86,6 +86,30 @@ _GENDER_HEADLINE_WORDS: dict[str, str] = {
 }
 
 
+# Back-derivation map: referral's collapsed `session_format` → the
+# two-axis `(in_person, virtual)` shape opening/affiliation still uses.
+# Lets the cross-kind list/detail templates read `view.in_person` /
+# `view.virtual` uniformly. `please_contact` maps both axes to
+# `please_contact` so the existing template chunk renders "Please
+# contact" once and not contradictory yes/no badges.
+_SESSION_FORMAT_TO_AXES: dict[str, tuple[str, str]] = {
+    "in_person_only": ("yes", "no"),
+    "virtual_only": ("no", "yes"),
+    "either": ("yes", "yes"),
+    "please_contact": ("please_contact", "please_contact"),
+}
+
+
+def _in_person_from_session_format(session_format: str | None) -> str | None:
+    pair = _SESSION_FORMAT_TO_AXES.get(session_format or "")
+    return pair[0] if pair else None
+
+
+def _virtual_from_session_format(session_format: str | None) -> str | None:
+    pair = _SESSION_FORMAT_TO_AXES.get(session_format or "")
+    return pair[1] if pair else None
+
+
 def insurance_posture_for_post(post) -> str | None:
     """Map a `Post` (either kind) to one of `INSURANCE_POSTURES`.
 
@@ -335,6 +359,10 @@ def post_card_view(post) -> dict[str, Any]:
         "header_state": None,
         "in_person": None,
         "virtual": None,
+        # Referral-only — the collapsed session-format axis (#1359).
+        # Opening / intake set it None; templates that want the
+        # cross-kind shape still read `in_person` / `virtual`.
+        "session_format": None,
         "services": [],
         "settings": [],
         "ages": [],
@@ -391,8 +419,16 @@ def post_card_view(post) -> dict[str, Any]:
                 "org": None,
             },
             headline=referral_headline(d),
-            in_person=getattr(d, "location_in_person", None),
-            virtual=getattr(d, "location_virtual", None),
+            # Referral side now stores a single `session_format`; back-
+            # derive the two-axis `in_person`/`virtual` view keys so the
+            # cross-kind list/detail templates (`posts/_item.html`,
+            # `posts/detail.html`) render unchanged. Opening side still
+            # reads from the affiliation's two independent columns.
+            session_format=getattr(d, "session_format", None),
+            in_person=_in_person_from_session_format(
+                getattr(d, "session_format", None)
+            ),
+            virtual=_virtual_from_session_format(getattr(d, "session_format", None)),
             # CR holds a single `gender`; wrap it so templates iterate
             # `genders` uniformly across kinds.
             genders=([d.gender] if getattr(d, "gender", None) else []),

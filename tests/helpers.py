@@ -72,15 +72,13 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "location_city": "Springfield",
     "location_state": "IL",
     "location_zip": "62701",
-    "location_in_person": "yes",
-    "location_virtual": "no",
+    "session_format": "in_person_only",
     "desired_times": [],
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
     "gender": "prefer_not_to_say",
     "description": "needs placement",
     "services": [],
-    "treatment_modality": None,
     "modalities": [],
     # Payment paths (#1358 PR-e). Three independent booleans + a
     # carrier list. Default emulates the most common corpus shape

@@ -167,15 +167,13 @@ def _make_cr_post(**detail_overrides):
         location_city="Brooklyn",
         location_state="NY",
         location_zip="11201",
-        location_in_person="yes",
-        location_virtual="no",
+        session_format="in_person_only",
         desired_times=["weekday_morning"],
         age_groups=["adults_25_64"],
         languages=["en", "es"],
         gender="female",
         description="Looking for a therapist who takes BCBS.",
         services=["psychotherapy", "medication_management"],
-        treatment_modality="CBT",
         accepts_in_network=True,
         accepts_out_of_network_superbill=False,
         accepts_private_pay=False,
@@ -338,10 +336,23 @@ def test_view_cr_header_state_is_none_state_lives_in_location_chunk():
     assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
 
 
-def test_view_cr_in_person_and_virtual_pull_from_detail_row():
-    v = post_card_view(_make_cr_post(location_in_person="yes", location_virtual="no"))
+def test_view_cr_in_person_and_virtual_derive_from_session_format():
+    """The referral side stores a single `session_format` (#1359). The
+    cross-kind list/detail templates still read `view.in_person` /
+    `view.virtual`, so the view derives them from `session_format`."""
+    v = post_card_view(_make_cr_post(session_format="in_person_only"))
+    assert v["session_format"] == "in_person_only"
     assert v["in_person"] == "yes"
     assert v["virtual"] == "no"
+
+    v = post_card_view(_make_cr_post(session_format="virtual_only"))
+    assert (v["in_person"], v["virtual"]) == ("no", "yes")
+
+    v = post_card_view(_make_cr_post(session_format="either"))
+    assert (v["in_person"], v["virtual"]) == ("yes", "yes")
+
+    v = post_card_view(_make_cr_post(session_format="please_contact"))
+    assert (v["in_person"], v["virtual"]) == ("please_contact", "please_contact")
 
 
 def test_view_cr_settings_always_empty():
