@@ -268,21 +268,27 @@ async def test_get_users_me_renders_authenticated_self_view(
     ), "every authenticated page must surface /auth/sign-out in the header chrome"
 
     # --- Lucide font preload (was test_base_template_preloads_lucide_icon_font)
-    # The preload URL MUST match the CSS's woff2 URL exactly (including
-    # the cache-buster query) or the browser sees them as different
-    # resources and the preload is wasted.
+    # The preload URL MUST match the CSS's `@font-face src` URL exactly
+    # — browsers match preloads to actual requests by exact URL. Today
+    # both omit a query string; cache-busting on Lucide-version bumps
+    # comes from replacing the vendored woff2 bytes (the URL stays
+    # the same, ETag changes).
     preload = tree.css_first('link[rel="preload"][as="font"]')
     assert preload is not None, "Lucide woff2 preload <link> is missing"
     href = preload.attributes.get("href") or ""
     assert "lucide.woff2" in href, "preload href must reference lucide.woff2"
     assert preload.attributes.get("type") == "font/woff2"
-    # Required for cross-origin font preloads — without it, the browser
-    # fetches the font twice (once preload, once for real).
+    # `crossorigin` is required even for same-origin font preloads —
+    # browsers fetch fonts in CORS-anonymous mode and a preload that
+    # omits the attribute hits the cache under a different key.
     assert "crossorigin" in preload.attributes, "preload <link> missing crossorigin"
-    assert "?t=" in href, (
-        "preload href must include the lucide.css cache-buster query "
-        "(`?t=...`); without exact-URL match the browser issues a "
-        "second font request and the preload is wasted"
+    # Self-hosted; the upstream-CDN `?t=...` cache-buster is no longer
+    # part of the URL (a same-origin static mount's ETag handles
+    # revalidation, see `StaticLongCacheMiddleware`).
+    assert href.startswith("/static/fw/fonts/lucide.woff2"), (
+        "preload must point at the same-origin self-hosted woff2 mount "
+        f"(got {href!r}); the upstream-CDN path was retired alongside "
+        "the unused-CSS pruning, see `base.html`."
     )
 
     # --- Identity facts hidden on self-view

@@ -90,6 +90,13 @@ _env = Environment(
 # `route_urls.py` and the `template_route_check.py` lint). Everything
 # entity-specific — enums, per-kind create schemas, view helpers — is
 # registered from `src/domain/template_globals.py`.
+# `static_version` — appended to `/static/...?v=X` references so the
+# `StaticLongCacheMiddleware` knows the URL is safe to cache for a
+# year (deploys change the SHA → URLs change → caches bust). Empty
+# string when `APP_RELEASE` is unset (local dev, smoke tests), which
+# falls through to the short-TTL branch — no surprise long-caching of
+# in-flight asset edits.
+_env.globals["static_version"] = settings.APP_RELEASE
 _env.globals["field_spec"] = field_spec
 _env.globals["entity_url"] = entity_url
 _env.globals["entity_form_url"] = entity_form_url

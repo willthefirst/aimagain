@@ -4,47 +4,58 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
+    {# Per-page descriptions override the block; the default is what
+       search engines + link previews use on routes that don't bother. #}
+    <meta name="description"
+          content="{% block meta_description %}Bedlam Connect is a referral and clinician-opening directory for the U.S. mental health workforce.{% endblock %}" />
     <title>Bedlam Connect</title>
-    <link rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
-    {# Lucide icon font. Pinned to a recent release rather than `@latest`
-       so the icon glyphs don't shift under us between deploys; bump the
-       version deliberately. The CSS defines `<i class="icon-<name>">`
-       per Lucide icon (e.g. `icon-baby`, `icon-shield-check`); see the
-       icon dicts in `src/domain/models/enums.py` for the per-enum
-       mappings.
+    {# Warm up TCP+TLS to each cross-origin CDN before the parser
+       reaches the actual `<link rel="stylesheet">` / `<script>` that
+       fetches from it. Lighthouse: "try to use no more than 4". The
+       Sentry origin is preconnect'd unconditionally — when
+       observability is off the connection cost is wasted, but the
+       common case is prod-with-Sentry where it shaves ~100ms off the
+       SDK fetch. See
+       https://developer.chrome.com/docs/lighthouse/performance/uses-rel-preconnect/. #}
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="preconnect" href="https://unpkg.com" crossorigin />
+<link rel="preconnect" href="https://browser.sentry-cdn.com" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+{# Lucide icon font, hand-curated subset.
+       `src/framework/static/fonts/lucide-icons.css` ships only the
+       30-or-so `.icon-NAME:before` rules we actually use; upstream's
+       full `lucide.css` defines 1,546 rules and Lighthouse flagged it
+       as 99% unused. Pinned to `lucide-static@0.471.0` codepoints.
+       See that CSS file for the drift guardrail (a colocated test
+       fails CI when a new `icon-NAME` is referenced without a rule).
 
        The `<link rel="preload">` for the woff2 is the cure for icon
-       flicker on first paint: without it, the browser fetches
-       `lucide.css` first, parses it, discovers the `@font-face` rule's
+       flicker on first paint: without it, the browser fetches the
+       stylesheet, parses it, discovers the `@font-face` rule's
        relative `url("lucide.woff2?t=...")` reference, and only THEN
        fetches the 220kb font — every `<i class="icon-x">` renders as
        blank space for the duration. Preloading kicks the font fetch
-       off in parallel with the CSS, so by the time the CSS's
-       `@font-face` resolves, the woff2 is already in browser cache and
-       the first paint includes the icons.
+       off in parallel with the CSS, so by the time `@font-face`
+       resolves, the woff2 is already in browser cache.
 
-       The cache-buster `?t=1736516416702` is baked into the pinned
-       version's CSS (see `curl -s
-       https://unpkg.com/lucide-static@0.471.0/font/lucide.css`).
-       Browsers match preloads to actual requests by exact URL, so the
-       two URLs MUST share the same query string. Bump the timestamp
-       here in lockstep with any version bump above. #}
-    <link rel="preload"
-          as="font"
-          type="font/woff2"
-          crossorigin
-          href="https://unpkg.com/lucide-static@0.471.0/font/lucide.woff2?t=1736516416702" />
-    <link rel="stylesheet"
-          href="https://unpkg.com/lucide-static@0.471.0/font/lucide.css" />
-    {# Density overrides and component styles live in two static CSS files
+       The preload URL and the URL in `lucide-icons.css`'s
+       `@font-face src` MUST match exactly — browsers match preloads by
+       exact URL including query string. Both omit a version sentinel
+       so the CSS file can stay fully static; the
+       `StaticLongCacheMiddleware` short-TTL branch + ETag
+       revalidation handles the rest, and bumping the Lucide release
+       means replacing the vendored bytes (URL unchanged, ETag
+       changes). #}
+<link rel="preload" as="font" type="font/woff2" crossorigin href="/static/fw/fonts/lucide.woff2" />
+<link rel="stylesheet" href="/static/fw/fonts/lucide-icons.css{% if static_version %}?v={{ static_version }}{% endif %}" />
+{# Density overrides and component styles live in two static CSS files
        split by framework/domain boundary — see `src/framework/static/css/`
        and `src/domain/static/css/`. The classful Pico build requires
        `class="container"` on the layout wrappers (`<header>` for the top
        nav, `<main>` for the page body) to get Pico's max-width centering. #}
-    <link rel="stylesheet" href="/static/fw/css/framework.css" />
-    <link rel="stylesheet" href="/static/domain/css/domain.css" />
-    {# `defer` keeps the HTML parser unblocked while these scripts
+<link rel="stylesheet" href="/static/fw/css/framework.css{% if static_version %}?v={{ static_version }}{% endif %}" />
+<link rel="stylesheet" href="/static/domain/css/domain.css{% if static_version %}?v={{ static_version }}{% endif %}" />
+{# `defer` keeps the HTML parser unblocked while these scripts
        download — they execute in document order after parsing
        completes, just before `DOMContentLoaded`, which is the event
        htmx wires its initial scan to. Without `defer` the head scripts
@@ -54,15 +65,12 @@
        in source order), so the extensions register against htmx-core
        before any hx-wired form fires. Pinned by `test_base_html.py`.
        See https://developer.chrome.com/docs/performance/insights/render-blocking. #}
-    <script src="https://unpkg.com/htmx.org@2.0.4"
-            integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
-            crossorigin="anonymous"
-            defer></script>
-    {# htmx 2 ships extensions as separate npm packages — the in-tree
+<script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous" defer></script>
+{# htmx 2 ships extensions as separate npm packages — the in-tree
        `dist/ext/json-enc.js` is the htmx-1 build and logs a "v1 extension
        with htmx 2" console warning. Use the htmx-2 package instead. #}
-    <script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js" defer></script>
-    {# `response-targets` extension lets a form swap the response into a
+<script src="https://unpkg.com/htmx-ext-json-enc@2.0.2/json-enc.js" defer></script>
+{# `response-targets` extension lets a form swap the response into a
        target on a 4xx response (htmx's default response handler only
        swaps on 2xx). With it, form-error rerenders can return *proper*
        HTTP status codes — 409 for "user already exists", 401 for bad
@@ -75,12 +83,11 @@
        behavior for forms that don't declare a 4xx target.
 
        https://htmx.org/extensions/response-targets/ #}
-    <script src="https://unpkg.com/htmx-ext-response-targets@2.0.4/response-targets.js"
-            defer></script>
-    {% block head %}{% endblock %}
-    {% if is_development %}
-      <!-- LiveReload script for development hot reloading -->
-      <script>
+<script src="https://unpkg.com/htmx-ext-response-targets@2.0.4/response-targets.js" defer></script>
+{% block head %}{% endblock %}
+{% if is_development %}
+<!-- LiveReload script for development hot reloading -->
+<script>
       ;(function () {
         var script = document.createElement('script')
         script.src =
@@ -88,46 +95,70 @@
         script.async = true
         document.head.appendChild(script)
       })()
-      </script>
-    {% endif %}
-    {% if not is_development and observability_frontend %}
-      {#
+</script>
+{% endif %}
+{% if not is_development and observability_frontend %}
+{#
       Browser SDK init. Dict shape and `provider` key come from
       `src/framework/observability/<provider>_backend.py:frontend_context`.
       Add a new `{% elif %}` branch here when adding a provider. #}
-      {% if observability_frontend.provider == "sentry" %}
-        {% set _replay_enabled = (observability_frontend.replays_session_sample_rate or 0) > 0 or
-                (observability_frontend.replays_on_error_sample_rate or 0) > 0 %}
-        <script src="https://browser.sentry-cdn.com/8.55.0/{% if _replay_enabled %}bundle.tracing.replay.min.js{% else %}bundle.tracing.min.js{% endif %}"
-                crossorigin="anonymous"></script>
-        <script>
-      Sentry.init({
-        dsn: "{{ observability_frontend.dsn }}",
-        environment: "{{ observability_frontend.environment }}",
-        {% if observability_frontend.release %}release: "{{ observability_frontend.release }}",{% endif %}
-        sendDefaultPii: true,
-        tracesSampleRate: {{ observability_frontend.traces_sample_rate }},
-        integrations: [
-          Sentry.browserTracingIntegration(),
-          {% if _replay_enabled %}Sentry.replayIntegration(),{% endif %}
-        ],
-        {% if _replay_enabled %}
-        replaysSessionSampleRate: {{ observability_frontend.replays_session_sample_rate }},
-        replaysOnErrorSampleRate: {{ observability_frontend.replays_on_error_sample_rate }},
-        {% endif %}
+{% if observability_frontend.provider == "sentry" %}
+{% set _replay_enabled = (observability_frontend.replays_session_sample_rate or 0) > 0 or
+(observability_frontend.replays_on_error_sample_rate or 0) > 0 %}
+{# Pick the smallest Sentry bundle that carries the integrations
+           we actually use. `browserTracingIntegration` only exists in
+           the `tracing` builds; loading the tracing build when traces
+           are sampled at 0 wastes ~14 KiB. The `replay` integration is
+           orthogonal — gated separately by replays_*_sample_rate. #}
+{% set _tracing_enabled = (observability_frontend.traces_sample_rate or 0) > 0 %}
+{% if _tracing_enabled and _replay_enabled %}
+{% set _bundle = "bundle.tracing.replay.min.js" %}
+{% elif _tracing_enabled %}
+{% set _bundle = "bundle.tracing.min.js" %}
+{% elif _replay_enabled %}
+{% set _bundle = "bundle.replay.min.js" %}
+{% else %}
+{% set _bundle = "bundle.min.js" %}
+{% endif %}
+{# `defer` on the SDK loader stops it from render-blocking
+           first paint (Lighthouse flagged ~300ms here). Deferred scripts
+           execute in document order after parsing completes but before
+           DOMContentLoaded, so the init script below — which runs
+           inside a DOMContentLoaded listener — is guaranteed to see
+           `Sentry` defined. Tradeoff: exceptions thrown during HTML
+           parsing aren't captured (acceptable — there's no app code
+           that runs that early). #}
+<script src="https://browser.sentry-cdn.com/8.55.0/{{ _bundle }}" crossorigin="anonymous" defer></script>
+<script>
+      document.addEventListener("DOMContentLoaded", function () {
+        Sentry.init({
+          dsn: "{{ observability_frontend.dsn }}",
+          environment: "{{ observability_frontend.environment }}",
+          {% if observability_frontend.release %}release: "{{ observability_frontend.release }}",{% endif %}
+          sendDefaultPii: true,
+          tracesSampleRate: {{ observability_frontend.traces_sample_rate }},
+          integrations: [
+            {% if _tracing_enabled %}Sentry.browserTracingIntegration(),{% endif %}
+            {% if _replay_enabled %}Sentry.replayIntegration(),{% endif %}
+          ],
+          {% if _replay_enabled %}
+          replaysSessionSampleRate: {{ observability_frontend.replays_session_sample_rate }},
+          replaysOnErrorSampleRate: {{ observability_frontend.replays_on_error_sample_rate }},
+          {% endif %}
+        })
       })
-        </script>
-      {% endif %}
-    {% endif %}
-  </head>
-  {# `hx-ext="response-targets"` enables 4xx response swaps for any
+</script>
+{% endif %}
+{% endif %}
+</head>
+{# `hx-ext="response-targets"` enables 4xx response swaps for any
      descendant form. The extension is loaded in <head>; this attribute
      activates it. Per-form opt-in still required via `hx-target-4xx`
      (or the more specific `hx-target-409`, etc) — adding the ext here
      doesn't change behavior for forms that don't declare a 4xx target.
      See https://htmx.org/extensions/response-targets/ #}
-  <body hx-ext="response-targets">
-    {# Primary nav renders on every screen so the chrome stays
+<body hx-ext="response-targets">
+{# Primary nav renders on every screen so the chrome stays
        consistent between authenticated app pages and the public auth
        flow. Authed users get the four inline links (Home, Posts,
        Profile, Sign out); anonymous visitors get only the brand. The
@@ -135,11 +166,11 @@
        `/posts?kind=referral` (the "find new clients" journey home —
        see `src/main.py:read_root` for the bias rationale) and unauthed
        users to the login page — safe on either side of the auth gate. #}
-    {# Self-profile page. The nav lights up for any path under
+{# Self-profile page. The nav lights up for any path under
        the self-alias URL. #}
-    {%- set _users_me_path = entity_url('user', id='me') -%}
-    {%- set _on_users_me = is_authenticated and (request.url.path == _users_me_path or request.url.path.startswith(_users_me_path + '/')) -%}
-    {# Section shortcuts. The primary nav promotes the unified `/posts`
+{%- set _users_me_path = entity_url('user', id='me') -%}
+{%- set _on_users_me = is_authenticated and (request.url.path == _users_me_path or request.url.path.startswith(_users_me_path + '/')) -%}
+{# Section shortcuts. The primary nav promotes the unified `/posts`
        feed, which lists every post kind (referrals, clinician openings,
        program intakes) and exposes a `kind` filter. The other URL
        families — `/clinicians` (Directory), `/organizations`,
@@ -148,28 +179,28 @@
        by typing the URL. Active-state rule is the same path-prefix
        shape used everywhere else: the tab lights on the family's list
        page and any subpath (`/posts/42`, `/posts/42/form`). #}
-    {%- set _on_home = is_authenticated and request.url.path == '/home' -%}
-    {%- set _posts_path = entity_url('post') -%}
-    {%- set _on_posts = is_authenticated and (request.url.path == _posts_path or request.url.path.startswith(_posts_path + '/')) -%}
-    {# Unified page-header band. `{% include %}` can't see this template's
+{%- set _on_home = is_authenticated and request.url.path == '/home' -%}
+{%- set _posts_path = entity_url('post') -%}
+{%- set _on_posts = is_authenticated and (request.url.path == _posts_path or request.url.path.startswith(_posts_path + '/')) -%}
+{# Unified page-header band. `{% include %}` can't see this template's
        blocks, so capture each chrome block's output into a context var and
        hand the pre-rendered HTML to the partial, which assembles the single
        fixed band (nav + breadcrumb slot + toolbar slot + boundary rule).
        The captured subtitle is rendered below the band, at the top of
        `<main>`. See `_shared/_page_header.html` and `templates/README.md`. #}
-    {%- set _breadcrumb_html %}
-      {% block breadcrumb %}{% endblock %}
-    {% endset -%}
-    {%- set _toolbar_html %}
-      {% block toolbar %}{% endblock %}
-    {% endset -%}
-    {%- set _subtitle_html %}
-      {% block subtitle %}{% endblock %}
-    {% endset -%}
-    {% include "_shared/_page_header.html" %}
-    <main class="container">
-      {# Onboarding banner removed. #}
-      {# Subtitle slot — a one-line muted meta string rendered directly
+{%- set _breadcrumb_html %}
+{% block breadcrumb %}{% endblock %}
+{% endset -%}
+{%- set _toolbar_html %}
+{% block toolbar %}{% endblock %}
+{% endset -%}
+{%- set _subtitle_html %}
+{% block subtitle %}{% endblock %}
+{% endset -%}
+{% include "_shared/_page_header.html" %}
+<main class="container">
+{# Onboarding banner removed. #}
+{# Subtitle slot — a one-line muted meta string rendered directly
          below the page-header band's rule, above content (e.g. a
          clinician's "NPI · Verified", a profile-mode line). The block is
          captured in the band-assembly section above and rendered here so
@@ -177,43 +208,43 @@
          the body. Wrapped in `<small class="meta">` so multiple `<span>`
          children auto-join with " · " (see the `.meta` rule). Empty on
          pages that don't set `{% block subtitle %}`. #}
-      {%- if _subtitle_html | trim %}
-        <p>
-          <small class="meta">{{ _subtitle_html | trim | safe }}</small>
-        </p>
-      {%- endif %}
-      {% block content %}{% endblock %}
-      {# Post-content slot. `views/list.html` populates this with the
+{%- if _subtitle_html | trim %}
+<p>
+<small class="meta">{{ _subtitle_html | trim | safe }}</small>
+</p>
+{%- endif %}
+{% block content %}{% endblock %}
+{# Post-content slot. `views/list.html` populates this with the
          pagination footer; non-list views leave it empty. Reserved
          for chrome that belongs *after* the main body but inside the
          `<main>` container — keep it small (a footer nav, not new
          content). #}
-      {% block after_content %}{% endblock %}
-    </main>
-    {# Page footer slot — outside `<main>` so the footer is the
+{% block after_content %}{% endblock %}
+</main>
+{# Page footer slot — outside `<main>` so the footer is the
        document's `<footer>` (semantic site-level role) rather than a
        child of the main content. Wrapped in Pico's `.container` so
        footer content picks up the same max-width centering as the
        header/main bands. The default body is a site-wide copyright /
        contact line shown on every page; pages can override by
        redefining `{% raw %}{% block footer %}{% endraw %}`. #}
-    <footer class="container">
-      {% block footer %}
-        <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
-      {% endblock %}
-    </footer>
-    {# Locked-affordance CTA popovers. One <div popover> per reason, rendered
+<footer class="container">
+{% block footer %}
+<small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
+{% endblock %}
+</footer>
+{# Locked-affordance CTA popovers. One <div popover> per reason, rendered
        once here so every page has them. The locked-affordance JS below
        dynamically anchors the active popover to whichever trigger was clicked
        via CSS anchor positioning (`position-anchor` inline style). #}
-    {%- from "_shared/_locked.html" import locked_popovers -%}
-    {{ locked_popovers() }}
-    {# Locked-affordance JS. Uses event delegation so it works for any
+{%- from "_shared/_locked.html" import locked_popovers -%}
+{{ locked_popovers() }}
+{# Locked-affordance JS. Uses event delegation so it works for any
        [data-locked-cta] element added by the locked_* macros. Per click:
        1. Assigns a fresh CSS anchor-name to the trigger element.
        2. Points the corresponding popover's position-anchor at that name.
        3. Opens the popover (showPopover handles closing any other open one). #}
-    <script>
+<script>
     ;(function () {
       var seq = 0
       document.addEventListener('click', function (e) {
@@ -229,6 +260,6 @@
         popover.showPopover()
       })
     }())
-    </script>
-  </body>
+</script>
+</body>
 </html>
