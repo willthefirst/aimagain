@@ -83,6 +83,43 @@ async def test_register_prod_mode_leaves_user_unverified(
     assert response.json()["is_verified"] is False
 
 
+async def test_dev_auto_verify_skipped_for_programmatic_create(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """Programmatic callers (seed, test fixtures) hit `UserManager.create`
+    with `request=None`. The dev-mode auto-verify only fires for
+    browser-initiated registration (request present), so a programmatic
+    `UserCreate(is_verified=False)` lands an actually-unverified row —
+    the persona seed in `scripts/dev/seed/overrides/personas.py`
+    depends on this."""
+    from src.auth_config import UserManager
+    from src.domain.logic.users.schema import UserCreate
+
+    async with db_test_session_manager() as session:
+        user_db = SQLAlchemyUserDatabase(session, User)
+        manager = UserManager(user_db)
+        created = await manager.create(
+            UserCreate(
+                email="programmatic-unverified@example.com",
+                password="password",
+                username="programmatic-unverified",
+                is_verified=False,
+            ),
+            safe=False,
+            request=None,
+        )
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        user_db = SQLAlchemyUserDatabase(session, User)
+        refreshed = await user_db.get(created.id)
+    assert refreshed is not None
+    assert refreshed.is_verified is False, (
+        "request=None + is_verified=False must land False in dev — the "
+        "auto-verify is gated on a Request being present"
+    )
+
+
 async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncClient):
     """HTMX register should auto-login (cookie) and redirect, not return JSON."""
     payload = {

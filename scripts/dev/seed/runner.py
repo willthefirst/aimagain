@@ -136,7 +136,7 @@ async def seed_all() -> int:
         f"\n✅ Seed complete — {total} rows across {len(metadata.sorted_tables)} tables."
     )
     print(
-        "   Login: admin@example.com / alice@example.com / bob@example.com  (password: password)"
+        "   Login: admin@example.com or any /dev/login-as persona  (password: password)"
     )
     return 0
 

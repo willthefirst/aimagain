@@ -23,12 +23,19 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_register(self, user: User, request: Optional[Request] = None):
         """Trigger the verify-email flow on new-account creation.
 
-        In development, the user is auto-verified — local dev creates
-        throw-away accounts and shouldn't have to click an email link
-        just to skip the nag banner (also lets Playwright/MCP automation
-        register users without intercepting the verify email). In any
-        other environment, call `self.request_verify(user, request)`
-        which generates a token and triggers `on_after_request_verify`
+        In development, browser-initiated registrations are auto-verified
+        — local dev creates throw-away accounts and shouldn't have to
+        click an email link just to skip the nag banner (also lets
+        Playwright/MCP automation register users without intercepting
+        the verify email). We gate the auto-verify on ``request is not
+        None``: programmatic callers (the seed, test fixtures) pass no
+        request and own ``is_verified`` directly via ``UserCreate``, so
+        they get whatever they asked for. Notably this lets the
+        ``unverified@example.com`` persona seed land an actually-
+        unverified row (see ``scripts/dev/seed/overrides/personas.py``).
+
+        Outside development, call ``self.request_verify(user, request)``
+        which generates a token and triggers ``on_after_request_verify``
         to send the email.
 
         Wrapped in try/except because email delivery failures must not
@@ -36,7 +43,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         they can re-request the verify link from the nag banner.
         """
         if settings.ENVIRONMENT == "development":
-            await self.user_db.update(user, {"is_verified": True})
+            if request is not None:
+                await self.user_db.update(user, {"is_verified": True})
             return
 
         try:

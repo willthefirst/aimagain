@@ -36,6 +36,7 @@ from src.domain.logic.verifications.scoring import (
 from src.domain.models import Clinician, Organization, User, Verification
 from src.framework.audit.core import record_audit_for
 from src.framework.audit.repository import AuditRepository
+from src.framework.config import settings
 from src.framework.http.exceptions import ForbiddenError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,17 @@ HTTP_TIMEOUT_SECONDS = 10.0
 _NPPES_SKIPPED_FLAG = "nppes_skipped"
 _NPPES_ORG_NAME_THRESHOLD = 0.80
 _SKIPPED_NPPES = NppesResult(found=False, first_name=None, last_name=None, raw=None)
+
+# Dev-only magic NPI: when `ENVIRONMENT=development`, submitting this NPI
+# short-circuits the NPPES lookup and produces a synthetic "matched"
+# result against whatever name is on the Clinician / Organization. Lets
+# Playwright/MCP automation and local devs walk the verified-clinician
+# flow without hitting the public NPPES API (which is rate-limit-free
+# but slow and flaky in CI). Never honored outside development — the
+# gate is the same one that mounts `/dev/login-as` (see
+# `src/domain/routes/dev_auth.py`).
+DEV_MAGIC_NPI = "0000000000"
+_DEV_MAGIC_FLAG = "dev_magic_npi"
 
 
 def npi_failure_message(verification: Verification) -> str:
@@ -139,7 +151,20 @@ async def run_clinician_verification(
     first_name, last_name = _clinician_names(clinician, owner)
 
     extra_flags: list[str] = []
-    if clinician.npi:
+    if clinician.npi == DEV_MAGIC_NPI and settings.ENVIRONMENT == "development":
+        # Magic-NPI short-circuit: skip NPPES, fabricate a "matched"
+        # result against the clinician's own name so the downstream
+        # scorer lands on `status='verified'`. Tagged with a flag so the
+        # audit row is unmistakable (this is the only `nppes_result.raw`
+        # the pipeline produces that wasn't fetched from the registry).
+        nppes_result = NppesResult(
+            found=True,
+            first_name=first_name,
+            last_name=last_name,
+            raw={"dev_magic_npi": True},
+        )
+        extra_flags.append(_DEV_MAGIC_FLAG)
+    elif clinician.npi:
         nppes_result = await nppes_lookup(clinician.npi, http=http)
     else:
         nppes_result = _SKIPPED_NPPES

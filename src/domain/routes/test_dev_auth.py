@@ -27,6 +27,21 @@ from src.domain.routes import dev_auth
 from src.framework.config import settings
 from tests.fixtures import create_test_user
 
+# --- DEV_SEED_USERS dropdown contents -----------------------------------
+
+
+def test_dev_seed_users_includes_three_persona_anchors():
+    """The login-page quick-sign-in dropdown advertises one entry per
+    auth state the rest of the app branches on. Pins the persona shape
+    so a future muscle-memory rename of an anchor email here also
+    forces the matching seed-override change in
+    `scripts/dev/seed/overrides/users.py`."""
+    emails = {u["email"] for u in dev_auth.DEV_SEED_USERS}
+    assert "unverified@example.com" in emails
+    assert "clinician-pending@example.com" in emails
+    assert "clinician-verified@example.com" in emails
+
+
 # --- mount_dev_routes: env-gated router registration --------------------
 
 
