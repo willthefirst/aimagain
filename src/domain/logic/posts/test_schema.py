@@ -36,7 +36,6 @@ from src.domain.logic.posts.schema import (
 from src.domain.models.enums import (
     GENDERS,
     INSURANCE_CARRIERS,
-    SESSION_FORMATS,
 )
 from tests.helpers import opening_payload, referral_payload
 
@@ -101,8 +100,6 @@ def test_post_create_referral_rejects_empty_description():
     [
         "location_city",
         "location_state",
-        "location_zip",
-        "session_format",
         "age_groups",
         "description",
         # The picker submits this; `referring_clinician_id` is now
@@ -298,11 +295,11 @@ def test_post_create_referral_dedupes_clinical_niches():
     assert p.clinical_niches == ["DGBI", "catatonia"]
 
 
-def test_post_create_referral_rejects_invalid_zip():
+def test_post_create_referral_rejects_zip():
+    """Referrals model client location as (city, state) only — ZIP is
+    not part of the referral wire shape."""
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(referral_payload(location_zip="abc"))
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(referral_payload(location_zip="1234"))
+        post_create_adapter.validate_python(referral_payload(location_zip="11201"))
 
 
 def test_post_create_referral_rejects_unknown_state():
@@ -467,9 +464,13 @@ def test_post_update_referral_rejects_whitespace_only_description():
         post_update_adapter.validate_python({"kind": "referral", "description": "   "})
 
 
-def test_post_update_referral_rejects_invalid_zip():
+def test_post_update_referral_rejects_zip():
+    """Referrals model client location as (city, state) only — patches
+    can't introduce a ZIP."""
     with pytest.raises(ValidationError):
-        post_update_adapter.validate_python({"kind": "referral", "location_zip": "12"})
+        post_update_adapter.validate_python(
+            {"kind": "referral", "location_zip": "11201"}
+        )
 
 
 def test_post_update_referral_rejects_owner_id():
@@ -612,7 +613,7 @@ def test_post_create_rejects_cross_kind_field_bleed():
     is a client-referral-only field; it has no place in a PA payload."""
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(
-            opening_payload(session_format="in_person_only")
+            opening_payload(session_format=["in_person"])
         )
 
 
@@ -739,13 +740,14 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         # Read variants. ``location_state`` moved into the
         # :class:`Location` value object in #451 — see the lockstep
         # test in ``src/domain/logic/value_objects/test_location.py``.
-        (ReferralRead, "session_format", SESSION_FORMATS),
+        # `session_format` is a `list[Literal[*SESSION_FORMATS]]` now
+        # (no SQL CHECK against JSON members, same pattern as
+        # `services` / `affirming_identities`) so it doesn't fit this
+        # top-level-Literal probe.
         (ReferralRead, "gender", GENDERS),
         # Create variants
-        (ReferralCreate, "session_format", SESSION_FORMATS),
         (ReferralCreate, "gender", GENDERS),
         # Update variants (Optional[Literal[*TUPLE]])
-        (ReferralUpdate, "session_format", SESSION_FORMATS),
         (ReferralUpdate, "gender", GENDERS),
     ],
 )
