@@ -9,7 +9,7 @@ Covers:
   via the at-least-one-field rule on embedding Update schemas.
 - :func:`gather_flat_location` rolls flat ``location_<sub>`` keys on a
   dict into the nested block, leaves unrelated ``location_*`` keys
-  (``location_in_person`` / ``location_virtual`` on client-referral
+  (any hypothetical sibling field on client-referral
   schemas) alone, and attaches a transient ``location`` attribute to
   attribute-bag inputs that expose only the flat columns.
 - :func:`flatten_location_on_dump` inverts the nested → flat
@@ -166,21 +166,20 @@ def test_gather_flat_location_handles_partial_flat_keys():
 
 
 def test_gather_flat_location_leaves_other_location_prefixed_keys_alone():
-    """``location_in_person`` / ``location_virtual`` are CR-specific
-    keys that share the ``location_`` prefix but are not subfields of
-    the value object. The helper must not consume them."""
+    """The helper consumes only the ``location_city`` / ``location_state``
+    / ``location_zip`` triple. Any other key sharing the ``location_``
+    prefix (a hypothetical future or sibling field) must pass through
+    unchanged — the helper isn't pattern-matching on the prefix."""
     out = gather_flat_location(
         {
             "location_city": "Boise",
             "location_state": "ID",
             "location_zip": "83702",
-            "location_in_person": "yes",
-            "location_virtual": "no",
+            "location_notes": "near the park",
         }
     )
     assert out["location"] == {"city": "Boise", "state": "ID", "zip": "83702"}
-    assert out["location_in_person"] == "yes"
-    assert out["location_virtual"] == "no"
+    assert out["location_notes"] == "near the park"
 
 
 def test_gather_flat_location_passthrough_when_no_flat_keys():

@@ -9,7 +9,7 @@ from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import (
     GENDERS,
-    LOCATION_AVAILABILITY_OPTIONS,
+    SESSION_FORMATS,
     US_STATES,
     named_check_in,
 )
@@ -29,8 +29,7 @@ class ReferralDetail(LocationMixin, Base):
     __tablename__ = _TABLE
     __table_args__ = (
         _ck("location_state", US_STATES),
-        _ck("location_in_person", LOCATION_AVAILABILITY_OPTIONS),
-        _ck("location_virtual", LOCATION_AVAILABILITY_OPTIONS),
+        _ck("session_format", SESSION_FORMATS),
         _ck("gender", GENDERS),
     )
 
@@ -41,8 +40,15 @@ class ReferralDetail(LocationMixin, Base):
     )
 
     # Section 1 — client location (city/state/zip from LocationMixin)
-    location_in_person = Column(Text, nullable=False)
-    location_virtual = Column(Text, nullable=False)
+    # `session_format` is the collapsed referral-side replacement for
+    # the previous two-axis (`location_in_person`, `location_virtual`)
+    # shape. CHECK pins the vocabulary to `SESSION_FORMATS`. NOT NULL
+    # with a server default of `either` so the migration backfill
+    # tolerates rows whose old combination was ambiguous (defensive —
+    # the migration's own backfill picks the right value first).
+    session_format = Column(
+        Text, nullable=False, server_default=text("'either'"), default="either"
+    )
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )
@@ -61,9 +67,11 @@ class ReferralDetail(LocationMixin, Base):
     subject = Column(Text, nullable=True)
     description = Column(Text, nullable=False)
 
-    # Section 4 — services
+    # Section 4 — services. `treatment_modality` (the free-text scalar)
+    # was dropped: the structured `modalities` enum list covers the
+    # filterable shape and the free-text `description` covers prose,
+    # so the scalar was duplicative on both axes.
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    treatment_modality = Column(Text, nullable=True)
     modalities = Column(JSON, nullable=True, server_default=text("'[]'"), default=list)
 
     # Affirming-identity request constraints — symmetric to

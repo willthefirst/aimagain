@@ -76,11 +76,11 @@ def test_text_columns_get_stub_string():
     cr = make_post_stub("referral", owner_id=uuid.uuid4())
     assert cr.referral_detail.description == "stub description"
     assert cr.referral_detail.location_city == "stub location_city"
-    assert cr.referral_detail.treatment_modality == "stub treatment_modality"
 
     pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     assert pa.opening_detail.description == "stub description"
     assert pa.opening_detail.schedule_text == "stub schedule_text"
+    assert pa.opening_detail.treatment_modality == "stub treatment_modality"
     # ``website`` moved to the affiliation in #1358 PR-f sub-3 and is no
     # longer a detail-row column.
 
@@ -100,8 +100,7 @@ def test_cr_enum_defaults_render_via_label_dict():
     enum entry needed."""
     cr = make_post_stub("referral", owner_id=uuid.uuid4())
     d = cr.referral_detail
-    assert d.location_in_person == "no"
-    assert d.location_virtual == "no"
+    assert d.session_format == "in_person_only"
     assert d.gender == "prefer_not_to_say"
     assert d.location_state == "NY"
     # Boolean payment-paths default to False; JSON `insurance_carriers`

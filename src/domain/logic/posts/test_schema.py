@@ -36,7 +36,7 @@ from src.domain.logic.posts.schema import (
 from src.domain.models.enums import (
     GENDERS,
     INSURANCE_CARRIERS,
-    LOCATION_AVAILABILITY_OPTIONS,
+    SESSION_FORMATS,
 )
 from tests.helpers import opening_payload, referral_payload
 
@@ -102,8 +102,7 @@ def test_post_create_referral_rejects_empty_description():
         "location_city",
         "location_state",
         "location_zip",
-        "location_in_person",
-        "location_virtual",
+        "session_format",
         "age_groups",
         "description",
         # The picker submits this; `referring_clinician_id` is now
@@ -152,11 +151,6 @@ def test_post_update_referral_referring_clinician_id_optional():
     assert p.referring_clinician_id is None
 
 
-def test_post_create_referral_optional_fields_default_none():
-    p = post_create_adapter.validate_python(referral_payload())
-    assert p.treatment_modality is None
-
-
 def test_post_create_referral_default_languages():
     """`languages` defaults to ['en'] — keeps "submit with defaults" valid
     even though the field is required min-1 (#428)."""
@@ -194,11 +188,6 @@ def test_post_create_referral_accepts_multiple_age_groups():
 def test_post_create_referral_rejects_empty_age_groups():
     with pytest.raises(ValidationError):
         post_create_adapter.validate_python(referral_payload(age_groups=[]))
-
-
-def test_post_create_referral_strips_optional_to_none():
-    p = post_create_adapter.validate_python(referral_payload(treatment_modality="   "))
-    assert p.treatment_modality is None
 
 
 def test_post_create_referral_defaults_affirming_identities_to_empty_list():
@@ -619,10 +608,12 @@ def test_post_create_rejects_unknown_fields_on_opening():
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
-    """Cross-kind field bleed must not validate. `location_in_person`
+    """Cross-kind field bleed must not validate. `session_format`
     is a client-referral-only field; it has no place in a PA payload."""
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(opening_payload(location_in_person="yes"))
+        post_create_adapter.validate_python(
+            opening_payload(session_format="in_person_only")
+        )
 
 
 def test_post_create_opening_accepts_description():
@@ -748,12 +739,13 @@ def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
         # Read variants. ``location_state`` moved into the
         # :class:`Location` value object in #451 — see the lockstep
         # test in ``src/domain/logic/value_objects/test_location.py``.
-        (ReferralRead, "location_in_person", LOCATION_AVAILABILITY_OPTIONS),
-        (ReferralRead, "location_virtual", LOCATION_AVAILABILITY_OPTIONS),
+        (ReferralRead, "session_format", SESSION_FORMATS),
         (ReferralRead, "gender", GENDERS),
         # Create variants
+        (ReferralCreate, "session_format", SESSION_FORMATS),
         (ReferralCreate, "gender", GENDERS),
         # Update variants (Optional[Literal[*TUPLE]])
+        (ReferralUpdate, "session_format", SESSION_FORMATS),
         (ReferralUpdate, "gender", GENDERS),
     ],
 )

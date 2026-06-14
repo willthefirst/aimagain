@@ -112,11 +112,10 @@ def gather_flat_location(data: Any) -> Any:
        ``location`` property via :class:`LocationMixin` skip this
        branch (their ``location`` attr is read directly).
 
-    Only the three exact ``location_<sub>`` keys are consumed; other
-    ``location_*`` keys on the same payload (e.g. ``location_in_person``
-    / ``location_virtual`` on the client-referral schema) are left
-    untouched. ``_LOCATION_SUBFIELDS`` is the closed alphabet for this
-    value object.
+    Only the three exact ``location_<sub>`` keys are consumed; any other
+    ``location_*`` key on the same payload (a hypothetical sibling field)
+    is left untouched. ``_LOCATION_SUBFIELDS`` is the closed alphabet for
+    this value object.
 
     If the input already has a ``"location"`` key/attribute the helper
     preserves it (no double-wrapping); a payload that sends *both*
