@@ -1351,7 +1351,7 @@ def test_owner_address_referral_from_referring_affiliation():
     ``view.full_address`` (the client location)."""
     v = post_card_view(_make_cr_post())
     assert v["owner_address"] == "Cambridge, MA 02139"
-    assert v["full_address"] == "Brooklyn, NY 11201"
+    assert v["full_address"] == "Brooklyn, NY"
 
 
 def test_owner_address_referral_none_when_no_affiliation():
