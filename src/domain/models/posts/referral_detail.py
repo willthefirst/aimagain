@@ -5,11 +5,9 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
 from src.framework.persistence.base_model import Base
-from src.framework.persistence.mixins import LocationMixin
 
 from ..enums import (
     GENDERS,
-    SESSION_FORMATS,
     US_STATES,
     named_check_in,
 )
@@ -18,18 +16,17 @@ _TABLE = "referral_details"
 _ck = partial(named_check_in, _TABLE)
 
 
-class ReferralDetail(LocationMixin, Base):
+class ReferralDetail(Base):
     """1:1 detail row for posts of kind = 'referral'.
 
-    Inherits ``(city, state, zip)`` location columns from
-    :class:`LocationMixin`; the ``location_state`` CHECK constraint stays
-    in ``__table_args__`` because CHECK names are table-prefixed.
+    Carries ``(city, state)`` inline rather than via :class:`LocationMixin`
+    — referrals don't model ZIP (they describe a client's region, not a
+    postal address). ``ClinicianAffiliation`` keeps the full triple.
     """
 
     __tablename__ = _TABLE
     __table_args__ = (
         _ck("location_state", US_STATES),
-        _ck("session_format", SESSION_FORMATS),
         _ck("gender", GENDERS),
     )
 
@@ -39,15 +36,15 @@ class ReferralDetail(LocationMixin, Base):
         primary_key=True,
     )
 
-    # Section 1 — client location (city/state/zip from LocationMixin)
-    # `session_format` is the collapsed referral-side replacement for
-    # the previous two-axis (`location_in_person`, `location_virtual`)
-    # shape. CHECK pins the vocabulary to `SESSION_FORMATS`. NOT NULL
-    # with a server default of `either` so the migration backfill
-    # tolerates rows whose old combination was ambiguous (defensive —
-    # the migration's own backfill picks the right value first).
+    # Section 1 — client location (city + state; no ZIP on referrals)
+    location_city = Column(Text, nullable=False)
+    location_state = Column(Text, nullable=False)
+    # `session_format` is a JSON list — any subset of {in_person, virtual}.
+    # Vocabulary check happens on the wire (Pydantic
+    # `Literal[*SESSION_FORMATS]`); no SQL CHECK against JSON array
+    # members, same pattern as `services` / `age_groups`.
     session_format = Column(
-        Text, nullable=False, server_default=text("'either'"), default="either"
+        JSON, nullable=False, server_default=text("'[]'"), default=list
     )
     desired_times = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list

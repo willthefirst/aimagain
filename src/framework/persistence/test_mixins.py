@@ -4,29 +4,32 @@ from src.domain.models import ClinicianAffiliation, ReferralDetail
 from src.framework.persistence.mixins import LocationMixin
 
 
-def test_both_consumer_tables_carry_the_three_location_columns():
-    """The mixin must contribute the same three column names to every
-    consuming table. If the column names ever diverge between
-    consumers, the mixin's whole reason to exist evaporates — surface
-    that here.
-
-    Consumers post-#635 PR B are ``ClinicianAffiliation`` (carrying the per-
-    role attributes that used to live on ``Clinician``/``ClinicianAffiliation``) and
-    ``ReferralDetail`` (the seeking side of a Post).
+def test_consumer_tables_carry_the_mixin_column_names():
+    """``ClinicianAffiliation`` is the sole post-PR consumer of the
+    mixin's full ``(city, state, zip)`` triple. ``ReferralDetail``
+    carries (city, state) only — declared inline, not via the mixin —
+    because referrals model client region, not a postal address.
+    Pin the contract on the remaining consumer so a column rename or
+    drop surfaces here.
     """
-    for cls in (ClinicianAffiliation, ReferralDetail):
-        cols = {c.name for c in cls.__table__.columns}
-        assert {"location_city", "location_state", "location_zip"} <= cols
+    cols = {c.name for c in ClinicianAffiliation.__table__.columns}
+    assert {"location_city", "location_state", "location_zip"} <= cols
+    # Referral side: city + state only, no zip.
+    ref_cols = {c.name for c in ReferralDetail.__table__.columns}
+    assert {"location_city", "location_state"} <= ref_cols
+    assert "location_zip" not in ref_cols
 
 
 def test_location_columns_are_not_null_on_each_table():
-    """ReferralDetail keeps ``NOT NULL`` on the three location columns.
-    ClinicianAffiliation allows ``NULL`` (location is deferred in the
-    fast-path onboarding wizard; users fill it in via "Complete your profile").
-    Pin both explicitly so a regression in either direction surfaces immediately."""
-    for name in ("location_city", "location_state", "location_zip"):
+    """ReferralDetail keeps ``NOT NULL`` on its (city, state).
+    ClinicianAffiliation allows ``NULL`` on its (city, state, zip)
+    triple (location is deferred in the fast-path onboarding wizard;
+    users fill it in via "Complete your profile"). Pin both directions
+    so a regression in either surfaces immediately."""
+    for name in ("location_city", "location_state"):
         ref_col = ReferralDetail.__table__.c[name]
         assert ref_col.nullable is False, f"ReferralDetail.{name} must be NOT NULL"
+    for name in ("location_city", "location_state", "location_zip"):
         aff_col = ClinicianAffiliation.__table__.c[name]
         assert aff_col.nullable is True, f"ClinicianAffiliation.{name} must be nullable"
 
