@@ -160,9 +160,38 @@ def test_referral_headline_falls_back_when_age_groups_empty():
 # tested separately at the route level.
 
 
-def _make_cr_post(**detail_overrides):
+_CR_REFERRING_CLINICIAN_DEFAULTS = dict(
+    id="ref-clin-1",
+    first_name="Carlos",
+    last_name="Rivera",
+)
+_CR_REFERRING_AFFILIATION_DEFAULTS = dict(
+    location_city="Cambridge",
+    location_state="MA",
+    location_zip="02139",
+    org=SimpleNamespace(id="org-ref", name="River Health"),
+)
+# Sentinel for `_make_cr_post` to distinguish "no kwarg passed → apply
+# defaults" from "kwarg explicitly None → clear the relation". Plain
+# ``None`` can't carry both meanings.
+_UNSET = object()
+
+
+def _make_cr_post(
+    *,
+    referring_clinician_attrs=_UNSET,
+    referring_affiliation_attrs=_UNSET,
+    **detail_overrides,
+):
     """Realistic CR stub. Defaults populate every field with a sensible
-    value so tests can override only what they care about."""
+    value so tests can override only what they care about.
+
+    Referring-clinician shape mirrors the model — a `Clinician` with
+    `first_name`/`last_name`/`id`, and a `ClinicianAffiliation` with
+    `location_*` + `org`. Pass ``referring_clinician_attrs=None`` (or
+    ``referring_affiliation_attrs=None``) to clear that relation —
+    e.g. legacy pre-#1454 rows or a sole-prop clinician with no
+    affiliation. A dict merges into the defaults."""
     defaults = dict(
         location_city="Brooklyn",
         location_state="NY",
@@ -186,6 +215,24 @@ def _make_cr_post(**detail_overrides):
         clinical_niches=[],
     )
     defaults.update(detail_overrides)
+    if referring_clinician_attrs is _UNSET:
+        rc = SimpleNamespace(**_CR_REFERRING_CLINICIAN_DEFAULTS)
+    elif referring_clinician_attrs is None:
+        rc = None
+    else:
+        rc = SimpleNamespace(
+            **{**_CR_REFERRING_CLINICIAN_DEFAULTS, **referring_clinician_attrs}
+        )
+    if referring_affiliation_attrs is _UNSET:
+        aff = SimpleNamespace(**_CR_REFERRING_AFFILIATION_DEFAULTS)
+    elif referring_affiliation_attrs is None:
+        aff = None
+    else:
+        aff = SimpleNamespace(
+            **{**_CR_REFERRING_AFFILIATION_DEFAULTS, **referring_affiliation_attrs}
+        )
+    defaults["referring_clinician"] = rc
+    defaults["clinician_affiliation"] = aff
     return SimpleNamespace(
         kind="referral",
         owner=SimpleNamespace(
@@ -741,21 +788,36 @@ def test_poster_name_intake_none_when_no_org():
     assert v["poster_name"] is None
 
 
-def test_poster_name_referral_uses_owner_clinician_name():
+def test_poster_name_referral_uses_referring_clinician_name():
+    """`poster_name` is the referring clinician's name (#1454 FK), not
+    the post owner's first clinician — the owner is a user; the
+    referrer is the named clinician they're acting on behalf of."""
     v = post_card_view(_make_cr_post())
     assert v["poster_name"] == "Carlos Rivera"
 
 
-def test_poster_name_referral_none_when_no_owner_clinicians():
-    post = _make_cr_post()
+def test_poster_name_referral_legacy_falls_back_to_owner_clinician():
+    """Pre-#1454 rows: no `referring_clinician`, falls back to the post
+    owner's first clinician."""
+    post = _make_cr_post(referring_clinician_attrs=None)
+    post.owner = SimpleNamespace(
+        clinicians=[SimpleNamespace(first_name="Maya", last_name="Patel")]
+    )
+    assert post_card_view(post)["poster_name"] == "Maya Patel"
+
+
+def test_poster_name_referral_legacy_none_when_no_owner_clinicians():
+    post = _make_cr_post(referring_clinician_attrs=None)
     post.owner = SimpleNamespace(clinicians=[])
     assert post_card_view(post)["poster_name"] is None
 
 
-def test_poster_name_referral_none_when_clinician_has_no_name():
-    post = _make_cr_post()
-    post.owner = SimpleNamespace(
-        clinicians=[SimpleNamespace(first_name=None, last_name=None)]
+def test_poster_name_referral_none_when_referring_clinician_has_no_name():
+    """Defensive — a referring clinician with no name returns
+    `poster_name=None` (the macro's name-or-id guard then suppresses the
+    card)."""
+    post = _make_cr_post(
+        referring_clinician_attrs={"first_name": None, "last_name": None}
     )
     assert post_card_view(post)["poster_name"] is None
 
@@ -1244,16 +1306,69 @@ def test_provider_ref_intake_is_program_then_org():
     }
 
 
-def test_provider_ref_referral_is_name_only():
-    """A referral byline has no linkable provider entity — name only,
-    so the macro renders plain text (no anchor)."""
+def test_provider_ref_referral_is_referring_clinician_then_affiliation_org():
+    """A referral resolves to the referring clinician (#1454 FK) with
+    the affiliation's org as the second part — the same shape openings
+    use, so the owner-context card renders an "About the referring
+    clinician" card with hyperlinked identity + org."""
     v = post_card_view(_make_cr_post())
+    assert v["provider_ref"] == {
+        "name": "Carlos Rivera",
+        "entity": "clinician",
+        "id": "ref-clin-1",
+        "org": {"id": "org-ref", "name": "River Health"},
+    }
+
+
+def test_provider_ref_referral_sole_prop_has_no_org():
+    """A referring clinician with no affiliation (sole-prop or
+    affiliation FK left null) yields ``org=None`` — the macro renders
+    just the linked clinician name."""
+    v = post_card_view(_make_cr_post(referring_affiliation_attrs=None))
+    assert v["provider_ref"]["entity"] == "clinician"
+    assert v["provider_ref"]["name"] == "Carlos Rivera"
+    assert v["provider_ref"]["id"] == "ref-clin-1"
+    assert v["provider_ref"]["org"] is None
+
+
+def test_provider_ref_referral_legacy_falls_back_to_owner_clinician():
+    """Pre-#1454 rows lack ``referring_clinician_id``. The view falls
+    back to the post owner's first clinician as a name-only reference
+    so legacy posts still surface a poster name; the owner-context
+    card's identity row then renders unhyperlinked plain text."""
+    v = post_card_view(_make_cr_post(referring_clinician_attrs=None))
     assert v["provider_ref"] == {
         "name": "Carlos Rivera",
         "entity": None,
         "id": None,
         "org": None,
     }
+
+
+def test_owner_address_referral_from_referring_affiliation():
+    """The owner-context card's Address row reads ``view.owner_address`` —
+    the referring clinician's affiliation address, distinct from
+    ``view.full_address`` (the client location)."""
+    v = post_card_view(_make_cr_post())
+    assert v["owner_address"] == "Cambridge, MA 02139"
+    assert v["full_address"] == "Brooklyn, NY 11201"
+
+
+def test_owner_address_referral_none_when_no_affiliation():
+    """Sole-prop / legacy case — no affiliation means no provider
+    address. The macro suppresses the row when ``owner_address`` is
+    ``None``."""
+    v = post_card_view(_make_cr_post(referring_affiliation_attrs=None))
+    assert v["owner_address"] is None
+
+
+def test_owner_address_opening_matches_full_address():
+    """For an opening, the provider's address IS the affiliation
+    address — both keys hold the same string, so the owner-context card
+    and the post-own facts block read consistent values."""
+    v = post_card_view(_make_pa_post())
+    assert v["owner_address"] == v["full_address"]
+    assert v["owner_address"] == "Brooklyn, NY 11201"
 
 
 def test_intake_reads_services_from_program():

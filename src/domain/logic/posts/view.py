@@ -299,14 +299,20 @@ def post_card_view(post) -> dict[str, Any]:
             unset.
         provider_ref: the canonical "who's behind this post" reference —
             ``{name, entity, id, org}`` where ``entity`` is ``"clinician"``
-            (opening), ``"program"`` (intake), or ``None`` (referral, a
-            name-only reference with no detail page), ``id`` is that
-            entity's id (``None`` when unlinkable), and ``org`` is
+            (opening, referral) or ``"program"`` (intake), ``id`` is that
+            entity's id (``None`` when unlinkable — e.g. a legacy referral
+            whose ``referring_clinician_id`` was never set), and ``org`` is
             ``{id, name}`` of the owning Organization or ``None`` (a
             sole-proprietor clinician has no org). The ``provider_ref``
             macro renders this as the hyperlinked "<name> · <org>"
             denotation on the detail card and the feed byline — one home
-            for the format and the links across surfaces.
+            for the format and the links across surfaces. For a referral
+            the entity is the referring clinician (FK
+            ``referral_detail.referring_clinician_id``) and the org comes
+            from the affiliation the clinician is referring under
+            (``referral_detail.clinician_affiliation``); pre-#1454 rows
+            with no ``referring_clinician_id`` fall back to the post
+            owner's first clinician as a name-only reference.
         practice_link: ``{id, name}`` — the linked Clinician's id with
             the affiliation's org name; ``None`` for other kinds.
         program_link: ``{id, name}`` of program's linked Program;
@@ -318,9 +324,17 @@ def post_card_view(post) -> dict[str, Any]:
             The owner-context card renders this as a clickable link so
             any post is one click from its org's detail page.
         full_address: ``"City, ST ZIP"`` string for the detail page's
-            expanded location row. CR reads from its own location;
-            PA reads from the linked ClinicianAffiliation; program
-            returns ``None``.
+            expanded location row — the post-own address. CR reads from
+            its own client-location columns; PA reads from the linked
+            ClinicianAffiliation; program returns ``None``.
+        owner_address: ``"City, ST ZIP"`` string for the owner-context
+            card's Address row — the provider-side address. PA's owner
+            is the linked ClinicianAffiliation (same string as
+            ``full_address``); referral's owner is the affiliation the
+            referring clinician acts under
+            (``referral_detail.clinician_affiliation``, distinct from the
+            client location in ``full_address``); program returns
+            ``None`` (programs have no address).
         accepts_in_network / accepts_out_of_network_superbill /
         accepts_private_pay: CR-only payment-path booleans from the
             detail row; ``None`` for other kinds.
@@ -374,6 +388,7 @@ def post_card_view(post) -> dict[str, Any]:
         "program_link": None,
         "organization_link": None,
         "full_address": None,
+        "owner_address": None,
         "sliding_scale": None,
         "accepts_in_network": None,
         "accepts_out_of_network_superbill": None,
@@ -394,23 +409,54 @@ def post_card_view(post) -> dict[str, Any]:
         if d is None:
             return base
         _forward_detail_passthrough(base, d)
-        _owner = getattr(post, "owner", None)
-        _owner_clinicians = getattr(_owner, "clinicians", None) or []
-        _rc = _owner_clinicians[0] if _owner_clinicians else None
-        _fn = getattr(_rc, "first_name", None) if _rc else None
-        _ln = getattr(_rc, "last_name", None) if _rc else None
-        _poster = " ".join(filter(None, [_fn, _ln])) or None
-        base.update(
-            poster_name=_poster,
-            # Referral byline is a name-only reference — the view has no
-            # clean link to the referring clinician's detail page, so
-            # `entity`/`id` stay None and the macro renders plain text.
-            provider_ref={
+        # Referring clinician comes from the FK the referral submitter
+        # designates (#1454); the affiliation column gives us the org the
+        # clinician is referring under (a multi-affiliation clinician
+        # picks one per referral). Pre-#1454 rows lack the FK — fall back
+        # to the post owner's first clinician as a name-only reference so
+        # legacy posts still surface a poster name in the byline.
+        _referring = getattr(d, "referring_clinician", None)
+        _referring_aff = getattr(d, "clinician_affiliation", None)
+        if _referring is not None:
+            _fn = getattr(_referring, "first_name", None)
+            _ln = getattr(_referring, "last_name", None)
+            _poster = " ".join(filter(None, [_fn, _ln])) or None
+            _org = getattr(_referring_aff, "org", None) if _referring_aff else None
+            _org_name = getattr(_org, "name", None) if _org else None
+            _org_ref = (
+                {"id": _org.id, "name": _org_name}
+                if _org and getattr(_org, "id", None) and _org_name
+                else None
+            )
+            _provider_ref = {
+                "name": _poster,
+                "entity": "clinician",
+                "id": getattr(_referring, "id", None),
+                "org": _org_ref,
+            }
+            _owner_address = full_address(
+                _read_scalar(_referring_aff, "location_city"),
+                _read_scalar(_referring_aff, "location_state"),
+                _read_scalar(_referring_aff, "location_zip"),
+            )
+        else:
+            _owner = getattr(post, "owner", None)
+            _owner_clinicians = getattr(_owner, "clinicians", None) or []
+            _rc = _owner_clinicians[0] if _owner_clinicians else None
+            _fn = getattr(_rc, "first_name", None) if _rc else None
+            _ln = getattr(_rc, "last_name", None) if _rc else None
+            _poster = " ".join(filter(None, [_fn, _ln])) or None
+            _provider_ref = {
                 "name": _poster,
                 "entity": None,
                 "id": None,
                 "org": None,
-            },
+            }
+            _owner_address = None
+        base.update(
+            poster_name=_poster,
+            provider_ref=_provider_ref,
+            owner_address=_owner_address,
             headline=referral_headline(d),
             # Referral side stores `session_format` as a list[str]
             # subset of {in_person, virtual}; back-derive the two
@@ -511,6 +557,16 @@ def post_card_view(post) -> dict[str, Any]:
             ),
             organization_link=_org_ref,
             full_address=full_address(
+                _read_scalar(affiliation, "location_city"),
+                _read_scalar(affiliation, "location_state"),
+                _read_scalar(affiliation, "location_zip"),
+            ),
+            # Owner-context card reads `owner_address` (the provider's
+            # address). For an opening that's the same affiliation as
+            # `full_address`; the duplication keeps `owner_address`'s
+            # semantics ("provider-side address") consistent across kinds
+            # so the macro can read one key.
+            owner_address=full_address(
                 _read_scalar(affiliation, "location_city"),
                 _read_scalar(affiliation, "location_state"),
                 _read_scalar(affiliation, "location_zip"),
