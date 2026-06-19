@@ -86,28 +86,21 @@ _GENDER_HEADLINE_WORDS: dict[str, str] = {
 }
 
 
-# Back-derivation map: referral's collapsed `session_format` → the
-# two-axis `(in_person, virtual)` shape opening/affiliation still uses.
-# Lets the cross-kind list/detail templates read `view.in_person` /
-# `view.virtual` uniformly. `please_contact` maps both axes to
-# `please_contact` so the existing template chunk renders "Please
-# contact" once and not contradictory yes/no badges.
-_SESSION_FORMAT_TO_AXES: dict[str, tuple[str, str]] = {
-    "in_person_only": ("yes", "no"),
-    "virtual_only": ("no", "yes"),
-    "either": ("yes", "yes"),
-    "please_contact": ("please_contact", "please_contact"),
-}
+# Back-derivation: referral's `session_format` is a list[str] subset
+# of {"in_person", "virtual"}; the cross-kind list/detail templates
+# still read `view.in_person` / `view.virtual` as "yes"/"no"/None, so
+# we lift list membership onto those keys. An empty list (no signal)
+# leaves both as None.
+def _in_person_from_session_format(session_format) -> str | None:
+    if not session_format:
+        return None
+    return "yes" if "in_person" in session_format else "no"
 
 
-def _in_person_from_session_format(session_format: str | None) -> str | None:
-    pair = _SESSION_FORMAT_TO_AXES.get(session_format or "")
-    return pair[0] if pair else None
-
-
-def _virtual_from_session_format(session_format: str | None) -> str | None:
-    pair = _SESSION_FORMAT_TO_AXES.get(session_format or "")
-    return pair[1] if pair else None
+def _virtual_from_session_format(session_format) -> str | None:
+    if not session_format:
+        return None
+    return "yes" if "virtual" in session_format else "no"
 
 
 def insurance_posture_for_post(post) -> str | None:
@@ -419,12 +412,14 @@ def post_card_view(post) -> dict[str, Any]:
                 "org": None,
             },
             headline=referral_headline(d),
-            # Referral side now stores a single `session_format`; back-
-            # derive the two-axis `in_person`/`virtual` view keys so the
-            # cross-kind list/detail templates (`posts/_item.html`,
-            # `posts/detail.html`) render unchanged. Opening side still
-            # reads from the affiliation's two independent columns.
-            session_format=getattr(d, "session_format", None),
+            # Referral side stores `session_format` as a list[str]
+            # subset of {in_person, virtual}; back-derive the two
+            # `in_person`/`virtual` view keys so the cross-kind
+            # list/detail templates (`posts/_item.html`,
+            # `posts/detail.html`) render unchanged. Opening side
+            # still reads from the affiliation's two independent
+            # columns.
+            session_format=list(getattr(d, "session_format", None) or []),
             in_person=_in_person_from_session_format(
                 getattr(d, "session_format", None)
             ),
@@ -435,12 +430,12 @@ def post_card_view(post) -> dict[str, Any]:
             location_chunk=_location_chunk(
                 getattr(d, "location_city", None),
                 getattr(d, "location_state", None),
-                getattr(d, "location_zip", None),
+                None,
             ),
             full_address=full_address(
                 getattr(d, "location_city", None),
                 getattr(d, "location_state", None),
-                getattr(d, "location_zip", None),
+                None,
             ),
             accepts_in_network=getattr(d, "accepts_in_network", None),
             accepts_out_of_network_superbill=getattr(

@@ -10,16 +10,16 @@ Used by both `posts/new_referral.html` (create, no prefill) and
     omit it so `actions(...)` defaults to "Save changes".
   - `post`: the persisted Post (for edit) or `None` (for create)
 
-Section order — six sections, ordered to match how a referring
-clinician actually thinks about the form:
+Section order — ordered to match how a referring clinician actually
+thinks about the form:
 
   1. Referring as — affiliation picker; establishes who is referring
-  2. About the client — narrative description (the primary signal)
-  3. Where & when — location + session format + desired session times
-  4. Client basics — age groups, languages, gender, affirming identities
-  5. Provider sought — services, modalities, acceptable license classes,
+  2. Where & when — location + session format + desired session times
+  3. Client basics — narrative description, age, languages, gender,
+     affirming identities
+  4. Provider sought — services, modalities, acceptable license classes,
      clinical niches (free-form tags)
-  6. Client's coverage — three independent payment-path booleans + carrier list
+  5. Client's coverage — three independent payment-path booleans + carrier list
 
 `subject` is NOT a form field — it's derived in the view layer
 (`post_feed_headline` in `domain/logic/posts/view.py`) from
@@ -71,19 +71,16 @@ the script block at the bottom of this file).
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Referring as", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {{ textarea_field("description", "About the client", current=d.description if d else None, help="What another clinician needs to know to decide if they can help. Please don't include identifying details.") }}
     {% call form_section("Where & when") %}
-      {{ text_field("location_city", "City", current=d.location_city if d else None) }}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-      {{ text_field("location_zip", "ZIP", current=d.location_zip if d else None, pattern="\\d{5}", maxlength=5) }}
-      {# Collapsed session-format picker (#1359). Previously two
-         independent `yes / no / please_contact` selects (one for
-         in-person, one for virtual); the corpus showed those collapsed
-         onto four mutually-exclusive options in practice. #}
-      {{ select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, placeholder=true) }}
+      {# Session-format is a multi-checkbox on the wire — any subset
+         of {in_person, virtual}. Empty selection = "unspecified". #}
+      {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
+      {{ text_field("location_city", "City", current=d.location_city if d else None, help="Only used for in-person sessions.") }}
       {{ multi_select_field("desired_times", "Desired session times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false, help="Select any that work; leave blank if flexible.") }}
     {% endcall %}
     {% call form_section("Client basics") %}
+      {{ textarea_field("description", "About the client", current=d.description if d else None, help="What another clinician needs to know to decide if they can help. Please don't include identifying details.") }}
       {# A referral describes one client, so age is a single value.
          The wire shape stays `age_groups: list[str]` (the schema's
          `scalar_to_list` BeforeValidator wraps a scalar into a

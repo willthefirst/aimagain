@@ -166,8 +166,7 @@ def _make_cr_post(**detail_overrides):
     defaults = dict(
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
-        session_format="in_person_only",
+        session_format=["in_person"],
         desired_times=["weekday_morning"],
         age_groups=["adults_25_64"],
         languages=["en", "es"],
@@ -333,26 +332,28 @@ def test_view_cr_header_state_is_none_state_lives_in_location_chunk():
     identity. Pin `header_state` is intentionally None for CR."""
     v = post_card_view(_make_cr_post())
     assert v["header_state"] is None
-    assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
+    # Referrals carry (city, state) only — no ZIP on the referral side.
+    assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": None}
 
 
 def test_view_cr_in_person_and_virtual_derive_from_session_format():
-    """The referral side stores a single `session_format` (#1359). The
-    cross-kind list/detail templates still read `view.in_person` /
-    `view.virtual`, so the view derives them from `session_format`."""
-    v = post_card_view(_make_cr_post(session_format="in_person_only"))
-    assert v["session_format"] == "in_person_only"
+    """The referral side stores `session_format` as a list[str] subset
+    of {in_person, virtual}. The cross-kind list/detail templates still
+    read `view.in_person` / `view.virtual`, so the view derives them
+    from list membership."""
+    v = post_card_view(_make_cr_post(session_format=["in_person"]))
+    assert v["session_format"] == ["in_person"]
     assert v["in_person"] == "yes"
     assert v["virtual"] == "no"
 
-    v = post_card_view(_make_cr_post(session_format="virtual_only"))
+    v = post_card_view(_make_cr_post(session_format=["virtual"]))
     assert (v["in_person"], v["virtual"]) == ("no", "yes")
 
-    v = post_card_view(_make_cr_post(session_format="either"))
+    v = post_card_view(_make_cr_post(session_format=["in_person", "virtual"]))
     assert (v["in_person"], v["virtual"]) == ("yes", "yes")
 
-    v = post_card_view(_make_cr_post(session_format="please_contact"))
-    assert (v["in_person"], v["virtual"]) == ("please_contact", "please_contact")
+    v = post_card_view(_make_cr_post(session_format=[]))
+    assert (v["in_person"], v["virtual"]) == (None, None)
 
 
 def test_view_cr_settings_always_empty():
@@ -375,9 +376,10 @@ def test_view_cr_missing_gender_yields_empty_list():
     assert v["genders"] == []
 
 
-def test_view_cr_full_address_composes_city_state_zip():
+def test_view_cr_full_address_composes_city_state():
+    """Referrals carry (city, state) only — no ZIP."""
     v = post_card_view(_make_cr_post())
-    assert v["full_address"] == "Brooklyn, NY 11201"
+    assert v["full_address"] == "Brooklyn, NY"
 
 
 def test_view_cr_cr_only_fields_set_pa_only_fields_none():

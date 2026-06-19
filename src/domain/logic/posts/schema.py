@@ -48,8 +48,8 @@ from pydantic import (
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
-    Location,
-    LocationPartial,
+    ReferralLocation,
+    ReferralLocationPartial,
     flatten_location_on_dump,
     gather_flat_location,
 )
@@ -138,6 +138,11 @@ GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list
 ModalitiesField = Annotated[
     list[Literal[*TREATMENT_MODALITIES]], BeforeValidator(scalar_to_list)
 ]
+# `referral.session_format` — multi-checkbox on the wire (any subset
+# of {in_person, virtual}). Empty list = "unspecified".
+SessionFormatField = Annotated[
+    list[Literal[*SESSION_FORMATS]], BeforeValidator(scalar_to_list)
+]
 # `referral.affirming_identities` — request-side constraint, multi-checkbox
 # on the wire. Empty list is allowed ("no preference stated"). Symmetric
 # to `Clinician.affirming_identities` on the provider side.
@@ -211,16 +216,17 @@ class _PostReadBase(ReadProjection):
 
 class ReferralRead(_PostReadBase):
     kind: Literal["referral"]
-    # `(city, state, zip)` modeled as a single :class:`Location` value
-    # object but kept flat on the wire/JSON shape — ``_flatten_post_to_dict``
-    # produces a flat dict from the ORM, ``gather_flat_location`` nests the
-    # three keys, and ``flatten_location_on_dump`` reverses on dump.
-    location: Location
-    # `session_format` is the collapsed referral-side format axis (#1359).
-    # Replaces `location_in_person` / `location_virtual`. `view.py`
-    # back-derives the legacy `in_person`/`virtual` view keys so the
+    # `(city, state)` modeled as a single :class:`ReferralLocation`
+    # value object but kept flat on the wire/JSON shape —
+    # ``_flatten_post_to_dict`` produces a flat dict from the ORM,
+    # ``gather_flat_location`` nests the two keys, and
+    # ``flatten_location_on_dump`` reverses on dump.
+    location: ReferralLocation
+    # `session_format` is a multi-select list — any subset of
+    # {in_person, virtual}. `view.py` derives the legacy
+    # `in_person`/`virtual` view keys from list membership so the
     # cross-kind list/detail templates render unchanged.
-    session_format: Literal[*SESSION_FORMATS]
+    session_format: SessionFormatField = []
     desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
@@ -332,16 +338,16 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     """Create payload for `kind='referral'`. Field set follows the
     client-referral intake form.
 
-    The ``(city, state, zip)`` triple is a single :class:`Location` value
-    object; form posts still send the three keys flat at the top level
-    (``gather_flat_location`` rolls them into the nested block).
+    The ``(city, state)`` pair is a single :class:`ReferralLocation`
+    value object; form posts still send the two keys flat at the top
+    level (``gather_flat_location`` rolls them into the nested block).
     """
 
     kind: Literal["referral"]
-    location: Location
-    # See :class:`ReferralRead.session_format` — single mutually-exclusive
-    # axis required on create.
-    session_format: Literal[*SESSION_FORMATS]
+    location: ReferralLocation
+    # See :class:`ReferralRead.session_format`. Multi-checkbox on the
+    # wire; empty list = "unspecified".
+    session_format: SessionFormatField = []
     desired_times: DesiredTimesField = []
     # Required min-1 on the wire. Mirrors PA's `age_groups`.
     age_groups: RequiredAgeGroupsField
@@ -483,9 +489,11 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     kind: Literal["referral"]
     # See :class:`ReferralCreate` — flat on the wire, nested
     # value object in Python, flat on dump.
-    location: LocationPartial | None = None
-    # `None` = leave unchanged. See :class:`ReferralRead.session_format`.
-    session_format: Literal[*SESSION_FORMATS] | None = None
+    location: ReferralLocationPartial | None = None
+    # `None` = leave unchanged; `[]` = clear all selections. Same
+    # list-replace semantics as other list fields. See
+    # :class:`ReferralRead.session_format`.
+    session_format: SessionFormatField | None = None
     # `None` = leave unchanged (per `update_post`); `[]` = clear all
     # selections. List-valued PATCH replaces the whole list — partial
     # add/remove is intentionally out of scope.
@@ -590,9 +598,9 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     # Mirrors :class:`ReferralRead`. Audit ``before`` / ``after``
     # snapshots stay flat on the wire — the serializer unrolls the nested
     # ``location`` block back to top-level keys.
-    location: Location
+    location: ReferralLocation
     # See :class:`ReferralRead.session_format`.
-    session_format: Literal[*SESSION_FORMATS]
+    session_format: SessionFormatField = []
     desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
