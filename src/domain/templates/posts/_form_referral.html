@@ -73,10 +73,10 @@ the script block at the bottom of this file).
     {{ composite_select_field("clinician_affiliation_id", "Referring as", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
     {% call form_section("Where & when") %}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-      {{ text_field("location_city", "City", current=d.location_city if d else None) }}
       {# Session-format is a multi-checkbox on the wire — any subset
          of {in_person, virtual}. Empty selection = "unspecified". #}
       {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
+      {{ text_field("location_city", "City", current=d.location_city if d else None, help="Only used for in-person sessions.") }}
       {{ multi_select_field("desired_times", "Desired session times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false, help="Select any that work; leave blank if flexible.") }}
     {% endcall %}
     {% call form_section("Client basics") %}
