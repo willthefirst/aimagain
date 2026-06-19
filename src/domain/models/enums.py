@@ -78,19 +78,14 @@ class LocationAvailability(LabeledChoice):
     please_contact = "please_contact", "Please contact"
 
 
-# Referral session-format axis. A referral describes one client; the
-# referrer picks one of four mutually-exclusive options. The matching
-# corpus said the previous two-axis shape (`location_in_person` *and*
-# `location_virtual`, each {yes, no, please_contact}) collapsed onto
-# these four combinations in practice — every meaningful answer was
-# one of "in-person only", "virtual only", "either", or "let's talk".
-# The opening / affiliation side keeps the two-axis shape because a
-# practice can legitimately offer both in independent quantities.
+# Referral session-format axes. Persisted as a list[str] on
+# ReferralDetail.session_format: any subset of {in_person, virtual} is
+# valid (both = "either", one = single-modality, empty = unspecified).
+# The opening / affiliation side keeps its own two-axis shape because
+# a practice can legitimately offer both in independent quantities.
 class SessionFormat(LabeledChoice):
-    in_person_only = "in_person_only", "In-person only"
-    virtual_only = "virtual_only", "Virtual only"
-    either = "either", "Either in-person or virtual"
-    please_contact = "please_contact", "Please contact"
+    in_person = "in_person", "In-person"
+    virtual = "virtual", "Virtual"
 
 
 LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = LocationAvailability.values()

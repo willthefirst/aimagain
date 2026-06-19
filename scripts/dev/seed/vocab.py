@@ -40,6 +40,7 @@ from src.domain.models.enums import (
     LANGUAGES,
     LICENSE_TYPES,
     REFERRAL_SERVICES,
+    SESSION_FORMATS,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
     US_STATES,
@@ -749,6 +750,7 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     # `in_network_carriers` on the provider side.
     "insurance_carriers": INSURANCE_CARRIERS,
     "affirming_identities": AFFIRMING_IDENTITIES,
+    "session_format": SESSION_FORMATS,
     "acceptable_license_types": LICENSE_TYPES,
     # Free-form on the wire — the seed subset above is realism only,
     # not a closed vocabulary. See `CLINICAL_NICHES_SEED` above.
