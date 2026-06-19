@@ -100,7 +100,6 @@ def test_cr_enum_defaults_render_via_label_dict():
     enum entry needed."""
     cr = make_post_stub("referral", owner_id=uuid.uuid4())
     d = cr.referral_detail
-    assert d.session_format == "in_person_only"
     assert d.gender == "prefer_not_to_say"
     assert d.location_state == "NY"
     # Boolean payment-paths default to False; JSON `insurance_carriers`

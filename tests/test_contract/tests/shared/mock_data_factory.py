@@ -70,7 +70,6 @@ _DETAIL_MODELS: dict[str, type] = {
 # itself.
 _ENUM_DEFAULTS: dict[str, dict[str, Any]] = {
     "referral": {
-        "session_format": "in_person_only",
         "gender": "prefer_not_to_say",
         "location_state": "NY",
     },
