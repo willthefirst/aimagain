@@ -4,12 +4,11 @@ The listing row in `src/domain/templates/posts/_item.html` needs a single
 4-state "insurance posture" axis to render as one icon badge. The two
 kinds model the underlying data with parallel shapes:
 
-  * `referral` — three independent payment-path booleans
-    (`accepts_in_network` / `accepts_out_of_network_superbill` /
-    `accepts_private_pay`) plus an `insurance_carriers` JSON list
-    of `INSURANCE_CARRIERS` tokens (#1358 PR-e). The posture is
-    derived from the booleans in priority order: in-network →
-    out-of-network → private-pay → please_contact (none set).
+  * `referral` — two independent payment-path booleans
+    (`accepts_in_network` / `accepts_private_pay`) plus an
+    `insurance_carriers` JSON list of `INSURANCE_CARRIERS` tokens.
+    The posture is derived from the booleans in priority order:
+    in-network → private-pay → please_contact (none set).
   * `opening` → linked `ClinicianAffiliation` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
@@ -20,28 +19,25 @@ ordering of branches is the priority the row should show: if a
 clinician accepts in-network plans, that's the posture, even if they
 also offer sliding scale — the in-network signal is louder.
 
-`referral_headline(detail)` composes the CR card's headline
-text from `age_groups[0]` + `gender`. CR posts describe one client,
+`referral_headline(detail)` composes the CR card's headline text from
+`age_groups[0]` — e.g. "Adult (25–64)". CR posts describe one client,
 so the first age group is the client's age (the schema still allows
 multi for forward-compat but only the first drives the title).
-Genders that don't slot in naturally — `prefer_not_to_say`,
-`gender_diverse` — drop the gender word entirely.
 
 `post_card_view(post)` is the unified view-model that both the listing
 card (`_item.html`) and the detail page (`detail.html`) read from. Each
 kind's underlying detail relationship has a different field set and
-naming — CR holds its own (city, state, zip) location and a single
-gender; PA reads location and insurance from the linked
-ClinicianAffiliation (the practice the opening announces, NOT the
-clinician's primary-affiliation proxies — a multi-affiliation
-clinician's opening must show the posting practice's facts);
-program reads identity from the linked Program. The function collapses
-those three shapes into one flat dict so templates iterate over keys
-rather than branching on `post.kind`. Values that don't apply to a
-kind are ``None`` (or empty lists); templates render via
-``{% if view.x %}``. Raw enum values are returned — display-label
-lookup is the template's job (it's the same label dict pattern as
-elsewhere).
+naming — CR holds its own (city, state, zip) location; PA reads
+location and insurance from the linked ClinicianAffiliation (the
+practice the opening announces, NOT the clinician's primary-affiliation
+proxies — a multi-affiliation clinician's opening must show the
+posting practice's facts); program reads identity from the linked
+Program. The function collapses those three shapes into one flat dict
+so templates iterate over keys rather than branching on `post.kind`.
+Values that don't apply to a kind are ``None`` (or empty lists);
+templates render via ``{% if view.x %}``. Raw enum values are returned
+— display-label lookup is the template's job (it's the same label dict
+pattern as elsewhere).
 
 The opening and intake branches additionally consult the linked
 ``ClinicianAffiliation`` (and the linked ``Clinician`` for the
@@ -73,18 +69,6 @@ from src.domain.models.enums import (
 )
 from src.framework.rendering.address import full_address
 
-# Gender values that don't fit a "<age> <gender>" phrase. `gender_diverse`
-# is the umbrella token (genderqueer / agender / two-spirit / etc.) —
-# fine as a value, awkward as an adjective. `prefer_not_to_say` is the
-# privacy opt-out. Both cases drop the gender word from the headline.
-_GENDER_HEADLINE_WORDS: dict[str, str] = {
-    "female": "female",
-    "male": "male",
-    "non_binary": "non-binary",
-    "trans_female": "trans woman",
-    "trans_male": "trans man",
-}
-
 
 # Back-derivation: referral's `session_format` is a list[str] subset
 # of {"in_person", "virtual"}; the cross-kind list/detail templates
@@ -115,13 +99,11 @@ def insurance_posture_for_post(post) -> str | None:
         if detail is None:
             return None
         # Map the payment-path booleans to the unified posture vocab in
-        # priority order: in-network > out-of-network > private-pay >
-        # please_contact (none set). Priority matches the provider-side
-        # collapse below — in-network is the loudest signal.
+        # priority order: in-network > private-pay > please_contact
+        # (none set). Priority matches the provider-side collapse
+        # below — in-network is the loudest signal.
         if getattr(detail, "accepts_in_network", False):
             return "in_network"
-        if getattr(detail, "accepts_out_of_network_superbill", False):
-            return "out_of_network"
         if getattr(detail, "accepts_private_pay", False):
             return "self_pay"
         return "please_contact"
@@ -189,9 +171,6 @@ _LIST_PASSTHROUGH: dict[str, str] = {
     "settings": "settings",
     "ages": "age_groups",
     "languages": "languages",
-    "genders": "genders",
-    "modalities": "modalities",
-    "desired_times": "desired_times",
 }
 
 # #1358 PR-f sub-3 — steady-state profile fields read exclusively from
@@ -259,8 +238,8 @@ def post_card_view(post) -> dict[str, Any]:
             list card's left-edge color uses (orange = Seeking, cyan
             = Providing).
         headline: the card's identity line — CR is ``referral_headline``
-            (age + gender combo); PA is the practice's org name;
-            program is the program name.
+            (age only after the gender column was removed); PA is the
+            practice's org name; program is the program name.
         header_state: the state shown next to the headline. Program
             reads from ``program.state_preference``; CR and PA leave
             this ``None`` and surface their state via the
@@ -276,11 +255,9 @@ def post_card_view(post) -> dict[str, Any]:
             both.
         services / settings: raw enum lists. PA + program carry
             ``settings``; CR's ``settings`` is empty.
-        ages / languages / genders: raw enum lists. CR's single
-            ``gender`` is wrapped in a list of one so templates iterate
-            uniformly (a CR with ``gender = "prefer_not_to_say"``
-            returns ``["prefer_not_to_say"]`` — the template still has
-            the value if it wants to handle it specially).
+        ages / languages / genders: raw enum lists. CR has no
+            ``genders`` slot (the column was removed); opening/intake
+            fill ``genders`` from the linked affiliation / program.
         insurance_posture: one of ``INSURANCE_POSTURES`` or ``None``
             (intake has no posture). Same value
             ``insurance_posture_for_post`` returns.
@@ -295,8 +272,6 @@ def post_card_view(post) -> dict[str, Any]:
             stays defensive for stubs that omit it.
         schedule_text: PA/program optional schedule notes; ``None``
             for CR.
-        desired_times: raw enum list of desired-time slots; empty if
-            unset.
         provider_ref: the canonical "who's behind this post" reference —
             ``{name, entity, id, org}`` where ``entity`` is ``"clinician"``
             (opening, referral) or ``"program"`` (intake), ``id`` is that
@@ -335,16 +310,10 @@ def post_card_view(post) -> dict[str, Any]:
             (``referral_detail.clinician_affiliation``, distinct from the
             client location in ``full_address``); program returns
             ``None`` (programs have no address).
-        accepts_in_network / accepts_out_of_network_superbill /
-        accepts_private_pay: CR-only payment-path booleans from the
-            detail row; ``None`` for other kinds.
+        accepts_in_network / accepts_private_pay: CR-only payment-path
+            booleans from the detail row; ``None`` for other kinds.
         insurance_carriers: CR-only list of carrier tokens; empty list
             for CR with no carriers specified, ``[]`` for other kinds.
-        affirming_identities / acceptable_license_types /
-        clinical_niches: CR-only matching-dimension lists (#1358 PR-a/b/c).
-            Raw token lists (free-form `str` for `clinical_niches`);
-            empty list both for CR with none specified and for other
-            kinds, so templates iterate uniformly via ``{% if view.x %}``.
         in_network_carriers / accepts_out_of_network / sliding_scale:
             PA-only raw values from the linked ClinicianAffiliation,
             consumed by the feed-row meta strip (``_feed_row.html``).
@@ -381,7 +350,6 @@ def post_card_view(post) -> dict[str, Any]:
         "location_chunk": None,
         "description": None,
         "schedule_text": None,
-        "desired_times": [],
         "poster_name": None,
         "provider_ref": None,
         "practice_link": None,
@@ -391,17 +359,10 @@ def post_card_view(post) -> dict[str, Any]:
         "owner_address": None,
         "sliding_scale": None,
         "accepts_in_network": None,
-        "accepts_out_of_network_superbill": None,
         "accepts_private_pay": None,
         "insurance_carriers": [],
         "in_network_carriers": [],
         "accepts_out_of_network": None,
-        # CR-only matching-dimension lists (#1358 PR-a/b/c). Default
-        # empty so the detail-page facts block can iterate them
-        # uniformly across kinds via `{% if view.x %}`.
-        "affirming_identities": [],
-        "acceptable_license_types": [],
-        "clinical_niches": [],
     }
 
     if kind == "referral":
@@ -470,9 +431,6 @@ def post_card_view(post) -> dict[str, Any]:
                 getattr(d, "session_format", None)
             ),
             virtual=_virtual_from_session_format(getattr(d, "session_format", None)),
-            # CR holds a single `gender`; wrap it so templates iterate
-            # `genders` uniformly across kinds.
-            genders=([d.gender] if getattr(d, "gender", None) else []),
             location_chunk=_location_chunk(
                 getattr(d, "location_city", None),
                 getattr(d, "location_state", None),
@@ -484,19 +442,8 @@ def post_card_view(post) -> dict[str, Any]:
                 None,
             ),
             accepts_in_network=getattr(d, "accepts_in_network", None),
-            accepts_out_of_network_superbill=getattr(
-                d, "accepts_out_of_network_superbill", None
-            ),
             accepts_private_pay=getattr(d, "accepts_private_pay", None),
             insurance_carriers=list(getattr(d, "insurance_carriers", None) or []),
-            # CR-only matching-dimension lists (#1358 PR-a/b/c). The
-            # detail-page facts block surfaces these on the expanded
-            # view; empty list = "no preference / no constraint".
-            affirming_identities=list(getattr(d, "affirming_identities", None) or []),
-            acceptable_license_types=list(
-                getattr(d, "acceptable_license_types", None) or []
-            ),
-            clinical_niches=list(getattr(d, "clinical_niches", None) or []),
         )
         return base
 
@@ -628,12 +575,10 @@ def post_card_view(post) -> dict[str, Any]:
 def referral_headline(detail) -> str:
     """Build the listing-card headline for a `referral`.
 
-    Format: `"<Age noun> [<gender>] (<range>)"` — e.g. `"Adult male
-    (25–64)"`, `"Adolescent female (14–18)"`, or `"Adult (25–64)"`
-    when the gender slot is empty (`prefer_not_to_say` or
-    `gender_diverse`). The age comes from `age_groups[0]` since a CR
-    post describes one client; the schema still allows multi but the
-    headline picks the first value.
+    Format: `"<Age noun> (<range>)"` — e.g. `"Adult (25–64)"`,
+    `"Adolescent (14–18)"`. The age comes from `age_groups[0]` since
+    a CR post describes one client; the schema still allows multi
+    but the headline picks the first value.
 
     Returns `"Client Referral"` as a fallback when the detail has no
     age groups (defensive — schema requires min-1, so this shouldn't
@@ -643,9 +588,6 @@ def referral_headline(detail) -> str:
     if not age_groups:
         return "Client Referral"
     age = CLIENT_AGE_GROUPS_BY_KEY[age_groups[0]]
-    gender_word = _GENDER_HEADLINE_WORDS.get(getattr(detail, "gender", None) or "")
-    if gender_word:
-        return f"{age.singular} {gender_word} ({age.range})"
     return f"{age.singular} ({age.range})"
 
 
@@ -729,7 +671,7 @@ def post_feed_headline(post) -> str:
     """Build the two-part feed-row headline for any post kind.
 
     Referrals: ``"<demographics> — <services>"``, e.g.
-    ``"Adult female (25–64) — Psychotherapy, Medication management"``.
+    ``"Adult (25–64) — Psychotherapy, Medication management"``.
     When the referral carries no services the demographics alone are returned.
 
     Openings: ``"<practice name> — <clinical focus>"``, e.g.

@@ -55,16 +55,11 @@ from src.domain.logic.value_objects.location import (
 )
 from src.domain.models import POST_KINDS
 from src.domain.models.enums import (
-    AFFIRMING_IDENTITIES,
     CLIENT_AGE_GROUPS,
-    DESIRED_TIME_SLOTS,
-    GENDERS,
     INSURANCE_CARRIERS,
     LANGUAGES,
-    LICENSE_TYPES,
     REFERRAL_SERVICES,
     SESSION_FORMATS,
-    TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
 )
 from src.framework.rendering.form_fields import HtmlTextarea
@@ -74,7 +69,6 @@ from src.framework.schema_validators import (
     StrippedOptionalText,
     StrippedText,
     WirePayload,
-    clean_free_form_tags,
     scalar_to_list,
 )
 
@@ -111,9 +105,6 @@ InsuranceCarriersField = Annotated[
 # Annotated aliases for the multi-checkbox fields. The `BeforeValidator`
 # runs first and normalizes a scalar string to a single-element list
 # (see `scalar_to_list` in `framework/schema_validators.py`); `Literal[*TUPLE]` then validates each member.
-DesiredTimesField = Annotated[
-    list[Literal[*DESIRED_TIME_SLOTS]], BeforeValidator(scalar_to_list)
-]
 ServicesField = Annotated[
     list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
 ]
@@ -131,40 +122,11 @@ AgeGroupsField = Annotated[
 # `opening.age_groups` is required-min-1 on the wire — every
 # practice serves at least one age bucket.
 RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
-# `opening.genders` is a multi-checkbox on the wire, same
-# normalization shape as services/settings/age_groups. Empty list is
-# allowed — "no restriction stated" / serves any gender.
-GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
-ModalitiesField = Annotated[
-    list[Literal[*TREATMENT_MODALITIES]], BeforeValidator(scalar_to_list)
-]
 # `referral.session_format` — multi-checkbox on the wire (any subset
 # of {in_person, virtual}). Empty list = "unspecified".
 SessionFormatField = Annotated[
     list[Literal[*SESSION_FORMATS]], BeforeValidator(scalar_to_list)
 ]
-# `referral.affirming_identities` — request-side constraint, multi-checkbox
-# on the wire. Empty list is allowed ("no preference stated"). Symmetric
-# to `Clinician.affirming_identities` on the provider side.
-AffirmingIdentitiesField = Annotated[
-    list[Literal[*AFFIRMING_IDENTITIES]], BeforeValidator(scalar_to_list)
-]
-# `referral.acceptable_license_types` — license-class disjunction on the
-# referred provider ("psychiatrist OR PMHNP"). Multi-checkbox on the wire;
-# empty list = "no constraint" (any license class). `LicenseType` already
-# exists in `enums.py` — referral request reuses the same vocabulary
-# `ClinicianLicensure.license_type` writes from.
-AcceptableLicenseTypesField = Annotated[
-    list[Literal[*LICENSE_TYPES]], BeforeValidator(scalar_to_list)
-]
-# `referral.clinical_niches` — free-form tag list. Symmetric to
-# `Clinician.clinical_niches` on the provider side. Deliberately NOT an
-# enum (#1358 PR-c): the corpus shows the niche vocabulary
-# ("DGBI", "ADHD in women", "psychedelic-knowledgeable", "complex trauma")
-# is too open-ended to commit to a closed `Literal` on day one. Tags are
-# stripped non-empty strings; empty/whitespace entries are dropped and
-# duplicates collapsed by `clean_free_form_tags`.
-ClinicalNichesField = Annotated[list[str], BeforeValidator(clean_free_form_tags)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -227,34 +189,20 @@ class ReferralRead(_PostReadBase):
     # `in_person`/`virtual` view keys from list membership so the
     # cross-kind list/detail templates render unchanged.
     session_format: SessionFormatField = []
-    desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
-    gender: Literal[*GENDERS]
     subject: str | None = None
     description: str
     services: ServicesField = []
-    modalities: ModalitiesField = []
-    # Payment paths — three independent booleans the corpus treats as
-    # non-mutually-exclusive (#1358 PR-e). See :class:`ReferralCreate`
-    # for the full rationale.
+    # Payment paths — independent booleans the corpus treats as
+    # non-mutually-exclusive. See :class:`ReferralCreate` for the
+    # full rationale.
     accepts_in_network: bool = False
-    accepts_out_of_network_superbill: bool = False
     accepts_private_pay: bool = False
     # Multi-select of `InsuranceCarrier` tokens — empty list = "no
     # carrier specified" (the typical shape when only private-pay is
     # accepted). Symmetric to `ClinicianAffiliation.in_network_carriers`.
     insurance_carriers: InsuranceCarriersField = []
-    # Affirming-identity request constraints. JSON list of
-    # `AFFIRMING_IDENTITIES` tokens; empty list = "no preference stated".
-    affirming_identities: AffirmingIdentitiesField = []
-    # License-class constraint on the referred provider. JSON list of
-    # `LICENSE_TYPES` tokens; empty list = "no constraint" (any license
-    # class accepted).
-    acceptable_license_types: AcceptableLicenseTypesField = []
-    # Clinical-niche request tags — free-form (see `ClinicalNichesField`).
-    # Empty list = no niche-specific constraint.
-    clinical_niches: ClinicalNichesField = []
     # FK to the Clinician the submitting user designated as referrer.
     # Nullable on the read side — rows created before this field existed
     # will have None here.
@@ -294,7 +242,6 @@ class ClinicianOpeningRead(_PostReadBase):
     # Context affiliation this opening is offered under. Nullable — see
     # `ReferralRead.clinician_affiliation_id`.
     clinician_affiliation_id: uuid.UUID | None = None
-    desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     treatment_modality: str | None = None
 
@@ -314,7 +261,6 @@ class ProgramIntakeRead(_PostReadBase):
     # profile all live on the linked row; templates dereference via
     # `post.intake_detail.program.<field>`.
     program_id: uuid.UUID
-    desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     treatment_modality: str | None = None
 
@@ -348,44 +294,23 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # See :class:`ReferralRead.session_format`. Multi-checkbox on the
     # wire; empty list = "unspecified".
     session_format: SessionFormatField = []
-    desired_times: DesiredTimesField = []
     # Required min-1 on the wire. Mirrors PA's `age_groups`.
     age_groups: RequiredAgeGroupsField
     # Required min-1 on the wire. Defaults to `["en"]` so the form's
     # "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
-    # Gender identity of the referred client. Defaults to
-    # `prefer_not_to_say` so existing form submissions that don't
-    # include the field still validate; the form's <select> defaults
-    # to the same value.
-    gender: Literal[*GENDERS] = "prefer_not_to_say"
     subject: StrippedOptionalText = None
     description: StrippedText
     services: ServicesField = []
-    modalities: ModalitiesField = []
-    # Payment paths (#1358 PR-e). Three independent booleans the corpus
-    # consistently distinguishes — "Anthem PPO; private pay okay"
-    # combines two. Not mutually exclusive; default all-false is
-    # shape-valid (some referrers genuinely leave it blank) but the form
-    # encourages picking at least one. Empty `insurance_carriers` is
-    # legal even when `accepts_in_network` is true (the patient may
-    # have a carrier they're trying to identify, or accept any
-    # carrier the provider takes).
+    # Payment paths. Independent booleans; not mutually exclusive;
+    # default all-false is shape-valid (some referrers genuinely leave
+    # it blank) but the form encourages picking at least one. Empty
+    # `insurance_carriers` is legal even when `accepts_in_network` is
+    # true (the patient may have a carrier they're trying to identify,
+    # or accept any carrier the provider takes).
     accepts_in_network: bool = False
-    accepts_out_of_network_superbill: bool = False
     accepts_private_pay: bool = False
     insurance_carriers: InsuranceCarriersField = []
-    # Affirming-identity request constraints. Multi-checkbox on the wire;
-    # empty list = "no preference stated" (the default).
-    affirming_identities: AffirmingIdentitiesField = []
-    # License-class disjunction on the referred provider. Multi-checkbox
-    # on the wire; empty list = "no constraint" (the default).
-    acceptable_license_types: AcceptableLicenseTypesField = []
-    # Clinical-niche request tags — free-form (see `ClinicalNichesField`
-    # for the simplicity rationale). Empty list (default) = no niche-
-    # specific constraint stated. Tags are stripped on the wire;
-    # empty/duplicate entries are dropped.
-    clinical_niches: ClinicalNichesField = []
     # Context: which ClinicianAffiliation the referring clinician acts
     # under. This is what the form's practice picker submits (one option
     # per affiliation). Required on new referrals. The server resolves
@@ -431,9 +356,8 @@ class ClinicianOpeningCreate(WirePayload):
     # (`_assert_post_payload_authz`), then re-checks ownership. Optional/
     # None on the wire; any client-sent value is overwritten.
     clinician_id: uuid.UUID | None = None
-    desired_times: DesiredTimesField = []
-    # Free-text companion to `desired_times` for cohort dates / fixed
-    # program hours. Single-line input; not a textarea.
+    # Free-text for cohort dates / fixed program hours. Single-line
+    # input; not a textarea.
     schedule_text: StrippedOptionalText = None
     treatment_modality: StrippedOptionalText = None
 
@@ -453,7 +377,6 @@ class ProgramIntakeCreate(WirePayload):
     # verifies ownership at write time so a wire-level attacker can't
     # reference another user's Program.
     program_id: uuid.UUID
-    desired_times: DesiredTimesField = []
     schedule_text: StrippedOptionalText = None
     treatment_modality: StrippedOptionalText = None
 
@@ -494,41 +417,22 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # list-replace semantics as other list fields. See
     # :class:`ReferralRead.session_format`.
     session_format: SessionFormatField | None = None
-    # `None` = leave unchanged (per `update_post`); `[]` = clear all
-    # selections. List-valued PATCH replaces the whole list — partial
-    # add/remove is intentionally out of scope.
-    desired_times: DesiredTimesField | None = None
     age_groups: RequiredAgeGroupsField | None = None
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring PA's `languages` semantics.
     languages: RequiredLanguagesField | None = None
-    # `None` = leave unchanged; any enum value sets it.
-    gender: Literal[*GENDERS] | None = None
     subject: StrippedOptionalText = None
     description: StrippedText | None = None
     services: ServicesField | None = None
-    modalities: ModalitiesField | None = None
-    # `None` = leave unchanged; any bool sets the flag (#1358 PR-e).
-    # The three payment paths are independent — a PATCH may flip just
-    # one or any subset without disturbing the others.
+    # `None` = leave unchanged; any bool sets the flag. The payment
+    # paths are independent — a PATCH may flip just one or any subset
+    # without disturbing the others.
     accepts_in_network: bool | None = None
-    accepts_out_of_network_superbill: bool | None = None
     accepts_private_pay: bool | None = None
     # `None` = leave unchanged; `[]` = clear all carriers. List-valued
     # PATCH replaces the whole list — partial add/remove is intentionally
-    # out of scope, matching `services` / `affirming_identities`.
+    # out of scope, matching `services`.
     insurance_carriers: InsuranceCarriersField | None = None
-    # `None` = leave unchanged; `[]` = clear all claims. List-valued
-    # PATCH replaces the whole list — partial add/remove is intentionally
-    # out of scope, matching `desired_times` / `services` semantics.
-    affirming_identities: AffirmingIdentitiesField | None = None
-    # `None` = leave unchanged; `[]` = clear constraint (any license class).
-    # List-valued PATCH replaces the whole list, matching `services` /
-    # `affirming_identities` semantics.
-    acceptable_license_types: AcceptableLicenseTypesField | None = None
-    # `None` = leave unchanged; `[]` = clear all tags. Same list-replace
-    # semantics as `affirming_identities`.
-    clinical_niches: ClinicalNichesField | None = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `referring_clinician_id` from it (and re-checks
     # ownership of the resolved clinician) in `_assert_post_payload_authz`.
@@ -554,7 +458,6 @@ class ClinicianOpeningUpdate(PartialUpdate):
     # leave unchanged. Server-derived from `clinician_affiliation_id`
     # when the picker changes context; ownership verified on update.
     clinician_id: uuid.UUID | None = None
-    desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
     treatment_modality: StrippedOptionalText = None
 
@@ -569,7 +472,6 @@ class ProgramIntakeUpdate(PartialUpdate):
     # unchanged. The spec's `payload_authz_path` verifies ownership on
     # update too — repointing at an unowned Program is 403.
     program_id: uuid.UUID | None = None
-    desired_times: DesiredTimesField | None = None
     schedule_text: StrippedOptionalText = None
     treatment_modality: StrippedOptionalText = None
 
@@ -601,21 +503,14 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     location: ReferralLocation
     # See :class:`ReferralRead.session_format`.
     session_format: SessionFormatField = []
-    desired_times: DesiredTimesField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
-    gender: Literal[*GENDERS]
     subject: str | None = None
     description: str
     services: ServicesField = []
-    modalities: ModalitiesField = []
     accepts_in_network: bool = False
-    accepts_out_of_network_superbill: bool = False
     accepts_private_pay: bool = False
     insurance_carriers: InsuranceCarriersField = []
-    affirming_identities: AffirmingIdentitiesField = []
-    acceptable_license_types: AcceptableLicenseTypesField = []
-    clinical_niches: ClinicalNichesField = []
     referring_clinician_id: uuid.UUID | None = None
     clinician_affiliation_id: uuid.UUID | None = None
 
@@ -633,7 +528,6 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     # standard pattern for relational audit snapshots.
     clinician_id: uuid.UUID
     clinician_affiliation_id: uuid.UUID | None = None
-    desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     treatment_modality: str | None = None
 
@@ -643,7 +537,6 @@ class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
     subject: str | None = None
     description: str | None = None
     program_id: uuid.UUID
-    desired_times: DesiredTimesField = []
     schedule_text: str | None = None
     treatment_modality: str | None = None
 
