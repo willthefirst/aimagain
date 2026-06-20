@@ -30,6 +30,7 @@ from .posts.post_kinds import (
 )
 from .posts.referral_detail import ReferralDetail
 from .programs.program import Program
+from .saved_searches.saved_search import SavedSearch
 from .users.user import User
 from .verifications.verification import Verification
 
@@ -50,6 +51,7 @@ __all__ = [
     "Post",
     "PostKindSpec",
     "Program",
+    "SavedSearch",
     "IntakeDetail",
     "OpeningDetail",
     "ClinicianCertification",
