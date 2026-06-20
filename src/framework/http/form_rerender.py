@@ -22,9 +22,14 @@ opting in must:
   1. import the form-fields macros `with context`,
   2. drop a `{{ form_banner() }}` call at the top of the form,
   3. set `hx-target="this" hx-swap="outerHTML"` on the `<form>`,
-  4. set `hx-target-4xx="this" hx-swap-4xx="outerHTML"` so the
-     `response-targets` extension (loaded globally in base.html)
-     swaps form-error rerenders that come back with a 4xx status.
+  4. set `hx-target-4xx="this"` so the `response-targets` extension
+     (loaded globally in base.html) swaps form-error rerenders that
+     come back with a 4xx status. (The swap *style* comes from
+     `hx-swap`; the extension overrides only the target, so there is no
+     `hx-swap-4xx` — htmx never reads it. See `_shared/form_meta.html`.)
+
+The easiest way to satisfy 1–4 is to wrap the form in the
+`_shared/form_meta.html::form_with_errors` macro, which bakes them in.
 
 `status_code` defaults to 422 for the entity-create Pydantic path
 and is set per-handler by `form_error_handler` callers. The htmx

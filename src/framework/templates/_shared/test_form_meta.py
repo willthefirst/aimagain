@@ -38,25 +38,26 @@ def _render(
     return env.from_string(template).render(**context)
 
 
-def test_form_with_errors_emits_response_targets_quad_and_method() -> None:
-    """The four ``hx-target`` / ``hx-swap`` / ``hx-target-4xx`` /
-    ``hx-swap-4xx`` attrs all land on the form, and ``method='post'``
-    emits ``hx-post``."""
+def test_form_with_errors_emits_response_targets_trio_and_method() -> None:
+    """The ``hx-target`` / ``hx-swap`` / ``hx-target-4xx`` attrs land on
+    the form, and ``method='post'`` emits ``hx-post``. There is no
+    ``hx-swap-4xx``: the extension overrides only the target, so the swap
+    style comes from ``hx-swap`` (see the scroll test below)."""
     env = _make_env()
     html = _render(env, "action='/posts', method='post'")
     form = HTMLParser(html).css_first("form")
     assert form.attributes.get("hx-post") == "/posts"
     assert form.attributes.get("hx-target") == "this"
     assert form.attributes.get("hx-target-4xx") == "this"
-    assert form.attributes.get("hx-swap-4xx") == "outerHTML"
+    assert "hx-swap-4xx" not in form.attributes
 
 
 def test_form_with_errors_swap_scrolls_window_to_top_on_rerender() -> None:
-    """The scroll-to-error modifier lives on ``hx-swap`` (NOT
+    """The scroll-to-error modifier lives on ``hx-swap`` (there is no
     ``hx-swap-4xx``): the ``response-targets`` extension only overrides
     the *target* on a 4xx, so htmx reads the swap spec — style AND
-    modifiers — from the plain ``hx-swap``. A modifier on ``hx-swap-4xx``
-    is never read and silently no-ops. ``show:window:top`` scrolls the
+    modifiers — from the plain ``hx-swap``. A modifier on a (now-removed)
+    ``hx-swap-4xx`` would never be read. ``show:window:top`` scrolls the
     viewport to the top so the re-rendered banner is visible. Pins the
     scroll-to-error behavior against silent regression."""
     env = _make_env()

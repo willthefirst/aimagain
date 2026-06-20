@@ -63,15 +63,18 @@ def test_entity_form_no_error_swap_attrs_by_default() -> None:
     html = _render(env, "'/organizations/abc'")
     tree = HTMLParser(html)
     form = tree.css_first("form")
-    for attr in ("hx-target", "hx-swap", "hx-target-4xx", "hx-swap-4xx"):
+    for attr in ("hx-target", "hx-swap", "hx-target-4xx"):
         assert attr not in form.attributes, f"Expected no {attr}"
 
 
-def test_entity_form_error_swap_emits_response_targets_quad() -> None:
-    """With ``error_swap=True`` the four ``hx-target`` / ``hx-swap`` /
-    ``hx-target-4xx`` / ``hx-swap-4xx`` attrs all land on the form.
-    The 4xx pair is what activates the response-targets extension so a
-    422 validation re-render swaps in place."""
+def test_entity_form_error_swap_emits_response_targets_trio() -> None:
+    """With ``error_swap=True`` the ``hx-target`` / ``hx-swap`` /
+    ``hx-target-4xx`` attrs land on the form. ``hx-target-4xx`` is what
+    activates the response-targets extension so a 422 validation
+    re-render swaps in place; the swap *style* comes from the plain
+    ``hx-swap`` (the extension only overrides the target, never the swap
+    — so there is deliberately NO ``hx-swap-4xx``, which htmx never
+    reads)."""
     env = _make_env()
     html = _render(env, "'/posts', method='post', error_swap=True")
     tree = HTMLParser(html)
@@ -79,4 +82,4 @@ def test_entity_form_error_swap_emits_response_targets_quad() -> None:
     assert form.attributes.get("hx-target") == "this"
     assert form.attributes.get("hx-swap") == "outerHTML"
     assert form.attributes.get("hx-target-4xx") == "this"
-    assert form.attributes.get("hx-swap-4xx") == "outerHTML"
+    assert "hx-swap-4xx" not in form.attributes
