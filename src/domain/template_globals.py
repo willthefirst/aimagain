@@ -29,6 +29,7 @@ from src.domain.logic.posts.view import (
     post_row_summary,
     referral_headline,
 )
+from src.domain.logic.saved_searches.urls import posts_url_for_filters
 from src.domain.logic.users.view import onboarding_readiness
 from src.domain.models import enums
 from src.domain.models.posts.post_kinds import POST_KINDS
@@ -134,6 +135,10 @@ register_template_globals(
     # `post_feed_headline(post)` — two-part "<identity> — <focus>" headline
     # for the feed-row component in home and browse list views.
     post_feed_headline=post_feed_headline,
+    # `posts_url_for_filters(filters)` renders a saved search's stored
+    # filter_values dict back into a `/posts?…` URL — the "open" half of
+    # the saved-search round-trip. See `src.domain.logic.saved_searches.urls`.
+    posts_url_for_filters=posts_url_for_filters,
     # `clinician_card_view(clinician)` is the unified view-model
     # `clinicians/detail.html` reads from — see its docstring in
     # `src.domain.logic.clinicians.view`.
