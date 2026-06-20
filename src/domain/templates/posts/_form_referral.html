@@ -87,15 +87,11 @@ overwhelming corpus default.
       {{ textarea_field("description", "Narrative", current=d.description if d else None, help="The client's story, what you're hoping for in treatment, and what would make a provider a good fit. Please don't include identifying details.") }}
     {% endcall %}
     {# Coverage — the accept-path booleans are independent (a referral
-     may accept any subset). Help text up front sells "and", not "or",
-     so the visual stack of checkboxes doesn't suggest exclusivity. #}
+     may accept any subset). #}
     {% call form_section("Coverage") %}
-      <p>
-        <small>How can this client pay? Select all that apply — they're independent.</small>
-      </p>
       {{ checkbox_field("accepts_in_network", "In-network — bill the client's carrier", current=(d.accepts_in_network if d else False) ) }}
       {% call conditional_field("accepts_in_network:true") %}
-        {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="Pick from the closed list — choose “Other” if the carrier isn't on it.") }}
+        {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false) }}
       {% endcall %}
       {% call conditional_field("insurance_carriers:other") %}
         {{ text_field("insurance_carriers_other_text", "Other carrier (specify)", current=d.insurance_carriers_other_text if d else None, required=false, help="Name the carrier — it isn't in the list above.") }}
