@@ -667,11 +667,15 @@ async def test_referral_form_uses_client_oriented_section_labels(
     tree = HTMLParser(response.text)
     # Parse to text so HTML-escaped apostrophes (`&#39;`) decode.
     page_text = tree.body.text()
-    assert "Client's coverage" in page_text
-    assert "Provider sought" in page_text
-    assert "Languages the client speaks" in page_text
-    # The checkbox still binds the same wire field; only its label changed.
-    assert "bill the client's carrier" in page_text
+    # The reworked referral form groups fields around the referring
+    # clinician's mental flow: Logistics / Service type / About the
+    # client / Coverage. The original "Client's coverage" / "Provider
+    # sought" framing collapsed into these four sections.
+    assert "Logistics" in page_text
+    assert "Service type" in page_text
+    assert "About the client" in page_text
+    assert "Coverage" in page_text
+    # The checkbox still binds the same wire field; only its section moved.
     assert (
         tree.css_first('input[name="accepts_in_network"]') is not None
     ), "renaming the section must not drop the accepts_in_network field"

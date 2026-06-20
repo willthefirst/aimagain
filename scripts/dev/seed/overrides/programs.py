@@ -19,7 +19,7 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
     GENDERS,
     LANGUAGES,
-    REFERRAL_SERVICES,
+    OPENING_SERVICES,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
     US_STATES,
@@ -61,7 +61,7 @@ async def generate_programs(
         # the offering. Use **index-driven round-robin** rather than
         # `rng.*` calls so adding fields here doesn't perturb the
         # downstream coverage tests.
-        services = [REFERRAL_SERVICES[i % len(REFERRAL_SERVICES)]]
+        services = [OPENING_SERVICES[i % len(OPENING_SERVICES)]]
         settings = (
             [] if i % 5 == 0 else [TREATMENT_SETTINGS[i % len(TREATMENT_SETTINGS)]]
         )

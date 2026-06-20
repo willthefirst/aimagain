@@ -78,7 +78,7 @@
       {% endcall %}
       {% call form_section("Services offered") %}
         {{ multi_select_field("services", "Services",
-                REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS,
+                OPENING_SERVICES, labels=OPENING_SERVICE_LABELS,
                 current=(current.services if current else None) ,
         help=select_all_help()) }}
         {{ multi_select_field("settings", "Treatment settings",

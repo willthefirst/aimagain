@@ -36,7 +36,7 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
     GENDERS,
     LANGUAGES,
-    REFERRAL_SERVICES,
+    OPENING_SERVICES,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
     US_STATES,
@@ -56,7 +56,7 @@ from src.framework.schema_validators import (
 # each layers a `Literal[*TUPLE]` over the shared `scalar_to_list`
 # coercion so a 1-checkbox-checked form post still validates.
 _ServicesField = Annotated[
-    list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
+    list[Literal[*OPENING_SERVICES]], BeforeValidator(scalar_to_list)
 ]
 _SettingsField = Annotated[
     list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(scalar_to_list)

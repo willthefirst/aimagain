@@ -86,6 +86,7 @@ class LocationAvailability(LabeledChoice):
 class SessionFormat(LabeledChoice):
     in_person = "in_person", "In-person"
     virtual = "virtual", "Virtual"
+    contact_to_discuss = "contact_to_discuss", "Please contact to discuss"
 
 
 LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = LocationAvailability.values()
@@ -242,7 +243,68 @@ DESIRED_TIME_SLOTS: Final[tuple[str, ...]] = tuple(
 # optional `services` on `referral` (empty list allowed) and
 # required-min-1 `services` on `opening`. Required-ness
 # differs but the value set is shared, so the tuple is single-sourced.
+#
+# Flat-leaf shape: Therapy splits into individual/group/family leaves;
+# Allied health splits into 7 discipline leaves. "Other" is paired
+# with a free-text `services_other_text` column on ReferralDetail.
+# The form template visually groups therapy + allied-health leaves
+# under shared subheadings; the wire shape is flat.
 class ReferralService(LabeledChoice):
+    medication_management = (
+        "medication_management",
+        "Psychiatry / medication management",
+        "pill",
+    )
+    therapy_individual = "therapy_individual", "Therapy — Individual", "message-circle"
+    therapy_group = "therapy_group", "Therapy — Group", "users"
+    therapy_family = "therapy_family", "Therapy — Family", "users-round"
+    allied_ot = (
+        "allied_ot",
+        "Allied health — Occupational Therapy",
+        "heart-pulse",
+    )
+    allied_creative_arts = (
+        "allied_creative_arts",
+        "Allied health — Creative Arts (Art / Music / Drama)",
+        "heart-pulse",
+    )
+    allied_social_work = (
+        "allied_social_work",
+        "Allied health — Clinical Social Work",
+        "heart-pulse",
+    )
+    allied_rehab_counseling = (
+        "allied_rehab_counseling",
+        "Allied health — Rehabilitation Counseling",
+        "heart-pulse",
+    )
+    allied_slp = (
+        "allied_slp",
+        "Allied health — Speech-Language Pathology",
+        "heart-pulse",
+    )
+    allied_dietetics = (
+        "allied_dietetics",
+        "Allied health — Dietetics / Nutrition",
+        "heart-pulse",
+    )
+    allied_exercise_physiology = (
+        "allied_exercise_physiology",
+        "Allied health — Exercise Physiology",
+        "heart-pulse",
+    )
+    other = "other", "Other (describe below)", "more-horizontal"
+
+
+REFERRAL_SERVICES: Final[tuple[str, ...]] = ReferralService.values()
+
+
+# Service-line categories used by opening/intake/affiliation/program.
+# The original 8-value vocab: kept on the provider side while referrals
+# move to the 12-leaf `ReferralService` flat shape. Provider-side forms
+# offer broader categories (psychotherapy / allied_health) rather than
+# the finer leaves a referrer fills in for a single client.
+class OpeningService(LabeledChoice):
     evaluation = "evaluation", "Evaluation", "clipboard-list"
     medication_management = "medication_management", "Medication management", "pill"
     psychotherapy = "psychotherapy", "Psychotherapy", "message-circle"
@@ -253,7 +315,7 @@ class ReferralService(LabeledChoice):
     couples_therapy = "couples_therapy", "Couples therapy", "heart-handshake"
 
 
-REFERRAL_SERVICES: Final[tuple[str, ...]] = ReferralService.values()
+OPENING_SERVICES: Final[tuple[str, ...]] = OpeningService.values()
 
 
 # Gender identity vocabulary. Single-axis enum that folds trans/cis into
@@ -277,6 +339,23 @@ class Gender(LabeledChoice):
 
 
 GENDERS: Final[tuple[str, ...]] = Gender.values()
+
+
+# Client pronouns. Multi-value list on `referral` — a client may go by
+# more than one set ("she/her, they/them"). Closed enum; the common
+# combos (she/they, he/they) get their own values rather than relying
+# on the multi-select to compose them, because the combos are a single
+# unit at a glance. `prefer_not_to_say` is the privacy opt-out.
+class Pronouns(LabeledChoice):
+    she_her = "she_her", "she/her"
+    he_him = "he_him", "he/him"
+    they_them = "they_them", "they/them"
+    she_they = "she_they", "she/they"
+    he_they = "he_they", "he/they"
+    prefer_not_to_say = "prefer_not_to_say", "Prefer not to say"
+
+
+PRONOUNS: Final[tuple[str, ...]] = Pronouns.values()
 
 
 # Treatment settings categories. `opening` only; required-min-1.
@@ -354,9 +433,11 @@ DESIRED_TIME_SLOT_LABELS: Final[dict[str, str]] = {
     for part in DESIRED_TIME_PARTS
 }
 REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = ReferralService.labels()
+OPENING_SERVICE_LABELS: Final[dict[str, str]] = OpeningService.labels()
 TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = TreatmentSetting.labels()
 TREATMENT_MODALITY_LABELS: Final[dict[str, str]] = TreatmentModality.labels()
 GENDER_LABELS: Final[dict[str, str]] = Gender.labels()
+PRONOUNS_LABELS: Final[dict[str, str]] = Pronouns.labels()
 
 
 # --- Unified insurance posture -----------------------------------------

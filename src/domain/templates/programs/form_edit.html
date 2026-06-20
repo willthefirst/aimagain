@@ -34,7 +34,7 @@
        isn't injected into the edit context — same shape as the
        state/start/end rows above. #}
     {% call form_section("Services offered") %}
-      {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=program.services, help=select_all_help() ) }}
+      {{ multi_select_field("services", "Services", OPENING_SERVICES, labels=OPENING_SERVICE_LABELS, current=program.services, help=select_all_help() ) }}
       {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=program.settings, help=select_all_help() ) }}
       {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=program.modalities, help=select_all_help() ) }}
     {% endcall %}

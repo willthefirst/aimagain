@@ -30,6 +30,20 @@ MIGRATED_VALUES = {
         "other",
     ),
     e.ReferralService: (
+        "medication_management",
+        "therapy_individual",
+        "therapy_group",
+        "therapy_family",
+        "allied_ot",
+        "allied_creative_arts",
+        "allied_social_work",
+        "allied_rehab_counseling",
+        "allied_slp",
+        "allied_dietetics",
+        "allied_exercise_physiology",
+        "other",
+    ),
+    e.OpeningService: (
         "evaluation",
         "medication_management",
         "psychotherapy",
@@ -38,6 +52,19 @@ MIGRATED_VALUES = {
         "group_therapy",
         "family_therapy",
         "couples_therapy",
+    ),
+    e.SessionFormat: (
+        "in_person",
+        "virtual",
+        "contact_to_discuss",
+    ),
+    e.Pronouns: (
+        "she_her",
+        "he_him",
+        "they_them",
+        "she_they",
+        "he_they",
+        "prefer_not_to_say",
     ),
     e.Gender: (
         "female",
@@ -173,6 +200,12 @@ ALIAS_BINDINGS = [
     (e.INSURANCE_CARRIER_LABELS, e.InsuranceCarrier, "labels"),
     (e.REFERRAL_SERVICES, e.ReferralService, "values"),
     (e.REFERRAL_SERVICE_LABELS, e.ReferralService, "labels"),
+    (e.OPENING_SERVICES, e.OpeningService, "values"),
+    (e.OPENING_SERVICE_LABELS, e.OpeningService, "labels"),
+    (e.SESSION_FORMATS, e.SessionFormat, "values"),
+    (e.SESSION_FORMAT_LABELS, e.SessionFormat, "labels"),
+    (e.PRONOUNS, e.Pronouns, "values"),
+    (e.PRONOUNS_LABELS, e.Pronouns, "labels"),
     (e.GENDERS, e.Gender, "values"),
     (e.GENDER_LABELS, e.Gender, "labels"),
     (e.TREATMENT_SETTINGS, e.TreatmentSetting, "values"),
@@ -233,7 +266,12 @@ def test_alias_equals_class_derivation(alias, cls, kind):
 
 
 def test_icon_bearing_vocabularies_have_an_icon_per_member():
-    for cls in (e.ReferralService, e.TreatmentSetting, e.InsurancePosture):
+    for cls in (
+        e.ReferralService,
+        e.OpeningService,
+        e.TreatmentSetting,
+        e.InsurancePosture,
+    ):
         assert all(icon is not None for icon in cls.icons().values())
 
 

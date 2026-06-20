@@ -20,9 +20,11 @@ clinician accepts in-network plans, that's the posture, even if they
 also offer sliding scale — the in-network signal is louder.
 
 `referral_headline(detail)` composes the CR card's headline text from
-`age_groups[0]` — e.g. "Adult (25–64)". CR posts describe one client,
-so the first age group is the client's age (the schema still allows
-multi for forward-compat but only the first drives the title).
+`age_groups[0]` and `pronouns` — e.g. "Adult she/her (25–64)", or
+"Adult (25–64)" when pronouns is empty / `prefer_not_to_say`. CR posts
+describe one client, so the first age group is the client's age (the
+schema still allows multi for forward-compat but only the first drives
+the title).
 
 `post_card_view(post)` is the unified view-model that both the listing
 card (`_item.html`) and the detail page (`detail.html`) read from. Each
@@ -64,6 +66,8 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS_SINGULAR,
     CLIENT_AGE_GROUPS_BY_KEY,
     INSURANCE_CARRIER_LABELS,
+    OPENING_SERVICE_LABELS,
+    PRONOUNS_LABELS,
     REFERRAL_SERVICE_LABELS,
     TREATMENT_SETTINGS_LABELS,
 )
@@ -363,6 +367,9 @@ def post_card_view(post) -> dict[str, Any]:
         "insurance_carriers": [],
         "in_network_carriers": [],
         "accepts_out_of_network": None,
+        "pronouns": [],
+        "services_other_text": None,
+        "in_network_carrier_notes": None,
     }
 
     if kind == "referral":
@@ -443,7 +450,11 @@ def post_card_view(post) -> dict[str, Any]:
             ),
             accepts_in_network=getattr(d, "accepts_in_network", None),
             accepts_private_pay=getattr(d, "accepts_private_pay", None),
+            sliding_scale=getattr(d, "sliding_scale", None),
+            in_network_carrier_notes=getattr(d, "in_network_carrier_notes", None),
             insurance_carriers=list(getattr(d, "insurance_carriers", None) or []),
+            pronouns=list(getattr(d, "pronouns", None) or []),
+            services_other_text=getattr(d, "services_other_text", None),
         )
         return base
 
@@ -575,10 +586,14 @@ def post_card_view(post) -> dict[str, Any]:
 def referral_headline(detail) -> str:
     """Build the listing-card headline for a `referral`.
 
-    Format: `"<Age noun> (<range>)"` — e.g. `"Adult (25–64)"`,
-    `"Adolescent (14–18)"`. The age comes from `age_groups[0]` since
-    a CR post describes one client; the schema still allows multi
-    but the headline picks the first value.
+    Format: `"<Age noun> [<pronouns>] (<range>)"` — e.g.
+    `"Adult she/her (25–64)"`, `"Adolescent (14–18)"` when no pronouns
+    are stated, or `"Adult she/her, they/them (25–64)"` when multiple.
+    Pronouns are capped at the first two to bound headline length;
+    `prefer_not_to_say` is treated as "not stated" and drops the slot.
+    The age comes from `age_groups[0]` since a CR post describes one
+    client; the schema still allows multi but the headline picks the
+    first value.
 
     Returns `"Client Referral"` as a fallback when the detail has no
     age groups (defensive — schema requires min-1, so this shouldn't
@@ -588,6 +603,12 @@ def referral_headline(detail) -> str:
     if not age_groups:
         return "Client Referral"
     age = CLIENT_AGE_GROUPS_BY_KEY[age_groups[0]]
+    pronouns = [
+        p for p in (getattr(detail, "pronouns", None) or []) if p != "prefer_not_to_say"
+    ]
+    if pronouns:
+        pronoun_str = ", ".join(PRONOUNS_LABELS.get(p, p) for p in pronouns[:2])
+        return f"{age.singular} {pronoun_str} ({age.range})"
     return f"{age.singular} ({age.range})"
 
 
@@ -639,7 +660,7 @@ def post_row_summary(post) -> str:
             ages = _read_list(affiliation, "age_groups")
             services = _read_list(affiliation, "services")
             age_labels = [CLIENT_AGE_GROUP_LABELS_SINGULAR.get(a, a) for a in ages[:2]]
-            svc_labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+            svc_labels = [OPENING_SERVICE_LABELS.get(s, s) for s in services[:2]]
             combined = age_labels + svc_labels
             if combined:
                 parts.append(", ".join(combined))
@@ -709,7 +730,7 @@ def post_feed_headline(post) -> str:
         # #1358 PR-f — services/settings read from the linked
         # ClinicianAffiliation.
         services = _read_list(affiliation, "services")
-        focus_parts = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+        focus_parts = [OPENING_SERVICE_LABELS.get(s, s) for s in services[:2]]
         if not focus_parts:
             settings = _read_list(affiliation, "settings")
             focus_parts = [TREATMENT_SETTINGS_LABELS.get(s, s) for s in settings[:2]]
@@ -727,7 +748,7 @@ def post_feed_headline(post) -> str:
         name = (getattr(prog, "name", None) if prog else None) or "Program"
         # `services` read from the linked Program (#1358 PR-f).
         services = _read_list(prog, "services")
-        focus_parts = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
+        focus_parts = [OPENING_SERVICE_LABELS.get(s, s) for s in services[:2]]
         if focus_parts:
             return f"{name} — {', '.join(focus_parts)}"
         return name

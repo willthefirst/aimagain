@@ -26,7 +26,7 @@ from src.domain.models.enums import (
     LANGUAGES,
     LOCATION_AVAILABILITY_OPTIONS,
     NPI_MATCH_STATUSES,
-    REFERRAL_SERVICES,
+    OPENING_SERVICES,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
     US_STATES,
@@ -170,7 +170,7 @@ def _affiliation_kwargs(rng: SeededRandom, index: int) -> dict:
         # `test_enum_coverage_for_every_check_constraint`). Index-
         # driven also makes the seeded shape stable as new fields
         # are added later in the chain.
-        "services": [REFERRAL_SERVICES[index % len(REFERRAL_SERVICES)]],
+        "services": [OPENING_SERVICES[index % len(OPENING_SERVICES)]],
         "settings": (
             []
             if index % 5 == 0

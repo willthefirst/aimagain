@@ -39,7 +39,7 @@
     {%- set _ = insurance_parts.append("Sliding scale") -%}
   {%- endif -%}
   {%- set _svc_labels = [] -%}
-  {%- for s in (aff.services or []) -%}{%- set _ = _svc_labels.append(REFERRAL_SERVICE_LABELS[s]) -%}{%- endfor -%}
+  {%- for s in (aff.services or []) -%}{%- set _ = _svc_labels.append(OPENING_SERVICE_LABELS[s]) -%}{%- endfor -%}
     {%- set _setting_labels = [] -%}
     {%- for s in (aff.settings or []) -%}{%- set _ = _setting_labels.append(TREATMENT_SETTINGS_LABELS[s]) -%}{%- endfor -%}
       {%- set _mod_labels = [] -%}

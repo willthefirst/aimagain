@@ -58,6 +58,7 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
     INSURANCE_CARRIERS,
     LANGUAGES,
+    PRONOUNS,
     REFERRAL_SERVICES,
     SESSION_FORMATS,
     TREATMENT_SETTINGS,
@@ -123,10 +124,13 @@ AgeGroupsField = Annotated[
 # practice serves at least one age bucket.
 RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 # `referral.session_format` — multi-checkbox on the wire (any subset
-# of {in_person, virtual}). Empty list = "unspecified".
+# of {in_person, virtual, contact_to_discuss}). Empty list = "unspecified".
 SessionFormatField = Annotated[
     list[Literal[*SESSION_FORMATS]], BeforeValidator(scalar_to_list)
 ]
+# `referral.pronouns` — multi-checkbox on the wire (any subset of
+# `PRONOUNS`). Empty list = "not stated".
+PronounsField = Annotated[list[Literal[*PRONOUNS]], BeforeValidator(scalar_to_list)]
 
 
 # --- Shared flatten helper ----------------------------------------------
@@ -191,17 +195,22 @@ class ReferralRead(_PostReadBase):
     session_format: SessionFormatField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    pronouns: PronounsField = []
     subject: str | None = None
     description: str
     services: ServicesField = []
+    services_other_text: str | None = None
     # Payment paths — independent booleans the corpus treats as
     # non-mutually-exclusive. See :class:`ReferralCreate` for the
     # full rationale.
     accepts_in_network: bool = False
     accepts_private_pay: bool = False
-    # Multi-select of `InsuranceCarrier` tokens — empty list = "no
-    # carrier specified" (the typical shape when only private-pay is
-    # accepted). Symmetric to `ClinicianAffiliation.in_network_carriers`.
+    sliding_scale: bool = False
+    # Free-text carrier notes paired with `accepts_in_network`.
+    in_network_carrier_notes: str | None = None
+    # Multi-select of `InsuranceCarrier` tokens — kept alongside
+    # `in_network_carrier_notes` for the subset of carriers modeled
+    # as an enum. Empty list = "no carrier specified".
     insurance_carriers: InsuranceCarriersField = []
     # FK to the Clinician the submitting user designated as referrer.
     # Nullable on the read side — rows created before this field existed
@@ -299,9 +308,14 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # Required min-1 on the wire. Defaults to `["en"]` so the form's
     # "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
+    # Pronouns the client goes by. Multi-checkbox on the wire; empty
+    # list (the default) = "not stated".
+    pronouns: PronounsField = []
     subject: StrippedOptionalText = None
     description: StrippedText
     services: ServicesField = []
+    # Free-text describing the "Other" services branch.
+    services_other_text: StrippedOptionalText = None
     # Payment paths. Independent booleans; not mutually exclusive;
     # default all-false is shape-valid (some referrers genuinely leave
     # it blank) but the form encourages picking at least one. Empty
@@ -310,6 +324,9 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # or accept any carrier the provider takes).
     accepts_in_network: bool = False
     accepts_private_pay: bool = False
+    sliding_scale: bool = False
+    # Free-text carrier notes — paired with `accepts_in_network`.
+    in_network_carrier_notes: StrippedOptionalText = None
     insurance_carriers: InsuranceCarriersField = []
     # Context: which ClinicianAffiliation the referring clinician acts
     # under. This is what the form's practice picker submits (one option
@@ -421,14 +438,18 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring PA's `languages` semantics.
     languages: RequiredLanguagesField | None = None
+    pronouns: PronounsField | None = None
     subject: StrippedOptionalText = None
     description: StrippedText | None = None
     services: ServicesField | None = None
+    services_other_text: StrippedOptionalText = None
     # `None` = leave unchanged; any bool sets the flag. The payment
     # paths are independent — a PATCH may flip just one or any subset
     # without disturbing the others.
     accepts_in_network: bool | None = None
     accepts_private_pay: bool | None = None
+    sliding_scale: bool | None = None
+    in_network_carrier_notes: StrippedOptionalText = None
     # `None` = leave unchanged; `[]` = clear all carriers. List-valued
     # PATCH replaces the whole list — partial add/remove is intentionally
     # out of scope, matching `services`.
@@ -505,11 +526,15 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     session_format: SessionFormatField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    pronouns: PronounsField = []
     subject: str | None = None
     description: str
     services: ServicesField = []
+    services_other_text: str | None = None
     accepts_in_network: bool = False
     accepts_private_pay: bool = False
+    sliding_scale: bool = False
+    in_network_carrier_notes: str | None = None
     insurance_carriers: InsuranceCarriersField = []
     referring_clinician_id: uuid.UUID | None = None
     clinician_affiliation_id: uuid.UUID | None = None
