@@ -214,6 +214,60 @@ async def test_referral_persists_payment_paths_and_carriers(
         assert pp_row.insurance_carriers == []
 
 
+async def test_referral_persists_single_age_group(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A referral may carry exactly one age bucket — one element passes
+    the `ck_referral_details_age_groups_single` CHECK and round-trips."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        repo = BaseRepository(session)
+        created = await _create_post(
+            repo,
+            Post(kind="referral", owner_id=owner.id),
+            make_referral_detail(
+                description="one bucket", age_groups=["children_6_10"]
+            ),
+        )
+        await session.commit()
+        post_id = created.id
+
+    async with db_test_session_manager() as session:
+        row = (
+            (
+                await session.execute(
+                    select(ReferralDetail).filter(ReferralDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        assert row.age_groups == ["children_6_10"]
+
+
+async def test_referral_rejects_multiple_age_groups_at_db(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """The `ck_referral_details_age_groups_single` CHECK makes a
+    two-bucket referral impossible in storage, even when the ORM is
+    driven directly (bypassing the wire's `max_length=1`)."""
+    owner = await _seed_owner(db_test_session_manager)
+
+    with pytest.raises(IntegrityError):
+        async with db_test_session_manager() as session:
+            repo = BaseRepository(session)
+            await _create_post(
+                repo,
+                Post(kind="referral", owner_id=owner.id),
+                make_referral_detail(
+                    description="two buckets",
+                    age_groups=["children_6_10", "preteens_11_13"],
+                ),
+            )
+            await session.commit()
+
+
 async def test_update_post_writes_to_referral_detail(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):

@@ -168,14 +168,24 @@ def test_post_create_referral_rejects_unknown_language_token():
         post_create_adapter.validate_python(referral_payload(languages=["xx"]))
 
 
-def test_post_create_referral_accepts_multiple_age_groups():
-    """CR's `age_groups` accepts a multi-bucket list (#432) —
-    the original single-valued `client_dem_ages` forced referrers to
-    pick one when a child straddled buckets."""
+def test_post_create_referral_accepts_single_age_group():
+    """A referral describes a single client, so `age_groups` carries
+    exactly one bucket. The wire keeps the list shape; the form renders a
+    single `<select>` (see `_form_referral.html`)."""
     p = post_create_adapter.validate_python(
-        referral_payload(age_groups=["children_6_10", "preteens_11_13"])
+        referral_payload(age_groups=["children_6_10"])
     )
-    assert p.age_groups == ["children_6_10", "preteens_11_13"]
+    assert p.age_groups == ["children_6_10"]
+
+
+def test_post_create_referral_rejects_multiple_age_groups():
+    """`max_length=1` — a referral may not span more than one age bucket.
+    (Inverts the original multi-bucket allowance from #432; the referral
+    form rework collapsed age to a single value.)"""
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            referral_payload(age_groups=["children_6_10", "preteens_11_13"])
+        )
 
 
 def test_post_create_referral_rejects_empty_age_groups():

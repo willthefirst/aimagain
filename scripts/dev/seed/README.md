@@ -27,12 +27,16 @@ When you change a model, the right action depends on what changed:
 | Add a free-text column with a domain-meaningful name (`institution`, `cost`, `slogan`) | Add one line to `vocab.COLUMN_VOCAB`. |
 | Add a free-text column where `<name>_<NN>` placeholder is OK | Add the name to `vocab.PLACEHOLDER_OK`. |
 | Add a model with structural specials (constructor side effects, hierarchy, fan-out, M:N) | Create a new module under `overrides/` and `@register(YourModel)`. |
+| Add a non-`IN` CHECK (e.g. a cardinality `json_array_length(col) <= 1`) on an **override-owned** table | Nothing extra here — the override already produces CHECK-valid rows, so the drift lint skips it. Make sure your override writes values that satisfy the CHECK. |
 | Change row counts | Edit `counts.py`. |
 
 The drift lint (`lint_coverage.py`, wired into `dev lint`) hard-fails
 on uncovered Text columns and unresolved CHECKs — so the table above
 is enforced, not just documented. If you forget a step, lint tells
-you the exact one-line fix.
+you the exact one-line fix. Tables an `overrides/` module owns
+end-to-end are exempt from the unresolved-CHECK rule: the generic
+generator never inserts them, so the override (not the lint) is what
+guarantees CHECK-valid rows.
 
 ## Layout
 
