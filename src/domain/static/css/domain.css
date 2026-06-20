@@ -51,13 +51,19 @@
    `framework.css`; these reveal the wrapped field when its trigger
    control is checked inside the enclosing `<form>` (pure CSS, no JS).
    Boolean triggers match `value="true"`; multi-select triggers match
-   the checked option's `value`. */
-form:has(input[name="session_format"][value="in_person"]:checked) .conditional-field[data-reveal-when="session_format:in_person"] { display: block; }
-form:has(input[name="accepts_in_network"][value="true"]:checked) .conditional-field[data-reveal-when="accepts_in_network:true"] { display: block; }
-form:has(input[name="services"][value="other"]:checked) .conditional-field[data-reveal-when="services:other"] { display: block; }
-form:has(input[name="insurance_carriers"][value="other"]:checked) .conditional-field[data-reveal-when="insurance_carriers:other"] { display: block; }
-form:has(input[name="languages"][value="other"]:checked) .conditional-field[data-reveal-when="languages:other"] { display: block; }
-form:has(input[name="pronouns"][value="other"]:checked) .conditional-field[data-reveal-when="pronouns:other"] { display: block; }
+   the checked option's `value`.
+
+   Reveal with `display: contents`, NOT `block`: the wrapper must
+   dissolve so its inner `.form-field` becomes a direct grid item of the
+   form and can subgrid the label/control columns — same trick the form
+   uses on `<fieldset>` (framework.css). A `block` wrapper would trap the
+   field in its own formatting context and break column alignment. */
+form:has(input[name="session_format"][value="in_person"]:checked) .conditional-field[data-reveal-when="session_format:in_person"] { display: contents; }
+form:has(input[name="accepts_in_network"][value="true"]:checked) .conditional-field[data-reveal-when="accepts_in_network:true"] { display: contents; }
+form:has(input[name="services"][value="other"]:checked) .conditional-field[data-reveal-when="services:other"] { display: contents; }
+form:has(input[name="insurance_carriers"][value="other"]:checked) .conditional-field[data-reveal-when="insurance_carriers:other"] { display: contents; }
+form:has(input[name="languages"][value="other"]:checked) .conditional-field[data-reveal-when="languages:other"] { display: contents; }
+form:has(input[name="pronouns"][value="other"]:checked) .conditional-field[data-reveal-when="pronouns:other"] { display: contents; }
 /* Compact post-rows table — kind badge column and meta columns.
    Pico's table defaults supply row dividers and cell padding;
    these two rules handle only what Pico can't infer semantically:

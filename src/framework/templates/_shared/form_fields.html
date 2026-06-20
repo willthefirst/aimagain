@@ -125,9 +125,11 @@ that is **hidden by default** (a generic CSS rule in `framework.css`
 sets `display: none` on `.conditional-field[data-reveal-when]`). It is
 revealed by a per-token CSS `:has()` rule keyed on the *same* token —
 e.g. `form:has(input[name="services"][value="other"]:checked)
-.conditional-field[data-reveal-when="services:other"] { display: block }`.
-There is **no JavaScript**: the reveal is pure CSS, scoped to the
-enclosing `<form>`.
+.conditional-field[data-reveal-when="services:other"] { display: contents }`.
+The reveal uses `display: contents` (not `block`) so the wrapper
+dissolves and its inner `.form-field` subgrids the form's label/control
+columns instead of forming its own block. There is **no JavaScript**:
+the reveal is pure CSS, scoped to the enclosing `<form>`.
 
 The `reveal_when` token is `"<trigger_field>:<trigger_value>"` (a
 boolean trigger uses `"true"`) — the same string a referral rule

@@ -257,8 +257,11 @@ dd { margin: 0; }
    `:has()` rule reveals it when its trigger control is checked. The
    reveal rules are domain-specific (they reference real field names +
    values) and live in `domain.css`; this base rule is the generic
-   "hidden until revealed" half. No JS — pure CSS reveal scoped to the
-   enclosing `<form>`. */
+   "hidden until revealed" half. The reveal rules use `display: contents`
+   (not `block`) so the wrapper dissolves and its inner `.form-field`
+   subgrids the form's label/control columns — see the note in
+   `domain.css`. No JS — pure CSS reveal scoped to the enclosing
+   `<form>`. */
 .conditional-field[data-reveal-when] { display: none; }
 .conditional-field[data-reveal-when] > .form-field { margin: 0; }
 /* `.checkbox-list` is the shared primitive for a scrollable list of
