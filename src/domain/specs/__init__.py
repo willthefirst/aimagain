@@ -27,6 +27,7 @@ from .org_representation import ORG_REPRESENTATION_ENTITY
 from .organization import ORGANIZATION_ENTITY
 from .posts import POST_ENTITY
 from .program import PROGRAM_ENTITY
+from .saved_search import SAVED_SEARCH_ENTITY
 from .user import USER_ENTITY
 from .user_favorite import FAVORITE_ENTITY
 
@@ -40,6 +41,7 @@ ALL_ENTITY_SPECS: tuple[EntitySpec, ...] = (
     EDUCATION_ENTITY,
     LICENSURE_ENTITY,
     USER_ENTITY,
+    SAVED_SEARCH_ENTITY,
     FAVORITE_ENTITY,
     ORG_REPRESENTATION_ENTITY,
 )
@@ -56,5 +58,6 @@ __all__ = [
     "ORG_REPRESENTATION_ENTITY",
     "POST_ENTITY",
     "PROGRAM_ENTITY",
+    "SAVED_SEARCH_ENTITY",
     "USER_ENTITY",
 ]

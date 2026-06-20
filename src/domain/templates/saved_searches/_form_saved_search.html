@@ -1,0 +1,36 @@
+{# Shared form-body macro for saved-search create + edit.
+
+   PR1 exposes only `name`. `filters` is not on this form yet — a
+   created search defaults to `{}` ("whole directory"); an edit submits
+   only `name`, so `SavedSearchUpdate.filters` stays None ("leave
+   unchanged") and the existing filters are preserved. The capture PR
+   adds the filter-picker / "Save this search" path that populates
+   `filters` from the live `/posts` query.
+
+   Args:
+     action_url    — POST (create) or PATCH (edit) target.
+     method        — "post" / "patch". Drives the submit-button label.
+     heading       — create submit-button text (edit uses the framework
+                     default via `actions(...)`).
+     cancel_url    — the action cluster's Cancel link target.
+     delete_url    — optional; when set (edit), renders Delete.
+     delete_confirm— required when `delete_url` is set.
+     current       — optional; on edit, the loaded SavedSearch row used
+                     to prefill. Create passes None.
+#}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/actions.html" import actions -%}
+{% macro saved_search_form(action_url, method, heading, cancel_url, delete_url=None, delete_confirm=None, current=None) -%}
+  <div class="entity-form-page">
+    {% call entity_form(action_url, method=method) %}
+      {{ text_field("name", "Name", required=true,
+            current=(current.name if current else None) ,
+      maxlength=200) }}
+      {{ actions(heading if method == "post" else none,
+            cancel_url=cancel_url,
+            delete_url=delete_url,
+            delete_confirm=delete_confirm) }}
+    {% endcall %}
+  </div>
+{%- endmacro %}

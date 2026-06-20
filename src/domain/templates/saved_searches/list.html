@@ -1,0 +1,33 @@
+{# `/users/{user_id}/saved_searches` — canonical list of a user's saved
+   searches.
+
+   PR1 (skeleton CRUD): each card links to its edit form, where rename
+   and delete live. The "open this search" link — the card headline
+   navigating to the rendered `/posts?…` URL — arrives with the URL
+   render/capture PR, alongside the "Save this search" affordance on
+   the posts page. For now `filters` is shown only as a count.
+
+   Renders via the shared `subresource_card` (headline + subtitle +
+   short fact-list), the same primitive the clinician credential lists
+   use — see `_shared/_card.html`.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/_card.html" import subresource_card -%}
+{%- from "_shared/_item_list.html" import item_list -%}
+{% block resource_label %}Saved searches{% endblock %}
+{% block actions %}
+  <li>
+    <a href="{{ entity_url('user', id=user_id) }}/saved_searches/form"
+       role="button">{{ entity_create_label("saved_search") }}</a>
+  </li>
+{% endblock %}
+{%- macro saved_search_card(s) %}
+  {{ subresource_card(id=s.id,
+    headline_url=entity_url('user', id=user_id) ~ "/saved_searches/" ~ s.id|string ~ "/form",
+  headline=s.name,
+  subtitle_parts=[(s.filters|length ~ " filter" ~ ("" if s.filters|length == 1 else "s"))]) }}
+{%- endmacro %}
+{% block list_body %}
+  {{ item_list(rows, saved_search_card, "saved-searches-list",
+    empty_msg="No saved searches yet.") }}
+{% endblock %}

@@ -24,6 +24,7 @@ When you change a model, the right action depends on what changed:
 | Add a Bool / Date / Int / Float / DateTime / UUID column | Nothing. Type-based defaults in `generators.py` cover it. |
 | Add a FK column | Nothing. The generator picks a random row from the FK target table. |
 | Add a JSON list column referencing an enum | Add one line to `vocab.JSON_LIST_SOURCE`. |
+| Add a JSON object column (default `dict`) | Nothing. The generator seeds `{}`; the drift lint treats a `dict`-default JSON column as covered. |
 | Add a free-text column with a domain-meaningful name (`institution`, `cost`, `slogan`) | Add one line to `vocab.COLUMN_VOCAB`. |
 | Add a free-text column where `<name>_<NN>` placeholder is OK | Add the name to `vocab.PLACEHOLDER_OK`. |
 | Add a model with structural specials (constructor side effects, hierarchy, fan-out, M:N) | Create a new module under `overrides/` and `@register(YourModel)`. |
