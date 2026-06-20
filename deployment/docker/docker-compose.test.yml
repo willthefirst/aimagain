@@ -1,10 +1,25 @@
+# Smoke-test stack for the queue-tier `docker-health-check` CI job
+# (`.github/workflows/ci-queue.yml`): build the image, boot it, hit
+# `/health` + `/docs/`.
+#
+# Every collidable resource is parameterized so two runs can coexist on one
+# host (e.g. parallel agent worktrees) — CI runners are isolated and just use
+# the defaults. To run a second copy concurrently, give it a distinct project
+# name and host port:
+#
+#     COMPOSE_PROJECT_NAME=health-b TEST_HOST_PORT=8010 TEST_IMAGE=test-image-b \
+#       docker compose -f deployment/docker/docker-compose.test.yml up -d
+#
+# The container is intentionally NOT given a fixed `container_name`: an
+# explicit name is machine-global and ignores the project, so a second `up`
+# fails with "name already in use". Leaving it unset lets Compose derive a
+# project-scoped name (`<project>-bedlam-connect-test-1`).
 services:
   bedlam-connect-test:
-    image: test-image
-    container_name: bedlam-connect-test
+    image: ${TEST_IMAGE:-test-image}
     restart: 'no' # Don't restart in CI
     ports:
-      - '8000:8000'
+      - '${TEST_HOST_PORT:-8000}:8000'
     environment:
       - SECRET=${SECRET}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
