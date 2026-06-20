@@ -48,6 +48,10 @@ class ReferralDetail(Base):
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
+    # Pronouns the client goes by. JSON list of `PRONOUNS` tokens; empty
+    # list = "not stated". Vocabulary check on the wire
+    # (`Literal[*PRONOUNS]`); no SQL CHECK against JSON array members.
+    pronouns = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
 
     # Section 3 — subject / description
     subject = Column(Text, nullable=True)
@@ -55,6 +59,10 @@ class ReferralDetail(Base):
 
     # Section 4 — services
     services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    # Free-text describing the "Other" branch of `services` when the
+    # referrer picks `other` in the multi-select. Nullable; the form
+    # surfaces it as a textarea adjacent to the services list.
+    services_other_text = Column(Text, nullable=True)
 
     # Section 5 — payment paths. Independent booleans; a single referral
     # may accept any subset.
@@ -77,12 +85,22 @@ class ReferralDetail(Base):
     accepts_private_pay = Column(
         Boolean, nullable=False, server_default=text("0"), default=False
     )
+    # Independent payment-path boolean — the provider offers reduced-fee
+    # private pay tied to client need. Distinct from `accepts_private_pay`
+    # (which only says "yes, the client will pay out of pocket").
+    sliding_scale = Column(
+        Boolean, nullable=False, server_default=text("0"), default=False
+    )
+    # Free-text notes naming the carrier(s) the patient has when
+    # ``accepts_in_network`` is true. Replaces the closed-vocab
+    # ``insurance_carriers`` list — the corpus has too many regional
+    # plans for a closed enum to keep up. Nullable; the form surfaces
+    # it adjacent to the in-network checkbox.
+    in_network_carrier_notes = Column(Text, nullable=True)
     # JSON array of `InsuranceCarrier` tokens; empty array means "no
-    # carrier specified" (which is the natural shape when
-    # ``accepts_in_network`` is false, but also valid when in-network is
-    # accepted with no specific carrier preference). Vocabulary check
-    # happens on the wire (Pydantic ``Literal[*INSURANCE_CARRIERS]``);
-    # no SQL CHECK against JSON array members.
+    # carrier specified" (the typical shape when only private-pay is
+    # accepted). Kept alongside `in_network_carrier_notes` for the
+    # subset of carriers we *do* model as an enum.
     insurance_carriers = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
     )

@@ -59,13 +59,17 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
         `medication_management` first; the rest follow in
         `REFERRAL_SERVICES` declaration order. PA + program `settings`
         render after services. -#}
+      {#- view.kind picks the right vocab: referrals use the 12-leaf
+        ReferralService vocab; opening / intake / program use the 8-value
+        OpeningService vocab. -#}
+      {%- set _svc_labels = REFERRAL_SERVICE_LABELS if view.kind == "referral" else OPENING_SERVICE_LABELS -%}
       {%- set _priority = ["psychotherapy", "medication_management"] -%}
       {%- set _labels = [] -%}
       {%- for s in _priority if s in view.services -%}
-        {%- set _ = _labels.append(REFERRAL_SERVICE_LABELS[s]) -%}
+        {%- set _ = _labels.append(_svc_labels[s]) -%}
       {%- endfor -%}
       {%- for s in view.services if s not in _priority -%}
-        {%- set _ = _labels.append(REFERRAL_SERVICE_LABELS[s]) -%}
+        {%- set _ = _labels.append(_svc_labels[s]) -%}
       {%- endfor -%}
       {%- for s in view.settings -%}
         {%- set _ = _labels.append(TREATMENT_SETTINGS_LABELS[s]) -%}
@@ -134,18 +138,30 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
                 {%- if view.virtual is not none %}
                   {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual], icon='monitor') }}
                 {%- endif %}
-                {#- Payment paths. Each accepted-path boolean renders
+                {%- if view.pronouns %}
+                  {%- set _pron_labels = [] -%}
+                  {%- for p in view.pronouns -%}{%- set _ = _pron_labels.append(PRONOUNS_LABELS[p]) -%}{%- endfor -%}
+                    {{ fact('pronouns', 'Pronouns', _pron_labels | join(", ") , icon='users') }}
+                  {%- endif %}
+                  {%- if view.services_other_text %}
+                    {{ fact('services_other_text', 'Other services', view.services_other_text, icon='layers') }}
+                  {%- endif %}
+                  {#- Payment paths. Each accepted-path boolean renders
                           as its own row when true; the carrier list shows
                           under in-network when set. Multiple rows are
                           normal — a referral that accepts both in-network
                           and private pay surfaces two rows. -#}
-                {%- if view.accepts_in_network %}{{ fact('accepts_in_network', 'In-network', 'Yes', icon='shield') }}{%- endif %}
-                  {%- if view.insurance_carriers %}
-                    {%- set _carrier_labels = [] -%}
-                    {%- for c in view.insurance_carriers -%}{%- set _ = _carrier_labels.append(INSURANCE_CARRIER_LABELS[c]) -%}{%- endfor -%}
-                      {{ fact('insurance_carriers', 'Insurance carriers', _carrier_labels | join(", ") , icon='shield') }}
+                  {%- if view.accepts_in_network %}{{ fact('accepts_in_network', 'In-network', 'Yes', icon='shield') }}{%- endif %}
+                    {%- if view.in_network_carrier_notes %}
+                      {{ fact('in_network_carrier_notes', 'In-network carrier notes', view.in_network_carrier_notes, icon='shield') }}
                     {%- endif %}
-                    {%- if view.accepts_private_pay %}{{ fact('accepts_private_pay', 'Private pay', 'Yes', icon='shield') }}{%- endif %}
-                    {%- endif %}
-                  {%- endcall %}
-                {%- endmacro %}
+                    {%- if view.insurance_carriers %}
+                      {%- set _carrier_labels = [] -%}
+                      {%- for c in view.insurance_carriers -%}{%- set _ = _carrier_labels.append(INSURANCE_CARRIER_LABELS[c]) -%}{%- endfor -%}
+                        {{ fact('insurance_carriers', 'Insurance carriers', _carrier_labels | join(", ") , icon='shield') }}
+                      {%- endif %}
+                      {%- if view.accepts_private_pay %}{{ fact('accepts_private_pay', 'Private pay', 'Yes', icon='shield') }}{%- endif %}
+                        {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes', icon='shield') }}{%- endif %}
+                        {%- endif %}
+                      {%- endcall %}
+                    {%- endmacro %}

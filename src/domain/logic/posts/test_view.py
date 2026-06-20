@@ -887,12 +887,12 @@ def test_feed_headline_referral_with_services():
         kind="referral",
         referral_detail=SimpleNamespace(
             age_groups=["adults_25_64"],
-            services=["psychotherapy", "medication_management"],
+            services=["therapy_individual", "medication_management"],
         ),
     )
     assert (
         post_feed_headline(post)
-        == "Adult (25–64) — Psychotherapy, Medication management"
+        == "Adult (25–64) — Therapy — Individual, Psychiatry / medication management"
     )
 
 
@@ -912,13 +912,13 @@ def test_feed_headline_referral_caps_services_at_two():
         kind="referral",
         referral_detail=SimpleNamespace(
             age_groups=["adults_25_64"],
-            services=["evaluation", "psychotherapy", "case_management"],
+            services=["medication_management", "therapy_individual", "therapy_group"],
         ),
     )
     headline = post_feed_headline(post)
     # Only first two services should appear; third is dropped.
-    assert "Evaluation, Psychotherapy" in headline
-    assert "Case management" not in headline
+    assert "Psychiatry / medication management, Therapy — Individual" in headline
+    assert "Therapy — Group" not in headline
 
 
 def test_feed_headline_referral_missing_detail_returns_fallback():
@@ -1009,10 +1009,10 @@ def test_feed_headline_referral_none_subject_falls_back_to_auto():
         referral_detail=SimpleNamespace(
             subject=None,
             age_groups=["adults_25_64"],
-            services=["psychotherapy"],
+            services=["therapy_individual"],
         ),
     )
-    assert post_feed_headline(post) == "Adult (25–64) — Psychotherapy"
+    assert post_feed_headline(post) == "Adult (25–64) — Therapy — Individual"
 
 
 def test_feed_headline_opening_subject_overrides_auto_generation():

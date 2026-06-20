@@ -33,7 +33,7 @@ from src.domain.models.enums import (
     GENDERS,
     INSURANCE_CARRIERS,
     LOCATION_AVAILABILITY_OPTIONS,
-    REFERRAL_SERVICES,
+    OPENING_SERVICES,
     TREATMENT_MODALITIES,
     TREATMENT_SETTINGS,
 )
@@ -57,7 +57,7 @@ InNetworkCarriersField = Annotated[
 # person-level on `Clinician`, not per-affiliation (see the model
 # docstring on `ClinicianAffiliation`).
 _ServicesField = Annotated[
-    list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
+    list[Literal[*OPENING_SERVICES]], BeforeValidator(scalar_to_list)
 ]
 _SettingsField = Annotated[
     list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(scalar_to_list)

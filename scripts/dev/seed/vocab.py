@@ -39,6 +39,7 @@ from src.domain.models.enums import (
     INSURANCE_CARRIERS,
     LANGUAGES,
     LICENSE_TYPES,
+    PRONOUNS,
     REFERRAL_SERVICES,
     SESSION_FORMATS,
     TREATMENT_MODALITIES,
@@ -711,6 +712,13 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
         # acknowledge it here. `clinician_id` is an FK populated from
         # the parent-row pool, not via COLUMN_VOCAB.
         "clinician_id",
+        # Free-text fields on `referral_details` added in the referral-form
+        # additive PR. A placeholder string is fine for these (the column
+        # only matters for the form / display); listing them here keeps the
+        # seed lint quiet without committing the generator to a synthetic
+        # vocabulary that drifts from the human-authored form copy.
+        "in_network_carrier_notes",
+        "services_other_text",
     }
 )
 
@@ -750,6 +758,7 @@ JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     # `in_network_carriers` on the provider side.
     "insurance_carriers": INSURANCE_CARRIERS,
     "affirming_identities": AFFIRMING_IDENTITIES,
+    "pronouns": PRONOUNS,
     "session_format": SESSION_FORMATS,
     "acceptable_license_types": LICENSE_TYPES,
     # Free-form on the wire — the seed subset above is realism only,
