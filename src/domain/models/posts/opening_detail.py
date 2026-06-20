@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, ForeignKey, Text, text
+from sqlalchemy import Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -11,13 +11,13 @@ class OpeningDetail(Base):
     """1:1 detail row for posts of kind = 'clinician_opening'.
 
     After #1358 PR-f sub-3 this row is **thin by design**: it carries only
-    per-announcement attributes (``desired_times`` / ``schedule_text`` /
-    ``subject`` / ``description`` / ``treatment_modality``) plus the two
-    context FKs (``clinician_id``, ``clinician_affiliation_id``). The
-    steady-state practice profile (services, settings, modalities,
-    age_groups, genders, languages, website, referral_instructions) lives
-    on the linked ``ClinicianAffiliation`` (and ``languages`` on the
-    linked ``Clinician``) — see
+    per-announcement attributes (``schedule_text`` / ``subject`` /
+    ``description`` / ``treatment_modality``) plus the two context FKs
+    (``clinician_id``, ``clinician_affiliation_id``). The steady-state
+    practice profile (services, settings, modalities, age_groups, genders,
+    languages, website, referral_instructions) lives on the linked
+    ``ClinicianAffiliation`` (and ``languages`` on the linked
+    ``Clinician``) — see
     [`../clinician_affiliations/README.md`](../clinician_affiliations/README.md)
     for the migration history.
     """
@@ -37,9 +37,6 @@ class OpeningDetail(Base):
     )
     clinician = relationship("Clinician", lazy="selectin")
 
-    desired_times = Column(
-        JSON, nullable=False, server_default=text("'[]'"), default=list
-    )
     schedule_text = Column(Text, nullable=True)
 
     # Per-announcement free-text overrides. ``treatment_modality`` is the

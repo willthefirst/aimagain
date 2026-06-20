@@ -14,25 +14,15 @@ Section order — ordered to match how a referring clinician actually
 thinks about the form:
 
   1. Referring as — affiliation picker; establishes who is referring
-  2. Where & when — location + session format + desired session times
-  3. Client basics — narrative description, age, languages, gender,
-     affirming identities
-  4. Provider sought — services, modalities, acceptable license classes,
-     clinical niches (free-form tags)
-  5. Client's coverage — three independent payment-path booleans + carrier list
+  2. Where & when — location + session format
+  3. Client basics — narrative description, age, languages
+  4. Provider sought — services
+  5. Client's coverage — payment-path booleans + carrier list
 
 `subject` is NOT a form field — it's derived in the view layer
 (`post_feed_headline` in `domain/logic/posts/view.py`) from
 demographics + services when persisted as None, which is the
-overwhelming corpus default. Removing it from the form trims one
-buried-last field whose value almost nobody overrode.
-
-`desired_times` and the insurance carrier list are both checkbox /
-multi-select fields that encode as repeated `name=value` pairs;
-FastAPI / Pydantic parses these as a list. The clinical-niche tag
-input is a single comma-separated text box that an inline script
-splits into repeated hidden `clinical_niches` inputs on submit (see
-the script block at the bottom of this file).
+overwhelming corpus default.
 #}
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected
@@ -42,7 +32,6 @@ the script block at the bottom of this file).
    value threading is required at the callsite below. #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section, checkbox_field with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
-{%- from "_shared/form_copy.html" import modality_help, select_all_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro referral_form(hx_method, action, submit_label=none, post=None, schema=None, cancel_url=None) -%}
   {%- set d = post.referral_detail if post else None -%}
@@ -77,7 +66,6 @@ the script block at the bottom of this file).
          of {in_person, virtual}. Empty selection = "unspecified". #}
       {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
       {{ text_field("location_city", "City", current=d.location_city if d else None, help="Only used for in-person sessions.") }}
-      {{ multi_select_field("desired_times", "Desired session times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false, help="Select any that work; leave blank if flexible.") }}
     {% endcall %}
     {% call form_section("Client basics") %}
       {{ textarea_field("description", "About the client", current=d.description if d else None, help="What another clinician needs to know to decide if they can help. Please don't include identifying details.") }}
@@ -89,87 +77,24 @@ the script block at the bottom of this file).
          (and only) persisted value for edit. #}
       {{ select_field("age_groups", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=(d.age_groups[0] if d and d.age_groups else None) , placeholder=true) }}
       {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
-      {# Gender defaults to `prefer_not_to_say` on the schema; rendering
-         the select with `required=false` keeps the form ungated without
-         changing the wire shape — Pydantic still accepts an unsubmitted
-         value as the default. #}
-      {{ select_field("gender", "Gender (optional)", GENDERS, labels=GENDER_LABELS, current=d.gender if d else None, required=false) }}
-      {# Affirming-identity request constraints (#1358 PR-a). Symmetric
-         to `Clinician.affirming_identities` — the referrer states the
-         affordances the client needs, the clinician claims the ones
-         they offer. Empty selection = "no preference stated", which is
-         the schema default. #}
-      {{ multi_select_field("affirming_identities", "Affirming identities", AFFIRMING_IDENTITIES, labels=AFFIRMING_IDENTITY_LABELS, current=d.affirming_identities if d else None, required=false, help="Affordances the client needs — select all that apply.") }}
     {% endcall %}
     {% call form_section("Provider sought") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=d.modalities if d else None, required=false) }}
-      {# License-class disjunction on the referred provider (#1358 PR-b).
-         Captures "psychiatrist OR PMHNP" patterns that `services` can't
-         express (medication_management could be delivered by a PCP, PA,
-         or non-psychiatric NP). Empty selection = "no constraint" — any
-         license class accepted; the schema default. #}
-      {{ multi_select_field("acceptable_license_types", "Acceptable license classes", LICENSE_TYPES, labels=LICENSE_TYPES_LABELS, current=d.acceptable_license_types if d else None, required=false, help="Leave empty for no constraint. Select multiple to express disjunction (e.g. psychiatrist OR PMHNP).") }}
-      {# Clinical-niche tags (#1358 PR-c). Free-form `list[str]` on the
-         wire — the niche vocabulary is too open-ended to commit to a
-         closed enum on day one. UI is a single comma-separated text input
-         that an inline script splits into multiple hidden
-         `clinical_niches` inputs on submit, so the server still receives
-         the wire shape Pydantic expects (repeated `clinical_niches=tag`
-         pairs the `scalar_to_list`/`clean_free_form_tags` validator
-         accepts). The raw input is disabled at submit time so it doesn't
-         also POST a stale comma-joined value. #}
-      {{ text_field("_clinical_niches_input", "Clinical niches", current=((d.clinical_niches | join(", ") ) if d and d.clinical_niches else None), required=false, help="Comma-separated free-form tags (e.g. \"DGBI, ADHD in women, complex trauma\"). Match what the clinician self-claims.") }}
-      <div id="clinical-niches-hidden" hidden></div>
     {% endcall %}
-    {# Coverage — the three accept-path booleans are independent (a
-     referral may accept any subset). Help text up front sells "and",
-     not "or", so the visual stack of checkboxes doesn't suggest
-     exclusivity. The carrier multi-select is always rendered (no
-     conditional show/hide): leaving it empty is the natural shape
-     whether or not in-network is checked. #}
+    {# Coverage — the accept-path booleans are independent (a referral
+     may accept any subset). Help text up front sells "and", not "or",
+     so the visual stack of checkboxes doesn't suggest exclusivity. The
+     carrier multi-select is always rendered (no conditional show/hide):
+     leaving it empty is the natural shape whether or not in-network is
+     checked. #}
     {% call form_section("Client's coverage") %}
       <p>
         <small>How can this client pay? Select all that apply — they're independent.</small>
       </p>
       {{ checkbox_field("accepts_in_network", "In-network — bill the client's carrier", current=(d.accepts_in_network if d else False) ) }}
-      {{ checkbox_field("accepts_out_of_network_superbill", "Out-of-network with superbill", current=(d.accepts_out_of_network_superbill if d else False) ) }}
       {{ checkbox_field("accepts_private_pay", "Private pay (out of pocket)", current=(d.accepts_private_pay if d else False) ) }}
       {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="Only relevant when in-network is checked. Leave empty for any / TBD.") }}
     {% endcall %}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   {%- endcall -%}
-  <script>
-  /* Clinical-niche tag splitter (#1358 PR-c). The visible input is a
-     single comma-separated text field; on form submit (capture phase so
-     htmx's submit handler sees the synthesized hidden inputs) we split
-     on comma, strip, drop empties, dedupe, and inject one hidden input
-     per tag with name="clinical_niches" — the wire shape the
-     `clean_free_form_tags` validator expects. The raw input is then
-     disabled so it doesn't also POST a stale comma-joined value under
-     its `_clinical_niches_input` name. Empty input is fine — zero
-     hidden inputs, which the schema reads as the default empty list. */
-  (function () {
-    var raw = document.querySelector('input[name="_clinical_niches_input"]');
-    var hidden = document.getElementById('clinical-niches-hidden');
-    if (!raw || !hidden) return;
-    var form = raw.closest('form');
-    if (!form) return;
-    form.addEventListener('submit', function () {
-      hidden.innerHTML = '';
-      var seen = {};
-      (raw.value || '').split(',').forEach(function (part) {
-        var tag = part.trim();
-        if (!tag || seen[tag]) return;
-        seen[tag] = true;
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'clinical_niches';
-        input.value = tag;
-        hidden.appendChild(input);
-      });
-      raw.disabled = true;
-    }, true);
-  })();
-  </script>
 {%- endmacro -%}
