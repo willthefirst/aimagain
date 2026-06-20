@@ -30,13 +30,6 @@ def test_known_provider_states_are_deduped():
     assert len(states) == len(set(states))
 
 
-def test_pact_ports_are_unique():
-    """Each pair's mock-server port must be unique — collisions cause
-    the second pair's pact-mock-server to fail to bind."""
-    ports = [p.pact_port for p in CONTRACT_PAIRS]
-    assert len(ports) == len(set(ports))
-
-
 def test_consumer_names_are_unique():
     """Pact participant names are used as file-name prefixes for the
     generated `<consumer>-<provider>.json` pact files; duplicates would

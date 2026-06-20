@@ -4,6 +4,8 @@ import os
 from pact import Consumer, Provider
 from playwright.async_api import Page, Route
 
+from tests.test_contract.infrastructure.ports import find_free_port
+
 PACT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "artifacts", "pacts")
 )
@@ -12,11 +14,20 @@ PACT_LOG_DIR = os.path.abspath(
 )
 
 
-def setup_pact(consumer_name: str, provider_name: str, port: int) -> Consumer:
+def setup_pact(consumer_name: str, provider_name: str) -> Consumer:
+    """Start a Pact mock service on a free port and return the consumer.
+
+    The port is OS-assigned (not a fixed per-pair constant) so concurrent
+    contract sessions don't collide; callers read the resulting URL back off
+    `pact.uri` rather than computing it from a known port.
+    """
     os.makedirs(PACT_LOG_DIR, exist_ok=True)
 
     pact = Consumer(consumer_name).has_pact_with(
-        Provider(provider_name), pact_dir=PACT_DIR, log_dir=PACT_LOG_DIR, port=port
+        Provider(provider_name),
+        pact_dir=PACT_DIR,
+        log_dir=PACT_LOG_DIR,
+        port=find_free_port(),
     )
 
     pact.start_service()

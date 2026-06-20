@@ -29,7 +29,6 @@ from tests.test_contract.constants import (
     CLINICIAN_STATE_CLINICIAN_EXISTS_AND_OWNED,
     CONSUMER_NAME_CLINICIAN_EDIT_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_CLINICIAN_EDIT,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -51,7 +50,6 @@ async def test_consumer_clinician_edit_form_submits(
     pact = setup_pact(
         CONSUMER_NAME_CLINICIAN_EDIT_FORM,
         CLINICIAN_NAME_CLINICIANS,
-        port=PACT_PORT_CLINICIAN_EDIT,
     )
     mock_server_uri = pact.uri
     edit_page_url = f"{origin_with_routes}{CLINICIAN_EDIT_FORM_PAGE_PATH}"

@@ -5,7 +5,6 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CONSUMER_NAME_RESET_PASSWORD,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_RESET_PASSWORD,
     PROVIDER_NAME_AUTH,
     PROVIDER_STATE_RESET_PASSWORD_TOKEN_IS_VALID,
     RESET_PASSWORD_API_PATH,
@@ -32,7 +31,6 @@ async def test_consumer_reset_password_form_interaction(
     pact = setup_pact(
         CONSUMER_NAME_RESET_PASSWORD,
         PROVIDER_NAME_AUTH,
-        port=PACT_PORT_RESET_PASSWORD,
     )
     mock_server_uri = pact.uri
     # `/auth/reset-password/{token}` is the GET page route; the form

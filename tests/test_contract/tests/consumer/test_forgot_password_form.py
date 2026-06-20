@@ -6,7 +6,6 @@ from tests.test_contract.constants import (
     CONSUMER_NAME_FORGOT_PASSWORD,
     FORGOT_PASSWORD_API_PATH,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_FORGOT_PASSWORD,
     PROVIDER_NAME_AUTH,
     PROVIDER_STATE_USER_CAN_REQUEST_PASSWORD_RESET,
     TEST_EMAIL,
@@ -29,7 +28,6 @@ async def test_consumer_forgot_password_form_interaction(
     pact = setup_pact(
         CONSUMER_NAME_FORGOT_PASSWORD,
         PROVIDER_NAME_AUTH,
-        port=PACT_PORT_FORGOT_PASSWORD,
     )
     mock_server_uri = pact.uri
     forgot_page_url = f"{origin_with_routes}{FORGOT_PASSWORD_API_PATH}"

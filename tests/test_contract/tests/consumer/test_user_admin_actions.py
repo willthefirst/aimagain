@@ -15,7 +15,6 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CONSUMER_NAME_USER_ADMIN_ACTIONS,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_USER_ACTIVATION,
     PROVIDER_NAME_USERS,
     PROVIDER_STATE_USER_EXISTS_AND_ACTIVE,
     TARGET_USER_ID,
@@ -36,11 +35,7 @@ from tests.test_contract.tests.shared.helpers import (
 async def test_consumer_deactivate_button_click(origin_with_routes: str, page: Page):
     """Click the Deactivate button on a stubbed user-detail page; assert the
     intercepted request matches the contracted shape."""
-    pact = setup_pact(
-        CONSUMER_NAME_USER_ADMIN_ACTIONS,
-        PROVIDER_NAME_USERS,
-        port=PACT_PORT_USER_ACTIVATION,
-    )
+    pact = setup_pact(CONSUMER_NAME_USER_ADMIN_ACTIONS, PROVIDER_NAME_USERS)
     mock_server_uri = pact.uri
     detail_page_url = f"{origin_with_routes}/users/{TARGET_USER_ID}"
     full_mock_url = f"{mock_server_uri}{USER_ACTIVATION_API_PATH}"

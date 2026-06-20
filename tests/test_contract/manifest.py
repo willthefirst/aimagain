@@ -22,7 +22,6 @@ class ContractPair:
     """One consumer-provider Pact pair.
 
     `consumer_name` and `provider_name` are the Pact participant names.
-    `pact_port` is the per-pair mock-server port (must be unique).
     `handler_mocks_factory` returns a `{handler_path: {...}}` dict the
     provider server uses to monkey-patch business-logic handlers.
     `consumer_setup_fn` (optional) is the FastAPI route mounter for
@@ -44,7 +43,6 @@ class ContractPair:
 
     consumer_name: str
     provider_name: str
-    pact_port: int
     handler_mocks_factory: Optional[Callable[[], dict]] = None
     consumer_setup_fn: Optional[Callable] = None
     provider_state: Optional[str] = None
@@ -56,7 +54,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="registration-form",
         provider_name="auth-api",
-        pact_port=1234,
         handler_mocks_factory=MockDataFactory.create_registration_dependency_config,
         consumer_setup_fn=None,  # uses real auth_pages router
         provider_state="User test.user@example.com does not exist",
@@ -76,7 +73,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="forgot-password-form",
         provider_name="auth-api",
-        pact_port=1243,
         handler_mocks_factory=MockDataFactory.create_forgot_password_dependency_config,
         consumer_setup_fn=None,  # uses real auth_pages router
         provider_state="User test.user@example.com can request a password reset",
@@ -86,7 +82,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="reset-password-form",
         provider_name="auth-api",
-        pact_port=1244,
         handler_mocks_factory=MockDataFactory.create_reset_password_dependency_config,
         consumer_setup_fn=None,  # uses real auth_pages router
         provider_state="Reset password token is valid for an active user",
@@ -96,7 +91,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="user-admin-actions",
         provider_name="users-api",
-        pact_port=1235,
         handler_mocks_factory=MockDataFactory.create_user_activation_dependency_config,
         consumer_setup_fn=_setup_users_admin_actions_stub,
         provider_state="User 11111111-1111-1111-1111-111111111111 exists and is active",
@@ -105,7 +99,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="post-owner-actions",
         provider_name="posts-api",
-        pact_port=1238,
         handler_mocks_factory=MockDataFactory.create_post_delete_dependency_config,
         consumer_setup_fn=_setup_post_owner_actions_stub,
         provider_state="Post 22222222-2222-2222-2222-222222222222 exists and is owned by the requester",
@@ -114,7 +107,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="clinician-create-form",
         provider_name="clinicians-api",
-        pact_port=1239,
         handler_mocks_factory=MockDataFactory.create_clinician_create_dependency_config,
         consumer_setup_fn=_setup_clinician_create_form_stub,
         provider_state="User can create a clinician",
@@ -135,7 +127,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="clinician-edit-form",
         provider_name="clinicians-api",
-        pact_port=1240,
         handler_mocks_factory=MockDataFactory.create_clinician_update_dependency_config,
         consumer_setup_fn=_setup_clinician_edit_form_stub,
         provider_state="Clinician 44444444-4444-4444-4444-444444444444 exists and is owned by the requester",
@@ -144,7 +135,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="organization-create-form",
         provider_name="organizations-api",
-        pact_port=1241,
         handler_mocks_factory=MockDataFactory.create_organization_create_dependency_config,
         consumer_setup_fn=_setup_organization_create_form_stub,
         provider_state="User can create an organization",
@@ -153,7 +143,6 @@ CONTRACT_PAIRS: list[ContractPair] = [
     ContractPair(
         consumer_name="program-create-form",
         provider_name="programs-api",
-        pact_port=1242,
         handler_mocks_factory=MockDataFactory.create_program_create_dependency_config,
         consumer_setup_fn=_setup_program_create_form_stub,
         provider_state="User can create a program",

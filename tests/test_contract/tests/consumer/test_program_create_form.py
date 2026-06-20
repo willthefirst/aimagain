@@ -24,7 +24,6 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CONSUMER_NAME_PROGRAM_CREATE_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_PROGRAM_CREATE,
     PROGRAM_CREATE_API_PATH,
     PROGRAM_CREATE_FORM_PAGE_PATH,
     PROVIDER_NAME_PROGRAMS,
@@ -52,7 +51,6 @@ async def test_consumer_program_create_form_submits(
     pact = setup_pact(
         CONSUMER_NAME_PROGRAM_CREATE_FORM,
         PROVIDER_NAME_PROGRAMS,
-        port=PACT_PORT_PROGRAM_CREATE,
     )
     mock_server_uri = pact.uri
     form_page_url = f"{origin_with_routes}{PROGRAM_CREATE_FORM_PAGE_PATH}"

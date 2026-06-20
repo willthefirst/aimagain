@@ -5,7 +5,6 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CONSUMER_NAME_REGISTRATION,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_AUTH,
     PROVIDER_NAME_AUTH,
     PROVIDER_STATE_USER_DOES_NOT_EXIST,
     REGISTER_API_PATH,
@@ -27,9 +26,7 @@ async def test_consumer_registration_form_interaction(
     Test navigating to the registration page, filling the form,
     and submitting it correctly to the backend API (verified by Pact).
     """
-    pact = setup_pact(
-        CONSUMER_NAME_REGISTRATION, PROVIDER_NAME_AUTH, port=PACT_PORT_AUTH
-    )
+    pact = setup_pact(CONSUMER_NAME_REGISTRATION, PROVIDER_NAME_AUTH)
     mock_server_uri = pact.uri
     register_page_url = f"{origin_with_routes}{REGISTER_API_PATH}"
     full_mock_url = f"{mock_server_uri}{REGISTER_API_PATH}"
