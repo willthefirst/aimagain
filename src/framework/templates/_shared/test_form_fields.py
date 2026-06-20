@@ -403,38 +403,52 @@ def test_composite_select_field_current_wins_over_default_first() -> None:
     assert selected[0].attributes.get("value") == "b"
 
 
-# --- optional indicator ---------------------------------------------------
+# --- required indicator ---------------------------------------------------
 
 
-def test_optional_marker_has_no_literal_space_before_small() -> None:
-    """Spacing between the label text and the `(optional)` marker is
-    owned by `.form-field-optional { margin-inline-start }` in
-    `base.html` — the macro must not emit a literal space character
-    before `<small class="form-field-optional">`. Whitespace-as-spacing
+def test_required_marker_has_no_literal_space_before_marker() -> None:
+    """Spacing between the label text and the required `*` marker is
+    owned by `.form-field-required { margin-inline-start }` in
+    `framework.css` — the macro must not emit a literal space character
+    before `<span class="form-field-required">`. Whitespace-as-spacing
     in markup is the anti-pattern this test pins against regression.
     """
-    html = _render(_make_env(), '{{ text_field("zip", "ZIP", required=false) }}')
-    # The label text and the `<small>` must be flush in the rendered
+    html = _render(_make_env(), '{{ text_field("name", "Name", required=true) }}')
+    # The label text and the `<span>` must be flush in the rendered
     # source — no run of one-or-more whitespace chars between them.
-    assert "ZIP<small" in html, (
-        "Expected label text flush against `<small>` (CSS owns the "
+    assert "Name<span" in html, (
+        "Expected label text flush against `<span>` (CSS owns the "
         f"gap). Rendered HTML: {html!r}"
     )
 
 
-def test_optional_marker_renders_inside_form_field_label_span() -> None:
-    """Sanity-check the structural contract while we're here: when
-    `required=false`, the `<small class="form-field-optional">` lives
-    inside the `<span class="form-field-label">` next to the label
-    text. This is what lets the CSS rule key off `.form-field-optional`
-    without any additional selector specificity."""
+def test_required_marker_renders_inside_form_field_label_span() -> None:
+    """When `required=true`, the `<span class="form-field-required">`
+    lives inside the `<span class="form-field-label">` next to the label
+    text. This is what lets the CSS rule key off `.form-field-required`
+    without any additional selector specificity. The marker is
+    `aria-hidden` decoration (the control's `required` attribute carries
+    the semantics for assistive tech)."""
+    html = _render(_make_env(), '{{ text_field("name", "Name", required=true) }}')
+    tree = HTMLParser(html)
+    span = tree.css_first("span.form-field-label")
+    assert span is not None
+    marker = span.css_first("span.form-field-required")
+    assert marker is not None
+    assert marker.text().strip() == "*"
+    assert marker.attributes.get("aria-hidden") == "true"
+
+
+def test_optional_field_has_no_required_marker() -> None:
+    """The flip side of the contract: when `required=false`, no marker
+    is rendered at all — optional fields are signaled by the *absence*
+    of the `*`, not by any `(optional)` text."""
     html = _render(_make_env(), '{{ text_field("zip", "ZIP", required=false) }}')
     tree = HTMLParser(html)
     span = tree.css_first("span.form-field-label")
     assert span is not None
-    small = span.css_first("small.form-field-optional")
-    assert small is not None
-    assert small.text().strip() == "(optional)"
+    assert span.css_first("span.form-field-required") is None
+    assert "(optional)" not in html
 
 
 # --- checkbox_field -------------------------------------------------------
@@ -540,17 +554,16 @@ def test_checkbox_field_with_help_emits_small_linked_via_aria() -> None:
     assert "Useful note." in small.text()
 
 
-def test_checkbox_field_required_false_by_default_shows_optional_marker() -> None:
+def test_checkbox_field_required_false_by_default_shows_no_marker() -> None:
     """Checkbox fields default to `required=False` because the
     overwhelming use case is feature flags (where "unchecked" is a
-    meaningful answer). The `(optional)` marker appears in the label
-    accordingly."""
+    meaningful answer). Being optional, the label carries no required
+    `*` marker."""
     html = _render(_make_env(), '{{ checkbox_field("x", "X") }}')
     tree = HTMLParser(html)
     span = tree.css_first("span.form-field-label")
     assert span is not None
-    small = span.css_first("small.form-field-optional")
-    assert small is not None
+    assert span.css_first("span.form-field-required") is None
 
 
 # --- error-state contract (pattern, parametrized over every macro) -------
@@ -691,10 +704,9 @@ def test_input_macro_no_error_no_help_omits_describedby_and_small(
         "aria-describedby" not in control.attributes
     ), f"{macro_name}: aria-describedby must be absent without help/error"
     # `<small id="x-helper">` is the helper/error slot; the macros also
-    # emit a sibling `<small class="form-field-optional">(optional)</small>`
-    # inside the label when `required=False` (so multi_select_field +
-    # any other defaulted-optional field carries one). Only the helper
-    # slot must be absent.
+    # emit a sibling `<span class="form-field-required">*</span>` inside
+    # the label when `required` (so required fields carry the marker).
+    # Only the helper slot must be absent.
     assert (
         tree.css_first("small#x-helper") is None
     ), f"{macro_name}: <small id='x-helper'> must be absent without help/error"

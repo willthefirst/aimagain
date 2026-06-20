@@ -128,18 +128,25 @@ emitted attribute string. #}
   {%- if error %}<small id="{{ name }}-helper">{{ error }}</small>
   {%- elif help %}<small id="{{ name }}-helper">{{ help|safe }}</small>{%- endif %}
 {%- endmacro %}
-{# Field label + optional indicator. Every macro funnels its label through
-   here so the "(optional)" marker is the *only* way an optional field is
-   communicated visually — there is no `help="Optional."` pattern anymore
-   (the per-field marker beats a help line both visually and in terms of
-   discoverability). The gap between the label and "(optional)" is owned
-   by `.form-field-optional { margin-inline-start }` in `base.html` — do
+{# Field label + required indicator. Every macro funnels its label through
+   here so the required `*` marker is the *only* way requiredness is
+   communicated visually — required fields get the marker, optional fields
+   get nothing (no `help="Optional."`, no `(optional)` text). Callers never
+   render the marker themselves; passing `required=` to any field macro is
+   the whole contract.
+
+   The marker is `aria-hidden` decoration: requiredness is conveyed to
+   assistive tech by the control's own `required` attribute (every text-like
+   macro emits it when `required`), so the `*` is purely visual. The gap
+   between the label and the `*` is owned by
+   `.form-field-required { margin-inline-start }` in `framework.css` — do
    not introduce literal whitespace here (spacing belongs in CSS, not
-   markup). Pinned by ``src/domain/templates/test_copy_conventions.py``
-   (copy) and ``test_form_fields.py`` (no literal-space markup).
+   markup). Pinned by ``test_form_fields.py`` (marker presence + no
+   literal-space markup) and ``src/domain/templates/test_copy_conventions.py``
+   (no prose duplicating the marker).
 #}
 {% macro _field_label(label, required) -%}
-  {{ label }}{%- if not required -%}<small class="form-field-optional">(optional)</small>{%- endif -%}
+  {{ label }}{%- if required -%}<span class="form-field-required" aria-hidden="true">*</span>{%- endif -%}
 {%- endmacro %}
 {# ---- text-like inputs --------------------------------------------- #}
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, error=None, type="text", autocomplete=None) -%}
@@ -226,9 +233,10 @@ emitted attribute string. #}
 
    Required: `required=False` by default ("any subset, including the
    empty set" is the canonical semantic — no in-network carriers, no
-   featured services). Callers can pass `required=True` to surface the
-   `(optional)` marker is hidden, but HTML can't natively require "at
-   least one of these checkboxes" — server-side validation owns that. #}
+   featured services), so no `*` marker is shown. Callers can pass
+   `required=True` to surface the `*` marker, but HTML can't natively
+   require "at least one of these checkboxes" — server-side validation
+   owns that (there's no native `required` attribute to lean on here). #}
 {% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None, error=None) -%}
   {%- set _form_errors = form_errors|default({}, true) -%}
   {%- set _form_values = form_values|default({}, true) -%}
