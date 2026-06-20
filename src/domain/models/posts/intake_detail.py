@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, ForeignKey, Text, text
+from sqlalchemy import Column, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -17,12 +17,11 @@ class IntakeDetail(Base):
     names a specific clinician.
 
     After #1358 PR-f sub-3 this row is **thin by design**: it carries
-    only per-announcement attributes (``desired_times`` /
-    ``schedule_text`` / ``subject`` / ``description`` /
-    ``treatment_modality``) plus the ``program_id`` context FK. The
-    steady-state profile (services, settings, modalities, age_groups,
-    genders, languages, website, referral_instructions) lives on the
-    linked ``Program`` — see
+    only per-announcement attributes (``schedule_text`` / ``subject`` /
+    ``description`` / ``treatment_modality``) plus the ``program_id``
+    context FK. The steady-state profile (services, settings, modalities,
+    age_groups, genders, languages, website, referral_instructions) lives
+    on the linked ``Program`` — see
     [`../programs/README.md`](../programs/README.md).
     """
 
@@ -49,9 +48,6 @@ class IntakeDetail(Base):
     program = relationship("Program", back_populates="intake_details", lazy="selectin")
 
     # Section 3 — availability
-    desired_times = Column(
-        JSON, nullable=False, server_default=text("'[]'"), default=list
-    )
     schedule_text = Column(Text, nullable=True)
 
     # Per-announcement free-text overrides — see :class:`OpeningDetail`

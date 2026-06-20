@@ -18,7 +18,6 @@ from src.domain.logic.posts.view import (
 def _cr_post(
     *,
     accepts_in_network: bool = False,
-    accepts_out_of_network_superbill: bool = False,
     accepts_private_pay: bool = False,
     insurance_carriers: list[str] | None = None,
 ):
@@ -26,7 +25,6 @@ def _cr_post(
         kind="referral",
         referral_detail=SimpleNamespace(
             accepts_in_network=accepts_in_network,
-            accepts_out_of_network_superbill=accepts_out_of_network_superbill,
             accepts_private_pay=accepts_private_pay,
             insurance_carriers=insurance_carriers or [],
         ),
@@ -48,10 +46,9 @@ def _pa_post(**affiliation_attrs):
 
 def test_cr_posture_prefers_in_network():
     """In-network is the highest-signal payment-path; show it even when
-    OON-superbill and private-pay are also accepted (#1358 PR-e)."""
+    private-pay is also accepted."""
     post = _cr_post(
         accepts_in_network=True,
-        accepts_out_of_network_superbill=True,
         accepts_private_pay=True,
     )
     assert insurance_posture_for_post(post) == "in_network"
@@ -61,15 +58,12 @@ def test_cr_posture_prefers_in_network():
     assert insurance_posture_for_post(post_with_carrier) == "in_network"
 
 
-def test_cr_posture_falls_back_to_oon_then_private_pay_then_contact():
-    """Priority order: in-network > out-of-network-superbill >
-    private-pay > please_contact (none set)."""
-    assert (
-        insurance_posture_for_post(_cr_post(accepts_out_of_network_superbill=True))
-        == "out_of_network"
-    )
+def test_cr_posture_falls_back_to_private_pay_then_contact():
+    """Priority order: in-network > private-pay > please_contact
+    (none set). The OON-superbill branch was removed when the
+    superbill column was dropped from the referral schema."""
     assert insurance_posture_for_post(_cr_post(accepts_private_pay=True)) == "self_pay"
-    # All three booleans false → the referral states no preference;
+    # Both booleans false → the referral states no preference;
     # the row macro surfaces the "Contact" glyph.
     assert insurance_posture_for_post(_cr_post()) == "please_contact"
 
@@ -113,22 +107,18 @@ def test_posture_returns_none_when_detail_missing():
 
 
 @pytest.mark.parametrize(
-    "age,gender,expected",
+    "age,expected",
     [
-        ("adults_25_64", "male", "Adult male (25–64)"),
-        ("adolescents_14_18", "female", "Adolescent female (14–18)"),
-        ("young_adults_19_24", "non_binary", "Young adult non-binary (19–24)"),
-        ("adults_25_64", "trans_female", "Adult trans woman (25–64)"),
-        ("adults_25_64", "trans_male", "Adult trans man (25–64)"),
-        # Gender values that don't slot in as an adjective drop the
-        # gender word entirely; the headline becomes "<noun> (<range>)".
-        ("adults_25_64", "prefer_not_to_say", "Adult (25–64)"),
-        ("adults_25_64", "gender_diverse", "Adult (25–64)"),
-        ("older_adults_65_plus", "prefer_not_to_say", "Older adult (65+)"),
+        ("adults_25_64", "Adult (25–64)"),
+        ("adolescents_14_18", "Adolescent (14–18)"),
+        ("young_adults_19_24", "Young adult (19–24)"),
+        ("older_adults_65_plus", "Older adult (65+)"),
     ],
 )
-def test_referral_headline_composes_age_and_gender(age, gender, expected):
-    detail = SimpleNamespace(age_groups=[age], gender=gender)
+def test_referral_headline_composes_age(age, expected):
+    """`gender` was removed from the referral schema; the headline is
+    now `"<noun> (<range>)"`."""
+    detail = SimpleNamespace(age_groups=[age])
     assert referral_headline(detail) == expected
 
 
@@ -138,15 +128,14 @@ def test_referral_headline_uses_first_age_group_only():
     title stays a single "<noun> (<range>)" phrase."""
     detail = SimpleNamespace(
         age_groups=["adolescents_14_18", "adults_25_64"],
-        gender="female",
     )
-    assert referral_headline(detail) == "Adolescent female (14–18)"
+    assert referral_headline(detail) == "Adolescent (14–18)"
 
 
 def test_referral_headline_falls_back_when_age_groups_empty():
     """Defensive — schema requires min-1, but the helper degrades
     gracefully if a future code path hands us an empty list."""
-    detail = SimpleNamespace(age_groups=[], gender="male")
+    detail = SimpleNamespace(age_groups=[])
     assert referral_headline(detail) == "Client Referral"
 
 
@@ -196,23 +185,13 @@ def _make_cr_post(
         location_city="Brooklyn",
         location_state="NY",
         session_format=["in_person"],
-        desired_times=["weekday_morning"],
         age_groups=["adults_25_64"],
         languages=["en", "es"],
-        gender="female",
         description="Looking for a therapist who takes BCBS.",
         services=["psychotherapy", "medication_management"],
         accepts_in_network=True,
-        accepts_out_of_network_superbill=False,
         accepts_private_pay=False,
         insurance_carriers=["anthem_bcbs"],
-        # CR-only matching-dimension lists (#1358 PR-a/b/c). Default
-        # empty so tests that don't care about matching-dimension
-        # surfacing don't have to override; tests that do pin
-        # their own values.
-        affirming_identities=[],
-        acceptable_license_types=[],
-        clinical_niches=[],
     )
     defaults.update(detail_overrides)
     if referring_clinician_attrs is _UNSET:
@@ -274,14 +253,13 @@ _PA_OPENING_CORE_DEFAULTS = dict(
     treatment_modality="DBT",
     description="Accepting new clients.",
     schedule_text="Mon-Wed 9-5",
-    desired_times=["weekday_morning"],
     subject=None,
 )
 
 
 def _make_pa_post(*, clinician_attrs=None, **overrides):
     """Realistic PA stub. ``overrides`` can target the announcement core
-    (``description`` / ``schedule_text`` / ``desired_times`` /
+    (``description`` / ``schedule_text`` /
     ``treatment_modality`` / ``subject``) or any steady-state profile
     field — steady-state fields land on the affiliation (or, for
     ``languages``, on the clinician), matching the post-#1358 PR-f
@@ -327,7 +305,6 @@ _PROGRAM_INTAKE_CORE_DEFAULTS = dict(
     treatment_modality="DBT",
     description="Intake cohort opens June 1.",
     schedule_text="M-F 9-3",
-    desired_times=["weekday_morning"],
     subject=None,
 )
 
@@ -368,9 +345,9 @@ def test_view_cr_basics():
     assert v["kind_verb"] == "Seeking"
 
 
-def test_view_cr_headline_from_age_and_gender():
-    v = post_card_view(_make_cr_post(age_groups=["adults_25_64"], gender="male"))
-    assert v["headline"] == "Adult male (25–64)"
+def test_view_cr_headline_from_age():
+    v = post_card_view(_make_cr_post(age_groups=["adults_25_64"]))
+    assert v["headline"] == "Adult (25–64)"
 
 
 def test_view_cr_header_state_is_none_state_lives_in_location_chunk():
@@ -410,19 +387,6 @@ def test_view_cr_settings_always_empty():
     assert v["settings"] == []
 
 
-def test_view_cr_gender_wraps_to_single_element_list():
-    """CR holds a scalar `gender`; PA/program hold a `genders` list.
-    Wrapping into a list keeps templates' iteration shape uniform —
-    the `{% for g in view.genders %}` block works for both kinds."""
-    v = post_card_view(_make_cr_post(gender="female"))
-    assert v["genders"] == ["female"]
-
-
-def test_view_cr_missing_gender_yields_empty_list():
-    v = post_card_view(_make_cr_post(gender=None))
-    assert v["genders"] == []
-
-
 def test_view_cr_full_address_composes_city_state():
     """Referrals carry (city, state) only — no ZIP."""
     v = post_card_view(_make_cr_post())
@@ -430,12 +394,10 @@ def test_view_cr_full_address_composes_city_state():
 
 
 def test_view_cr_cr_only_fields_set_pa_only_fields_none():
-    """CR populates payment-paths booleans + `insurance_carriers`
-    (#1358 PR-e); the link keys (PA/program identity) stay at their
-    None defaults."""
+    """CR populates payment-paths booleans + `insurance_carriers`;
+    the link keys (PA/program identity) stay at their None defaults."""
     v = post_card_view(_make_cr_post())
     assert v["accepts_in_network"] is True
-    assert v["accepts_out_of_network_superbill"] is False
     assert v["accepts_private_pay"] is False
     assert v["insurance_carriers"] == ["anthem_bcbs"]
     assert v["practice_link"] is None
@@ -453,45 +415,6 @@ def test_view_cr_subject_none_when_absent():
     """No subject on the detail row → `subject` key is None in view."""
     v = post_card_view(_make_cr_post(subject=None))
     assert v["subject"] is None
-
-
-def test_view_cr_matching_dimensions_default_empty():
-    """CR matching-dimension lists (#1358 PR-a/b/c) propagate as empty
-    lists when the detail row has none set, matching the schema's
-    column-default of `[]`. Templates iterate them via `{% if view.x %}`
-    so an empty list cleanly suppresses the row."""
-    v = post_card_view(_make_cr_post())
-    assert v["affirming_identities"] == []
-    assert v["acceptable_license_types"] == []
-    assert v["clinical_niches"] == []
-
-
-def test_view_cr_matching_dimensions_round_trip():
-    """When the CR detail row carries matching-dimension tokens, the
-    view-model surfaces them as plain Python lists so the facts block
-    can label-lookup (`AFFIRMING_IDENTITY_LABELS`, `LICENSE_TYPES_LABELS`)
-    and join. `clinical_niches` is free-form so values pass through
-    unchanged."""
-    v = post_card_view(
-        _make_cr_post(
-            affirming_identities=["lgbtq", "trans"],
-            acceptable_license_types=["md", "pmhnp"],
-            clinical_niches=["DGBI", "ADHD in women"],
-        )
-    )
-    assert v["affirming_identities"] == ["lgbtq", "trans"]
-    assert v["acceptable_license_types"] == ["md", "pmhnp"]
-    assert v["clinical_niches"] == ["DGBI", "ADHD in women"]
-
-
-def test_view_pa_matching_dimensions_empty_for_other_kinds():
-    """Matching-dimension keys are CR-only; PA/program populate the
-    view-model with empty lists so templates iterate uniformly without
-    branching on `view.kind`."""
-    v = post_card_view(_make_pa_post())
-    assert v["affirming_identities"] == []
-    assert v["acceptable_license_types"] == []
-    assert v["clinical_niches"] == []
 
 
 # --- post_card_view: opening ------------------------------
@@ -594,7 +517,6 @@ def test_view_pa_no_location_chunk_when_clinician_missing():
             treatment_modality=None,
             description=None,
             schedule_text=None,
-            desired_times=[],
             subject=None,
         ),
     )
@@ -646,18 +568,9 @@ def test_view_program_no_in_person_virtual_no_insurance_no_address():
 
 
 # --- post_card_view: modalities -----------------------------------------
-
-
-def test_view_cr_modalities_populated():
-    post = _make_cr_post(modalities=["cbt", "dbt"])
-    v = post_card_view(post)
-    assert v["modalities"] == ["cbt", "dbt"]
-
-
-def test_view_cr_modalities_empty_by_default():
-    post = _make_cr_post(modalities=[])
-    v = post_card_view(post)
-    assert v["modalities"] == []
+#
+# `modalities` was removed from `ReferralDetail`; on the offering side
+# it stays on `ClinicianAffiliation` (opening) and `Program` (intake).
 
 
 def test_view_pa_modalities_populated():
@@ -709,7 +622,6 @@ def test_view_pa_missing_clinician_returns_partial_view():
             treatment_modality=None,
             description="x",
             schedule_text=None,
-            desired_times=[],
             subject=None,
         ),
     )
@@ -770,7 +682,6 @@ def test_poster_name_opening_none_when_no_clinician():
             treatment_modality=None,
             description=None,
             schedule_text=None,
-            desired_times=[],
             website=None,
             referral_instructions=None,
         ),
@@ -836,7 +747,6 @@ def test_row_summary_referral_description_carrier_city():
             insurance_carriers=["aetna"],
             location_city="Berkeley",
             age_groups=["adults_25_64"],
-            gender="female",
         ),
     )
     assert (
@@ -854,14 +764,13 @@ def test_row_summary_referral_no_carrier_no_city():
             insurance_carriers=[],
             location_city=None,
             age_groups=["adults_25_64"],
-            gender="male",
         ),
     )
     assert post_row_summary(post) == "Needs a therapist"
 
 
 def test_row_summary_referral_no_description_falls_back_to_headline():
-    """When description is absent the age+gender headline is used."""
+    """When description is absent the age-based headline is used."""
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
@@ -869,10 +778,9 @@ def test_row_summary_referral_no_description_falls_back_to_headline():
             insurance_carriers=[],
             location_city=None,
             age_groups=["adults_25_64"],
-            gender="male",
         ),
     )
-    assert post_row_summary(post) == "Adult male (25–64)"
+    assert post_row_summary(post) == "Adult (25–64)"
 
 
 def test_row_summary_referral_truncates_long_description():
@@ -885,7 +793,6 @@ def test_row_summary_referral_truncates_long_description():
             insurance_carriers=[],
             location_city=None,
             age_groups=["adults_25_64"],
-            gender=None,
         ),
     )
     summary = post_row_summary(post)
@@ -980,13 +887,12 @@ def test_feed_headline_referral_with_services():
         kind="referral",
         referral_detail=SimpleNamespace(
             age_groups=["adults_25_64"],
-            gender="female",
             services=["psychotherapy", "medication_management"],
         ),
     )
     assert (
         post_feed_headline(post)
-        == "Adult female (25–64) — Psychotherapy, Medication management"
+        == "Adult (25–64) — Psychotherapy, Medication management"
     )
 
 
@@ -995,11 +901,10 @@ def test_feed_headline_referral_no_services_returns_demographics_only():
         kind="referral",
         referral_detail=SimpleNamespace(
             age_groups=["adolescents_14_18"],
-            gender="male",
             services=[],
         ),
     )
-    assert post_feed_headline(post) == "Adolescent male (14–18)"
+    assert post_feed_headline(post) == "Adolescent (14–18)"
 
 
 def test_feed_headline_referral_caps_services_at_two():
@@ -1007,7 +912,6 @@ def test_feed_headline_referral_caps_services_at_two():
         kind="referral",
         referral_detail=SimpleNamespace(
             age_groups=["adults_25_64"],
-            gender="non_binary",
             services=["evaluation", "psychotherapy", "case_management"],
         ),
     )
@@ -1090,13 +994,12 @@ def test_feed_headline_referral_subject_overrides_auto_generation():
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
-            subject="Child female (0–5) — Group therapy",
+            subject="Child (0–5) — Group therapy",
             age_groups=["children_0_5"],
-            gender="female",
             services=["group_therapy"],
         ),
     )
-    assert post_feed_headline(post) == "Child female (0–5) — Group therapy"
+    assert post_feed_headline(post) == "Child (0–5) — Group therapy"
 
 
 def test_feed_headline_referral_none_subject_falls_back_to_auto():
@@ -1106,11 +1009,10 @@ def test_feed_headline_referral_none_subject_falls_back_to_auto():
         referral_detail=SimpleNamespace(
             subject=None,
             age_groups=["adults_25_64"],
-            gender="female",
             services=["psychotherapy"],
         ),
     )
-    assert post_feed_headline(post) == "Adult female (25–64) — Psychotherapy"
+    assert post_feed_headline(post) == "Adult (25–64) — Psychotherapy"
 
 
 def test_feed_headline_opening_subject_overrides_auto_generation():

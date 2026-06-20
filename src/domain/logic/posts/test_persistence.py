@@ -155,10 +155,10 @@ async def test_create_post_persists_parent_and_referral_detail(
 async def test_referral_persists_payment_paths_and_carriers(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """All four payment-path columns round-trip through the detail row
-    (#1358 PR-e). The three booleans are NOT NULL with server-side
-    default `false`; `insurance_carriers` is NOT NULL JSON with
-    server-side default `[]`."""
+    """The surviving payment-path columns round-trip through the detail
+    row. The two booleans (`accepts_in_network` / `accepts_private_pay`)
+    are NOT NULL with server-side default `false`; `insurance_carriers`
+    is NOT NULL JSON with server-side default `[]`."""
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -169,7 +169,6 @@ async def test_referral_persists_payment_paths_and_carriers(
             make_referral_detail(
                 description="cigna patient",
                 accepts_in_network=True,
-                accepts_out_of_network_superbill=False,
                 accepts_private_pay=True,
                 insurance_carriers=["cigna"],
             ),
@@ -180,7 +179,6 @@ async def test_referral_persists_payment_paths_and_carriers(
             make_referral_detail(
                 description="self-pay patient",
                 accepts_in_network=False,
-                accepts_out_of_network_superbill=False,
                 accepts_private_pay=True,
                 insurance_carriers=[],
             ),
@@ -209,11 +207,9 @@ async def test_referral_persists_payment_paths_and_carriers(
             .first()
         )
         assert in_row.accepts_in_network is True
-        assert in_row.accepts_out_of_network_superbill is False
         assert in_row.accepts_private_pay is True
         assert in_row.insurance_carriers == ["cigna"]
         assert pp_row.accepts_in_network is False
-        assert pp_row.accepts_out_of_network_superbill is False
         assert pp_row.accepts_private_pay is True
         assert pp_row.insurance_carriers == []
 

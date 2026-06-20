@@ -62,8 +62,8 @@ class PostRepository(BaseRepository):
       and ``Program`` (intake-side). ``ReferralDetail`` has no settings
       field and is excluded when this filter is active.
     * ``modality`` (Choice, multi) — ``modalities`` JSON-array contains
-      check across ``ReferralDetail`` (request-side), ``ClinicianAffiliation``
-      (opening), and ``Program`` (intake).
+      check across ``ClinicianAffiliation`` (opening) and ``Program``
+      (intake). ``ReferralDetail`` no longer has a ``modalities`` column.
     * ``insurance`` (Choice, multi) — ``insurance_carriers`` JSON-array
       contains check on ``ReferralDetail`` OR ``in_network_carriers``
       JSON-contains on linked ``ClinicianAffiliation`` (#1358 PR-e —
@@ -267,13 +267,11 @@ class PostRepository(BaseRepository):
 
         if modality:
             # Steady-state home: ClinicianAffiliation (opening) /
-            # Program (intake). CR's ``modalities`` stays on
-            # ReferralDetail (no steady-state home on referrals).
+            # Program (intake). Referrals have no `modalities` column.
             stmt = stmt.filter(
                 _json_array_contains_any_multi(
                     modality,
                     (
-                        (ReferralDetail, "modalities"),
                         (ClinicianAffiliation, "modalities"),
                         (Program, "modalities"),
                     ),
