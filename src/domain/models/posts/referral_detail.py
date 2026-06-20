@@ -78,7 +78,7 @@ class ReferralDetail(Base):
     # be true in practice, but the schema doesn't enforce that. The
     # unified ``INSURANCE_POSTURES`` view collapse (in
     # ``src/domain/logic/posts/view.py``) prioritizes
-    # in-network → private-pay → please_contact when none is set.
+    # in-network → private-pay, and yields ``None`` when neither is set.
     accepts_in_network = Column(
         Boolean, nullable=False, server_default=text("0"), default=False
     )

@@ -689,11 +689,13 @@ def test_referral_services_other_text_defaults_none():
     assert p.services_other_text is None
 
 
-def test_session_format_accepts_contact_to_discuss():
-    p = post_create_adapter.validate_python(
-        referral_payload(session_format=["contact_to_discuss"])
-    )
-    assert p.session_format == ["contact_to_discuss"]
+def test_session_format_rejects_dropped_contact_to_discuss():
+    # `contact_to_discuss` was removed from SessionFormat; the wire now
+    # only accepts the {in_person, virtual} subset.
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(
+            referral_payload(session_format=["contact_to_discuss"])
+        )
 
 
 def test_referral_pronouns_accepts_list():
@@ -701,6 +703,13 @@ def test_referral_pronouns_accepts_list():
         referral_payload(pronouns=["she_her", "they_them"])
     )
     assert p.pronouns == ["she_her", "they_them"]
+
+
+def test_referral_pronouns_rejects_dropped_combo_value():
+    # The combinatory members (she_they / he_they) were removed; combos
+    # are now expressed by selecting both atomic members instead.
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(referral_payload(pronouns=["she_they"]))
 
 
 def test_referral_services_accepts_new_vocab():

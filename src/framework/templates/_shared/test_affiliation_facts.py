@@ -31,7 +31,7 @@ def _render(aff) -> HTMLParser:
 def _full_aff() -> SimpleNamespace:
     return SimpleNamespace(
         in_person_sessions="yes",
-        virtual_sessions="please_contact",
+        virtual_sessions="no",
         in_network_carriers=["aetna", "anthem_bcbs"],
         accepts_out_of_network=True,
         sliding_scale=True,
@@ -81,7 +81,7 @@ def test_full_profile_renders_every_row_by_stable_key() -> None:
 def test_rows_carry_human_readable_labels() -> None:
     html = _render(_full_aff()).html or ""
     assert "In-person: Yes" in html
-    assert "Virtual: Please contact" in html
+    assert "Virtual: No" in html
     assert "Out-of-network OK" in html
     assert "Sliding scale" in html
     assert "Psychotherapy" in html

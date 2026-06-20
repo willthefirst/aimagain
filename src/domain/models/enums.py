@@ -75,7 +75,6 @@ US_STATES: Final[tuple[str, ...]] = (
 class LocationAvailability(LabeledChoice):
     yes = "yes", "Yes"
     no = "no", "No"
-    please_contact = "please_contact", "Please contact"
 
 
 # Referral session-format axes. Persisted as a list[str] on
@@ -86,7 +85,6 @@ class LocationAvailability(LabeledChoice):
 class SessionFormat(LabeledChoice):
     in_person = "in_person", "In-person"
     virtual = "virtual", "Virtual"
-    contact_to_discuss = "contact_to_discuss", "Please contact to discuss"
 
 
 LOCATION_AVAILABILITY_OPTIONS: Final[tuple[str, ...]] = LocationAvailability.values()
@@ -322,12 +320,10 @@ OPENING_SERVICES: Final[tuple[str, ...]] = OpeningService.values()
 # the value (`female` / `trans_female`) rather than splitting into two
 # fields — for the listing row the reader wants one labeled chunk
 # ("Gender: Trans woman"), not a parenthesized modifier. `gender_diverse`
-# is the umbrella token for genderqueer / agender / two-spirit / etc.;
-# `prefer_not_to_say` is the privacy-respecting opt-out.
+# is the umbrella token for genderqueer / agender / two-spirit / etc.
 #
-# Used as a scalar on `referral` (`gender`: the client's identity)
-# and as a multi-value list on `opening` (`genders`: the
-# practice serves these).
+# Used as a multi-value list on `opening` (`genders`: the practice
+# serves these). Referral no longer carries a gender column.
 class Gender(LabeledChoice):
     female = "female", "Female"
     male = "male", "Male"
@@ -335,24 +331,20 @@ class Gender(LabeledChoice):
     trans_female = "trans_female", "Trans woman"
     trans_male = "trans_male", "Trans man"
     gender_diverse = "gender_diverse", "Gender-diverse"
-    prefer_not_to_say = "prefer_not_to_say", "Prefer not to say"
 
 
 GENDERS: Final[tuple[str, ...]] = Gender.values()
 
 
 # Client pronouns. Multi-value list on `referral` — a client may go by
-# more than one set ("she/her, they/them"). Closed enum; the common
-# combos (she/they, he/they) get their own values rather than relying
-# on the multi-select to compose them, because the combos are a single
-# unit at a glance. `prefer_not_to_say` is the privacy opt-out.
+# more than one set ("she/her, they/them"). Closed enum of atomic sets;
+# combinations like "she/they" are expressed by selecting both members
+# in the multi-select rather than enumerating every combo as its own
+# value. Empty list = "not stated".
 class Pronouns(LabeledChoice):
     she_her = "she_her", "she/her"
     he_him = "he_him", "he/him"
     they_them = "they_them", "they/them"
-    she_they = "she_they", "she/they"
-    he_they = "he_they", "he/they"
-    prefer_not_to_say = "prefer_not_to_say", "Prefer not to say"
 
 
 PRONOUNS: Final[tuple[str, ...]] = Pronouns.values()
@@ -452,16 +444,16 @@ PRONOUNS_LABELS: Final[dict[str, str]] = Pronouns.labels()
 #     `accepts_out_of_network` / `sliding_scale` booleans.
 #
 # For the listing row we need *one* axis the eye can read at a glance,
-# so both shapes collapse to this 4-state posture. The mapping helper
+# so both shapes collapse to this 3-state posture. The mapping helper
 # `insurance_posture_for_post(post)` lives in
-# `src/domain/logic/posts/view.py`. Adding a fifth state means: extend
-# this tuple, extend the labels + icons dicts, update the helper, and
-# the row macro picks it up.
+# `src/domain/logic/posts/view.py`; it returns `None` when no payment
+# signal is set, and the row/facts macros omit the chunk entirely.
+# Adding a fourth state means: extend this tuple, extend the labels +
+# icons dicts, update the helper, and the row macro picks it up.
 class InsurancePosture(LabeledChoice):
     in_network = "in_network", "In-network", "shield-check"
     out_of_network = "out_of_network", "Out-of-network", "shield"
     self_pay = "self_pay", "Self-pay", "dollar-sign"
-    please_contact = "please_contact", "Contact for insurance", "circle-help"
 
 
 INSURANCE_POSTURES: Final[tuple[str, ...]] = InsurancePosture.values()

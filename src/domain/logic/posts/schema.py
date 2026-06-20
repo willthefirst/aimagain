@@ -124,7 +124,7 @@ AgeGroupsField = Annotated[
 # practice serves at least one age bucket.
 RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
 # `referral.session_format` — multi-checkbox on the wire (any subset
-# of {in_person, virtual, contact_to_discuss}). Empty list = "unspecified".
+# of {in_person, virtual}). Empty list = "unspecified".
 SessionFormatField = Annotated[
     list[Literal[*SESSION_FORMATS]], BeforeValidator(scalar_to_list)
 ]

@@ -26,7 +26,7 @@ def _wire_create(**overrides):
         location_state="NY",
         location_zip="11201",
         in_person_sessions="yes",
-        virtual_sessions="please_contact",
+        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=["aetna", "anthem_bcbs"],
         sliding_scale=False,
