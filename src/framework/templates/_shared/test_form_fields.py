@@ -46,7 +46,7 @@ def _render(env: Environment, body: str) -> str:
     it so tests can stay focused on the macro call under test.
     """
     template = textwrap.dedent(f"""\
-        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, checkbox_field, conditional_field -%}}
+        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, checkbox_field, conditional_field, form_section -%}}
         {body}
         """)
     return env.from_string(template).render()
@@ -592,6 +592,34 @@ def test_conditional_field_wraps_caller_in_reveal_div() -> None:
     # The wrapper carries no requiredness of its own; the wrapped field
     # was rendered with required=false so the textarea has no `required`.
     assert "required" not in inner.attributes
+
+
+# --- form_section ---------------------------------------------------------
+
+
+def test_form_section_wraps_caller_in_fieldset_with_legend() -> None:
+    """`form_section(title)` emits a `<fieldset class="form-section">`
+    whose `<legend>` holds the title and which wraps the `{% call %}`
+    body. This is the structural contract the section-heading CSS hooks
+    onto: `.entity-form-page form > fieldset > legend` styles the legend
+    as a section heading and draws the group's boundary rule
+    (framework.css). The `<fieldset>`/`<legend>` pair is also the only
+    correct way to give a *group* of fields an accessible name — a
+    `<label>` names a single control, never a group."""
+    html = _render(
+        _make_env(),
+        '{% call form_section("Coverage") %}'
+        '{{ text_field("plan_name", "Plan name") }}'
+        "{% endcall %}",
+    )
+    tree = HTMLParser(html)
+    fieldset = tree.css_first("fieldset.form-section")
+    assert fieldset is not None
+    legend = fieldset.css_first("legend")
+    assert legend is not None
+    assert legend.text().strip() == "Coverage"
+    # The called body renders inside the same fieldset, after the legend.
+    assert fieldset.css_first('input[name="plan_name"]') is not None
 
 
 # --- error-state contract (pattern, parametrized over every macro) -------
