@@ -445,11 +445,10 @@ def test_post_update_opening_accepts_schedule_text_only():
 
 @pytest.mark.parametrize(
     "token",
-    ["group_therapy", "family_therapy", "couples_therapy"],
+    ["therapy_group", "therapy_family", "allied_ot"],
 )
 def test_post_create_referral_accepts_new_services_tokens(token):
-    """CR shares the `REFERRAL_SERVICES` vocab with PA; widening
-    propagates to both (#440)."""
+    """Referrals use the flat-leaf `ReferralService` vocab (#440)."""
     p = post_create_adapter.validate_python(referral_payload(services=[token]))
     assert p.services == [token]
 
@@ -618,16 +617,18 @@ def test_post_create_referral_services_defaults_to_empty_list():
 
 def test_post_create_referral_services_accepts_subset():
     p = post_create_adapter.validate_python(
-        referral_payload(services=["evaluation", "psychotherapy"])
+        referral_payload(services=["medication_management", "therapy_individual"])
     )
-    assert p.services == ["evaluation", "psychotherapy"]
+    assert p.services == ["medication_management", "therapy_individual"]
 
 
 def test_post_create_referral_services_coerces_scalar_to_singleton_list():
     """Same json-enc 1-checkbox-collapses-to-scalar story as `desired_times`
     — the shared `_scalar_to_list` BeforeValidator handles it."""
-    p = post_create_adapter.validate_python(referral_payload(services="evaluation"))
-    assert p.services == ["evaluation"]
+    p = post_create_adapter.validate_python(
+        referral_payload(services="medication_management")
+    )
+    assert p.services == ["medication_management"]
 
 
 def test_post_create_referral_services_rejects_unknown_token():
@@ -637,9 +638,9 @@ def test_post_create_referral_services_rejects_unknown_token():
 
 def test_post_update_referral_services_coerces_scalar_to_singleton_list():
     p = post_update_adapter.validate_python(
-        {"kind": "referral", "services": "evaluation"}
+        {"kind": "referral", "services": "medication_management"}
     )
-    assert p.services == ["evaluation"]
+    assert p.services == ["medication_management"]
 
 
 def test_post_update_referral_services_accepts_empty_list():
@@ -660,3 +661,50 @@ def test_post_update_referral_services_rejects_unknown_token():
 # `ClientAgeGroup` / `DesiredTime*` — is pinned centrally in
 # `src/domain/models/test_enums.py`, since each `*_LABELS` / `*_ICONS` dict now
 # derives from its `LabeledChoice` class and so can't drift from the value set.
+
+
+# --- New optional referral fields: defaults + accepted shapes ----------
+# Pins the wire defaults for the four fields added in the referral-form
+# additive PR so the "submit with only required fields" case stays valid
+# and persists the right shapes (#1467 PR-B).
+
+
+def test_referral_pronouns_defaults_empty():
+    p = post_create_adapter.validate_python(referral_payload())
+    assert p.pronouns == []
+
+
+def test_referral_sliding_scale_defaults_false():
+    p = post_create_adapter.validate_python(referral_payload())
+    assert p.sliding_scale is False
+
+
+def test_referral_in_network_carrier_notes_defaults_none():
+    p = post_create_adapter.validate_python(referral_payload())
+    assert p.in_network_carrier_notes is None
+
+
+def test_referral_services_other_text_defaults_none():
+    p = post_create_adapter.validate_python(referral_payload())
+    assert p.services_other_text is None
+
+
+def test_session_format_accepts_contact_to_discuss():
+    p = post_create_adapter.validate_python(
+        referral_payload(session_format=["contact_to_discuss"])
+    )
+    assert p.session_format == ["contact_to_discuss"]
+
+
+def test_referral_pronouns_accepts_list():
+    p = post_create_adapter.validate_python(
+        referral_payload(pronouns=["she_her", "they_them"])
+    )
+    assert p.pronouns == ["she_her", "they_them"]
+
+
+def test_referral_services_accepts_new_vocab():
+    p = post_create_adapter.validate_python(
+        referral_payload(services=["therapy_individual"])
+    )
+    assert p.services == ["therapy_individual"]

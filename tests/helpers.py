@@ -76,6 +76,10 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "languages": ["en"],
     "description": "needs placement",
     "services": [],
+    "services_other_text": None,
+    "pronouns": [],
+    "sliding_scale": False,
+    "in_network_carrier_notes": None,
     # Payment paths — independent booleans + a carrier list. Default
     # emulates the most common corpus shape ("in-network preferred,
     # Aetna patient") so existing tests that don't override get a

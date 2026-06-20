@@ -10,14 +10,15 @@ Used by both `posts/new_referral.html` (create, no prefill) and
     omit it so `actions(...)` defaults to "Save changes".
   - `post`: the persisted Post (for edit) or `None` (for create)
 
-Section order — ordered to match how a referring clinician actually
-thinks about the form:
+Section order — follows the spec's referrer mental flow: structure
+only the limiting answers (state, format, service type, coverage);
+keep preferences open text:
 
-  1. Referring as — affiliation picker; establishes who is referring
-  2. Where & when — location + session format
-  3. Client basics — narrative description, age, languages
-  4. Provider sought — services
-  5. Client's coverage — payment-path booleans + carrier list
+  (Referring as — affiliation picker, before any section)
+  1. Logistics — state, session format, city
+  2. Service type — services multi-select + "Other" free-text
+  3. About the client — age, pronouns, languages, narrative
+  4. Coverage — payment-path booleans + carrier notes
 
 `subject` is NOT a form field — it's derived in the view layer
 (`post_feed_headline` in `domain/logic/posts/view.py`) from
@@ -27,30 +28,17 @@ overwhelming corpus default.
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected
    into the render context by `mount_create` on a validation-failure
-   re-render (see `POST_ENTITY.form_error_render` + the docstring
-   at the top of `_shared/form_fields.html`). No per-field error or
-   value threading is required at the callsite below. #}
+   re-render. #}
 {%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section, checkbox_field with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro referral_form(hx_method, action, submit_label=none, post=None, schema=None, cancel_url=None) -%}
   {%- set d = post.referral_detail if post else None -%}
-  {# `error_swap=True` lights up the response-targets attrs that swap a
-     422 validation re-render in place; success path is unaffected
-     because `mount_create` emits `HX-Redirect`. #}
   {%- call entity_form(action, method=hx_method, error_swap=True) -%}
     <input type="hidden" name="kind" value="referral" />
     {# Referring clinician picker — required; populated from the current
-       user's owned clinicians' affiliations. Each option value is the
-       *affiliation* id; the label is **person first, org as
-       disambiguator when present** — "Jane Smith" for a solo clinician
-       whose affiliation has `org_id` NULL, "Jane Smith · Acme
-       Counseling" when the affiliation points at an org. The server
-       derives `referring_clinician_id` from the chosen affiliation
-       (`_resolve_affiliation_context`), so a clinician with two
-       affiliations produces two distinct options instead of collapsing
-       both onto the same clinician id. Mirrors the PA form's practice
-       picker. #}
+       user's owned clinicians' affiliations. Mirrors the PA form's
+       practice picker. #}
     {%- set _practices = namespace(opts=[]) -%}
     {%- for c in current_user.clinicians -%}
       {%- set _name = (c.first_name ~ " " ~ c.last_name)|trim -%}
@@ -60,40 +48,38 @@ overwhelming corpus default.
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Referring as", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {% call form_section("Where & when") %}
+    {% call form_section("Logistics") %}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
-      {# Session-format is a multi-checkbox on the wire — any subset
-         of {in_person, virtual}. Empty selection = "unspecified". #}
+      {# Session-format is a multi-checkbox — any subset of
+         {in_person, virtual, contact_to_discuss}. Empty = "unspecified". #}
       {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
       {{ text_field("location_city", "City", current=d.location_city if d else None, help="Only used for in-person sessions.") }}
     {% endcall %}
-    {% call form_section("Client basics") %}
-      {{ textarea_field("description", "About the client", current=d.description if d else None, help="What another clinician needs to know to decide if they can help. Please don't include identifying details.") }}
-      {# A referral describes one client, so age is a single value.
-         The wire shape stays `age_groups: list[str]` (the schema's
-         `scalar_to_list` BeforeValidator wraps a scalar into a
-         one-element list); the form just renders a single `<select>`
-         instead of multi. `current=d.age_groups[0]` reads the first
-         (and only) persisted value for edit. #}
-      {{ select_field("age_groups", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=(d.age_groups[0] if d and d.age_groups else None) , placeholder=true) }}
-      {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
-    {% endcall %}
-    {% call form_section("Provider sought") %}
+    {% call form_section("Service type") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
+      {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false, help="Only if you picked 'Other' above.") }}
+    {% endcall %}
+    {% call form_section("About the client") %}
+      {# A referral describes one client, so age is a single value.
+         The wire shape stays `age_groups: list[str]`; the form renders
+         a single `<select>`. #}
+      {{ select_field("age_groups", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=(d.age_groups[0] if d and d.age_groups else None) , placeholder=true) }}
+      {{ multi_select_field("pronouns", "Pronouns", PRONOUNS, labels=PRONOUNS_LABELS, current=d.pronouns if d else None, required=false) }}
+      {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
+      {{ textarea_field("description", "Narrative", current=d.description if d else None, help="The client's story, what you're hoping for in treatment, and what would make a provider a good fit. Please don't include identifying details.") }}
     {% endcall %}
     {# Coverage — the accept-path booleans are independent (a referral
      may accept any subset). Help text up front sells "and", not "or",
-     so the visual stack of checkboxes doesn't suggest exclusivity. The
-     carrier multi-select is always rendered (no conditional show/hide):
-     leaving it empty is the natural shape whether or not in-network is
-     checked. #}
-    {% call form_section("Client's coverage") %}
+     so the visual stack of checkboxes doesn't suggest exclusivity. #}
+    {% call form_section("Coverage") %}
       <p>
         <small>How can this client pay? Select all that apply — they're independent.</small>
       </p>
       {{ checkbox_field("accepts_in_network", "In-network — bill the client's carrier", current=(d.accepts_in_network if d else False) ) }}
+      {{ text_field("in_network_carrier_notes", "In-network carrier notes", current=d.in_network_carrier_notes if d else None, required=false, help="Name the carrier(s) the patient has, if known.") }}
       {{ checkbox_field("accepts_private_pay", "Private pay (out of pocket)", current=(d.accepts_private_pay if d else False) ) }}
-      {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="Only relevant when in-network is checked. Leave empty for any / TBD.") }}
+      {{ checkbox_field("sliding_scale", "Sliding scale", current=(d.sliding_scale if d else False) ) }}
+      {{ multi_select_field("insurance_carriers", "Insurance carriers (controlled vocab)", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="Optional — pick from the closed list if the carrier is on it. Free-text notes above cover everything else.") }}
     {% endcall %}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   {%- endcall -%}

@@ -20,7 +20,7 @@
 {% macro program_facts(program) -%}
   {%- if program.services %}
     {%- set _svc = [] -%}
-    {%- for s in program.services -%}{%- set _ = _svc.append(REFERRAL_SERVICE_LABELS[s]) -%}{%- endfor -%}
+    {%- for s in program.services -%}{%- set _ = _svc.append(OPENING_SERVICE_LABELS[s]) -%}{%- endfor -%}
       {{ fact('services', 'Services', _svc | join(", ") ) }}
     {%- endif %}
     {%- if program.settings %}
