@@ -470,6 +470,12 @@ async def test_referral_create_form_error_render_is_wired(
     group_start = response.text.index('id="age_groups"')
     age_block = response.text[max(0, group_start - 200) : group_start + 200]
     assert 'aria-invalid="true"' in age_block, age_block
+    # The form re-render now carries a form-level summary banner at the
+    # top (via the `form_with_errors` wrapper + `mount_create`'s 422
+    # path), so a failed submit is announced near the top of the form
+    # instead of only on fields scrolled off-screen above the button.
+    assert 'class="form-banner" role="alert"' in response.text
+    assert "Please fix the highlighted fields" in response.text
     assert "<!DOCTYPE" not in response.text
     assert "<html" not in response.text
     assert "Bedlam Connect" not in response.text

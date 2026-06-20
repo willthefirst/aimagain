@@ -14,9 +14,16 @@
    `mount_update` swaps the form fragment in place — the form re-renders
    with `form_errors` / `form_values` populated. Without it, the htmx
    default handler ignores the 4xx body and the user sees a blank-form
-   surface on a failed submit. The polymorphic post forms opt in;
-   today's entity edit forms (org / clinician / program) do not — that's
-   a known asymmetry, not load-bearing on this wrapper.
+   surface on a failed submit.
+
+   Prefer `_shared/form_meta.html::form_with_errors` for new opted-in
+   forms: it bakes in the same four hx-* attrs PLUS the
+   `{{ form_banner() }}` summary slot, so a failed submit also shows a
+   form-level alert (see `form_meta.html`). The create forms (entity +
+   the polymorphic post forms) use `form_with_errors`; `entity_form`'s
+   `error_swap` remains for edit forms and callers that don't want the
+   banner. Today's entity edit forms (org / clinician / program) don't
+   opt into error_swap at all — a known asymmetry, not load-bearing here.
 
    Used by every top-level entity create/edit form, including
    sub-resource add forms on the clinician credential list pages
