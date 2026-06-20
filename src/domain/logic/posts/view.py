@@ -372,7 +372,9 @@ def post_card_view(post) -> dict[str, Any]:
         "accepts_out_of_network": None,
         "pronouns": [],
         "services_other_text": None,
-        "in_network_carrier_notes": None,
+        "insurance_carriers_other_text": None,
+        "languages_other_text": None,
+        "pronouns_other_text": None,
     }
 
     if kind == "referral":
@@ -454,10 +456,14 @@ def post_card_view(post) -> dict[str, Any]:
             accepts_in_network=getattr(d, "accepts_in_network", None),
             accepts_private_pay=getattr(d, "accepts_private_pay", None),
             sliding_scale=getattr(d, "sliding_scale", None),
-            in_network_carrier_notes=getattr(d, "in_network_carrier_notes", None),
+            insurance_carriers_other_text=getattr(
+                d, "insurance_carriers_other_text", None
+            ),
             insurance_carriers=list(getattr(d, "insurance_carriers", None) or []),
             pronouns=list(getattr(d, "pronouns", None) or []),
             services_other_text=getattr(d, "services_other_text", None),
+            languages_other_text=getattr(d, "languages_other_text", None),
+            pronouns_other_text=getattr(d, "pronouns_other_text", None),
         )
         return base
 

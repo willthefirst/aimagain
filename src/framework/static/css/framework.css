@@ -252,6 +252,15 @@ dd { margin: 0; }
 .entity-form-page form .form-field > input,
 .entity-form-page form .form-field > select,
 .entity-form-page form .form-field > textarea { margin: 0; min-width: 0; }
+/* Conditional-reveal wrapper (emitted by the `conditional_field` macro
+   in `_shared/form_fields.html`). Hidden by default; a per-token
+   `:has()` rule reveals it when its trigger control is checked. The
+   reveal rules are domain-specific (they reference real field names +
+   values) and live in `domain.css`; this base rule is the generic
+   "hidden until revealed" half. No JS — pure CSS reveal scoped to the
+   enclosing `<form>`. */
+.conditional-field[data-reveal-when] { display: none; }
+.conditional-field[data-reveal-when] > .form-field { margin: 0; }
 /* `.checkbox-list` is the shared primitive for a scrollable list of
    `<label><input type="checkbox">…</label>` options. The max-height
    cap is the whole point: long controlled vocabularies (50 US states,

@@ -29,7 +29,7 @@ overwhelming corpus default.
    `error=`/`current=` from the `form_errors`/`form_values` injected
    into the render context by `mount_create` on a validation-failure
    re-render. #}
-{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section, checkbox_field with context -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, select_field, multi_select_field, composite_select_field, field_for, form_section, checkbox_field, conditional_field with context -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- macro referral_form(hx_method, action, submit_label=none, post=None, schema=None, cancel_url=None) -%}
@@ -53,11 +53,15 @@ overwhelming corpus default.
       {# Session-format is a multi-checkbox — any subset of
          {in_person, virtual}. Empty = "unspecified". #}
       {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
-      {{ text_field("location_city", "City", current=d.location_city if d else None, help="Only used for in-person sessions.") }}
+      {% call conditional_field("session_format:in_person") %}
+        {{ text_field("location_city", "City", current=d.location_city if d else None, required=false, help="City or area for in-person sessions.") }}
+      {% endcall %}
     {% endcall %}
     {% call form_section("Service type") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
-      {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false, help="Only if you picked 'Other' above.") }}
+      {% call conditional_field("services:other") %}
+        {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
+      {% endcall %}
     {% endcall %}
     {% call form_section("About the client") %}
       {# A referral describes one client, so age is a single value.
@@ -65,7 +69,13 @@ overwhelming corpus default.
          a single `<select>`. #}
       {{ select_field("age_groups", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=(d.age_groups[0] if d and d.age_groups else None) , placeholder=true) }}
       {{ multi_select_field("pronouns", "Pronouns", PRONOUNS, labels=PRONOUNS_LABELS, current=d.pronouns if d else None, required=false) }}
+      {% call conditional_field("pronouns:other") %}
+        {{ text_field("pronouns_other_text", "Other pronouns (specify)", current=d.pronouns_other_text if d else None, required=false) }}
+      {% endcall %}
       {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
+      {% call conditional_field("languages:other") %}
+        {{ text_field("languages_other_text", "Other language (specify)", current=d.languages_other_text if d else None, required=false) }}
+      {% endcall %}
       {{ textarea_field("description", "Narrative", current=d.description if d else None, help="The client's story, what you're hoping for in treatment, and what would make a provider a good fit. Please don't include identifying details.") }}
     {% endcall %}
     {# Coverage — the accept-path booleans are independent (a referral
@@ -76,10 +86,14 @@ overwhelming corpus default.
         <small>How can this client pay? Select all that apply — they're independent.</small>
       </p>
       {{ checkbox_field("accepts_in_network", "In-network — bill the client's carrier", current=(d.accepts_in_network if d else False) ) }}
-      {{ text_field("in_network_carrier_notes", "In-network carrier notes", current=d.in_network_carrier_notes if d else None, required=false, help="Name the carrier(s) the patient has, if known.") }}
+      {% call conditional_field("accepts_in_network:true") %}
+        {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="Pick from the closed list — choose “Other” if the carrier isn't on it.") }}
+      {% endcall %}
+      {% call conditional_field("insurance_carriers:other") %}
+        {{ text_field("insurance_carriers_other_text", "Other carrier (specify)", current=d.insurance_carriers_other_text if d else None, required=false, help="Name the carrier — it isn't in the list above.") }}
+      {% endcall %}
       {{ checkbox_field("accepts_private_pay", "Private pay (out of pocket)", current=(d.accepts_private_pay if d else False) ) }}
       {{ checkbox_field("sliding_scale", "Sliding scale", current=(d.sliding_scale if d else False) ) }}
-      {{ multi_select_field("insurance_carriers", "Insurance carriers (controlled vocab)", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="Optional — pick from the closed list if the carrier is on it. Free-text notes above cover everything else.") }}
     {% endcall %}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   {%- endcall -%}

@@ -46,7 +46,7 @@ def _render(env: Environment, body: str) -> str:
     it so tests can stay focused on the macro call under test.
     """
     template = textwrap.dedent(f"""\
-        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, checkbox_field -%}}
+        {{%- from "_shared/form_fields.html" import text_field, textarea_field, url_field, select_field, multi_select_field, entity_select_field, composite_select_field, checkbox_field, conditional_field -%}}
         {body}
         """)
     return env.from_string(template).render()
@@ -564,6 +564,34 @@ def test_checkbox_field_required_false_by_default_shows_no_marker() -> None:
     span = tree.css_first("span.form-field-label")
     assert span is not None
     assert span.css_first("span.form-field-required") is None
+
+
+# --- conditional_field ----------------------------------------------------
+
+
+def test_conditional_field_wraps_caller_in_reveal_div() -> None:
+    """`conditional_field(token)` emits a
+    `<div class="conditional-field" data-reveal-when="<token>">` that
+    wraps its `{% call %}` body. The token is the reveal key the CSS
+    `:has()` rule matches (hidden by default in framework.css, revealed
+    per-token in domain.css for referral fields). No `required` attr is
+    added by the wrapper — requiredness is server-side only."""
+    html = _render(
+        _make_env(),
+        '{% call conditional_field("services:other") %}'
+        '{{ textarea_field("services_other_text", "Other", required=false) }}'
+        "{% endcall %}",
+    )
+    tree = HTMLParser(html)
+    wrapper = tree.css_first("div.conditional-field")
+    assert wrapper is not None
+    assert wrapper.attributes.get("data-reveal-when") == "services:other"
+    # The wrapped field renders inside the div.
+    inner = wrapper.css_first('textarea[name="services_other_text"]')
+    assert inner is not None
+    # The wrapper carries no requiredness of its own; the wrapped field
+    # was rendered with required=false so the textarea has no `required`.
+    assert "required" not in inner.attributes
 
 
 # --- error-state contract (pattern, parametrized over every macro) -------

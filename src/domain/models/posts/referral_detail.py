@@ -55,7 +55,11 @@ class ReferralDetail(Base):
     )
 
     # Section 1 — client location (city + state; no ZIP on referrals)
-    location_city = Column(Text, nullable=False)
+    # `location_city` is nullable: a referral only needs a city for
+    # in-person sessions. The conditional requirement (in-person →
+    # city) is enforced on the wire by `REFERRAL_CONDITIONAL_RULES`
+    # (`posts/conditional_fields.py`), not by a NOT NULL here.
+    location_city = Column(Text, nullable=True)
     location_state = Column(Text, nullable=False)
     # `session_format` is a JSON list — any subset of {in_person, virtual}.
     # Vocabulary check happens on the wire (Pydantic
@@ -73,10 +77,17 @@ class ReferralDetail(Base):
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]
     )
+    # Free-text "Other" branch of `languages` (a language outside the
+    # closed `Language` enum). Mirrors `services_other_text`; nullable.
+    # Conditional-required wiring: `posts/conditional_fields.py`.
+    languages_other_text = Column(Text, nullable=True)
     # Pronouns the client goes by. JSON list of `PRONOUNS` tokens; empty
     # list = "not stated". Vocabulary check on the wire
     # (`Literal[*PRONOUNS]`); no SQL CHECK against JSON array members.
     pronouns = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    # Free-text "Other" branch of `pronouns`. Mirrors
+    # `services_other_text`; nullable. See `posts/conditional_fields.py`.
+    pronouns_other_text = Column(Text, nullable=True)
 
     # Section 3 — subject / description
     subject = Column(Text, nullable=True)
@@ -116,15 +127,15 @@ class ReferralDetail(Base):
     sliding_scale = Column(
         Boolean, nullable=False, server_default=text("0"), default=False
     )
-    # Free-text notes naming the carrier(s) the patient has when
-    # ``accepts_in_network`` is true. Replaces the closed-vocab
-    # ``insurance_carriers`` list — the corpus has too many regional
-    # plans for a closed enum to keep up. Nullable; the form surfaces
-    # it adjacent to the in-network checkbox.
-    in_network_carrier_notes = Column(Text, nullable=True)
+    # Free-text "Other" branch of the `insurance_carriers` multi-select:
+    # names carrier(s) not covered by the closed `InsuranceCarrier` enum.
+    # Mirrors `services_other_text` for `services`. Nullable — an optional
+    # free-text column; the form surfaces it adjacent to the carrier picker.
+    # Conditional-required wiring lands in a follow-up PR.
+    insurance_carriers_other_text = Column(Text, nullable=True)
     # JSON array of `InsuranceCarrier` tokens; empty array means "no
     # carrier specified" (the typical shape when only private-pay is
-    # accepted). Kept alongside `in_network_carrier_notes` for the
+    # accepted). Kept alongside `insurance_carriers_other_text` for the
     # subset of carriers we *do* model as an enum.
     insurance_carriers = Column(
         JSON, nullable=False, server_default=text("'[]'"), default=list
