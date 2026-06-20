@@ -60,10 +60,11 @@ overwhelming corpus default.
       {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false, help="Only if you picked 'Other' above.") }}
     {% endcall %}
     {% call form_section("About the client") %}
-      {# A referral describes one client, so age is a single value.
-         The wire shape stays `age_groups: list[str]`; the form renders
-         a single `<select>`. #}
-      {{ select_field("age_groups", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=(d.age_groups[0] if d and d.age_groups else None) , placeholder=true) }}
+      {# A referral describes one client, so age is a single value — the
+         options use the singular noun ("Child", not "Children"). The wire
+         shape stays `age_groups: list[str]`; the form renders a single
+         `<select>`. #}
+      {{ select_field("age_groups", "Age group", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS_SINGULAR, current=(d.age_groups[0] if d and d.age_groups else None) , placeholder=true) }}
       {{ multi_select_field("pronouns", "Pronouns", PRONOUNS, labels=PRONOUNS_LABELS, current=d.pronouns if d else None, required=false) }}
       {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
       {{ textarea_field("description", "Narrative", current=d.description if d else None, help="The client's story, what you're hoping for in treatment, and what would make a provider a good fit. Please don't include identifying details.") }}

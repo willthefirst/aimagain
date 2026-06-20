@@ -28,6 +28,7 @@ from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Clinician, Organization, Post, Program
+from src.domain.models.enums import CLIENT_AGE_GROUP_LABELS_SINGULAR
 from src.domain.models.org_representations.org_representation import OrgRepresentation
 from tests.helpers import (
     create_test_user,
@@ -679,6 +680,34 @@ async def test_referral_form_uses_client_oriented_section_labels(
     assert (
         tree.css_first('input[name="accepts_in_network"]') is not None
     ), "renaming the section must not drop the accepts_in_network field"
+
+
+async def test_referral_form_age_group_options_are_singular(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A referral describes ONE client, so the age-group `<select>` names
+    a single person: its options are the vocabulary's singular labels
+    ("Child (0–5)"), not the plural listing form used by the multi-valued
+    program/affiliation/search vocabularies. Pins the singular-label wiring
+    in `_form_referral.html` against the vocabulary as the source of truth."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    select = HTMLParser(response.text).css_first('select[name="age_groups"]')
+    assert select is not None, "referral form must render an age_groups <select>"
+    # Real options carry a value; the leading placeholder (`value=""`) doesn't.
+    option_texts = {
+        opt.text().strip()
+        for opt in select.css("option")
+        if opt.attributes.get("value")
+    }
+    assert option_texts == set(CLIENT_AGE_GROUP_LABELS_SINGULAR.values())
 
 
 async def test_opening_create_form_renders_practice_profile_preview(
