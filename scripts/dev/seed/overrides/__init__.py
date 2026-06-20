@@ -54,6 +54,7 @@ from . import (  # noqa: E402,F401
     organizations,
     posts,
     programs,
+    saved_searches,
     users,
     verifications,
 )
