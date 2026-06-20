@@ -7,8 +7,9 @@ a test failure here rather than as a code-review note.
 The rules pinned (see [`./README.md` § "Copy style guide"](README.md)
 for the full statement of each):
 
-  1. `help="Optional."` is forbidden — the `(optional)` indicator
-     rendered by `_field_label` is the single canonical signal.
+  1. `help="Optional."` is forbidden — optionality is signaled by the
+     *absence* of the required `*` marker rendered by `_field_label`,
+     never by prose.
   2. `help="Optional. ..."` (period-as-prose-prefix) is forbidden for
      the same reason.
   3. The app-internal abbreviation `Org` is forbidden in user-facing
@@ -44,13 +45,14 @@ def _all_template_files() -> list[Path]:
     [
         (
             r'help=["\']Optional\.?["\']',
-            'help="Optional." duplicates the (optional) indicator',
+            'help="Optional." restates optionality already signaled by the '
+            "absence of the required `*` marker",
         ),
         (
             r'help=["\']Optional\.\s',
-            'help="Optional. ..." duplicates the (optional) indicator — '
-            "use `required=False` and put the explanation in help= without "
-            'the "Optional." prefix',
+            'help="Optional. ..." restates optionality already signaled by '
+            "the absence of the required `*` marker — use `required=False` "
+            'and put the explanation in help= without the "Optional." prefix',
         ),
         (
             r"\(root — no parent\)",
