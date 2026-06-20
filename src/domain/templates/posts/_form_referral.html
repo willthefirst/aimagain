@@ -51,7 +51,7 @@ overwhelming corpus default.
     {% call form_section("Logistics") %}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
       {# Session-format is a multi-checkbox — any subset of
-         {in_person, virtual, contact_to_discuss}. Empty = "unspecified". #}
+         {in_person, virtual}. Empty = "unspecified". #}
       {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
       {{ text_field("location_city", "City", current=d.location_city if d else None, help="Only used for in-person sessions.") }}
     {% endcall %}

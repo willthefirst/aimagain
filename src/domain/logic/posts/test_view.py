@@ -58,14 +58,14 @@ def test_cr_posture_prefers_in_network():
     assert insurance_posture_for_post(post_with_carrier) == "in_network"
 
 
-def test_cr_posture_falls_back_to_private_pay_then_contact():
-    """Priority order: in-network > private-pay > please_contact
-    (none set). The OON-superbill branch was removed when the
-    superbill column was dropped from the referral schema."""
+def test_cr_posture_falls_back_to_private_pay_then_none():
+    """Priority order: in-network > private-pay > None (none set). The
+    OON-superbill branch was removed when the superbill column was
+    dropped from the referral schema."""
     assert insurance_posture_for_post(_cr_post(accepts_private_pay=True)) == "self_pay"
-    # Both booleans false → the referral states no preference;
-    # the row macro surfaces the "Contact" glyph.
-    assert insurance_posture_for_post(_cr_post()) == "please_contact"
+    # Both booleans false → the referral states no preference; the
+    # helper returns None and the row/facts macros omit the chunk.
+    assert insurance_posture_for_post(_cr_post()) is None
 
 
 def test_pa_posture_prefers_in_network_when_set():
@@ -79,16 +79,16 @@ def test_pa_posture_prefers_in_network_when_set():
     assert insurance_posture_for_post(post) == "in_network"
 
 
-def test_pa_posture_falls_back_to_oon_then_self_pay_then_contact():
+def test_pa_posture_falls_back_to_oon_then_self_pay_then_none():
     assert (
         insurance_posture_for_post(_pa_post(accepts_out_of_network=True))
         == "out_of_network"
     )
     assert insurance_posture_for_post(_pa_post(sliding_scale=True)) == "self_pay"
     assert insurance_posture_for_post(_pa_post(cost="$150/session")) == "self_pay"
-    # No flags set at all → the post offers no insurance signal; the row
-    # macro renders the help glyph so the reader knows to ask.
-    assert insurance_posture_for_post(_pa_post()) == "please_contact"
+    # No flags set at all → the post offers no insurance signal; the
+    # helper returns None and the facts macro omits the chunk.
+    assert insurance_posture_for_post(_pa_post()) is None
 
 
 def test_posture_returns_none_for_unknown_kind():
@@ -240,7 +240,7 @@ _PA_AFFILIATION_PROFILE_DEFAULTS = dict(
     location_state="NY",
     location_zip="11201",
     in_person_sessions="yes",
-    virtual_sessions="please_contact",
+    virtual_sessions="yes",
     in_network_carriers=["aetna"],
     accepts_out_of_network=False,
     sliding_scale=True,
@@ -1167,7 +1167,7 @@ def test_opening_practice_facts_come_from_its_affiliation_not_clinician_proxy():
     assert v["location_chunk"] == {"city": "Brooklyn", "state": "NY", "zip": "11201"}
     assert v["full_address"] == "Brooklyn, NY 11201"
     assert v["in_person"] == "yes"
-    assert v["virtual"] == "please_contact"
+    assert v["virtual"] == "yes"
     assert insurance_posture_for_post(post) == "in_network"
 
 

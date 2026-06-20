@@ -14,7 +14,7 @@ from src.domain.models import enums as e
 # Frozen expected storage values per migrated vocabulary. Editing a value here
 # is a schema change — it must come with an Alembic migration.
 MIGRATED_VALUES = {
-    e.LocationAvailability: ("yes", "no", "please_contact"),
+    e.LocationAvailability: ("yes", "no"),
     e.Language: ("en", "es", "zh", "yue", "vi", "tl", "ko", "ru"),
     e.InsuranceCarrier: (
         "aetna",
@@ -56,15 +56,11 @@ MIGRATED_VALUES = {
     e.SessionFormat: (
         "in_person",
         "virtual",
-        "contact_to_discuss",
     ),
     e.Pronouns: (
         "she_her",
         "he_him",
         "they_them",
-        "she_they",
-        "he_they",
-        "prefer_not_to_say",
     ),
     e.Gender: (
         "female",
@@ -73,7 +69,6 @@ MIGRATED_VALUES = {
         "trans_female",
         "trans_male",
         "gender_diverse",
-        "prefer_not_to_say",
     ),
     e.TreatmentSetting: (
         "outpatient",
@@ -99,7 +94,6 @@ MIGRATED_VALUES = {
         "in_network",
         "out_of_network",
         "self_pay",
-        "please_contact",
     ),
     e.LicenseType: (
         "lcsw",

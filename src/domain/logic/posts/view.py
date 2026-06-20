@@ -1,27 +1,28 @@
 """View helpers for posts — pure functions consumed by templates.
 
 The listing row in `src/domain/templates/posts/_item.html` needs a single
-4-state "insurance posture" axis to render as one icon badge. The two
+3-state "insurance posture" axis to render as one icon badge. The two
 kinds model the underlying data with parallel shapes:
 
   * `referral` — two independent payment-path booleans
     (`accepts_in_network` / `accepts_private_pay`) plus an
     `insurance_carriers` JSON list of `INSURANCE_CARRIERS` tokens.
     The posture is derived from the booleans in priority order:
-    in-network → private-pay → please_contact (none set).
+    in-network → private-pay → `None` (no signal set).
   * `opening` → linked `ClinicianAffiliation` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
 
 `insurance_posture_for_post(post)` collapses both shapes to a value
-from `INSURANCE_POSTURES` (see `src/domain/models/enums.py`). The
+from `INSURANCE_POSTURES` (see `src/domain/models/enums.py`), or `None`
+when no payment signal is set. The
 ordering of branches is the priority the row should show: if a
 clinician accepts in-network plans, that's the posture, even if they
 also offer sliding scale — the in-network signal is louder.
 
 `referral_headline(detail)` composes the CR card's headline text from
 `age_groups[0]` and `pronouns` — e.g. "Adult she/her (25–64)", or
-"Adult (25–64)" when pronouns is empty / `prefer_not_to_say`. CR posts
+"Adult (25–64)" when pronouns is empty. CR posts
 describe one client, so the first age group is the client's age (the
 schema still allows multi for forward-compat but only the first drives
 the title).
@@ -94,8 +95,10 @@ def _virtual_from_session_format(session_format) -> str | None:
 def insurance_posture_for_post(post) -> str | None:
     """Map a `Post` (either kind) to one of `INSURANCE_POSTURES`.
 
-    Returns `None` only when the post has no detail row (shouldn't
-    happen for persisted posts, but the row template tolerates it).
+    Returns `None` when the post has no detail row (shouldn't happen
+    for persisted posts, but the row template tolerates it) or when no
+    payment signal is set — the row/facts macros omit the chunk in
+    both cases.
     """
     kind = getattr(post, "kind", None)
     if kind == "referral":
@@ -103,14 +106,14 @@ def insurance_posture_for_post(post) -> str | None:
         if detail is None:
             return None
         # Map the payment-path booleans to the unified posture vocab in
-        # priority order: in-network > private-pay > please_contact
-        # (none set). Priority matches the provider-side collapse
-        # below — in-network is the loudest signal.
+        # priority order: in-network > private-pay > None (no signal
+        # set). Priority matches the provider-side collapse below —
+        # in-network is the loudest signal.
         if getattr(detail, "accepts_in_network", False):
             return "in_network"
         if getattr(detail, "accepts_private_pay", False):
             return "self_pay"
-        return "please_contact"
+        return None
     if kind == "clinician_opening":
         detail = getattr(post, "opening_detail", None)
         affiliation = (
@@ -128,7 +131,7 @@ def insurance_posture_for_post(post) -> str | None:
             affiliation, "cost", None
         ):
             return "self_pay"
-        return "please_contact"
+        return None
     if kind == "program_intake":
         # Program-availability has no insurance posture today — insurance
         # is modeled on the Clinician (who delivers care) and on the
@@ -589,8 +592,7 @@ def referral_headline(detail) -> str:
     Format: `"<Age noun> [<pronouns>] (<range>)"` — e.g.
     `"Adult she/her (25–64)"`, `"Adolescent (14–18)"` when no pronouns
     are stated, or `"Adult she/her, they/them (25–64)"` when multiple.
-    Pronouns are capped at the first two to bound headline length;
-    `prefer_not_to_say` is treated as "not stated" and drops the slot.
+    Pronouns are capped at the first two to bound headline length.
     The age comes from `age_groups[0]` since a CR post describes one
     client; the schema still allows multi but the headline picks the
     first value.
@@ -603,9 +605,7 @@ def referral_headline(detail) -> str:
     if not age_groups:
         return "Client Referral"
     age = CLIENT_AGE_GROUPS_BY_KEY[age_groups[0]]
-    pronouns = [
-        p for p in (getattr(detail, "pronouns", None) or []) if p != "prefer_not_to_say"
-    ]
+    pronouns = list(getattr(detail, "pronouns", None) or [])
     if pronouns:
         pronoun_str = ", ".join(PRONOUNS_LABELS.get(p, p) for p in pronouns[:2])
         return f"{age.singular} {pronoun_str} ({age.range})"

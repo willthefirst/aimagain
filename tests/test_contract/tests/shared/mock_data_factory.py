@@ -57,12 +57,11 @@ _DETAIL_MODELS: dict[str, type] = {
 
 # Per-kind defaults for Text columns that hold enum values
 # (CHECK-constrained to a vocabulary in `src.domain.models.enums`).
-# Without these, columns like `gender` would default to `"stub gender"`
-# — a string the detail template's display-label lookup
-# (`GENDER_LABELS["stub gender"]`) can't resolve, which crashes the
-# render. Values chosen here are *valid* enum members, picked for
-# neutrality where possible (`gender = "prefer_not_to_say"` rather
-# than the alphabetical first option).
+# Without these, an enum-typed Text column like `location_state` would
+# default to a stub string the detail template's display-label lookup
+# can't resolve, which crashes the render. Values chosen here are
+# *valid* enum members, picked for neutrality where possible rather
+# than the alphabetical first option.
 #
 # An empty dict for a kind means "no enum-typed Text columns on this
 # detail row" — PA and intake hold their enum values
@@ -385,7 +384,7 @@ class MockDataFactory:
             location_state="NY",
             location_zip="11201",
             in_person_sessions="yes",
-            virtual_sessions="please_contact",
+            virtual_sessions="no",
             # Insurance posture on Clinician: empty carrier list (no
             # in-network) + OON off keeps this stub deterministic.
             accepts_out_of_network=False,
