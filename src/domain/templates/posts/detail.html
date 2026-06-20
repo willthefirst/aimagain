@@ -83,9 +83,9 @@
    owner-context card (the referring clinician + affiliation —
    `referral_detail.referring_clinician_id` / `clinician_affiliation_id`,
    #1454). Opening/intake detail splits the same two ways: the post's
-   own facts (the announcement delta — desired times, schedule notes,
-   modality) up top, then the owner-context card. Per-kind logic lives
-   in `post_card_view` (one place); every visual element reads from
+   own facts (the announcement delta — schedule notes, modality) up
+   top, then the owner-context card. Per-kind logic lives in
+   `post_card_view` (one place); every visual element reads from
    `view` (plus the linked affiliation/program model rows the shared
    facts macros render directly). #}
       {% block content %}
@@ -95,25 +95,20 @@
             {{ facts_block(view, expanded=True, redacted=not can_act_as_provider) }}
             {{ owner_context(view, post, redacted=not can_act_as_provider) }}
           {%- else %}
-            {%- if view.desired_times or view.schedule_text or view.treatment_modality %}
+            {%- if view.schedule_text or view.treatment_modality %}
               {%- call entity_facts() %}
-                {%- if view.desired_times %}
-                  {%- set times = [] -%}
-                  {%- for slot in view.desired_times -%}{%- set _ = times.append(DESIRED_TIME_SLOT_LABELS[slot]) -%}{%- endfor -%}
-                    {{ fact('desired_times', 'Desired times', times | join(", ") ) }}
-                  {%- endif %}
-                  {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
-                    {%- if view.treatment_modality %}{{ fact('modality', 'Modality', view.treatment_modality, icon='brain') }}{%- endif %}
-                    {%- endcall %}
-                  {%- endif %}
-                  {{ owner_context(view, post, redacted=not can_act_as_provider) }}
+                {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
+                  {%- if view.treatment_modality %}{{ fact('modality', 'Modality', view.treatment_modality, icon='brain') }}{%- endif %}
+                  {%- endcall %}
                 {%- endif %}
-                <footer>
-                  {% if can_act_as_provider %}
-                    {% include "posts/_shared/_message_form.html" %}
-                  {% else %}
-                    {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
-                  {% endif %}
-                </footer>
-              </section>
-            {% endblock %}
+                {{ owner_context(view, post, redacted=not can_act_as_provider) }}
+              {%- endif %}
+              <footer>
+                {% if can_act_as_provider %}
+                  {% include "posts/_shared/_message_form.html" %}
+                {% else %}
+                  {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
+                {% endif %}
+              </footer>
+            </section>
+          {% endblock %}

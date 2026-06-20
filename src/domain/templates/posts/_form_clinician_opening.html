@@ -111,7 +111,6 @@ Field order:
         {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
       {% endcall %}
       {% call form_section("Availability") %}
-        {{ multi_select_field("desired_times", "Desired times", DESIRED_TIME_SLOTS, labels=DESIRED_TIME_SLOT_LABELS, current=d.desired_times if d else None, required=false) }}
         {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
       {% endcall %}
       {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
