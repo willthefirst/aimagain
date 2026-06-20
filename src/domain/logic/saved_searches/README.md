@@ -4,9 +4,14 @@ Per-user, CRUD-able named filtered views of the post directory. Owned subentity 
 
 ## Files
 
-- `schema.py` — `SavedSearchCreate` / `SavedSearchUpdate` / `SavedSearchRead`. A saved search is `name` + a `filters` dict (the persisted `filter_values` shape). Filter-vocabulary validation against the live `POST_ENTITY.filters` names is **not** here yet — PR1 round-trips any JSON object; the capture/round-trip PR adds it alongside the URL helpers that consume the dict.
+- `schema.py` — `SavedSearchCreate` / `SavedSearchUpdate` / `SavedSearchRead`. A saved search is `name` + a `filters` dict (the persisted `filter_values` shape). `filters` accepts a real JSON object *or* a JSON string (the posts-page "Save this search" hidden field), then **drops keys that aren't currently-declared `/posts` filters** — the durability contract (a renamed/removed post filter degrades to "ignore that dimension", never a load failure). Values pass through; `/posts` validates them on use.
 - `repository.py` — `SavedSearchRepository`, a thin `BaseRepository` shell. The owner-scoped listing reuses `BaseRepository.list_owned_by(SavedSearch, user_id, owner_attr="user_id")`.
 - `handlers.py` — `handle_list_saved_searches`, the **only** bespoke verb. The other CRUD verbs are framework-generic.
+- `urls.py` — `posts_url_for_filters(filters)`, the "open" half of the round-trip: renders the stored dict back into a `/posts?…` URL. Registered as a Jinja global in [`../../template_globals.py`](../../template_globals.py); the saved-search list card headline uses it. Serialization mirrors the active-filter query-string builder in `framework/dispatch/mounts/list_.py`.
+
+## The round-trip
+
+`/posts` filter form → `filter_values` dict → **capture** ("Save this search" on `posts/list.html`, hidden `filters` JSON) → stored dict → **open** (`posts_url_for_filters`) → `/posts?…`. The dict is canonical; the URL is derived at both ends, so URL-syntax changes never touch stored rows.
 
 ## Why only the list verb is bespoke
 

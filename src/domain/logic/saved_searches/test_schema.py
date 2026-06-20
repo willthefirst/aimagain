@@ -32,6 +32,37 @@ def test_create_keeps_structured_filters():
     assert payload.filters == {"kind": "clinician_opening", "state": ["CA"]}
 
 
+def test_create_parses_json_string_filters():
+    """The posts-page "Save this search" form submits `filters` as a
+    JSON string in a hidden field; the coercer parses it to a dict."""
+    payload = SavedSearchCreate(
+        name="From form", filters='{"kind": "referral", "state": ["NY"]}'
+    )
+    assert payload.filters == {"kind": "referral", "state": ["NY"]}
+
+
+def test_create_drops_unknown_filter_keys():
+    """Keys that aren't currently-declared `/posts` filters are dropped
+    (the durability contract — a renamed/removed filter degrades to
+    "ignore that dimension", not a 422)."""
+    payload = SavedSearchCreate(
+        name="Has cruft", filters={"kind": "referral", "not_a_filter": "x"}
+    )
+    assert payload.filters == {"kind": "referral"}
+
+
+def test_create_rejects_non_object_filters():
+    with pytest.raises(ValidationError):
+        SavedSearchCreate(name="x", filters="not json")
+    with pytest.raises(ValidationError):
+        SavedSearchCreate(name="x", filters="[1, 2, 3]")
+
+
+def test_update_scopes_filters_too():
+    payload = SavedSearchUpdate(filters={"kind": "referral", "bogus": 1})
+    assert payload.filters == {"kind": "referral"}
+
+
 def test_create_requires_non_empty_name():
     with pytest.raises(ValidationError):
         SavedSearchCreate(name="")
