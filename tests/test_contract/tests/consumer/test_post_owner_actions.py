@@ -17,7 +17,6 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CONSUMER_NAME_POST_OWNER_ACTIONS,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_POST_DELETE,
     POST_DELETE_API_PATH,
     POST_DETAIL_PAGE_PATH,
     PROVIDER_NAME_POSTS,
@@ -41,7 +40,6 @@ async def test_consumer_delete_button_click(origin_with_routes: str, page: Page)
     pact = setup_pact(
         CONSUMER_NAME_POST_OWNER_ACTIONS,
         PROVIDER_NAME_POSTS,
-        port=PACT_PORT_POST_DELETE,
     )
     mock_server_uri = pact.uri
     detail_page_url = f"{origin_with_routes}{POST_DETAIL_PAGE_PATH}"

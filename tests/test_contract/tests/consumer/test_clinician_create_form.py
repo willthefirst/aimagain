@@ -23,7 +23,6 @@ from tests.test_contract.constants import (
     CLINICIAN_STATE_USER_CAN_CREATE_CLINICIAN,
     CONSUMER_NAME_CLINICIAN_CREATE_FORM,
     NETWORK_TIMEOUT_MS,
-    PACT_PORT_CLINICIAN_CREATE,
 )
 from tests.test_contract.tests.shared.helpers import (
     setup_pact,
@@ -46,7 +45,6 @@ async def test_consumer_clinician_create_form_submits(
     pact = setup_pact(
         CONSUMER_NAME_CLINICIAN_CREATE_FORM,
         CLINICIAN_NAME_CLINICIANS,
-        port=PACT_PORT_CLINICIAN_CREATE,
     )
     mock_server_uri = pact.uri
     form_page_url = f"{origin_with_routes}{CLINICIAN_CREATE_FORM_PAGE_PATH}"

@@ -19,16 +19,13 @@ from playwright.async_api import async_playwright
 from yarl import URL
 
 from .infrastructure.config import (
-    CONSUMER_BASE_URL,
     CONSUMER_HOST,
-    CONSUMER_PORT,
     KNOWN_PROVIDER_STATES,
     PACT_DIR,
-    PROVIDER_BASE_URL,
     PROVIDER_HOST,
-    PROVIDER_PORT,
     PROVIDER_STATE_SETUP_ENDPOINT_PATH,
 )
+from .infrastructure.ports import find_free_port
 from .infrastructure.servers.consumer import ConsumerServerConfig, ConsumerServerManager
 from .infrastructure.servers.provider import ProviderServerManager, ProviderStateHandler
 
@@ -46,10 +43,10 @@ def origin_with_routes(request) -> str:
 
     config = ConsumerServerConfig(**routes_config_dict)
 
-    server_manager = ConsumerServerManager(CONSUMER_HOST, CONSUMER_PORT)
+    server_manager = ConsumerServerManager(CONSUMER_HOST, find_free_port(CONSUMER_HOST))
     server_manager.start_with_config(config)
 
-    yield str(CONSUMER_BASE_URL)
+    yield str(server_manager.base_url)
 
     server_manager.stop()
 
@@ -83,12 +80,12 @@ def provider_server(request) -> Generator[URL, Any, None]:
 
     state_handler = ProviderStateHandler(KNOWN_PROVIDER_STATES)
 
-    server_manager = ProviderServerManager(PROVIDER_HOST, PROVIDER_PORT)
+    server_manager = ProviderServerManager(PROVIDER_HOST, find_free_port(PROVIDER_HOST))
     server_manager.start_with_state_handler(
         PROVIDER_STATE_SETUP_ENDPOINT_PATH, state_handler, override_config
     )
 
-    yield PROVIDER_BASE_URL
+    yield server_manager.base_url
 
     server_manager.stop()
 

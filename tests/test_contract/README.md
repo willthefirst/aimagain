@@ -43,7 +43,8 @@ tests/test_contract/
 ├── test_manifest.py                   # Manifest-consistency tests (uniqueness, derived-state coverage)
 ├── artifacts/                         # Generated pact files and logs (gitignored except .gitkeep)
 ├── infrastructure/                    # Server orchestration + Pact/Playwright glue
-│   ├── config.py                      # Hosts, ports; KNOWN_PROVIDER_STATES derived from manifest.py
+│   ├── config.py                      # Hosts; KNOWN_PROVIDER_STATES derived from manifest.py
+│   ├── ports.py                       # find_free_port — OS-assigned ports so sessions don't collide
 │   ├── servers/                       # Consumer + provider subprocess managers
 │   └── utilities/                     # MockAuthManager, setup_pact, Playwright route interception
 └── tests/
@@ -68,6 +69,8 @@ dev test tests/test_contract/tests/consumer/test_auth_form.py
 
 Consumer tests must run before provider tests in any single session — the consumer run *generates* the pact JSON files in `artifacts/pacts/` that the provider run *verifies against*. Running both with one invocation (above) handles this ordering automatically.
 
+All servers a session binds — the consumer server, each provider server, and the per-test Pact mock services — listen on **OS-assigned free ports**, allocated at fixture setup by [`infrastructure/ports.py`](infrastructure/ports.py). There are no fixed ports, so multiple contract sessions can run concurrently on one machine (e.g. parallel agent worktrees) without colliding. Consumer tests read their mock-service URL back off `pact.uri`; never assume a known port.
+
 Provider tests carry `pytest.mark.provider` (applied directly to the parametrized test functions in `tests/provider/test_*_verification.py`), so `-m provider` filters them. Per-API marks are registered in `pyproject.toml` and applied via each pair's `pytest_marks` field in [`manifest.py`](manifest.py); keeping the two in sync is a manual discipline (see follow-up note in the manifest's docstring). Consumer tests are not marked, so there is no symmetric `-m consumer` filter.
 
 ## Adding a contract test pair
@@ -75,8 +78,8 @@ Provider tests carry `pytest.mark.provider` (applied directly to the parametrize
 When you add a new HTML form (per [`src/domain/routes/RESOURCE_GRAMMAR.md`](../../src/domain/routes/RESOURCE_GRAMMAR.md) — every form-bearing resource MUST have a contract test pair):
 
 1. **(If the consumer needs an HTML stub page)** add a flag to `ConsumerServerConfig` in `infrastructure/servers/consumer.py` and a `_setup_*_stub` function that mounts the page. Reference the setup function as the pair's `consumer_setup_fn` in step 3.
-2. **Add constants** for the API path, consumer/provider Pact names, and a unique Pact port to `constants.py`. (Provider states no longer need to be appended to `KNOWN_PROVIDER_STATES` separately — the manifest entry's `provider_state` is what drives that list.)
-3. **Add a `ContractPair` entry** to [`manifest.py`](manifest.py): consumer + provider names, port, `provider_state` string, `pytest_marks` tuple, and the optional `consumer_setup_fn` / `handler_mocks_factory` callables. The provider verification test under `tests/provider/test_<resource>_verification.py` parametrizes over `pairs_for_provider(provider_name)` automatically — no per-pair subclass needed.
+2. **Add constants** for the API path and the consumer/provider Pact names to `constants.py`. (No port constant — Pact mock ports are allocated at runtime; see [`infrastructure/ports.py`](infrastructure/ports.py). Provider states no longer need to be appended to `KNOWN_PROVIDER_STATES` separately either — the manifest entry's `provider_state` is what drives that list.)
+3. **Add a `ContractPair` entry** to [`manifest.py`](manifest.py): consumer + provider names, `provider_state` string, `pytest_marks` tuple, and the optional `consumer_setup_fn` / `handler_mocks_factory` callables. The provider verification test under `tests/provider/test_<resource>_verification.py` parametrizes over `pairs_for_provider(provider_name)` automatically — no per-pair subclass needed.
 4. **Write the consumer test** (`tests/consumer/test_<resource>_form.py`) — drive the form with Playwright and assert the intercepted request matches a Pact expectation.
 5. **(If the route needs handler-level mocks)** add a `MockDataFactory.create_<resource>_dependency_config()` classmethod returning `{handler_path: {"return_value_config": ...}}`, and reference it as `handler_mocks_factory` on the manifest entry. For Post-shaped stubs, use `make_post_stub(kind, **field_overrides)` from `tests/shared/mock_data_factory.py` — it reads the per-kind detail relationship and field tuple from `POST_KINDS` in [`src/domain/models/posts/post_kinds.py`](../../src/domain/models/posts/post_kinds.py).
 6. **(If the provider name is new)** create `tests/provider/test_<resource>_verification.py` with a parametrized test function (see existing files as templates — they're 8 lines each, parametrized over `pairs_for_provider`).
