@@ -1,6 +1,14 @@
 from functools import partial
 
-from sqlalchemy import JSON, Boolean, Column, ForeignKey, Text, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Column,
+    ForeignKey,
+    Text,
+    text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -14,6 +22,20 @@ from ..enums import (
 _TABLE = "referral_details"
 _ck = partial(named_check_in, _TABLE)
 
+# A referral describes a single client, so `age_groups` carries *at most
+# one* bucket — unlike the multi-valued `age_groups` on openings/programs
+# (which live on the linked affiliation/program, not here). The wire keeps
+# the list shape (`RequiredAgeGroupsField`, exactly-one) so read/audit
+# projections stay unchanged; this CHECK pins the cardinality in storage.
+# This is a *cardinality* CHECK — distinct from the "vocabulary on the
+# wire, no SQL CHECK against array *members*" convention the other JSON
+# lists follow. `json_array_length` is valid in both SQLite (JSON1) and
+# Postgres; migration `bf122208871b` uses the same function cross-dialect.
+_ck_age_groups_single = CheckConstraint(
+    "json_array_length(age_groups) <= 1",
+    name=f"ck_{_TABLE}_age_groups_single",
+)
+
 
 class ReferralDetail(Base):
     """1:1 detail row for posts of kind = 'referral'.
@@ -24,7 +46,7 @@ class ReferralDetail(Base):
     """
 
     __tablename__ = _TABLE
-    __table_args__ = (_ck("location_state", US_STATES),)
+    __table_args__ = (_ck("location_state", US_STATES), _ck_age_groups_single)
 
     post_id = Column(
         Uuid(as_uuid=True),
@@ -44,6 +66,9 @@ class ReferralDetail(Base):
     )
 
     # Section 2 — demographics
+    # `age_groups` JSON list, capped at one bucket by the
+    # `ck_referral_details_age_groups_single` CHECK above (a referral
+    # describes a single client). Vocabulary still checked on the wire.
     age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     languages = Column(
         JSON, nullable=False, server_default=text("'[\"en\"]'"), default=lambda: ["en"]

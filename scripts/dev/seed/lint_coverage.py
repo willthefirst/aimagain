@@ -40,7 +40,16 @@ from src.domain.models import metadata
 
 from .check_registry import check_values_for, unresolved_checks
 from .generators import SYSTEM_COLUMNS
+from .overrides import OVERRIDES
 from .vocab import COLUMN_VOCAB, JSON_LIST_SOURCE, PLACEHOLDER_OK
+
+# Tables whose rows an `overrides/` module owns end-to-end — the generic
+# generator never inserts them, so a CHECK the generic path couldn't
+# satisfy is irrelevant: the override is responsible for producing
+# CHECK-valid values (e.g. `referral_details.age_groups`, capped at one
+# bucket inside `overrides/posts.py`). This is the "fresh overrides/
+# module" escape hatch this module's docstring already advertises.
+_OVERRIDE_TABLES: frozenset[str] = frozenset(m.__tablename__ for m in OVERRIDES)
 
 # Columns the framework / fastapi-users owns; not a seed concern.
 _FRAMEWORK_COLUMNS: frozenset[str] = frozenset(
@@ -108,6 +117,10 @@ def _problems() -> Iterable[str]:
 
     # 2) Non-IN CHECKs without a COLUMN_VOCAB strategy.
     for tname, sql in unresolved_checks():
+        # Override-owned tables aren't generically generated, so a
+        # generic-path CHECK gap can't bite — skip them.
+        if tname in _OVERRIDE_TABLES:
+            continue
         # Try to extract a column name from the SQL — best-effort.
         # If we can't, surface the whole SQL.
         words = sql.split()
