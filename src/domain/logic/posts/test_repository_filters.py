@@ -494,39 +494,6 @@ async def test_level_of_care_absent_returns_all(db_test_session_manager):
 # ---------------------------------------------------------------------------
 
 
-async def test_modality_matches_referral_modalities(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id, modalities=["emdr"]
-                ),
-                "referral_detail",
-            )
-            no_match = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id, modalities=["cbt"]
-                ),
-                "referral_detail",
-            )
-
-    results = await _list(db_test_session_manager, modality=["emdr"])
-    ids = {p.id for p in results}
-    assert match.id in ids
-    assert no_match.id not in ids
-
-
 async def test_modality_matches_opening_modalities(db_test_session_manager):
     """Opening-side modalities live on ``ClinicianAffiliation``."""
     owner = await _seed_user(db_test_session_manager)

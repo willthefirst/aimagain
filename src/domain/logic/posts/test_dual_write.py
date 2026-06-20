@@ -87,7 +87,6 @@ def test_opening_detail_thin_shape():
         "post_id",
         "clinician_id",
         "clinician_affiliation_id",
-        "desired_times",
         "schedule_text",
         "treatment_modality",
         "subject",
@@ -102,7 +101,6 @@ def test_intake_detail_thin_shape():
     expected = {
         "post_id",
         "program_id",
-        "desired_times",
         "schedule_text",
         "treatment_modality",
         "subject",

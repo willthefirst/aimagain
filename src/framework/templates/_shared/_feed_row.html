@@ -98,8 +98,6 @@ under the "Feed rows" section. #}
 </span>
 {%- elif view.accepts_in_network -%}
 <span>{{ icon_label('shield', 'In-network') }}</span>
-{%- elif view.accepts_out_of_network_superbill -%}
-<span>{{ icon_label('shield', 'Out-of-network') }}</span>
 {%- elif view.accepts_private_pay -%}
 <span>{{ icon_label('shield', 'Private pay') }}</span>
 {%- endif -%}

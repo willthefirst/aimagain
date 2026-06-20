@@ -72,30 +72,17 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "location_city": "Springfield",
     "location_state": "IL",
     "session_format": ["in_person"],
-    "desired_times": [],
     "age_groups": ["adults_25_64"],
     "languages": ["en"],
-    "gender": "prefer_not_to_say",
     "description": "needs placement",
     "services": [],
-    "modalities": [],
-    # Payment paths (#1358 PR-e). Three independent booleans + a
-    # carrier list. Default emulates the most common corpus shape
-    # ("in-network preferred, Aetna patient") so existing tests
-    # that don't override get a representative referral.
+    # Payment paths — independent booleans + a carrier list. Default
+    # emulates the most common corpus shape ("in-network preferred,
+    # Aetna patient") so existing tests that don't override get a
+    # representative referral.
     "accepts_in_network": True,
-    "accepts_out_of_network_superbill": False,
     "accepts_private_pay": False,
     "insurance_carriers": [],
-    # Default to "no preference stated" — most tests don't care about
-    # affirming-identity match; tests that do override.
-    "affirming_identities": [],
-    # Default to "no constraint" — most tests don't care about
-    # license-class restriction; tests that do override.
-    "acceptable_license_types": [],
-    # Default to "no niche tags" — most tests don't care about clinical-
-    # niche match; tests that do override. Free-form `list[str]`.
-    "clinical_niches": [],
     # FK fields: always None here. Add stub string UUIDs to _REFERRAL_WIRE_DEFAULTS instead.
     "referring_clinician_id": None,
 }
@@ -119,7 +106,6 @@ _REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
 _OPENING_DEFAULTS: dict[str, Any] = {
     "subject": None,
     "description": None,
-    "desired_times": [],
     "schedule_text": None,
     "treatment_modality": None,
 }
@@ -167,7 +153,6 @@ def make_referral_detail(**overrides: Any) -> ReferralDetail:
 _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
     "subject": None,
     "description": None,
-    "desired_times": [],
     "schedule_text": None,
     "treatment_modality": None,
 }

@@ -18,7 +18,6 @@ Covers:
 
 import uuid
 from types import SimpleNamespace
-from typing import get_args
 
 import pytest
 from pydantic import ValidationError
@@ -27,14 +26,12 @@ from src.domain.logic.posts.schema import (
     ClinicianOpeningCreate,
     ClinicianOpeningUpdate,
     ReferralCreate,
-    ReferralRead,
     ReferralUpdate,
     post_audit_snapshot,
     post_create_adapter,
     post_update_adapter,
 )
 from src.domain.models.enums import (
-    GENDERS,
     INSURANCE_CARRIERS,
 )
 from tests.helpers import opening_payload, referral_payload
@@ -56,7 +53,6 @@ def test_post_create_dispatches_referral():
     # Payment-paths (#1358 PR-e): defaults to in-network only per the
     # test helper, with no carriers picked yet.
     assert p.accepts_in_network is True
-    assert p.accepts_out_of_network_superbill is False
     assert p.accepts_private_pay is False
     assert p.insurance_carriers == []
 
@@ -187,114 +183,6 @@ def test_post_create_referral_rejects_empty_age_groups():
         post_create_adapter.validate_python(referral_payload(age_groups=[]))
 
 
-def test_post_create_referral_defaults_affirming_identities_to_empty_list():
-    """`affirming_identities` is optional on the wire; empty list is
-    the default (no preference stated)."""
-    payload = referral_payload()
-    payload.pop("affirming_identities", None)
-    p = post_create_adapter.validate_python(payload)
-    assert p.affirming_identities == []
-
-
-def test_post_create_referral_accepts_affirming_identities_list():
-    p = post_create_adapter.validate_python(
-        referral_payload(affirming_identities=["lgbtq", "neurodiversity"])
-    )
-    assert p.affirming_identities == ["lgbtq", "neurodiversity"]
-
-
-def test_post_create_referral_coerces_scalar_affirming_identity_to_list():
-    """HTML form checkbox single-value submits land as a bare string;
-    `scalar_to_list` normalizes to a one-element list before the
-    `Literal[*AFFIRMING_IDENTITIES]` per-member check."""
-    p = post_create_adapter.validate_python(
-        referral_payload(affirming_identities="trans")
-    )
-    assert p.affirming_identities == ["trans"]
-
-
-def test_post_create_referral_rejects_unknown_affirming_identity():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            referral_payload(affirming_identities=["not_a_real_token"])
-        )
-
-
-def test_post_create_referral_defaults_acceptable_license_types_to_empty_list():
-    """`acceptable_license_types` is optional on the wire; empty list is
-    the default (no constraint — any license class accepted)."""
-    payload = referral_payload()
-    payload.pop("acceptable_license_types", None)
-    p = post_create_adapter.validate_python(payload)
-    assert p.acceptable_license_types == []
-
-
-def test_post_create_referral_accepts_acceptable_license_types_list():
-    """The "psychiatrist OR PMHNP" disjunction the corpus surfaces lands
-    as a two-element list — the wire model accepts multi-select directly."""
-    p = post_create_adapter.validate_python(
-        referral_payload(acceptable_license_types=["md", "pmhnp"])
-    )
-    assert p.acceptable_license_types == ["md", "pmhnp"]
-
-
-def test_post_create_referral_coerces_scalar_license_type_to_list():
-    """HTML form checkbox single-value submits land as a bare string;
-    `scalar_to_list` normalizes to a one-element list before the
-    `Literal[*LICENSE_TYPES]` per-member check."""
-    p = post_create_adapter.validate_python(
-        referral_payload(acceptable_license_types="lcsw")
-    )
-    assert p.acceptable_license_types == ["lcsw"]
-
-
-def test_post_create_referral_rejects_unknown_license_type():
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            referral_payload(acceptable_license_types=["not_a_real_license"])
-        )
-
-
-def test_post_create_referral_defaults_clinical_niches_to_empty_list():
-    """`clinical_niches` is optional on the wire; empty list is the
-    default (no niche-specific constraint)."""
-    payload = referral_payload()
-    payload.pop("clinical_niches", None)
-    p = post_create_adapter.validate_python(payload)
-    assert p.clinical_niches == []
-
-
-def test_post_create_referral_accepts_clinical_niches_list():
-    p = post_create_adapter.validate_python(
-        referral_payload(clinical_niches=["DGBI", "ADHD in women"])
-    )
-    assert p.clinical_niches == ["DGBI", "ADHD in women"]
-
-
-def test_post_create_referral_coerces_scalar_clinical_niche_to_list():
-    """Single-value tag submits as a bare string; `clean_free_form_tags`
-    wraps it in a one-element list before per-member `str` validation."""
-    p = post_create_adapter.validate_python(referral_payload(clinical_niches="DGBI"))
-    assert p.clinical_niches == ["DGBI"]
-
-
-def test_post_create_referral_strips_and_drops_empty_clinical_niches():
-    """Free-form tags: stripped on the wire, empty/whitespace-only
-    entries dropped silently."""
-    p = post_create_adapter.validate_python(
-        referral_payload(clinical_niches=["  DGBI  ", "", "   ", "catatonia"])
-    )
-    assert p.clinical_niches == ["DGBI", "catatonia"]
-
-
-def test_post_create_referral_dedupes_clinical_niches():
-    """Duplicate-tag submissions collapse to first-occurrence order."""
-    p = post_create_adapter.validate_python(
-        referral_payload(clinical_niches=["DGBI", "catatonia", "DGBI"])
-    )
-    assert p.clinical_niches == ["DGBI", "catatonia"]
-
-
 def test_post_create_referral_rejects_zip():
     """Referrals model client location as (city, state) only — ZIP is
     not part of the referral wire shape."""
@@ -351,18 +239,16 @@ def test_post_create_referral_accepts_multiple_carriers():
 
 
 def test_post_create_referral_payment_paths_independent():
-    """The three payment-path booleans are independent — any subset
+    """The two payment-path booleans are independent — any subset
     (including all-true or all-false) round-trips through the schema."""
     p = post_create_adapter.validate_python(
         referral_payload(
             accepts_in_network=True,
-            accepts_out_of_network_superbill=True,
             accepts_private_pay=True,
             insurance_carriers=["anthem_bcbs"],
         )
     )
     assert p.accepts_in_network is True
-    assert p.accepts_out_of_network_superbill is True
     assert p.accepts_private_pay is True
     assert p.insurance_carriers == ["anthem_bcbs"]
 
@@ -373,14 +259,12 @@ def test_post_create_referral_payment_paths_default_false():
     payload = referral_payload()
     for key in (
         "accepts_in_network",
-        "accepts_out_of_network_superbill",
         "accepts_private_pay",
     ):
         payload.pop(key, None)
     payload.pop("insurance_carriers", None)
     p = post_create_adapter.validate_python(payload)
     assert p.accepts_in_network is False
-    assert p.accepts_out_of_network_superbill is False
     assert p.accepts_private_pay is False
     assert p.insurance_carriers == []
 
@@ -509,10 +393,6 @@ def test_audit_snapshot_for_referral_post():
     assert snap["description"] == detail_attrs["description"]
     assert snap["location_city"] == detail_attrs["location_city"]
     assert snap["accepts_in_network"] == detail_attrs["accepts_in_network"]
-    assert (
-        snap["accepts_out_of_network_superbill"]
-        == detail_attrs["accepts_out_of_network_superbill"]
-    )
     assert snap["accepts_private_pay"] == detail_attrs["accepts_private_pay"]
     assert snap["insurance_carriers"] == detail_attrs["insurance_carriers"]
 
@@ -715,136 +595,11 @@ def test_audit_snapshot_for_opening_post():
 
 
 # --- Schema-literal vs model-tuple guardrail ----------------------------
-
-
-def _literal_args(model_cls, field_name: str) -> tuple[str, ...]:
-    """Pull the `Literal[...]` accepted values off a Pydantic field's
-    annotation, regardless of `Optional` wrapping."""
-    annotation = model_cls.model_fields[field_name].annotation
-    args = get_args(annotation)
-    if args:
-        # Optional[...] / Union[...]: find the Literal arm.
-        for arm in args:
-            literal_values = get_args(arm)
-            if literal_values and all(isinstance(v, str) for v in literal_values):
-                return literal_values
-        # Direct Literal[...]
-        if all(isinstance(a, str) for a in args):
-            return args
-    return ()
-
-
-@pytest.mark.parametrize(
-    "model_cls,field,expected",
-    [
-        # Read variants. ``location_state`` moved into the
-        # :class:`Location` value object in #451 — see the lockstep
-        # test in ``src/domain/logic/value_objects/test_location.py``.
-        # `session_format` is a `list[Literal[*SESSION_FORMATS]]` now
-        # (no SQL CHECK against JSON members, same pattern as
-        # `services` / `affirming_identities`) so it doesn't fit this
-        # top-level-Literal probe.
-        (ReferralRead, "gender", GENDERS),
-        # Create variants
-        (ReferralCreate, "gender", GENDERS),
-        # Update variants (Optional[Literal[*TUPLE]])
-        (ReferralUpdate, "gender", GENDERS),
-    ],
-)
-def test_schema_literals_match_model_tuples(model_cls, field, expected):
-    """Schema `Literal[*TUPLE]`s and DB CHECK universes must agree,
-    sourced from the tuples in `src/domain/models/enums.py`. If you add or
-    rename a vocabulary value, update both places (and the migration);
-    this guardrail keeps them honest."""
-    assert set(_literal_args(model_cls, field)) == set(expected)
-
-
-# --- desired_times multi-select -----------------------------------------
-
-
-@pytest.mark.parametrize(
-    "payload_factory,kind",
-    [
-        (referral_payload, "referral"),
-        (opening_payload, "clinician_opening"),
-    ],
-)
-def test_post_create_desired_times_defaults_to_empty_list(payload_factory, kind):
-    payload = payload_factory()
-    payload.pop("desired_times", None)
-    p = post_create_adapter.validate_python(payload)
-    assert p.desired_times == []
-
-
-@pytest.mark.parametrize(
-    "payload_factory",
-    [referral_payload, opening_payload],
-)
-def test_post_create_desired_times_accepts_subset(payload_factory):
-    p = post_create_adapter.validate_python(
-        payload_factory(desired_times=["monday_am", "friday_pm"])
-    )
-    assert p.desired_times == ["monday_am", "friday_pm"]
-
-
-@pytest.mark.parametrize(
-    "payload_factory",
-    [referral_payload, opening_payload],
-)
-def test_post_create_desired_times_coerces_scalar_to_singleton_list(payload_factory):
-    """htmx's `json-enc` collapses a 1-checkbox-checked group to a scalar
-    string on the wire (only emits an array when the same name appears
-    2+ times). The schema's `_scalar_to_list` BeforeValidator wraps that
-    scalar back into a list before the `Literal[*TUPLE]` member check
-    fires; otherwise users who pick exactly one slot would 422."""
-    p = post_create_adapter.validate_python(payload_factory(desired_times="monday_am"))
-    assert p.desired_times == ["monday_am"]
-
-
-@pytest.mark.parametrize("kind", ["referral", "clinician_opening"])
-def test_post_update_desired_times_coerces_scalar_to_singleton_list(kind):
-    p = post_update_adapter.validate_python(
-        {"kind": kind, "desired_times": "monday_am"}
-    )
-    assert p.desired_times == ["monday_am"]
-
-
-@pytest.mark.parametrize(
-    "payload_factory",
-    [referral_payload, opening_payload],
-)
-def test_post_create_desired_times_rejects_unknown_token(payload_factory):
-    with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            payload_factory(desired_times=["monday_brunch"])
-        )
-
-
-@pytest.mark.parametrize(
-    "kind",
-    ["referral", "clinician_opening"],
-)
-def test_post_update_desired_times_replaces_with_explicit_list(kind):
-    """Sending an explicit list (including `[]`) replaces the persisted
-    selection. None is "leave unchanged" — that's the standard
-    `update_post` semantic, not specific to this field."""
-    p = post_update_adapter.validate_python(
-        {"kind": kind, "desired_times": ["monday_am"]}
-    )
-    assert p.desired_times == ["monday_am"]
-    p = post_update_adapter.validate_python({"kind": kind, "desired_times": []})
-    assert p.desired_times == []
-
-
-@pytest.mark.parametrize(
-    "kind",
-    ["referral", "clinician_opening"],
-)
-def test_post_update_desired_times_rejects_unknown_token(kind):
-    with pytest.raises(ValidationError):
-        post_update_adapter.validate_python(
-            {"kind": kind, "desired_times": ["monday_brunch"]}
-        )
+#
+# `gender` was the last referral field with a top-level `Literal[*TUPLE]`
+# annotation; removing it leaves no probe targets here. The same
+# source-of-truth contract is exercised in `src/domain/models/test_enums.py`
+# for the remaining vocabularies.
 
 
 # --- services multi-select ----------------------------------------------
