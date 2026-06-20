@@ -209,11 +209,34 @@ dd { margin: 0; }
 .entity-form-page form > fieldset {
   display: contents;
 }
-/* Legend becomes a full-width section header in the form grid. */
+/* Legend reads as a SECTION HEADING, not an eyebrow label: larger and
+   heavier than the field labels below it (which stay 1rem/500), full
+   contrast (not muted), normal case. Visual weight mirrors semantic
+   level — the legend titles the group, so it must out-rank its leaves.
+
+   The base `legend` rule dresses every legend as a small uppercase muted
+   filter-label — correct for the search sidebar, where the legend IS a
+   filter's own label and sits beside plain `<label>`s on sibling filters
+   (`_filter_field.html`). Here it titles a field group, so override those
+   base properties back to heading values.
+
+   Grouping (Gestalt common region) is carried by whitespace + a hairline
+   rule. `margin-block-start` opens more space BETWEEN groups than the
+   form's `row-gap` leaves between fields WITHIN a group, and the
+   `border-block-start` draws the boundary the fieldset can't paint
+   itself — it's `display: contents` (see the fieldset rule above), so its
+   own box model is ignored. The rule rides on the legend because the
+   legend is the one full-width grid item at the top of each group. */
 .entity-form-page form > fieldset > legend {
   grid-column: 1 / -1;
+  font-size: 1.05rem;
   font-weight: 600;
-  margin-block-start: var(--pico-spacing);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--pico-color);
+  margin-block: calc(var(--pico-spacing) * 1.25) 0;
+  padding-block-start: calc(var(--pico-spacing) * 1.25);
+  border-block-start: var(--pico-border-width) solid var(--pico-muted-border-color);
 }
 /* Every direct child of the form/fieldset that ISN'T a
    `.form-field` spans both columns of the parent grid: legends,
