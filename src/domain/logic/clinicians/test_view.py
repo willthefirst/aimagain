@@ -24,7 +24,7 @@ def _stub_affiliation(**overrides):
         location_state="NY",
         location_zip="11201",
         in_person_sessions="yes",
-        virtual_sessions="please_contact",
+        virtual_sessions="no",
         in_network_carriers=["aetna"],
         accepts_out_of_network=False,
         sliding_scale=False,
@@ -58,7 +58,7 @@ def _stub_clinician(**overrides):
         location_state="NY",
         location_zip="11201",
         in_person_sessions="yes",
-        virtual_sessions="please_contact",
+        virtual_sessions="no",
         in_network_carriers=["aetna"],
         accepts_out_of_network=False,
         sliding_scale=False,
@@ -325,7 +325,7 @@ def test_view_prefers_affiliation_over_legacy_clinician_columns():
         # `primary_clinician_affiliation` carries the post-PR-3 source of truth.
         primary_clinician_affiliation=SimpleNamespace(
             in_person_sessions="yes",
-            virtual_sessions="please_contact",
+            virtual_sessions="no",
             sliding_scale=True,
             cost="$200/session",
             location_city="New City",

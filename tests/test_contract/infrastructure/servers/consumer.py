@@ -259,7 +259,7 @@ def _setup_clinician_edit_form_stub(app: FastAPI) -> None:
             location_state="NY",
             location_zip="11201",
             in_person_sessions="yes",
-            virtual_sessions="please_contact",
+            virtual_sessions="no",
             # Insurance posture stub: empty carrier list (no in-network) +
             # OON off keeps the form's bool radios deterministic.
             accepts_out_of_network=False,

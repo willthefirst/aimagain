@@ -40,7 +40,7 @@ def _make_clinician(*, owner: User, org: Organization, **overrides) -> Clinician
         first_name="Jane",
         last_name="Smith",
         in_person_sessions="yes",
-        virtual_sessions="please_contact",
+        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=["aetna"],
         sliding_scale=False,
@@ -77,7 +77,7 @@ async def test_clinician_construct_auto_creates_affiliation_with_per_role_attrs(
     assert aff is not None
     assert aff.org_id == org.id
     assert aff.in_person_sessions == "yes"
-    assert aff.virtual_sessions == "please_contact"
+    assert aff.virtual_sessions == "no"
     assert aff.accepts_out_of_network is True
     assert aff.in_network_carriers == ["aetna"]
     assert aff.sliding_scale is False

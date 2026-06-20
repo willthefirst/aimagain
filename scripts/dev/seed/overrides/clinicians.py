@@ -11,7 +11,7 @@ Coverage:
     appears at least once (CLINICIAN_COUNT > 51).
   - `in_person_sessions` and `virtual_sessions` independently
     round-robin LOCATION_AVAILABILITY_OPTIONS — produces rows for
-    (in-person only), (virtual only), (both), (please_contact).
+    (in-person only), (virtual only), (both), (neither).
 """
 
 from __future__ import annotations
