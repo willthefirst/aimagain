@@ -41,7 +41,27 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         Wrapped in try/except because email delivery failures must not
         block registration — the user is already created at this point;
         they can re-request the verify link from the nag banner.
+
+        Every new user is also seeded with the default saved searches
+        (openings + referrals). Lazy-imported (the framework layer
+        shouldn't pull domain modules at import time) and wrapped so a
+        seeding failure — like the email send below — never blocks
+        registration; the user can still create searches by hand. The
+        helper opens its own session and is safe here because
+        fastapi-users has already committed the user row before calling
+        this hook.
         """
+        try:
+            from src.domain.logic.saved_searches.defaults import (
+                seed_default_saved_searches,
+            )
+
+            await seed_default_saved_searches(self.user_db.session, user.id)
+        except Exception:
+            # Defaults are convenience, not correctness — never block
+            # account creation on them.
+            pass
+
         if settings.ENVIRONMENT == "development":
             if request is not None:
                 await self.user_db.update(user, {"is_verified": True})

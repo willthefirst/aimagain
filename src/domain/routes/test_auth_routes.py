@@ -54,6 +54,37 @@ async def test_register(
         assert created_user.email == email_to_test
 
 
+async def test_register_seeds_default_saved_searches(
+    test_client: AsyncClient, db_test_session_manager: async_sessionmaker[AsyncSession]
+):
+    """`on_after_register` seeds every new user with the default saved
+    searches (openings + referrals) via `seed_default_saved_searches`."""
+    import uuid
+
+    from src.domain.logic.saved_searches.defaults import DEFAULT_SAVED_SEARCHES
+    from src.domain.models import SavedSearch
+
+    response = await test_client.post(
+        "/auth/register",
+        json={"email": "seeded@example.com", "password": "password123"},
+    )
+    assert response.status_code == 201, response.text
+    user_id = uuid.UUID(response.json()["id"])
+
+    async with db_test_session_manager() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(SavedSearch).where(SavedSearch.user_id == user_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    by_name = {r.name: r.filters for r in rows}
+    assert by_name == {name: filters for name, filters in DEFAULT_SAVED_SEARCHES}
+
+
 async def test_register_prod_mode_leaves_user_unverified(
     test_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
