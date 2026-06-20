@@ -31,6 +31,72 @@
     </dd>
   </div>
 {%- endmacro %}
+{# A `fact` whose value is a LIST — each item on its own line rather
+   than comma-joined into one run-on string. Use on detail pages, where
+   vertical space is cheap and a stacked list reads better than
+   "A, B, C" (services, languages, pronouns, insurance carriers, …).
+   The compact list card keeps the comma-joined `fact(...)` value form
+   (density matters there); this is its detail-page counterpart.
+
+   `values` is an iterable of already-resolved display strings. The
+   `<dd>` holds a bullet-less `<ul class="fact-values">` (styled in
+   framework.css). Same `key` / `label` / `icon` contract as `fact`, so
+   the `data-fact` test selector and the dt label read identically — only
+   the value layout differs. A single-item list renders as one line, so
+   callers can route any "list of things" through here without special-
+   casing length 1. #}
+{% macro fact_list(key, label, values, icon=None) -%}
+  {%- call fact(key, label, icon=icon) -%}
+    <ul class="fact-values">
+      {%- for v in values %}<li>{{ v }}</li>{%- endfor %}
+    </ul>
+  {%- endcall -%}
+{%- endmacro %}
+{# Multi-section fact grid — groups several titled `<dl>`s so their
+   key/value columns ALIGN ACROSS sections, instead of each group's
+   `<dl>` sizing its own label column independently. The read-side mirror
+   of the form's layout (`.entity-form-page form`): one parent grid
+   declares the two tracks once, each group's `<dl>` SUBGRIDS them, so
+   every label lines up regardless of which group it's in.
+
+   `facts_grid()` IS the `<section class="entity-facts">` panel (it keeps
+   its normal section box + margins — nothing is collapsed with
+   `display: contents`). Inside it, `fact_group(...)` emits a full-width
+   heading and `fact_rows()` wraps that group's rows in a bare `<dl>` —
+   both land as DIRECT CHILDREN of the grid, so the `<dl>` subgrids the
+   shared tracks without an intervening wrapper. Splitting heading from
+   rows lets a group hold prose (a leading `<p>`) instead of a `<dl>`
+   when it isn't key/value data. Compose it as:
+
+     {% call facts_grid() %}
+       {{ fact_group("Summary") }}<p>Free-text intro.</p>
+       {{ fact_group("Coverage") }}
+       {% call fact_rows() %}{{ fact('plan', 'Plan', 'PPO') }}{% endcall %}
+     {% endcall %}
+
+   A single ungrouped `facts_block()` doesn't need this — it's only for
+   splitting one aligned grid into titled sections. #}
+{% macro facts_grid() -%}
+  <section class="entity-facts facts-grid">
+    {{ caller() }}
+  </section>
+{%- endmacro %}
+{# A titled group's heading inside a `facts_grid`: a full-width plain
+   Pico `<h2>` (default size/weight/spacing). The only custom CSS is the
+   layout rule that spans it across both columns; its default margin
+   carries the group separation. Followed by either a `fact_rows()` block
+   (key/value data) or a full-width `<p>` (prose). #}
+{% macro fact_group(title) -%}
+  <h2 class="fact-group">{{ title }}</h2>
+{%- endmacro %}
+{# A group's rows: a bare `<dl>` of `fact(...)` / `fact_list(...)` rows,
+   a direct child of `facts_grid` so it subgrids the shared label/value
+   columns (the `.facts-grid > dl` rule in framework.css). #}
+{% macro fact_rows() -%}
+  <dl>
+    {{ caller() }}
+  </dl>
+{%- endmacro %}
 {# Wrap a stack of `fact(...)` rows in the canonical
    `<section class="entity-facts"><dl>…</dl></section>` chrome.
 

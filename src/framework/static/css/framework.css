@@ -35,12 +35,22 @@ html { scrollbar-gutter: stable; font-size: 14px; }
   --color-warning: #b45309;
   --color-success: #166534;
 }
-/* Heading sizes and weights — tight, not shouting. Pico hardcodes these on
-   the element; custom properties have no effect so we override directly. */
-h1 { font-size: 1.5rem; font-weight: 600; }
-h2 { font-size: 1.25rem; font-weight: 500; }
-h3 { font-size: 1.0625rem; font-weight: 500; }
-h4, h5, h6 { font-size: 1rem; font-weight: 500; }
+/* Heading scale — tight, not shouting. Set Pico's per-heading custom
+   properties rather than raw `font-size`/`font-weight` on the element:
+   Pico v2 drives headings from `--pico-font-size` / `--pico-font-weight`
+   AND ties the auto heading top-margin (`--pico-typography-spacing-top`,
+   applied to a heading that follows flow content) to the same per-level
+   block. Overriding the variables keeps size, weight, and spacing
+   coherent — overriding only `font-size` (as we used to) left the
+   spacing calibrated to Pico's larger default sizes. Our scale is
+   flatter/denser than Pico's, so `--pico-typography-spacing-top` is
+   scaled down to match (Pico's defaults — e.g. 2.625rem for h2 — read as
+   too airy at our sizes). Spacing is intentionally approximate; we let
+   Pico's typography system own the rhythm rather than hand-tuning it. */
+h1 { --pico-font-size: 1.5rem; --pico-font-weight: 600; --pico-typography-spacing-top: 1.75rem; }
+h2 { --pico-font-size: 1.25rem; --pico-font-weight: 500; --pico-typography-spacing-top: 1.25rem; }
+h3 { --pico-font-size: 1.0625rem; --pico-font-weight: 500; --pico-typography-spacing-top: 1rem; }
+h4, h5, h6 { --pico-font-size: 1rem; --pico-font-weight: 500; }
 /* Entity list — <ul class="entity-list"> wraps every list of entity
    cards. Resets remove browser list chrome while keeping the <ul>/<li>
    in the accessibility tree so screen readers announce "list of N items".
@@ -147,10 +157,47 @@ dl {
 dl > div { display: contents; }
 dt { font-weight: 500; }
 dd { margin: 0; }
+/* `fact_list(...)` value — items stacked one per line inside the `<dd>`.
+   Just a list reset (drop the bullet + indent) so each value aligns
+   flush under the dt; vertical rhythm is Pico's default `<li>` spacing.
+   Pico v2 sets `list-style-type` on the `<li>` (not the `<ul>`), so the
+   marker is stripped at the `li` level too — the same gotcha the
+   `.glyph-list` rule documents above. */
+.fact-values, .fact-values > li { list-style: none; }
+.fact-values { margin: 0; padding: 0; }
 @media (max-width: 640px) {
   dl { grid-template-columns: 1fr; row-gap: 0.5rem; }
   dl > div { display: block; }
   dt { margin-bottom: 0.125rem; }
+}
+/* Multi-section fact grid (`facts_grid()` in `_shared/sections.html`) —
+   the READ-side mirror of the form's grid (`.entity-form-page form`
+   below). The grid `<section>` declares the two tracks once; each
+   group's `<dl>` is a DIRECT child and SUBGRIDS them, so the label
+   column is the same width across every section instead of each `<dl>`
+   sizing its own. Same trick the form uses to align labels across
+   fieldset boundaries — but here the `<dl>`s sit directly in the grid,
+   so nothing needs `display: contents` (the `<section>` keeps its normal
+   box + margins). The headings (`fact_group`'s `<h2>`) span both
+   columns; their size/weight/spacing are Pico's heading defaults, and
+   the heading's default margin carries the group separation. */
+.facts-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+.facts-grid > dl {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+}
+.facts-grid > h2.fact-group { grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  /* Collapse to one column — the subgrid `<dl>`s inherit it, and the
+     existing `dl > div { display: block }` rule stacks each label above
+     its value (matches the standalone `<dl>` collapse above). */
+  .facts-grid { grid-template-columns: 1fr; }
 }
 /* Form-field layout — the form-side mirror of the `<dl>` grid
    above. The key trick is **subgrid**: the parent `<form>` declares
@@ -160,12 +207,14 @@ dd { margin: 0; }
    every row in the form — including across fieldset boundaries —
    instead of each row sizing to its own label independently.
 
-   Fieldsets use `display: contents` so their children participate
-   directly in the form's grid rather than establishing a new grid
-   layer. Chrome does not propagate subgrid tracks through a
-   fieldset-as-grid-container, so the intermediate layer must be
-   collapsed. Legends inside fieldsets get `grid-column: 1 / -1` so
-   they span the full form width as visual section headers.
+   Sections (`form_section`'s `<section class="form-section">`) SUBGRID
+   the form's two tracks and their `.form-field` rows subgrid in turn, so
+   the label column is one shared width across every section. The section
+   stays a real box (its margins/spacing work normally) — unlike the old
+   `<fieldset>`, which had to be collapsed with `display: contents`
+   because Chrome won't propagate subgrid tracks through a
+   fieldset-as-grid-container. Section `<h2>`s get `grid-column: 1 / -1`
+   so they span the full form width as section headers.
 
    Markup contract (emitted by `_shared/form_fields.html` macros):
 
@@ -201,50 +250,31 @@ dd { margin: 0; }
   row-gap: var(--pico-spacing);
   align-items: baseline;
 }
-/* Fieldsets collapse out of the layout so their children (labels,
-   legends) become direct form grid items. This lets `.form-field`
-   subgrid from the form rather than from an intermediate fieldset
-   layer — Chrome doesn't propagate subgrid tracks through
-   fieldset-as-grid-container. */
-.entity-form-page form > fieldset {
-  display: contents;
-}
-/* Legend reads as a SECTION HEADING, not an eyebrow label: larger and
-   heavier than the field labels below it (which stay 1rem/500), full
-   contrast (not muted), normal case. Visual weight mirrors semantic
-   level — the legend titles the group, so it must out-rank its leaves.
-
-   The base `legend` rule dresses every legend as a small uppercase muted
-   filter-label — correct for the search sidebar, where the legend IS a
-   filter's own label and sits beside plain `<label>`s on sibling filters
-   (`_filter_field.html`). Here it titles a field group, so override those
-   base properties back to heading values.
-
-   Grouping (Gestalt common region) is carried by whitespace + a hairline
-   rule. `margin-block-start` opens more space BETWEEN groups than the
-   form's `row-gap` leaves between fields WITHIN a group, and the
-   `border-block-start` draws the boundary the fieldset can't paint
-   itself — it's `display: contents` (see the fieldset rule above), so its
-   own box model is ignored. The rule rides on the legend because the
-   legend is the one full-width grid item at the top of each group. */
-.entity-form-page form > fieldset > legend {
+/* Each titled section subgrids the form's two tracks (it stays a real
+   `<section>` box — not collapsed with `display: contents` — so its
+   margins work normally), and its `.form-field` rows subgrid in turn.
+   The chain form → section → field shares ONE label column, so labels
+   align across every section. Same trick the detail page's `facts_grid`
+   uses; the `<section>` (vs `<fieldset>`) is what makes it possible —
+   Chrome won't propagate subgrid tracks through a fieldset. */
+.entity-form-page form > .form-section {
+  display: grid;
+  grid-template-columns: subgrid;
   grid-column: 1 / -1;
-  font-size: 1.05rem;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--pico-color);
-  margin-block: calc(var(--pico-spacing) * 1.25) 0;
-  padding-block-start: calc(var(--pico-spacing) * 1.25);
-  border-block-start: var(--pico-border-width) solid var(--pico-muted-border-color);
+  row-gap: var(--pico-spacing);
 }
-/* Every direct child of the form/fieldset that ISN'T a
-   `.form-field` spans both columns of the parent grid: legends,
-   Pico `.grid` utility wrappers, fieldset-scoped helper
-   `<small>`s, the action cluster, hidden inputs, hand-rolled
-   `<label>`s that haven't been macro-converted, etc. */
-.entity-form-page form > :not(.form-field):not(fieldset),
-.entity-form-page form > fieldset > :not(.form-field) {
+/* Section heading — a plain Pico `<h2>` (default size/weight/spacing).
+   The only custom rule spans it across both columns; its default margin
+   carries the separation between groups. */
+.entity-form-page form > .form-section > h2 {
+  grid-column: 1 / -1;
+}
+/* Every child of the form/section that ISN'T a `.form-field` spans both
+   columns of the parent grid: section headings, Pico `.grid` utility
+   wrappers, section-scoped helper `<small>`s, the action cluster, hidden
+   inputs, hand-rolled `<label>`s that haven't been macro-converted, etc. */
+.entity-form-page form > :not(.form-field):not(.form-section),
+.entity-form-page form > .form-section > :not(.form-field) {
   grid-column: 1 / -1;
 }
 /* Form-field row: subgrid so label sits in col 1, control col 2. */
@@ -593,8 +623,6 @@ td > menu > li > [role="button"] {
   .form-actions { flex-direction: column; align-items: stretch; }
   .form-actions > .form-actions-destructive { margin-left: 0; }
 }
-/* (fieldset margin-block-start removed — fieldsets use display:contents
-   and ignore box-model properties; spacing is on legend instead.) */
 /* Search-page multi-choice filters render as a `<fieldset>` wrapping
    a `.checkbox-list` of single-click checkboxes (replacing the
    previous native `<select multiple>` listbox — #583). The legend

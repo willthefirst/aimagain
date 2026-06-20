@@ -40,8 +40,10 @@ Per-kind branching and field selection live in
 `src.domain.logic.posts.view.post_card_view`, which collapses CR /
 PA / intake detail shapes into one flat `view` dict. `modality_chips`
 emits the modality `<span>`s; `_facts_block` emits the single `<dl>`
-body. Detail templates reuse the same `_facts_block` partial so
-list and detail share the same visual vocabulary.
+body. The referral detail page renders its own grouped fact display
+(`_referral_facts`) but reuses `_facts_block`'s `services_fact` macro
+for the services row, so list and detail share the same visual
+vocabulary.
 
 `entity_name` is the URL family the card links into — ``"post"`` (the
 single whole-supertype family). The list template passes this name so
