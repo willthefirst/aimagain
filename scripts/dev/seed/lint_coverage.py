@@ -16,10 +16,14 @@ Hard-fails (exit 1) on any of:
      check without a matching vocab entry would silently violate the
      CHECK at insert time.
 
-  3. A `JSON` column whose name isn't in `vocab.JSON_LIST_SOURCE` and
-     isn't nullable. Generic JSON fallback writes `[]` if the column's
-     default is list — but the lint forces the developer to think
-     about whether `[]` is meaningful or a typed enum subset is wanted.
+  3. A `JSON` column whose name isn't in `vocab.JSON_LIST_SOURCE`,
+     isn't nullable, and isn't an object column (default `dict`).
+     Generic JSON fallback writes `[]` for a list-default column — and
+     the lint forces the developer to think about whether `[]` is
+     meaningful or a typed enum subset is wanted. A `dict`-default
+     column instead seeds as `{}` (a meaningful "empty object" value,
+     e.g. a free-form filter map), which `generators.build_row` already
+     produces, so it needs no `JSON_LIST_SOURCE` entry.
 
 The lint walks `metadata.tables` so it sees every declared model.
 Adding a new model triggers the lint on the next CI run; the
@@ -69,6 +73,25 @@ def _column_is_json(column) -> bool:
     return isinstance(column.type, SAJSON)
 
 
+def _json_default_is_object(column) -> bool:
+    """True when a JSON column's Python default produces a dict (`{}`).
+
+    Such "object" columns are seeded as `{}` by `generators.build_row`
+    (a meaningful empty-object value, e.g. a free-form filter map), so
+    they need no `JSON_LIST_SOURCE` entry. SQLAlchemy wraps a
+    ``default=dict`` callable, so ``column.default.arg is dict`` is
+    unreliable — call the wrapped callable and check the produced type
+    instead (the same way ``list`` defaults produce ``[]``)."""
+    default = column.default
+    arg = getattr(default, "arg", None)
+    if not callable(arg):
+        return False
+    try:
+        return isinstance(arg(None), dict)
+    except Exception:
+        return False
+
+
 def _column_is_well_typed_scalar(column) -> bool:
     """Bool / Date / DateTime / Float / Integer / Uuid — the generic
     generator covers these by type, so they need no vocab entry."""
@@ -105,9 +128,11 @@ def _problems() -> Iterable[str]:
                         f"`{cname}` in PLACEHOLDER_OK."
                     )
 
-            # 3) JSON without a known enum source AND non-nullable.
+            # 3) JSON without a known enum source AND non-nullable —
+            # unless it's an object column (default `dict`), which the
+            # generic generator seeds as `{}` (see `generators.build_row`).
             if _column_is_json(column) and cname not in JSON_LIST_SOURCE:
-                if not column.nullable:
+                if not column.nullable and not _json_default_is_object(column):
                     yield (
                         f"  ❌ non-nullable JSON column `{tname}.{cname}` has no "
                         f"entry in JSON_LIST_SOURCE.\n"

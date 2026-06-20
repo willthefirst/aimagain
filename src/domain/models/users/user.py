@@ -52,3 +52,15 @@ class User(SQLAlchemyBaseUserTable[uuid.UUID], BaseModel):
         lazy="selectin",
         viewonly=True,
     )
+    # Owned subentity (1:N) — the user's saved searches. NOT viewonly:
+    # the framework's generic create handler appends a new row through
+    # this collection (`repo.add_child(user, "saved_searches", row)`),
+    # so the relationship must be writable. `cascade="all, delete-orphan"`
+    # mirrors the FK's `ondelete="CASCADE"` at the ORM level so deleting a
+    # user evicts their saved searches in-session too.
+    saved_searches = relationship(
+        "SavedSearch",
+        foreign_keys="SavedSearch.user_id",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )

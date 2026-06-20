@@ -1,0 +1,14 @@
+{# `/users/{user_id}/saved_searches/{saved_search_id}/form` — canonical edit form. #}
+{% extends "views/form_edit.html" %}
+{%- from "saved_searches/_form_saved_search.html" import saved_search_form with context -%}
+{% block resource_label %}Saved searches{% endblock %}
+{% block current_label %}{{ saved_search.name }}{% endblock %}
+{% block form_content %}
+  {{ saved_search_form(resource_detail_url,
+    "patch",
+    edit_heading,
+    cancel_url=resource_url,
+    delete_url=resource_detail_url,
+    delete_confirm="Delete this saved search?",
+    current=saved_search) }}
+{% endblock %}

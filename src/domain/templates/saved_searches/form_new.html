@@ -1,0 +1,10 @@
+{# `/users/{user_id}/saved_searches/form` — canonical create form. #}
+{% extends "views/form_new.html" %}
+{%- from "saved_searches/_form_saved_search.html" import saved_search_form with context -%}
+{% block resource_label %}Saved searches{% endblock %}
+{% block form_content %}
+  {{ saved_search_form(resource_url,
+    "post",
+    create_heading,
+    cancel_url=resource_url) }}
+{% endblock %}
