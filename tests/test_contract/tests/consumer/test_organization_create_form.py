@@ -20,7 +20,6 @@ from tests.test_contract.constants import (
     NETWORK_TIMEOUT_MS,
     ORGANIZATION_CREATE_API_PATH,
     ORGANIZATION_CREATE_FORM_PAGE_PATH,
-    PACT_PORT_ORGANIZATION_CREATE,
     PROVIDER_NAME_ORGANIZATIONS,
     PROVIDER_STATE_USER_CAN_CREATE_ORGANIZATION,
 )
@@ -44,7 +43,6 @@ async def test_consumer_organization_create_form_submits(
     pact = setup_pact(
         CONSUMER_NAME_ORGANIZATION_CREATE_FORM,
         PROVIDER_NAME_ORGANIZATIONS,
-        port=PACT_PORT_ORGANIZATION_CREATE,
     )
     mock_server_uri = pact.uri
     form_page_url = f"{origin_with_routes}{ORGANIZATION_CREATE_FORM_PAGE_PATH}"

@@ -20,7 +20,9 @@ import pytest
 from pact import Verifier
 from yarl import URL
 
-from tests.test_contract.infrastructure.config import PROVIDER_STATE_SETUP_FULL_URL
+from tests.test_contract.infrastructure.config import (
+    PROVIDER_STATE_SETUP_ENDPOINT_PATH,
+)
 from tests.test_contract.tests.shared.helpers import PACT_DIR, PACT_LOG_DIR
 
 if TYPE_CHECKING:
@@ -73,7 +75,11 @@ def verify_pair(pair: "ContractPair", provider_server: URL) -> None:
     verifier = Verifier(
         provider=pair.provider_name,
         provider_base_url=str(provider_server),
-        provider_states_setup_url=PROVIDER_STATE_SETUP_FULL_URL,
+        # Built from the running server's (ephemeral) URL, not a fixed
+        # constant, so the verifier posts states to the right port.
+        provider_states_setup_url=str(
+            provider_server / PROVIDER_STATE_SETUP_ENDPOINT_PATH
+        ),
     )
 
     success, logs_dict = verifier.verify_pacts(pact_file, log_dir=PACT_LOG_DIR)

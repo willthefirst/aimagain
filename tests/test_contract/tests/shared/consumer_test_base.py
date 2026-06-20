@@ -27,11 +27,6 @@ class BaseConsumerTest(ABC):
 
     @property
     @abstractmethod
-    def pact_port(self) -> int:
-        """The port for the pact mock server."""
-
-    @property
-    @abstractmethod
     def api_path(self) -> str:
         """The API path being tested."""
 
@@ -103,7 +98,7 @@ class BaseConsumerTest(ABC):
 
     def create_pact(self) -> Consumer:
         """Create and return a pact instance."""
-        return setup_pact(self.consumer_name, self.provider_name, self.pact_port)
+        return setup_pact(self.consumer_name, self.provider_name)
 
     @abstractmethod
     async def perform_user_actions(self, page: Page, origin: str):
