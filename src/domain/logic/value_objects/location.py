@@ -77,11 +77,18 @@ class ReferralLocation(BaseModel):
     flatten helpers iterate `_LOCATION_SUBFIELDS` but only emit keys
     that are present in the input, so a referral payload without
     ``location_zip`` validates here (and ``extra="forbid"`` rejects
-    stray ``zip`` from any caller that smuggles one in)."""
+    stray ``zip`` from any caller that smuggles one in).
+
+    ``city`` is optional here (unlike :class:`Location`): a referral
+    only *needs* a city for in-person sessions. That conditional
+    requirement is enforced at the referral level — see
+    ``REFERRAL_CONDITIONAL_RULES`` in
+    ``src/domain/logic/posts/conditional_fields.py`` — not on this value
+    object, which can't see ``session_format``."""
 
     model_config = ConfigDict(extra="forbid")
 
-    city: _CityText
+    city: _CityTextOptional = None
     state: Literal[*US_STATES]
 
 

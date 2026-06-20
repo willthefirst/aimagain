@@ -8,7 +8,7 @@
 it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact, list_or_empty -%}
-{%- from "_shared/form_fields.html" import text_field, select_field, multi_select_field, checkbox_field, textarea_field -%}
+{%- from "_shared/form_fields.html" import text_field, select_field, multi_select_field, checkbox_field, textarea_field, conditional_field -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/forms.html" import filter_checkbox, icon_legend -%}
 {%- from "_shared/form_banner.html" import form_banner -%}
@@ -174,6 +174,9 @@ it's dev-only chrome that should never ship to production. #}
                   </li>
                   <li>
                     <a href="#forms">Form fields</a>
+                  </li>
+                  <li>
+                    <a href="#conditional-field">Conditional field</a>
                   </li>
                   <li>
                     <a href="#form-banner">Form banner</a>
@@ -442,6 +445,20 @@ it's dev-only chrome that should never ship to production. #}
         <div class="entity-form-page">
           <form>
             {{ text_field("email", "Email", current="not-an-email", error="Enter a valid email address.", invalid=True) }}
+          </form>
+        </div>
+      </section>
+      <section class="gallery-section" id="conditional-field">
+        <h2>Conditional field</h2>
+        <p>
+          <small>Rendered via <code>_shared/form_fields.html</code> → <code>conditional_field()</code>. Field is hidden until its trigger is checked; requiredness is enforced server-side (the wrapped field carries no <code>required</code> attr). Pure CSS <code>:has()</code> reveal scoped to the enclosing <code>&lt;form&gt;</code> — no JS. Reveal tokens for referrals come from <code>REFERRAL_CONDITIONAL_RULES</code> in <code>src/domain/logic/posts/conditional_fields.py</code>.</small>
+        </p>
+        <div class="entity-form-page">
+          <form>
+            {{ checkbox_field('accepts_in_network', "In-network — bill the client's carrier") }}
+            {% call conditional_field("accepts_in_network:true") %}
+              {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, required=false) }}
+            {% endcall %}
           </form>
         </div>
       </section>

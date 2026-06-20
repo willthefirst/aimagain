@@ -77,9 +77,11 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "description": "needs placement",
     "services": [],
     "services_other_text": None,
+    "languages_other_text": None,
     "pronouns": [],
+    "pronouns_other_text": None,
     "sliding_scale": False,
-    "in_network_carrier_notes": None,
+    "insurance_carriers_other_text": None,
     # Payment paths — independent booleans + a carrier list. Default
     # emulates the most common corpus shape ("in-network preferred,
     # Aetna patient") so existing tests that don't override get a
@@ -98,6 +100,13 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
 # here as a stub so schema round-trip tests still exercise it.
 _REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
     **_REFERRAL_ORM_DEFAULTS,
+    # The default is in-network (`accepts_in_network=True`), which the
+    # conditional-required rules now require to carry ≥1 carrier — so the
+    # representative wire payload picks one ("Aetna patient"). The ORM
+    # default leaves the list empty (ORM rows aren't wire-validated); only
+    # the wire factory needs a carrier. Tests exercising the empty-carrier
+    # path override `accepts_in_network=False` (or pass `insurance_carriers`).
+    "insurance_carriers": ["aetna"],
     "referring_clinician_id": str(_STUB_REFERRING_CLINICIAN_ID),
     "clinician_affiliation_id": str(_STUB_CLINICIAN_AFFILIATION_ID),
 }

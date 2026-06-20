@@ -46,6 +46,7 @@ from pydantic import (
     model_validator,
 )
 
+from src.domain.logic.posts.conditional_fields import enforce_conditional_required
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
     ReferralLocation,
@@ -202,7 +203,9 @@ class ReferralRead(_PostReadBase):
     session_format: SessionFormatField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    languages_other_text: str | None = None
     pronouns: PronounsField = []
+    pronouns_other_text: str | None = None
     subject: str | None = None
     description: str
     services: ServicesField = []
@@ -213,12 +216,13 @@ class ReferralRead(_PostReadBase):
     accepts_in_network: bool = False
     accepts_private_pay: bool = False
     sliding_scale: bool = False
-    # Free-text carrier notes paired with `accepts_in_network`.
-    in_network_carrier_notes: str | None = None
-    # Multi-select of `InsuranceCarrier` tokens — kept alongside
-    # `in_network_carrier_notes` for the subset of carriers modeled
-    # as an enum. Empty list = "no carrier specified".
+    # Multi-select of `InsuranceCarrier` tokens; empty list = "no carrier
+    # specified". Paired with `insurance_carriers_other_text` for the
+    # "Other" branch.
     insurance_carriers: InsuranceCarriersField = []
+    # Free-text "Other" branch of `insurance_carriers` (mirrors
+    # `services_other_text` for `services`). Optional free text.
+    insurance_carriers_other_text: str | None = None
     # FK to the Clinician the submitting user designated as referrer.
     # Nullable on the read side — rows created before this field existed
     # will have None here.
@@ -316,26 +320,35 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # Required min-1 on the wire. Defaults to `["en"]` so the form's
     # "submit with defaults" case still validates.
     languages: RequiredLanguagesField = ["en"]
+    # Free-text "Other" branch of `languages`. Required iff `languages`
+    # contains `other` — see `REFERRAL_CONDITIONAL_RULES`.
+    languages_other_text: StrippedOptionalText = None
     # Pronouns the client goes by. Multi-checkbox on the wire; empty
     # list (the default) = "not stated".
     pronouns: PronounsField = []
+    # Free-text "Other" branch of `pronouns`. Required iff `pronouns`
+    # contains `other` — see `REFERRAL_CONDITIONAL_RULES`.
+    pronouns_other_text: StrippedOptionalText = None
     subject: StrippedOptionalText = None
     description: StrippedText
     services: ServicesField = []
-    # Free-text describing the "Other" services branch.
+    # Free-text describing the "Other" services branch. Required iff
+    # `services` contains `other` — see `REFERRAL_CONDITIONAL_RULES`.
     services_other_text: StrippedOptionalText = None
     # Payment paths. Independent booleans; not mutually exclusive;
     # default all-false is shape-valid (some referrers genuinely leave
-    # it blank) but the form encourages picking at least one. Empty
-    # `insurance_carriers` is legal even when `accepts_in_network` is
-    # true (the patient may have a carrier they're trying to identify,
-    # or accept any carrier the provider takes).
+    # it blank) but the form encourages picking at least one. When
+    # `accepts_in_network` is true, at least one `insurance_carriers`
+    # token is required (`other` covers carriers off the closed list)
+    # — see `REFERRAL_CONDITIONAL_RULES`.
     accepts_in_network: bool = False
     accepts_private_pay: bool = False
     sliding_scale: bool = False
-    # Free-text carrier notes — paired with `accepts_in_network`.
-    in_network_carrier_notes: StrippedOptionalText = None
     insurance_carriers: InsuranceCarriersField = []
+    # Free-text "Other" branch of `insurance_carriers` (mirrors
+    # `services_other_text`). Required iff `insurance_carriers` contains
+    # `other` — see `REFERRAL_CONDITIONAL_RULES`.
+    insurance_carriers_other_text: StrippedOptionalText = None
     # Context: which ClinicianAffiliation the referring clinician acts
     # under. This is what the form's practice picker submits (one option
     # per affiliation). Required on new referrals. The server resolves
@@ -349,6 +362,15 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # resolved clinician. Optional/None on the wire; any client-sent
     # value is overwritten by the resolved one.
     referring_clinician_id: uuid.UUID | None = None
+
+    # Conditional-required rules (in-person → city; "Other" → its
+    # free-text; in-network → ≥1 carrier) live in one registry so the
+    # validator and the form's reveal CSS can't drift. See
+    # `conditional_fields.py`.
+    @model_validator(mode="after")
+    def _enforce_conditional_required(self) -> "ReferralCreate":
+        enforce_conditional_required(self)
+        return self
 
 
 class ClinicianOpeningCreate(WirePayload):
@@ -449,7 +471,9 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring PA's `languages` semantics.
     languages: RequiredLanguagesField | None = None
+    languages_other_text: StrippedOptionalText = None
     pronouns: PronounsField | None = None
+    pronouns_other_text: StrippedOptionalText = None
     subject: StrippedOptionalText = None
     description: StrippedText | None = None
     services: ServicesField | None = None
@@ -460,11 +484,11 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     accepts_in_network: bool | None = None
     accepts_private_pay: bool | None = None
     sliding_scale: bool | None = None
-    in_network_carrier_notes: StrippedOptionalText = None
     # `None` = leave unchanged; `[]` = clear all carriers. List-valued
     # PATCH replaces the whole list — partial add/remove is intentionally
     # out of scope, matching `services`.
     insurance_carriers: InsuranceCarriersField | None = None
+    insurance_carriers_other_text: StrippedOptionalText = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `referring_clinician_id` from it (and re-checks
     # ownership of the resolved clinician) in `_assert_post_payload_authz`.
@@ -474,6 +498,15 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # ownership re-checked on update — repointing to a clinician the user
     # doesn't own is 403.
     referring_clinician_id: uuid.UUID | None = None
+
+    # Same conditional-required registry as `ReferralCreate`. On a
+    # partial patch, rules whose trigger field is absent are skipped
+    # (the edit form always submits the full field set). See
+    # `conditional_fields.py`.
+    @model_validator(mode="after")
+    def _enforce_conditional_required(self) -> "ReferralUpdate":
+        enforce_conditional_required(self)
+        return self
 
 
 class ClinicianOpeningUpdate(PartialUpdate):
@@ -537,7 +570,9 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     session_format: SessionFormatField = []
     age_groups: AgeGroupsField = []
     languages: LanguagesField = []
+    languages_other_text: str | None = None
     pronouns: PronounsField = []
+    pronouns_other_text: str | None = None
     subject: str | None = None
     description: str
     services: ServicesField = []
@@ -545,8 +580,8 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     accepts_in_network: bool = False
     accepts_private_pay: bool = False
     sliding_scale: bool = False
-    in_network_carrier_notes: str | None = None
     insurance_carriers: InsuranceCarriersField = []
+    insurance_carriers_other_text: str | None = None
     referring_clinician_id: uuid.UUID | None = None
     clinician_affiliation_id: uuid.UUID | None = None
 
