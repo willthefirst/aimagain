@@ -120,9 +120,16 @@ RequiredLanguagesField = Annotated[LanguagesField, Field(min_length=1)]
 AgeGroupsField = Annotated[
     list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(scalar_to_list)
 ]
-# `opening.age_groups` is required-min-1 on the wire — every
-# practice serves at least one age bucket.
-RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1)]
+# `referral.age_groups` is required-*exactly*-one on the wire. A referral
+# describes a single client, so it has exactly one age bucket — the form
+# renders a single `<select>` (see `_form_referral.html`). The wire shape
+# stays `list[str]` (not a scalar) so the read/response/audit projections
+# and `view.py`'s `age_groups[0]` keep working unchanged; the cardinality
+# is pinned with `max_length=1` here and a matching SQL CHECK on
+# `referral_details.age_groups`. This is referral-only — openings/intakes
+# carry their multi-valued `age_groups` on the linked affiliation/program,
+# not on the post wire.
+RequiredAgeGroupsField = Annotated[AgeGroupsField, Field(min_length=1, max_length=1)]
 # `referral.session_format` — multi-checkbox on the wire (any subset
 # of {in_person, virtual}). Empty list = "unspecified".
 SessionFormatField = Annotated[
@@ -303,7 +310,8 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # See :class:`ReferralRead.session_format`. Multi-checkbox on the
     # wire; empty list = "unspecified".
     session_format: SessionFormatField = []
-    # Required min-1 on the wire. Mirrors PA's `age_groups`.
+    # Required *exactly one* on the wire — a referral describes a single
+    # client. See `RequiredAgeGroupsField` for the list-shape rationale.
     age_groups: RequiredAgeGroupsField
     # Required min-1 on the wire. Defaults to `["en"]` so the form's
     # "submit with defaults" case still validates.
@@ -434,6 +442,9 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # list-replace semantics as other list fields. See
     # :class:`ReferralRead.session_format`.
     session_format: SessionFormatField | None = None
+    # `None` = leave unchanged; on edit the new value must still be
+    # exactly one bucket (`min_length=1, max_length=1` via
+    # `RequiredAgeGroupsField`).
     age_groups: RequiredAgeGroupsField | None = None
     # `None` = leave unchanged. `min_length=1` rejects an explicit `[]`,
     # mirroring PA's `languages` semantics.

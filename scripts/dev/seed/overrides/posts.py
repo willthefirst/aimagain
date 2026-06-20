@@ -32,6 +32,7 @@ from src.domain.models import (
     ReferralDetail,
     User,
 )
+from src.domain.models.enums import CLIENT_AGE_GROUPS
 
 from .. import counts
 from ..generators import SeedPool, build_row
@@ -90,6 +91,15 @@ async def generate_posts(
         ref_clin = clinicians[i % len(clinicians)]
         detail.referring_clinician_id = ref_clin.id
         detail.clinician_affiliation_id = primary_aff_by_clinician.get(ref_clin.id)
+        # A referral describes a single client → exactly one age bucket
+        # (the `ck_referral_details_age_groups_single` CHECK + the wire's
+        # exactly-one rule). The generic builder draws a multi-element
+        # subset; keep its first pick, or draw one when it came back empty.
+        detail.age_groups = (
+            detail.age_groups[:1]
+            if detail.age_groups
+            else [rng.choice(CLIENT_AGE_GROUPS)]
+        )
         detail.subject = None if rng.bool(0.2) else referral_subject(rng, i)
         detail.description = render_referral_description(rng, i)
         # Sidecar PK isn't an FK-pool target; just give it a stable
