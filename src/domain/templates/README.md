@@ -55,22 +55,25 @@ Every label, legend, help string, button, and intro paragraph in `src/domain/tem
 
 - **Full sentence, period at the end.** `Adding your NPI lets us cross-check your identity against NPPES.` not `Adding your NPI lets us cross-check your identity against NPPES`.
 - **Specific.** Explain *what the value is for*, not that the field exists. `For example: DBT, EMDR, IFS.` beats `Free text.`.
-- **Never write `help="Optional."`.** The `(optional)` indicator on the label is the single canonical signal — see below.
+- **Never write `help="Optional."`.** Optionality is signaled by the *absence* of the required `*` marker — never by prose. See below.
 - If the same help string appears in two or more forms, move it to [`../../framework/templates/_shared/form_copy.html`](../../framework/templates/_shared/form_copy.html) and import it.
 
-### Optional fields
+### Required vs. optional fields
 
-Pass `required=False` to any form-field macro. The macro renders a muted `(optional)` after the label automatically (see `_field_label` in [`../../framework/templates/_shared/form_fields.html`](../../framework/templates/_shared/form_fields.html)).
+Requiredness is owned entirely by the `required=` argument to any form-field macro — never markup it yourself. `_field_label` (in [`../../framework/templates/_shared/form_fields.html`](../../framework/templates/_shared/form_fields.html)) renders an accent-colored `*` after the label of required fields and **nothing** for optional ones. The `*` is `aria-hidden` decoration; the control's own `required` attribute conveys the semantics to assistive tech.
 
 ```jinja
-{# OK — `(optional)` is rendered automatically #}
+{# Required (the default for most macros) — `*` is rendered automatically #}
+{{ text_field("last_name", "Last name", help="As it appears on your license.") }}
+
+{# Optional — pass required=False; no marker, no "Optional." prose #}
 {{ text_field("npi", "NPI", required=False, help="Adding your NPI lets us cross-check your identity against NPPES.") }}
 
-{# Bad — duplicates the (optional) indicator with prose #}
+{# Bad — restates optionality the missing `*` already conveys #}
 {{ text_field("npi", "NPI", required=False, help="Optional. Adding your NPI lets us cross-check your identity against NPPES.") }}
 ```
 
-Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — every field carries its own indicator now.
+Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — required fields are marked and optional ones are bare.
 
 ### Buttons
 

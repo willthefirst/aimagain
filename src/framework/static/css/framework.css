@@ -236,18 +236,18 @@ dd { margin: 0; }
   border: 0;
 }
 .form-field-label { font-weight: 500; }
-/* "(optional)" indicator rendered by every form-field macro when
-   `required=False`. Reads as muted secondary text next to the
-   label so it's visually clear the field can be left blank
-   without competing with the label itself. Replaces the previous
-   per-form `help="Optional."` pattern (single source of truth in
-   `_field_label` — see `_shared/form_fields.html`). The
-   label-to-"(optional)" gap is owned here — `_field_label` emits
-   no literal whitespace between the two. */
-.form-field-optional {
+/* Required `*` marker rendered by every form-field macro when
+   `required` (the default for most macros). Reads as an accent-colored
+   asterisk next to the label so required fields stand out while optional
+   ones carry no marker at all — the single source of truth lives in
+   `_field_label` (see `_shared/form_fields.html`). The marker is
+   `aria-hidden` decoration; the control's own `required` attribute
+   conveys requiredness to assistive tech. The label-to-`*` gap is owned
+   here — `_field_label` emits no literal whitespace between the two. */
+.form-field-required {
   font-weight: 400;
-  color: var(--pico-muted-color);
-  margin-inline-start: 0.5em;
+  color: var(--pico-color-red-600);
+  margin-inline-start: 0.2em;
 }
 .entity-form-page form .form-field > input,
 .entity-form-page form .form-field > select,
