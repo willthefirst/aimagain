@@ -46,11 +46,11 @@ tests/test_contract/
 │   ├── config.py                      # Hosts; KNOWN_PROVIDER_STATES derived from manifest.py
 │   ├── ports.py                       # find_free_port — OS-assigned ports so sessions don't collide
 │   ├── servers/                       # Consumer + provider subprocess managers
-│   └── utilities/                     # MockAuthManager, setup_pact, Playwright route interception
+│   └── utilities/                     # MockAuthManager, Playwright route interception
 └── tests/
     ├── consumer/                      # One test_<form>.py per HTML form under test
     ├── provider/                      # One test_<api>_verification.py per API the manifest groups by
-    └── shared/                        # BaseConsumerTest, mock_data_factory, provider_verification_base
+    └── shared/                        # helpers (setup_pact), mock_data_factory, provider_verification_base
 ```
 
 The `consumer/` and `provider/` directories are the registries — each new contract pair adds files there alongside its `manifest.py` entry. `find tests/test_contract -name 'test_*.py'` enumerates them.
