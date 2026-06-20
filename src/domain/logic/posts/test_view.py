@@ -1210,9 +1210,9 @@ def test_provider_ref_intake_is_program_then_org():
 
 def test_provider_ref_referral_is_referring_clinician_then_affiliation_org():
     """A referral resolves to the referring clinician (#1454 FK) with
-    the affiliation's org as the second part — the same shape openings
-    use, so the owner-context card renders an "About the referring
-    clinician" card with hyperlinked identity + org."""
+    the affiliation's org as the second part — the same `provider_ref`
+    shape openings use, which the detail page renders as the "Referred by"
+    linked reference in the meta line (hyperlinked identity + org)."""
     v = post_card_view(_make_cr_post())
     assert v["provider_ref"] == {
         "name": "Carlos Rivera",

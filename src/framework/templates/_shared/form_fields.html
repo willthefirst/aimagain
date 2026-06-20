@@ -481,10 +481,18 @@ emitted attribute string. #}
     {%- endif -%}
   {%- endmacro %}
   {# ---- form section ------------------------------------------------- #}
-  {# Canonical `<fieldset>` + `<legend>` wrapper for a named group of
-   fields. Replaces hand-written fieldsets in every form template so
-   the section chrome is defined once and layout changes apply
-   everywhere.
+  {# Canonical `<section>` + `<h2>` wrapper for a named group of fields.
+   Replaces hand-written groupings in every form template so the section
+   chrome is defined once and layout changes apply everywhere.
+
+   A `<section>`, not a `<fieldset>`, on purpose: the form is a CSS grid
+   and each section SUBGRIDS the form's label/control columns so labels
+   align across every section (`.entity-form-page form > .form-section`
+   in framework.css — the same grid the detail page's `facts_grid` uses).
+   Chrome won't propagate subgrid tracks through a `<fieldset>`, so a
+   fieldset would force `display: contents` and lose its box; a
+   `<section>` keeps its normal box + margins and still subgrids. The
+   `<h2>` reads as a plain Pico heading (no custom sizing).
 
    Usage:
      {% call form_section("Client location") %}
@@ -493,10 +501,10 @@ emitted attribute string. #}
      {% endcall %}
 #}
   {% macro form_section(title) -%}
-    <fieldset class="form-section">
-      <legend>{{ title }}</legend>
+    <section class="form-section">
+      <h2>{{ title }}</h2>
       {{ caller() }}
-    </fieldset>
+    </section>
   {%- endmacro %}
   {# ---- specialized widgets ------------------------------------------ #}
   {# Day × time-of-day checkbox grid. One checkbox per (day, part) pair;

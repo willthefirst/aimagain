@@ -337,6 +337,290 @@ async def test_edit_form_route_works_for_each_kind(
     assert response.status_code == 200
 
 
+# --- Referral detail: grouped fact display (mirrors the create/edit form) -
+#
+# These pin the read-side / write-side parity introduced when the
+# referral detail page (`posts/_shared/_referral_facts.html`) adopted the
+# form's four-section grouping. The form's sections live in
+# `_form_referral.html`; the detail's matching headings live here.
+
+
+def _verified_provider_clinician(owner_id):
+    """A verified, NPI-matched clinician owned by the viewer so they
+    clear `can_act_as_provider` — the gate that un-redacts the client
+    address on the detail page (see `test_message_send_verified_user...`
+    for the same setup on the message route)."""
+    clinician = make_clinician_with_org(owner_id=owner_id, npi="1234567890")
+    clinician.npi_match_status = "matched"
+    clinician.clinician_verified = True
+    return clinician
+
+
+async def test_referral_detail_groups_facts_like_the_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A fully-populated referral detail surfaces the same four section
+    headings as the create/edit form — Logistics / Service type / About
+    the client / Coverage — as `fact_group` headings inside one aligned
+    `facts_grid`, with the relevant `data-fact` rows under them."""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(
+        owner_id=author.id,
+        session_format=["in_person", "virtual"],
+        services=["therapy_individual"],
+        age_groups=["adults_25_64"],
+        pronouns=["she_her"],
+        languages=["en"],
+        accepts_in_network=True,
+        insurance_carriers=["aetna"],
+        accepts_private_pay=True,
+        sliding_scale=True,
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    headings = [h.text(strip=True) for h in tree.css(".facts-grid > h2.fact-group")]
+    assert headings == [
+        "Logistics",
+        "Service type",
+        "About the client",
+        "Coverage",
+    ], headings
+
+    facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
+    assert {
+        "address",
+        "in_person_sessions",
+        "virtual_sessions",
+        "services",
+        "age",
+        "pronouns",
+        "languages",
+        # Narrative is a row of "About the client" (mirrors the form's
+        # "Narrative" field), not a separate section.
+        "narrative",
+        "accepts_in_network",
+        "insurance_carriers",
+        "accepts_private_pay",
+        "sliding_scale",
+    } <= facts, facts
+
+
+async def test_referral_detail_renders_list_facts_one_per_line(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Multi-value rows (services, and any other list) stack one item per
+    line on the detail page via `fact_list` — a bullet-less
+    `<ul class="fact-values">` of `<li>`s, not a comma-joined string."""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(
+        owner_id=author.id,
+        services=["therapy_individual", "therapy_group", "medication_management"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    items = tree.css('[data-fact="services"] ul.fact-values > li')
+    labels = [li.text(strip=True) for li in items]
+    # Priority sort puts medication_management first; the rest follow in
+    # vocab order. Three services → three lines.
+    assert labels == [
+        "Psychiatry / medication management",
+        "Therapy — Individual",
+        "Therapy — Group",
+    ], labels
+
+
+async def test_referral_detail_meta_omits_modality_chips(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The referral detail's Logistics group carries In-person / Virtual
+    as labeled rows, so the subtitle `.meta` line no longer repeats them
+    as chips — only the date remains there. (Opening/intake keep the
+    chips; that's covered by their own kinds, not pinned here.)"""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(owner_id=author.id, session_format=["in_person", "virtual"])
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    meta_chips = [s.text(strip=True) for s in tree.css("small.meta span")]
+    assert "In-person" not in meta_chips, meta_chips
+    assert "Virtual" not in meta_chips, meta_chips
+    # The Logistics rows still carry the modality (it moved, not vanished).
+    facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
+    assert {"in_person_sessions", "virtual_sessions"} <= facts, facts
+
+
+async def test_referral_detail_suppresses_empty_coverage_group(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A group with nothing to show renders no heading. A referral that
+    accepts no payment paths and names no carriers drops the whole
+    Coverage section — no bare heading over an empty group."""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(
+        owner_id=author.id,
+        accepts_in_network=False,
+        accepts_private_pay=False,
+        sliding_scale=False,
+        insurance_carriers=[],
+        insurance_carriers_other_text=None,
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    headings = [h.text(strip=True) for h in tree.css(".facts-grid > h2.fact-group")]
+    assert "Coverage" not in headings, headings
+
+
+async def test_referral_detail_locks_client_address_for_non_provider(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A viewer without provider-network access sees the client-address
+    row (so they know the detail exists) but the value is redacted to a
+    `locked_field` — the real city/state never reaches the wire."""
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(owner_id=author.id, location_city="Metropolis")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    address_rows = tree.css('[data-fact="address"]')
+    assert address_rows, "expected the client-address row to render (locked)"
+    assert tree.css('[data-fact="address"] .locked-redacted'), response.text
+    assert "Metropolis" not in response.text
+
+
+async def test_referral_detail_narrative_is_row_of_about_the_client(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The narrative renders as the `narrative` row inside the "About the
+    client" group — same section + position as the form's "Narrative"
+    field, not a separate leading block."""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(
+        owner_id=author.id,
+        description="Teen seeking DBT after a recent move.",
+        age_groups=["adolescents_14_18"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    # The "About the client" group is the `<dl>` carrying the age row;
+    # the narrative is a sibling row in that same `<dl>`.
+    about_dl = next(
+        (
+            dl
+            for dl in tree.css(".facts-grid > dl")
+            if dl.css_first('[data-fact="age"]')
+        ),
+        None,
+    )
+    assert about_dl is not None, "About-the-client group should render"
+    narrative = about_dl.css_first('[data-fact="narrative"] dd')
+    assert narrative is not None, "narrative should be a row of About the client"
+    assert "Teen seeking DBT" in narrative.text()
+
+
+async def test_referral_detail_links_referring_clinician_in_meta_not_a_card(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """A referral surfaces its referring clinician as a linked reference
+    in the meta line ("Referred by <name>"), NOT as an owner-context
+    card — that card is for openings/intakes only."""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    referring = make_clinician_with_org(
+        owner_id=author.id,
+        practice_name="Reyes Group",
+        first_name="Dana",
+        last_name="Reyes",
+    )
+    referring.id = referring.id or uuid.uuid4()
+    post = _referral_post(owner_id=author.id)
+    post.referral_detail.referring_clinician = referring
+    post.referral_detail.clinician_affiliation = referring.primary_clinician_affiliation
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(referring)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+
+    # No owner-context card on a referral detail page.
+    assert tree.css_first('article[data-row-id="provider-profile"]') is None
+    # The referring clinician is a linked reference in the meta line.
+    meta = tree.css_first("small.meta")
+    assert meta is not None, "subtitle meta line should render"
+    assert "Referred by" in meta.text(), meta.text()
+    assert (
+        meta.css_first(f'a[href="/clinicians/{referring.id}"]') is not None
+    ), "referring clinician name should link to the clinician detail page"
+
+
 # --- Owner authz invariants ----------------------------------------------
 
 
