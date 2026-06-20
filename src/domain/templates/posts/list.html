@@ -2,6 +2,9 @@
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {%- from "_shared/_locked.html" import locked_action -%}
+{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/form_fields.html" import text_field with context -%}
+{%- from "_shared/actions.html" import actions -%}
 {% block actions %}
   {% if can_act_as_provider %}
     <li>
@@ -22,4 +25,28 @@
     {{ item_list(posts, post_feed_row, "posts-list", "post-feed-list",
         empty=_empty,
         pager=pager) }}
+  {% endblock %}
+  {% block after_content %}
+    {#- "Save this search" — persists the *current* filter set as a named
+      SavedSearch owned by the viewer. Only shown to a signed-in user
+      with at least one active filter (saving the unfiltered directory is
+      pointless). The hidden `filters` field carries the live
+      `filter_values` dict as JSON; `SavedSearchCreate._coerce_filters`
+      parses the string and scopes it to declared post filters. Posts to
+      the viewer's own collection — the framework's create handler runs
+      `assert_self_or_admin` against the URL's user. -#}
+    {%- if current_user and active_filter_count %}
+      <details class="save-search">
+        <summary>Save this search</summary>
+        <section class="entity-form-page">
+          {%- call entity_form(entity_url('user', id=current_user.id) ~ "/saved_searches",
+            method="post") %}
+            <input type="hidden" name="filters" value='{{ filter_values | tojson }}'>
+            {{ text_field("name", "Name", required=true, maxlength=200,
+                        help="Give this filter set a name to find it later.") }}
+            {{ actions("Save search") }}
+          {%- endcall %}
+        </section>
+      </details>
+    {%- endif %}
   {% endblock %}

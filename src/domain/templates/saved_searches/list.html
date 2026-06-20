@@ -1,18 +1,17 @@
 {# `/users/{user_id}/saved_searches` — canonical list of a user's saved
    searches.
 
-   PR1 (skeleton CRUD): each card links to its edit form, where rename
-   and delete live. The "open this search" link — the card headline
-   navigating to the rendered `/posts?…` URL — arrives with the URL
-   render/capture PR, alongside the "Save this search" affordance on
-   the posts page. For now `filters` is shown only as a count.
+   The card headline is the **open** action: it navigates to the
+   rendered `/posts?…` URL (`posts_url_for_filters(s.filters)`), so
+   clicking a saved search runs it. Rename / delete live behind the
+   secondary "Edit" link in the card footer, which goes to the row's
+   edit form.
 
-   Renders via the shared `subresource_card` (headline + subtitle +
-   short fact-list), the same primitive the clinician credential lists
-   use — see `_shared/_card.html`.
+   Renders via the shared `card` primitive (headline + subtitle +
+   caller-supplied footer) — see `_shared/_card.html`.
 #}
 {% extends "views/list.html" %}
-{%- from "_shared/_card.html" import subresource_card -%}
+{%- from "_shared/_card.html" import card -%}
 {%- from "_shared/_item_list.html" import item_list -%}
 {% block resource_label %}Saved searches{% endblock %}
 {% block actions %}
@@ -22,10 +21,18 @@
   </li>
 {% endblock %}
 {%- macro saved_search_card(s) %}
-  {{ subresource_card(id=s.id,
-    headline_url=entity_url('user', id=user_id) ~ "/saved_searches/" ~ s.id|string ~ "/form",
-  headline=s.name,
-  subtitle_parts=[(s.filters|length ~ " filter" ~ ("" if s.filters|length == 1 else "s"))]) }}
+  {%- set count = s.filters|length -%}
+  {%- set subtitle %}<span>{{ count }} filter{{ "" if count == 1 else "s" }}</span>{%- endset %}
+  {%- call card(id=s.id,
+    headline_url=posts_url_for_filters(s.filters),
+    headline=s.name,
+    subtitle=subtitle) -%}
+    <footer>
+      <a href="{{ entity_url('user', id=user_id) }}/saved_searches/{{ s.id|string }}/form"
+         role="button"
+         class="secondary outline">Edit</a>
+    </footer>
+  {%- endcall %}
 {%- endmacro %}
 {% block list_body %}
   {{ item_list(rows, saved_search_card, "saved-searches-list",

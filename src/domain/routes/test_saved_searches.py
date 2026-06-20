@@ -139,6 +139,71 @@ async def test_delete_removes(
 
 
 @pytest.mark.asyncio
+async def test_create_captures_json_filters_from_form(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The posts-page "Save this search" form posts `name` + a hidden
+    `filters` JSON string; the create handler parses + scopes it."""
+    response = await authenticated_client.post(
+        f"/users/{logged_in_user.id}/saved_searches",
+        data={
+            "name": "CA openings",
+            "filters": '{"kind": "clinician_opening", "state": ["CA"], "bogus": 1}',
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+    async with db_test_session_manager() as session:
+        row = (
+            (
+                await session.execute(
+                    select(SavedSearch).where(SavedSearch.user_id == logged_in_user.id)
+                )
+            )
+            .scalars()
+            .one()
+        )
+    # JSON parsed; unknown key dropped.
+    assert row.filters == {"kind": "clinician_opening", "state": ["CA"]}
+
+
+@pytest.mark.asyncio
+async def test_posts_page_shows_save_search_when_filtered(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    filtered = await authenticated_client.get("/posts?kind=clinician_opening")
+    assert filtered.status_code == 200
+    assert "Save this search" in filtered.text
+
+    unfiltered = await authenticated_client.get("/posts")
+    assert unfiltered.status_code == 200
+    assert "Save this search" not in unfiltered.text
+
+
+@pytest.mark.asyncio
+async def test_list_card_links_to_rendered_posts_url(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A saved-search card's headline opens the rendered `/posts?…`
+    URL — the "open" half of the round-trip."""
+    await _seed_search(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        name="CA openings",
+        filters={"kind": "clinician_opening", "state": ["CA"]},
+    )
+    response = await authenticated_client.get(
+        f"/users/{logged_in_user.id}/saved_searches"
+    )
+    assert response.status_code == 200, response.text
+    assert "/posts?kind=clinician_opening&amp;state=CA" in response.text
+
+
+@pytest.mark.asyncio
 async def test_list_forbidden_for_other_user(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
