@@ -32,6 +32,14 @@ from src.framework.persistence.base_repository import BaseRepository
 if TYPE_CHECKING:
     from src.framework.dispatch.entity_spec import EntitySpec
 
+# Generic form-level summary shown on a validation (422) re-render when
+# the caller didn't supply a more specific banner. The per-field errors
+# carry the detail; this banner exists so a failed submit is announced
+# at the top of the form (and to screen readers via the banner's
+# `role="alert"`) instead of only highlighting fields that may be
+# scrolled off-screen above the submit button.
+_VALIDATION_SUMMARY_BANNER = "Please fix the highlighted fields below, then resubmit."
+
 
 def mount_create(
     router: Any,
@@ -270,12 +278,21 @@ async def _render_form_with_errors(
     # extension swaps on the 422 (the default response handler only
     # swaps on 2xx).
     fragment_name = _fragment_template_name(template_name)
+    field_errors = build_form_errors_dict(errors, kind=kind)
+    # When the caller didn't pin a specific banner (the 422 validation
+    # path) but there *are* field errors, fall back to the generic
+    # summary so the failure is visible at the top of the form. The 400
+    # business-rule path always passes its own `form_banner`, so this
+    # never overrides a caller-supplied message.
+    banner = form_banner
+    if banner is None and field_errors:
+        banner = _VALIDATION_SUMMARY_BANNER
     return form_rerender(
         request=request,
         template_name=fragment_name,
         context=context,
-        field_errors=build_form_errors_dict(errors, kind=kind),
-        form_banner=form_banner,
+        field_errors=field_errors,
+        form_banner=banner,
         values=payload_dict,
         current_user=requesting_user,
         status_code=status_code,

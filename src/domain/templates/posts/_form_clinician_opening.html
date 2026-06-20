@@ -41,7 +41,7 @@ Field order:
    threading is required at the callsite; explicit overrides still win
    if a future caller needs them. #}
 {%- from "_shared/form_fields.html" import text_field, composite_select_field, multi_select_field, field_for, form_section with context -%}
-{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/_card.html" import card -%}
@@ -49,10 +49,11 @@ Field order:
 {%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
 {%- macro opening_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.opening_detail if post else None -%}
-  {# `error_swap=True` lights up the response-targets attrs that swap a
-     422 validation re-render in place; `mount_create` and `mount_update`
-     emit `HX-Redirect` on success so the redirect path is unaffected. #}
-  {%- call entity_form(action, method=hx_method, error_swap=True) -%}
+  {# `form_with_errors` lights up the response-targets attrs that swap a
+     422 validation re-render in place AND adds the `{{ form_banner() }}`
+     summary slot; `mount_create` and `mount_update` emit `HX-Redirect`
+     on success so the redirect path is unaffected. #}
+  {%- call form_with_errors(action=action, method=hx_method) -%}
     <input type="hidden" name="kind" value="clinician_opening" />
     {# Practice picker. A Clinician may carry multiple Affiliations
      (clinician × org practice-role rows). The label is **person first,

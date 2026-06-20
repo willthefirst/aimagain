@@ -54,6 +54,7 @@ from src.framework.dispatch.mounts.conftest import (
     parent_spec,
 )
 from src.framework.dispatch.mounts.create import (
+    _VALIDATION_SUMMARY_BANNER,
     build_form_errors_dict,
     handle_create,
     make_create_handler,
@@ -265,6 +266,12 @@ def test_mount_create_with_hx_request_and_form_error_render_invokes_renderer() -
     # them.
     assert ctx["form_errors"] == {"x": "Field required"}
     assert ctx["form_values"] == {}
+    # A generic form-level summary banner is injected on the 422 path so
+    # the failure is announced at the top of the form (and to screen
+    # readers via the banner's `role="alert"`), not only on the
+    # highlighted fields that may be scrolled off-screen above the
+    # submit button.
+    assert ctx["form_banner_text"] == _VALIDATION_SUMMARY_BANNER
 
 
 def test_mount_create_without_hx_request_falls_through_to_json_422() -> None:

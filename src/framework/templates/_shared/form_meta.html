@@ -1,13 +1,13 @@
 {# `form_with_errors` — wraps an opted-in form's `<form>` tag with the
-   four hx-* attributes the form-error rerender path requires, plus
-   the `form_banner()` placement. Templates supply the field inputs
-   inside a `{% call form_with_errors(...) %}` block.
+   hx-* attributes the form-error rerender path requires, plus the
+   `form_banner()` placement. Templates supply the field inputs inside a
+   `{% call form_with_errors(...) %}` block.
 
    Before this macro, every opted-in form template wrote nine lines
    of mechanical wiring:
 
        {%- from "_shared/form_banner.html" import form_banner with context -%}
-       <form hx-post="..." hx-target="this" hx-swap="outerHTML" hx-target-4xx="this" hx-swap-4xx="outerHTML">
+       <form hx-post="..." hx-target="this" hx-swap="outerHTML show:window:top" hx-target-4xx="this">
          {{ form_banner() }}
          ...
        </form>
@@ -22,9 +22,37 @@
    The macro bakes in:
 
      - `hx-{method}="<action>"`              — the submit URL.
-     - `hx-target="this" hx-swap="outerHTML"` — the success/error-2xx swap.
-     - `hx-target-4xx="this" hx-swap-4xx="outerHTML"` — activates
-       `response-targets` so 4xx rerenders swap too.
+     - `hx-target="this" hx-swap="outerHTML show:window:top"` — the
+       swap spec for BOTH success and error. The `show:window:top`
+       modifier scrolls the viewport to the top of the page after the
+       swap so the re-rendered `form_banner()` slot is visible. Without
+       it the error swap happens in place and the user — still scrolled
+       at the submit button — sees no movement and thinks nothing
+       happened; the summary + highlighted fields are above the fold.
+
+       GOTCHA — the swap spec (style AND modifiers) lives ONLY on
+       `hx-swap`; there is deliberately no `hx-swap-4xx`. The
+       `response-targets` extension reads only `hx-target-<code>`
+       attributes: on a 4xx it sets `evt.detail.shouldSwap = true` and
+       `evt.detail.target`, and never touches the swap style. htmx then
+       takes the swap spec from the element's plain `hx-swap`. So
+       `hx-swap-4xx` is read by nothing (neither the extension nor htmx
+       core) — putting the scroll modifier there silently no-ops. The
+       repo used to set `hx-swap-4xx="outerHTML"` on every opted-in form;
+       it only ever "worked" because the value happened to match
+       `hx-swap`. It's been removed as dead.
+
+       We use `show:window:top` (scroll viewport to 0) rather than
+       `show:top` (scroll the *swap target* into view) because the swap
+       is `outerHTML` — it replaces the form element, so htmx can't
+       reliably re-resolve the now-removed target; scrolling the window
+       is unconditional and correct here because every form using this
+       wrapper sits at the top of its page. On a successful submit
+       `mount_create` returns `HX-Redirect` (htmx navigates, no swap),
+       so the modifier only ever fires on the error re-render.
+     - `hx-target-4xx="this"` — activates `response-targets` so 4xx
+       rerenders swap in place (the swap *style* still comes from
+       `hx-swap` above — see the gotcha).
      - `hx-ext="json-enc"` (when `json_enc=true`) — for endpoints
        that take JSON bodies (`/auth/register`, `/auth/forgot-password`).
      - `{{ form_banner() }}` — the form-level alert slot.
@@ -57,9 +85,8 @@
   <form {{ _hx_method_attr|safe }}
         {{ _json_ext|safe }}
         hx-target="this"
-        hx-swap="outerHTML"
+        hx-swap="outerHTML show:window:top"
         hx-target-4xx="this"
-        hx-swap-4xx="outerHTML"
         {{ extra_attrs|safe }}>
     {{ form_banner() }}
     {{ caller() }}

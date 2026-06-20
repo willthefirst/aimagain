@@ -17,10 +17,10 @@
    (see the docstring at the top of `_shared/form_fields.html`). The
    `form_with_errors` wrapper imports `form_banner` itself.
 
-   `form_with_errors` bakes in the four hx-* attributes the form-error
-   rerender path needs (`hx-target`, `hx-swap`, `hx-target-4xx`,
-   `hx-swap-4xx`) plus the `{{ form_banner() }}` placement. `json_enc=true`
-   matches `UserCreate`'s JSON body contract on POST /auth/register. #}
+   `form_with_errors` bakes in the hx-* attributes the form-error
+   rerender path needs (`hx-target`, `hx-swap`, `hx-target-4xx`) plus
+   the `{{ form_banner() }}` placement. `json_enc=true` matches
+   `UserCreate`'s JSON body contract on POST /auth/register. #}
 {%- from "_shared/form_fields.html" import text_field with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {% call form_with_errors(action="/auth/register", method="post", json_enc=True) %}

@@ -12,9 +12,9 @@
    per-field `error=`/`current=` from `form_errors`/`form_values`
    injected into the render context by `mount_create` — see
    `_shared/form_fields.html` docstring. The `form_with_errors`
-   wrapper bakes in the four hx-* attrs (`hx-target`, `hx-swap`,
-   `hx-target-4xx`, `hx-swap-4xx`) and the `{{ form_banner() }}`
-   placement, so the template stays focused on field declarations. #}
+   wrapper bakes in the hx-* attrs (`hx-target`, `hx-swap`,
+   `hx-target-4xx`) and the `{{ form_banner() }}` placement, so the
+   template stays focused on field declarations. #}
 {%- from "_shared/form_fields.html" import text_field, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/actions.html" import actions -%}

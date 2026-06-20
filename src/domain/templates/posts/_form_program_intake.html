@@ -41,7 +41,7 @@ Field order:
    the top of `_shared/form_fields.html`). No per-field error or value
    threading is required at the callsite. #}
 {%- from "_shared/form_fields.html" import text_field, composite_select_field, multi_select_field, field_for, form_section with context -%}
-{%- from "_shared/forms.html" import entity_form -%}
+{%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/_card.html" import card -%}
@@ -49,10 +49,11 @@ Field order:
 {%- from "_shared/_program_facts.html" import program_facts -%}
 {%- macro intake_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.intake_detail if post else None -%}
-  {# `error_swap=True` lights up the response-targets attrs that swap a
-     422 validation re-render in place; success path is unaffected
-     because `mount_create` emits `HX-Redirect`. #}
-  {%- call entity_form(action, method=hx_method, error_swap=True) -%}
+  {# `form_with_errors` lights up the response-targets attrs that swap a
+     422 validation re-render in place AND adds the `{{ form_banner() }}`
+     summary slot; success path is unaffected because `mount_create`
+     emits `HX-Redirect`. #}
+  {%- call form_with_errors(action=action, method=hx_method) -%}
     <input type="hidden" name="kind" value="program_intake" />
     {# Program picker — uses `composite_select_field` because the
      option label is a "<Program> · <Org>" composite derived from
