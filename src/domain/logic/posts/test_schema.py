@@ -50,11 +50,12 @@ def test_post_create_dispatches_referral():
     # flat — see ``test_post_create_referral_dump_keeps_flat_location``.
     assert p.location.city == "Springfield"
     assert p.location.state == "IL"
-    # Payment-paths (#1358 PR-e): defaults to in-network only per the
-    # test helper, with no carriers picked yet.
+    # Payment-paths (#1358 PR-e): defaults to in-network per the test
+    # helper, which now carries a representative carrier (in-network
+    # requires ≥1 — see conditional_fields.py).
     assert p.accepts_in_network is True
     assert p.accepts_private_pay is False
-    assert p.insurance_carriers == []
+    assert p.insurance_carriers == ["aetna"]
 
 
 def test_post_create_requires_kind():
@@ -219,20 +220,29 @@ def test_post_create_referral_rejects_unknown_insurance_carrier():
         )
 
 
-def test_post_create_referral_allows_empty_carrier_list():
-    """Empty `insurance_carriers` list is valid with any combination of
-    the three payment-path booleans — e.g. an in-network-friendly
-    referral whose carrier is undecided, or a private-pay-only one."""
+def test_post_create_referral_empty_carriers_ok_when_not_in_network():
+    """Empty `insurance_carriers` is valid as long as the referral is not
+    in-network — e.g. a private-pay-only referral, or one with no payment
+    path set. (In-network requires ≥1 carrier; see the next test.)"""
     for bools in (
-        {"accepts_in_network": True},
         {"accepts_private_pay": True},
-        {"accepts_in_network": True, "accepts_private_pay": True},
         {},  # All false — shape-valid even if uncommon.
     ):
         p = post_create_adapter.validate_python(
-            referral_payload(insurance_carriers=[], **bools)
+            referral_payload(insurance_carriers=[], accepts_in_network=False, **bools)
         )
         assert p.insurance_carriers == []
+
+
+def test_post_create_referral_in_network_requires_a_carrier():
+    """In-network referrals must name at least one carrier (the `other`
+    token + free text covers carriers off the closed list). The error
+    lands on the `insurance_carriers` field."""
+    with pytest.raises(ValidationError) as ei:
+        post_create_adapter.validate_python(
+            referral_payload(accepts_in_network=True, insurance_carriers=[])
+        )
+    assert any(e["loc"][-1] == "insurance_carriers" for e in ei.value.errors())
 
 
 def test_post_create_referral_accepts_multiple_carriers():
@@ -467,9 +477,13 @@ def test_post_create_referral_accepts_new_services_tokens(token):
 def test_post_create_referral_accepts_all_insurance_carriers(token):
     """Every `INSURANCE_CARRIERS` token validates as an element of
     `insurance_carriers` (shared vocab with Clinician, now both
-    sides are lists — #1358 PR-e)."""
+    sides are lists — #1358 PR-e). The free text is supplied so the
+    `other` token also satisfies its conditional-required rule."""
     p = post_create_adapter.validate_python(
-        referral_payload(insurance_carriers=[token])
+        referral_payload(
+            insurance_carriers=[token],
+            insurance_carriers_other_text="A regional plan",
+        )
     )
     assert p.insurance_carriers == [token]
 
@@ -689,9 +703,9 @@ def test_referral_sliding_scale_defaults_false():
     assert p.sliding_scale is False
 
 
-def test_referral_in_network_carrier_notes_defaults_none():
+def test_referral_insurance_carriers_other_text_defaults_none():
     p = post_create_adapter.validate_python(referral_payload())
-    assert p.in_network_carrier_notes is None
+    assert p.insurance_carriers_other_text is None
 
 
 def test_referral_services_other_text_defaults_none():

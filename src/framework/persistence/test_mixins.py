@@ -21,14 +21,17 @@ def test_consumer_tables_carry_the_mixin_column_names():
 
 
 def test_location_columns_are_not_null_on_each_table():
-    """ReferralDetail keeps ``NOT NULL`` on its (city, state).
-    ClinicianAffiliation allows ``NULL`` on its (city, state, zip)
-    triple (location is deferred in the fast-path onboarding wizard;
-    users fill it in via "Complete your profile"). Pin both directions
-    so a regression in either surfaces immediately."""
-    for name in ("location_city", "location_state"):
-        ref_col = ReferralDetail.__table__.c[name]
-        assert ref_col.nullable is False, f"ReferralDetail.{name} must be NOT NULL"
+    """ReferralDetail keeps ``NOT NULL`` on ``location_state`` but allows
+    ``NULL`` on ``location_city`` — a referral only needs a city for
+    in-person sessions, enforced conditionally on the wire by
+    ``REFERRAL_CONDITIONAL_RULES`` (see
+    ``src/domain/logic/posts/conditional_fields.py``), not by a column
+    constraint. ClinicianAffiliation allows ``NULL`` on its full
+    (city, state, zip) triple (location is deferred in the fast-path
+    onboarding wizard). Pin all three directions so a regression
+    surfaces immediately."""
+    assert ReferralDetail.__table__.c["location_state"].nullable is False
+    assert ReferralDetail.__table__.c["location_city"].nullable is True
     for name in ("location_city", "location_state", "location_zip"):
         aff_col = ClinicianAffiliation.__table__.c[name]
         assert aff_col.nullable is True, f"ClinicianAffiliation.{name} must be nullable"

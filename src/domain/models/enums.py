@@ -165,6 +165,11 @@ class Language(LabeledChoice):
     tl = "tl", "Tagalog"
     ko = "ko", "Korean"
     ru = "ru", "Russian"
+    # Catch-all for a language outside the closed list; paired with the
+    # free-text `languages_other_text` column on `ReferralDetail` (the
+    # uniform "Other → please specify" pattern, see
+    # `posts/conditional_fields.py`).
+    other = "other", "Other"
 
 
 LANGUAGES: Final[tuple[str, ...]] = Language.values()
@@ -345,6 +350,10 @@ class Pronouns(LabeledChoice):
     she_her = "she_her", "she/her"
     he_him = "he_him", "he/him"
     they_them = "they_them", "they/them"
+    # Any set outside the closed list; paired with the free-text
+    # `pronouns_other_text` column on `ReferralDetail` (the uniform
+    # "Other → please specify" pattern, see `posts/conditional_fields.py`).
+    other = "other", "Other"
 
 
 PRONOUNS: Final[tuple[str, ...]] = Pronouns.values()

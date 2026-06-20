@@ -110,6 +110,39 @@ Composite labels (e.g. "<Program> · <Org>") and nested-flatten cases
 `.attr` shape — for those, build a list of `(value, label)` tuples at
 the call site and pass it to `composite_select_field`.
 
+## Conditional reveal (`conditional_field`)
+
+`conditional_field(reveal_when)` is a `{% call %}`-style wrapper for a
+field that should only appear once another field holds a particular
+value. It wraps *any* field macro:
+
+  {% call conditional_field("services:other") %}
+    {{ textarea_field("services_other_text", "Other services", required=false) }}
+  {% endcall %}
+
+It emits a `<div class="conditional-field" data-reveal-when="<token>">`
+that is **hidden by default** (a generic CSS rule in `framework.css`
+sets `display: none` on `.conditional-field[data-reveal-when]`). It is
+revealed by a per-token CSS `:has()` rule keyed on the *same* token —
+e.g. `form:has(input[name="services"][value="other"]:checked)
+.conditional-field[data-reveal-when="services:other"] { display: block }`.
+There is **no JavaScript**: the reveal is pure CSS, scoped to the
+enclosing `<form>`.
+
+The `reveal_when` token is `"<trigger_field>:<trigger_value>"` (a
+boolean trigger uses `"true"`) — the same string a referral rule
+exposes as `rule.reveal_token` in
+`src/domain/logic/posts/conditional_fields.py`, which is the single
+source of truth for which referral fields are conditional and on what.
+The domain reveal rules live in `src/domain/static/css/domain.css`.
+
+**"Required" is enforced server-side only.** Callers pass
+`required=false` and the wrapped field emits **no** HTML `required`
+attribute: a hidden field that carried `required` would block form
+submit with a control the user can't see or focus. The schema's
+`enforce_conditional_required` validator owns the "you must fill this
+in" half of the contract and renders the error on the field.
+
 #}
 {# ---- helpers (internal) ------------------------------------------- #}
 {# Renders the input-attribute fragment shared by every text-like macro.
@@ -471,3 +504,14 @@ emitted attribute string. #}
    list on edit). The form using this macro must also declare
    `data-array-fields="<name> ..."` so a 0-checked grid still posts an
    empty array. #}
+  {# ---- conditional reveal ------------------------------------------- #}
+  {# Wraps a field that should only appear when another field holds a
+   given value. Hidden by default (generic rule in framework.css);
+   revealed by a per-token `:has()` rule keyed on the same
+   `data-reveal-when` token (domain.css for referral tokens). No JS;
+   "required" is server-side only, so the wrapped field passes
+   `required=false` and emits no `required` attr. See the top docstring
+   and `src/domain/logic/posts/conditional_fields.py`. #}
+  {% macro conditional_field(reveal_when) -%}
+    <div class="conditional-field" data-reveal-when="{{ reveal_when }}">{{ caller() }}</div>
+  {%- endmacro %}

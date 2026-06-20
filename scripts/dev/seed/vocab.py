@@ -717,8 +717,10 @@ PLACEHOLDER_OK: Final[frozenset[str]] = frozenset(
         # only matters for the form / display); listing them here keeps the
         # seed lint quiet without committing the generator to a synthetic
         # vocabulary that drifts from the human-authored form copy.
-        "in_network_carrier_notes",
+        "insurance_carriers_other_text",
         "services_other_text",
+        "languages_other_text",
+        "pronouns_other_text",
     }
 )
 
