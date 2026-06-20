@@ -1340,10 +1340,11 @@ async def test_clinician_edit_form_has_no_inline_subresource_ui(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    # No `<h2>` headings on the edit form — only the toolbar `<h1>`
-    # ("Edit clinician") and the one `<form>` for person-level fields.
-    assert tree.css("main h2") == []
     # The sub-resource POST/DELETE forms that used to live inline are gone.
+    # (The form's own `<h2>` section headings — emitted by `form_section`
+    # since the fieldset→section port — are person-level field groups, not
+    # subresource UI, so we pin the absence of the actual CRUD affordances
+    # below rather than "no headings at all".)
     for collection in (
         "clinician_affiliations",
         "licensures",
@@ -1589,9 +1590,8 @@ async def test_clinician_edit_form_renders_for_solo_clinician(
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    # Person-level form is present; no `<h2>` sub-sections.
+    # Person-level form renders for the solo (org_id NULL) shape.
     assert tree.css_first(f'form[hx-patch="/clinicians/{clinician_id}"]') is not None
-    assert tree.css("main h2") == []
 
 
 async def test_admin_can_open_edit_form_for_any_clinician(

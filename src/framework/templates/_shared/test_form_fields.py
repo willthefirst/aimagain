@@ -597,15 +597,16 @@ def test_conditional_field_wraps_caller_in_reveal_div() -> None:
 # --- form_section ---------------------------------------------------------
 
 
-def test_form_section_wraps_caller_in_fieldset_with_legend() -> None:
-    """`form_section(title)` emits a `<fieldset class="form-section">`
-    whose `<legend>` holds the title and which wraps the `{% call %}`
-    body. This is the structural contract the section-heading CSS hooks
-    onto: `.entity-form-page form > fieldset > legend` styles the legend
-    as a section heading and draws the group's boundary rule
-    (framework.css). The `<fieldset>`/`<legend>` pair is also the only
-    correct way to give a *group* of fields an accessible name — a
-    `<label>` names a single control, never a group."""
+def test_form_section_wraps_caller_in_section_with_heading() -> None:
+    """`form_section(title)` emits a `<section class="form-section">`
+    whose `<h2>` holds the title and which wraps the `{% call %}` body.
+    This is the structural contract the form-grid CSS hooks onto:
+    `.entity-form-page form > .form-section` subgrids the form's two
+    tracks so labels align across sections, and `> h2` spans both columns
+    as the section heading (framework.css). A `<section>` (not a
+    `<fieldset>`) on purpose — Chrome won't propagate subgrid tracks
+    through a fieldset, so a section is what lets the group keep its box
+    and still subgrid; see the macro docstring."""
     html = _render(
         _make_env(),
         '{% call form_section("Coverage") %}'
@@ -613,13 +614,13 @@ def test_form_section_wraps_caller_in_fieldset_with_legend() -> None:
         "{% endcall %}",
     )
     tree = HTMLParser(html)
-    fieldset = tree.css_first("fieldset.form-section")
-    assert fieldset is not None
-    legend = fieldset.css_first("legend")
-    assert legend is not None
-    assert legend.text().strip() == "Coverage"
-    # The called body renders inside the same fieldset, after the legend.
-    assert fieldset.css_first('input[name="plan_name"]') is not None
+    section = tree.css_first("section.form-section")
+    assert section is not None
+    heading = section.css_first("h2")
+    assert heading is not None
+    assert heading.text().strip() == "Coverage"
+    # The called body renders inside the same section, after the heading.
+    assert section.css_first('input[name="plan_name"]') is not None
 
 
 # --- error-state contract (pattern, parametrized over every macro) -------
@@ -1086,9 +1087,9 @@ def test_input_macros_no_with_context_silently_skip_auto_resolution() -> None:
 def test_no_orphan_small_next_to_macro_call(form_template: str) -> None:
     """Lints the template source: a `<small>` should never appear at
     the same indentation as a macro call `{{ ... }}`. The legitimate
-    cases are `<small>` *inside* a `<fieldset>` after multiple inputs
-    in a `<div class="grid">` (fieldset-scoped helper) — those have a
-    `</div>` or `</fieldset>` line between the macro and the small, so
+    cases are `<small>` *inside* a `form_section` `<section>` after
+    multiple inputs in a `<div class="grid">` (section-scoped helper) —
+    those have a `</div>` or `</section>` line between the macro and the small, so
     the simple adjacency rule below catches the bad pattern without
     flagging the good one.
 

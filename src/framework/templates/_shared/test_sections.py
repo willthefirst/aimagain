@@ -3,9 +3,12 @@
 ``fact`` + ``facts_block`` are the canonical pair for rendering a
 labeled key/value rows panel — used by every list-card body, every
 detail-page card body, and a few form-page confirmation surfaces.
-Domain templates must compose these macros instead of hand-rolling
-the ``<section class="entity-facts"><dl>…</dl></section>`` chrome
-(per #1193's component-library rule).
+``fact_list`` is the multi-value variant: same row contract, but the
+value stacks one item per line (a ``<ul class="fact-values">``) instead
+of being comma-joined — the detail-page treatment for "a list of
+things". Domain templates must compose these macros instead of
+hand-rolling the ``<section class="entity-facts"><dl>…</dl></section>``
+chrome (per #1193's component-library rule).
 """
 
 from __future__ import annotations
@@ -26,7 +29,7 @@ def _make_env() -> Environment:
 
 def _render(env: Environment, body: str) -> str:
     template = (
-        '{%- from "_shared/sections.html" import fact, facts_block -%}'
+        '{%- from "_shared/sections.html" import fact, fact_list, facts_block -%}'
         "{% call facts_block() %}" + body + "{% endcall %}"
     )
     return env.from_string(template).render()
@@ -57,6 +60,65 @@ def test_facts_block_renders_caller_rows_inside_the_dl() -> None:
     tree = HTMLParser(html)
     rows = tree.css("section.entity-facts > dl > div[data-fact]")
     assert [r.attributes.get("data-fact") for r in rows] == ["npi", "state"]
+
+
+def test_fact_list_stacks_values_one_per_line() -> None:
+    """``fact_list`` renders its values as a bullet-less
+    ``<ul class="fact-values">`` of ``<li>``s inside the ``<dd>`` — the
+    detail-page counterpart to ``fact``'s comma-joined value. The
+    ``data-fact`` key and ``<dt>`` label match ``fact`` so the test
+    selector and label are unchanged; only the value layout differs."""
+    env = _make_env()
+    html = _render(
+        env,
+        "{{ fact_list('services', 'Seeking', ['Therapy', 'Meds', 'Groups']) }}",
+    )
+    tree = HTMLParser(html)
+    row = tree.css_first('div[data-fact="services"]')
+    assert row is not None
+    items = row.css("dd ul.fact-values > li")
+    assert [li.text(strip=True) for li in items] == ["Therapy", "Meds", "Groups"]
+
+
+def test_fact_list_single_value_renders_one_line() -> None:
+    """A length-1 list renders a single ``<li>`` — callers can route any
+    "list of things" through ``fact_list`` without special-casing
+    length 1."""
+    env = _make_env()
+    html = _render(env, "{{ fact_list('age', 'Age', ['Adult']) }}")
+    tree = HTMLParser(html)
+    items = tree.css('div[data-fact="age"] dd ul.fact-values > li')
+    assert [li.text(strip=True) for li in items] == ["Adult"]
+
+
+def test_facts_grid_groups_put_dl_directly_in_the_grid_section() -> None:
+    """`facts_grid` is the `<section class="entity-facts facts-grid">`
+    panel; `fact_group` drops a full-width `<h2>` and `fact_rows` a `<dl>`,
+    both as DIRECT children of it. The `<dl>`-as-direct-child structure is
+    what lets it subgrid the shared tracks without collapsing any wrapper
+    via `display: contents` (so the section keeps its normal box) — this
+    test pins that contract so a future refactor can't silently
+    reintroduce an intervening wrapper."""
+    env = _make_env()
+    template = (
+        '{%- from "_shared/sections.html" import fact, facts_grid, fact_group, fact_rows -%}'
+        "{% call facts_grid() %}"
+        '{{ fact_group("Logistics") }}'
+        '{% call fact_rows() %}{{ fact("state", "State", "NY") }}{% endcall %}'
+        '{{ fact_group("Coverage") }}'
+        '{% call fact_rows() %}{{ fact("plan", "Plan", "PPO") }}{% endcall %}'
+        "{% endcall %}"
+    )
+    tree = HTMLParser(env.from_string(template).render())
+    grid = tree.css_first("section.entity-facts.facts-grid")
+    assert grid is not None
+    # h2 headings and dls are DIRECT children of the grid section.
+    heads = [h.text(strip=True) for h in grid.css("section.facts-grid > h2.fact-group")]
+    assert heads == ["Logistics", "Coverage"], heads
+    dls = grid.css("section.facts-grid > dl")
+    assert len(dls) == 2, "each group's <dl> must be a direct child of the grid"
+    # The rows live inside their group's dl.
+    assert dls[0].css_first("div[data-fact] dt").text(strip=True) == "State"
 
 
 def test_facts_block_empty_body_still_emits_wrapper() -> None:
