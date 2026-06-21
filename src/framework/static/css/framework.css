@@ -155,7 +155,15 @@ dl {
   margin: 0;
 }
 dl > div { display: contents; }
-dt { font-weight: 500; }
+/* Fact labels are chrome, not signal — the same key repeats down every
+   row, so the value is what differentiates. Mute the label and its icon
+   (Lucide glyphs are a font, so they inherit this `color`) at the normal
+   weight, leaving the `<dd>` value at the default text color so it reads
+   as primary. */
+dt {
+  color: var(--pico-muted-color);
+  font-weight: var(--pico-font-weight);
+}
 dd { margin: 0; }
 /* `fact_list(...)` value — items stacked one per line inside the `<dd>`.
    Just a list reset (drop the bullet + indent) so each value aligns

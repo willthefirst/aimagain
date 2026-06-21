@@ -691,7 +691,6 @@ async def test_insurance_matches_referral_carrier(db_test_session_manager):
                 make_referral_detail(
                     referring_clinician_id=clinician.id,
                     insurance_carriers=["aetna"],
-                    accepts_in_network=True,
                 ),
                 "referral_detail",
             )
@@ -701,7 +700,6 @@ async def test_insurance_matches_referral_carrier(db_test_session_manager):
                 make_referral_detail(
                     referring_clinician_id=clinician.id,
                     insurance_carriers=["cigna"],
-                    accepts_in_network=True,
                 ),
                 "referral_detail",
             )
@@ -769,7 +767,6 @@ async def test_insurance_absent_returns_all(db_test_session_manager):
                 make_referral_detail(
                     referring_clinician_id=clinician.id,
                     insurance_carriers=["aetna"],
-                    accepts_in_network=True,
                 ),
                 "referral_detail",
             )

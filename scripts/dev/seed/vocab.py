@@ -438,16 +438,9 @@ MODALITIES_FREETEXT: Final[tuple[str, ...]] = (
     "Mindfulness-based",
     "Exposure and response prevention",
 )
-REFERRAL_SUBJECTS: Final[tuple[str, ...]] = (
-    "Child female (0–5) — Group therapy, Family therapy",
-    "Adult male seeking CBT, in-person only",
-    "Adolescent — trauma-informed care, Telehealth OK",
-    "Adult female — perinatal, EMDR preferred",
-    "Senior with depression, SF Bay Area",
-    "Adult — anxiety/OCD, sliding scale needed",
-    "Child (6–12) — ADHD, family involvement required",
-    "Young adult — first episode psychosis, Aetna",
-)
+# Referrals have no `subject` column — their title is always derived from
+# demographics (`post_feed_headline`), so there are no referral subjects to
+# seed. Openings and intakes still carry a poster-set subject.
 OPENING_SUBJECTS: Final[tuple[str, ...]] = (
     "3 slots — adults, relational/psychodynamic · $200/session",
     "Accepting new clients for trauma work",
@@ -501,15 +494,18 @@ AGE_DESCRIPTORS: Final[dict[str, str]] = {
     "adults_25_64": "adult",
     "older_adults_65_plus": "older adult",
 }
+# Natural-prose phrase per service, drawn for the `{service_word}` slot in
+# the description templates. Keys track the current `REFERRAL_SERVICES`
+# vocabulary (the old `psychotherapy` / `case_management` / `couples_therapy`
+# tokens are gone); only the prose values reach the seed text.
 SERVICE_WORDS: Final[dict[str, str]] = {
-    "evaluation": "evaluation",
     "medication_management": "medication management",
-    "psychotherapy": "psychotherapy",
-    "case_management": "case management",
-    "allied_health": "allied health support",
-    "group_therapy": "group therapy",
-    "family_therapy": "family therapy",
-    "couples_therapy": "couples therapy",
+    "therapy_individual": "individual therapy",
+    "therapy_group": "group therapy",
+    "therapy_family": "family therapy",
+    "allied_social_work": "clinical social work",
+    "allied_ot": "occupational therapy",
+    "allied_creative_arts": "creative arts therapy",
 }
 INSURANCE_NOTES: Final[tuple[str, ...]] = (
     "Aetna preferred but flexible.",
@@ -812,10 +808,6 @@ def render_intake_description(rng: SeededRandom, index: int) -> str:
     )
 
 
-def referral_subject(rng: SeededRandom, index: int) -> str:
-    return rng.round_robin(REFERRAL_SUBJECTS, index)
-
-
 def opening_subject(rng: SeededRandom, index: int) -> str:
     return rng.round_robin(OPENING_SUBJECTS, index)
 
@@ -859,7 +851,6 @@ __all__ = [
     "render_intake_description",
     "practice_name",
     "program_name",
-    "referral_subject",
     "opening_subject",
     "intake_subject",
     "US_STATES",

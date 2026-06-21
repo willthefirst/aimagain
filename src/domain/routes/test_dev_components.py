@@ -86,7 +86,7 @@ async def test_component_gallery_documents_conditional_field(
     reveal pattern can be inspected in isolation."""
     response = await test_client.get("/dev/components")
     assert 'id="conditional-field"' in response.text
-    assert 'data-reveal-when="accepts_in_network:true"' in response.text
+    assert 'data-reveal-when="insurance_carriers:other"' in response.text
 
 
 async def test_component_gallery_404s_when_not_development(
