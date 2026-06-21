@@ -112,10 +112,8 @@ _REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
 # ClinicianAffiliation (and `languages` on the linked Clinician) and
 # are set there directly.
 _OPENING_DEFAULTS: dict[str, Any] = {
-    "subject": None,
     "description": None,
     "schedule_text": None,
-    "treatment_modality": None,
 }
 
 
@@ -159,10 +157,8 @@ def make_referral_detail(**overrides: Any) -> ReferralDetail:
 # lives on the linked Program (including `languages`, which is
 # program-level on the intake side).
 _PROGRAM_AVAILABILITY_DEFAULTS: dict[str, Any] = {
-    "subject": None,
     "description": None,
     "schedule_text": None,
-    "treatment_modality": None,
 }
 
 # Stub program_id for schema-validation tests that never hit the DB.

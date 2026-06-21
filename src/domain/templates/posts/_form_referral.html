@@ -20,10 +20,10 @@ keep preferences open text:
   3. About the client — age, pronouns, languages, narrative
   4. Coverage — payment-path booleans + carrier notes
 
-Referrals have no `subject` field at all (unlike openings/intakes): the
-title is always derived in the view layer (`post_feed_headline` in
-`domain/logic/posts/view.py`) from demographics. There's no poster-set
-custom title to override it.
+No post kind has a `subject` field: the title is always derived in the
+view layer (`post_feed_headline` in `domain/logic/posts/view.py`) — for
+referrals, from demographics. There's no poster-set custom title to
+override it.
 #}
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected

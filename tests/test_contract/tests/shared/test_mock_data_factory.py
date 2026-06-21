@@ -80,9 +80,9 @@ def test_text_columns_get_stub_string():
     pa = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
     assert pa.opening_detail.description == "stub description"
     assert pa.opening_detail.schedule_text == "stub schedule_text"
-    assert pa.opening_detail.treatment_modality == "stub treatment_modality"
-    # ``website`` moved to the affiliation in #1358 PR-f sub-3 and is no
-    # longer a detail-row column.
+    # ``website`` moved to the affiliation in #1358 PR-f sub-3, and
+    # ``subject`` / ``treatment_modality`` were later dropped — none are
+    # detail-row columns anymore.
 
 
 # --- Defaults: enum-typed Text columns (per-kind registry) -------------
