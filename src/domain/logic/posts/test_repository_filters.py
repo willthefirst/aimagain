@@ -1,19 +1,18 @@
 """Tests for PostRepository.list_posts() filter dimensions.
 
-Covers: geography, include_telehealth, insurance, age_group, language.
-Each dimension is tested in isolation, then multi-value OR-within-field
-cases are pinned. Absent params are verified to skip the WHERE clause
-(all posts returned).
+Covers: session_format, services, insurance, age_group, language. Each
+dimension is tested in isolation, then multi-value OR-within-field cases
+are pinned. Absent params are verified to skip the WHERE clause (all posts
+returned).
 
-After the program-intake remodel every post kind is self-describing on
-its own detail row: ``age_group`` matches ``ReferralDetail.age_groups``,
-``OpeningDetail.age_groups``, AND ``IntakeDetail.age_groups`` (no longer
-the linked ``Program``); ``include_telehealth`` matches
-``OpeningDetail.session_format`` containing ``virtual``. The
-``level_of_care`` / ``modality`` axes were removed entirely — no post
-kind models treatment settings or modalities anymore (services collapsed
-onto the single ``ReferralService`` "what care" axis across all three
-kinds).
+Every post kind is self-describing on its own detail row, so the
+per-announcement filters read across all three: ``age_group`` and
+``services`` match ``ReferralDetail`` / ``OpeningDetail`` / ``IntakeDetail``;
+``session_format`` matches ReferralDetail + OpeningDetail (intakes have no
+delivery axis). The old free-text ``geography`` + ``include_telehealth``
+flag folded into the structured ``state`` / ``city`` / ``session_format``
+filters; ``level_of_care`` / ``modality`` were removed when settings /
+modalities collapsed onto the single ``services`` axis.
 """
 
 from __future__ import annotations
@@ -72,242 +71,6 @@ async def _list(db_test_session_manager, **kwargs) -> list[Post]:
 
 
 # ---------------------------------------------------------------------------
-# geography filter
-# ---------------------------------------------------------------------------
-
-
-async def test_geography_matches_referral_city(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id,
-                    location_city="Portland",
-                    location_state="OR",
-                ),
-                "referral_detail",
-            )
-            no_match = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id,
-                    location_city="Denver",
-                    location_state="CO",
-                ),
-                "referral_detail",
-            )
-
-    results = await _list(db_test_session_manager, geography="Portland")
-    ids = {p.id for p in results}
-    assert match.id in ids
-    assert no_match.id not in ids
-
-
-async def test_geography_matches_referral_state(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id,
-                    location_city="Eugene",
-                    location_state="OR",
-                ),
-                "referral_detail",
-            )
-            no_match = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id,
-                    location_city="Boise",
-                    location_state="ID",
-                ),
-                "referral_detail",
-            )
-
-    results = await _list(db_test_session_manager, geography="OR")
-    ids = {p.id for p in results}
-    assert match.id in ids
-    assert no_match.id not in ids
-
-
-async def test_geography_matches_opening_affiliation_city(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match_clinician = make_clinician_with_org(
-                owner_id=owner.id,
-                location_city="Berkeley",
-                location_state="CA",
-            )
-            no_match_clinician = make_clinician_with_org(
-                owner_id=owner.id,
-                location_city="Oakland",
-                location_state="CA",
-                practice_name="Other Practice",
-            )
-            session.add(match_clinician)
-            session.add(no_match_clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(clinician_id=match_clinician.id),
-                "opening_detail",
-            )
-            no_match = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(clinician_id=no_match_clinician.id),
-                "opening_detail",
-            )
-
-    results = await _list(db_test_session_manager, geography="Berkeley")
-    ids = {p.id for p in results}
-    assert match.id in ids
-    assert no_match.id not in ids
-
-
-async def test_geography_absent_returns_all(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            p1 = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id, location_city="Austin"
-                ),
-                "referral_detail",
-            )
-            p2 = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(
-                    referring_clinician_id=clinician.id, location_city="Miami"
-                ),
-                "referral_detail",
-            )
-
-    results = await _list(db_test_session_manager, geography=None)
-    ids = {p.id for p in results}
-    assert p1.id in ids
-    assert p2.id in ids
-
-
-# ---------------------------------------------------------------------------
-# include_telehealth + geography
-# ---------------------------------------------------------------------------
-
-
-async def test_include_telehealth_expands_geography_to_virtual_ca(
-    db_test_session_manager,
-):
-    """A virtual/CA opening appears when geography='CA' + include_telehealth='1',
-    even though the affiliation city doesn't match the search term."""
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            # Clinician in a different CA city. Telehealth is now a
-            # per-announcement attribute (the opening's `session_format`),
-            # not a clinician/affiliation column — set below on the post.
-            virtual_ca = make_clinician_with_org(
-                owner_id=owner.id,
-                location_city="San Francisco",
-                location_state="CA",
-                practice_name="Virtual CA Practice",
-            )
-            # Clinician in a different state — should not appear
-            out_of_state = make_clinician_with_org(
-                owner_id=owner.id,
-                location_city="Seattle",
-                location_state="WA",
-                practice_name="WA Virtual Practice",
-            )
-            session.add(virtual_ca)
-            session.add(out_of_state)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            ca_post = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(
-                    clinician_id=virtual_ca.id, session_format=["virtual"]
-                ),
-                "opening_detail",
-            )
-            wa_post = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(
-                    clinician_id=out_of_state.id, session_format=["virtual"]
-                ),
-                "opening_detail",
-            )
-
-    # geography="CA" matches location_state; include_telehealth also adds
-    # the virtual+CA clause — the CA clinician matches on both paths.
-    results = await _list(
-        db_test_session_manager, geography="CA", include_telehealth="1"
-    )
-    ids = {p.id for p in results}
-    assert ca_post.id in ids
-    assert wa_post.id not in ids
-
-
-async def test_include_telehealth_alone_adds_no_constraint(db_test_session_manager):
-    """include_telehealth with no geography param returns all posts."""
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            p = await _add_post(
-                session,
-                owner.id,
-                make_referral_detail(referring_clinician_id=clinician.id),
-                "referral_detail",
-            )
-
-    results = await _list(db_test_session_manager, include_telehealth="1")
-    assert p.id in {post.id for post in results}
-
-
-# ---------------------------------------------------------------------------
 # Shared intake-seed helpers (a Program needs an Org parent; the intake's
 # own profile — services / age_groups / genders / cost — lives on its
 # IntakeDetail, not the Program).
@@ -335,6 +98,129 @@ async def _seed_program(db_test_session_manager, owner_id, org_id, **program_kwa
             )
             session.add(program)
         return program.id
+
+
+# ---------------------------------------------------------------------------
+# session_format filter (replaces the old free-text geography + telehealth)
+# ---------------------------------------------------------------------------
+
+
+async def test_session_format_matches_referral_and_opening(db_test_session_manager):
+    """``session_format`` matches the per-announcement delivery format on
+    ReferralDetail + OpeningDetail (both carry the list); intakes have no
+    session-format axis, so they never match."""
+    owner = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(owner_id=owner.id)
+            session.add(clinician)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            ref_match = await _add_post(
+                session,
+                owner.id,
+                make_referral_detail(
+                    referring_clinician_id=clinician.id, session_format=["virtual"]
+                ),
+                "referral_detail",
+            )
+            ref_no = await _add_post(
+                session,
+                owner.id,
+                make_referral_detail(
+                    referring_clinician_id=clinician.id, session_format=["in_person"]
+                ),
+                "referral_detail",
+            )
+            open_match = await _add_post(
+                session,
+                owner.id,
+                make_opening_detail(
+                    clinician_id=clinician.id, session_format=["in_person", "virtual"]
+                ),
+                "opening_detail",
+            )
+
+    results = await _list(db_test_session_manager, session_format=["virtual"])
+    ids = {p.id for p in results}
+    assert ref_match.id in ids
+    assert open_match.id in ids
+    assert ref_no.id not in ids
+
+
+async def test_session_format_absent_returns_all(db_test_session_manager):
+    owner = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(owner_id=owner.id)
+            session.add(clinician)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            p = await _add_post(
+                session,
+                owner.id,
+                make_referral_detail(referring_clinician_id=clinician.id),
+                "referral_detail",
+            )
+    results = await _list(db_test_session_manager)
+    assert p.id in {post.id for post in results}
+
+
+# ---------------------------------------------------------------------------
+# services filter — the unified "what care" axis across every kind
+# ---------------------------------------------------------------------------
+
+
+async def test_services_matches_across_all_kinds(db_test_session_manager):
+    """``services`` matches the ``ReferralService`` token on each kind's own
+    detail row — ReferralDetail, OpeningDetail, and IntakeDetail."""
+    owner = await _seed_user(db_test_session_manager)
+    org_id = await _seed_org(db_test_session_manager, owner.id)
+    pid = await _seed_program(db_test_session_manager, owner.id, org_id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician_with_org(owner_id=owner.id)
+            session.add(clinician)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            ref_match = await _add_post(
+                session,
+                owner.id,
+                make_referral_detail(
+                    referring_clinician_id=clinician.id,
+                    services=["medication_management"],
+                ),
+                "referral_detail",
+            )
+            open_match = await _add_post(
+                session,
+                owner.id,
+                make_opening_detail(
+                    clinician_id=clinician.id, services=["medication_management"]
+                ),
+                "opening_detail",
+            )
+            intake_match = await _add_post(
+                session,
+                owner.id,
+                make_intake_detail(program_id=pid, services=["medication_management"]),
+                "intake_detail",
+            )
+            no_match = await _add_post(
+                session,
+                owner.id,
+                make_referral_detail(
+                    referring_clinician_id=clinician.id, services=["therapy_group"]
+                ),
+                "referral_detail",
+            )
+
+    results = await _list(db_test_session_manager, services=["medication_management"])
+    ids = {p.id for p in results}
+    assert {ref_match.id, open_match.id, intake_match.id} <= ids
+    assert no_match.id not in ids
 
 
 # ---------------------------------------------------------------------------
