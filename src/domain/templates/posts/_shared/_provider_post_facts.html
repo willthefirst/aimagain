@@ -1,0 +1,74 @@
+{# Provider-post (clinician_opening + program_intake) DETAIL-page fact
+   display — grouped to mirror the create/edit form
+   (`_form_clinician_opening.html` / `_form_program_intake.html`).
+
+   The post's own **self-describing** profile renders here; the
+   steady-state provider *context* (location, insurance, how-to-refer)
+   renders in the owner-context card in `posts/detail.html`. The read view
+   and the write view tell the same story in the same order — the form's
+   sections, in the form's order:
+
+     1. Service type    — services offered (+ "other" free text)
+     2. Clients served  — the cohort (ages, genders)
+     3. About           — the announcement narrative
+     4. Availability    — schedule notes + cost
+
+   Delivery (in-person/virtual) is NOT a section here: it's shown in the
+   `.post-meta` modality chips above (and `location_summary` carries it on
+   the list card), so repeating it would be noise.
+
+   The sections live inside ONE `facts_grid()` so their key/value columns
+   align across every section (the read-side mirror of the form's single
+   aligned grid). Each section is a `fact_group("Title")` heading plus a
+   `fact_rows()` `<dl>`; a section with no values suppresses itself
+   (heading included) via the `{% if %}` guards.
+
+   No per-row icons: the section headings carry the organization.
+   Multi-value rows (services, ages, genders) stack one item per line via
+   `fact_list`. Reads from `view` (the `post_card_view` dict);
+   `CLIENT_AGE_GROUP_LABELS` / `GENDER_LABELS` are Jinja globals, and the
+   services row reuses `services_fact` so its priority-sort matches the
+   list card exactly. #}
+{%- from "_shared/sections.html" import fact, fact_list, facts_grid, fact_group, fact_rows -%}
+{%- from "posts/_shared/_facts_block.html" import services_fact -%}
+{% macro provider_post_facts(view) -%}
+  {%- call facts_grid() %}
+    {%- if view.services or view.services_other_text %}
+      {{ fact_group("Service type") }}
+      {%- call fact_rows() %}
+        {{ services_fact(view, multiline=True) }}
+        {%- if view.services_other_text %}
+          {{ fact('services_other_text', 'Other services', view.services_other_text) }}
+        {%- endif %}
+      {%- endcall %}
+    {%- endif %}
+    {%- if view.ages or view.genders %}
+      {{ fact_group("Clients served") }}
+      {%- call fact_rows() %}
+        {%- if view.ages %}
+          {%- set _ages = [] -%}
+          {%- for g in view.ages -%}{%- set _ = _ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+            {{ fact_list('ages', 'Ages', _ages) }}
+          {%- endif %}
+          {%- if view.genders %}
+            {%- set _gs = [] -%}
+            {%- for g in view.genders -%}{%- set _ = _gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
+              {{ fact_list('genders', 'Genders', _gs) }}
+            {%- endif %}
+          {%- endcall %}
+        {%- endif %}
+        {%- if view.description %}
+          {{ fact_group("About") }}
+          {%- call fact_rows() %}
+            {{ fact('narrative', 'Narrative', view.description) }}
+          {%- endcall %}
+        {%- endif %}
+        {%- if view.schedule_text or view.cost %}
+          {{ fact_group("Availability") }}
+          {%- call fact_rows() %}
+            {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
+              {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
+              {%- endcall %}
+            {%- endif %}
+          {%- endcall %}
+        {%- endmacro %}

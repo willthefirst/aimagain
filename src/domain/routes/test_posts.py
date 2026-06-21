@@ -1356,11 +1356,11 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """Opening detail renders the post's own facts (schedule notes) in
-    the top facts block and the steady-state practice *context* inside the
-    `provider-profile` owner-context card — the affiliation now models
-    only insurance posture + how-to-refer (website), so those rows live in
-    the card, structurally separate from the announcement copy."""
+    """Opening detail renders the post's own self-describing profile
+    (services / cohort / cost / schedule) in the grouped facts up top, and
+    the steady-state practice *context* (insurance posture + how-to-refer
+    website) inside the `provider-profile` owner-context card —
+    structurally separate from the announcement profile."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
@@ -1375,6 +1375,9 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     aff.website = "https://acme.example.com"
     post = _opening_post(owner_id=author.id, clinician=clinician)
     post.opening_detail.schedule_text = "Mornings only"
+    post.opening_detail.services = ["therapy_individual"]
+    post.opening_detail.age_groups = ["adults_25_64"]
+    post.opening_detail.cost = "$150/session"
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(viewer_clinician)
@@ -1407,9 +1410,15 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
             card.css_first(f'div[data-fact="{fact_key}"]') is not None
         ), f"{fact_key} should render inside the provider-profile card"
     assert "Sliding scale" in card.text()
-    # ...post-own facts live outside it, in the top facts block.
-    row = tree.css_first('div[data-fact="schedule_notes"]')
-    assert row is not None, "schedule_notes should render on the detail page"
+    # The opening's own self-describing profile renders in the grouped
+    # facts up top — NOT through the owner-context card.
+    for fact_key in ("services", "ages", "cost", "schedule_notes"):
+        row = tree.css_first(f'div[data-fact="{fact_key}"]')
+        assert row is not None, f"{fact_key} should render on the detail page"
+        assert (
+            card.css_first(f'div[data-fact="{fact_key}"]') is None
+        ), f"{fact_key} is the post's own profile, not steady-state context"
+    assert "Therapy — Individual" in tree.text()
 
 
 async def test_intake_detail_renders_program_profile_card(
@@ -1464,6 +1473,16 @@ async def test_intake_detail_renders_program_profile_card(
         card.css_first('div[data-fact="website"]') is not None
     ), "website should render inside the provider-profile card"
     assert "https://riseiop.example.com" in card.text()
+    # The intake's own self-describing profile (services / cohort) renders
+    # in the grouped facts up top — NOT through the owner-context card.
+    # `_intake_post` seeds services=["therapy_group"], age_groups=[adolescents].
+    for fact_key in ("services", "ages"):
+        row = tree.css_first(f'div[data-fact="{fact_key}"]')
+        assert row is not None, f"{fact_key} should render on the intake detail page"
+        assert (
+            card.css_first(f'div[data-fact="{fact_key}"]') is None
+        ), f"{fact_key} is the post's own profile, not Program context"
+    assert "Therapy — Group" in tree.text()
 
 
 # --- POST /posts/{id}/message (in-app contact form) --------------------------

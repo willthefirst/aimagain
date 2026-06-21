@@ -1,6 +1,7 @@
 {% extends "views/detail.html" %}
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_referral_facts.html" import referral_facts -%}
+{%- from "posts/_shared/_provider_post_facts.html" import provider_post_facts -%}
 {%- from "_shared/_card.html" import card -%}
 {%- from "_shared/sections.html" import fact, fact_list, facts_block as entity_facts -%}
 {%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
@@ -76,15 +77,17 @@
           {%- endcall %}
         {%- endif -%}
       {%- endmacro %}
-      {# Detail-page layout. Referral detail is the grouped fact display
-   (`_referral_facts` — Narrative / Logistics / Service type / About the
-   client / Coverage, mirroring the create/edit form's sections); its
+      {# Detail-page layout. Every kind leads with a grouped fact display
+   mirroring its create/edit form's sections: referrals via
+   `_referral_facts` (Logistics / Service type / About the client /
+   Coverage), openings + intakes via `_provider_post_facts` (Service type /
+   Clients served / About / Availability). For provider posts the
+   steady-state provider context (insurance, address, languages,
+   how-to-refer) then renders in the owner-context card; the referral's
    referring clinician is the linked `provider_ref` in the meta line, not
-   an owner card. Opening/intake detail splits two ways: the post's own
-   facts (the announcement delta — schedule notes) up top, then the
-   owner-context card. Per-kind logic lives in `post_card_view` (one
-   place); every visual element reads from `view` (plus the linked
-   affiliation/program model rows the shared facts macros render
+   an owner card. Per-kind logic lives in `post_card_view` (one place);
+   every visual element reads from `view` (plus the linked
+   affiliation/program model rows the owner-context macro renders
    directly). #}
       {% block content %}
         <section data-kind="{{ post.kind }}">
@@ -113,12 +116,11 @@
                  reference in the `.post-meta` line above, not an owner card. #}
             {{ referral_facts(view, redacted=not can_act_as_provider) }}
           {%- else %}
-            {%- if view.description %}<p>{{ view.description }}</p>{%- endif %}
-            {%- if view.schedule_text %}
-              {%- call entity_facts() %}
-                {{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}
-              {%- endcall %}
-            {%- endif %}
+            {# The provider post's own self-describing profile (services /
+                 cohort / narrative / cost), grouped to mirror its form —
+                 then the steady-state provider context (insurance, address,
+                 languages, how-to-refer) in the owner-context card below. #}
+            {{ provider_post_facts(view) }}
             {{ owner_context(view, post, redacted=not can_act_as_provider) }}
           {%- endif %}
           <footer>
