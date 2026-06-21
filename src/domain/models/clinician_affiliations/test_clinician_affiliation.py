@@ -39,15 +39,11 @@ def _make_clinician(*, owner: User, org: Organization, **overrides) -> Clinician
         org_id=org.id,
         first_name="Jane",
         last_name="Smith",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=["aetna"],
         sliding_scale=False,
-        cost="$150/session",
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
     )
     defaults.update(overrides)
     return Clinician(**defaults)
@@ -76,15 +72,11 @@ async def test_clinician_construct_auto_creates_affiliation_with_per_role_attrs(
     aff = clinician.primary_clinician_affiliation
     assert aff is not None
     assert aff.org_id == org.id
-    assert aff.in_person_sessions == "yes"
-    assert aff.virtual_sessions == "no"
     assert aff.accepts_out_of_network is True
     assert aff.in_network_carriers == ["aetna"]
     assert aff.sliding_scale is False
-    assert aff.cost == "$150/session"
     assert aff.location_city == "Brooklyn"
     assert aff.location_state == "NY"
-    assert aff.location_zip == "11201"
     # ClinicianAffiliation shares the Clinician directly.
     assert aff.clinician is clinician
 
@@ -97,8 +89,6 @@ async def test_clinician_construct_with_existing_affiliations_skips_auto_create(
     existing = ClinicianAffiliation(
         clinician_id=uuid.uuid4(),
         org_id=org.id,
-        in_person_sessions="yes",
-        virtual_sessions="no",
         accepts_out_of_network=False,
         in_network_carriers=[],
         sliding_scale=False,
@@ -126,21 +116,16 @@ async def test_clinician_per_role_writes_land_on_affiliation():
     assert aff is not None
 
     clinician.location_city = "Queens"
-    clinician.in_person_sessions = "no"
     clinician.sliding_scale = True
-    clinician.cost = "$300/session"
     clinician.in_network_carriers = ["bcbs", "cigna"]
 
     assert aff.location_city == "Queens"
-    assert aff.in_person_sessions == "no"
     assert aff.sliding_scale is True
-    assert aff.cost == "$300/session"
     assert aff.in_network_carriers == ["bcbs", "cigna"]
     # Reads through the Clinician's property proxies return the same
     # value the affiliation now holds — `ClinicianRead.model_validate`
     # picks up post-edit values via `from_attributes`.
     assert clinician.location_city == "Queens"
-    assert clinician.in_person_sessions == "no"
     assert clinician.sliding_scale is True
 
 
@@ -182,13 +167,9 @@ async def test_clinician_supports_multiple_affiliations(session):
             org_id=org_b.id,
             location_city="Manhattan",
             location_state="NY",
-            location_zip="10001",
-            in_person_sessions="no",
-            virtual_sessions="yes",
             accepts_out_of_network=False,
             in_network_carriers=[],
             sliding_scale=True,
-            cost="$200/session",
         )
     )
     session.add_all([user, org_a, org_b, clinician])
@@ -223,9 +204,6 @@ async def test_primary_affiliation_picks_oldest_by_created_at(session):
         org_id=org_b.id,
         location_city="Manhattan",
         location_state="NY",
-        location_zip="10001",
-        in_person_sessions="no",
-        virtual_sessions="yes",
         accepts_out_of_network=False,
         in_network_carriers=[],
         sliding_scale=True,

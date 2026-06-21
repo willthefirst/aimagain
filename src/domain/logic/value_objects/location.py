@@ -227,6 +227,12 @@ def flatten_location_on_dump(model: BaseModel, data: dict[str, Any]) -> dict[str
     touched ``location.city`` produces ``{"location_city": ...}`` and
     not ``{"location_city": ..., "location_state": None, "location_zip": None}``.
     """
+    # Schemas embedding a no-ZIP location flavor (``ReferralLocation*``)
+    # declare ``_location_subfields = ("city", "state")`` so the dump never
+    # emits a ``location_zip`` key — which would otherwise be passed as an
+    # invalid kwarg to a model that dropped the ZIP column. Defaults to the
+    # full triple for the ZIP-ful ``Location`` schemas.
+    subfields = getattr(model, "_location_subfields", _LOCATION_SUBFIELDS)
     _absent = object()
     nested = data.pop("location", _absent)
     if nested is _absent:
@@ -234,9 +240,9 @@ def flatten_location_on_dump(model: BaseModel, data: dict[str, Any]) -> dict[str
         # Update that didn't touch location) — leave the dict untouched.
         return data
     if nested is None:
-        # location was explicitly None — write explicit nulls so the wire shape
-        # is stable (consumers always see location_city / _state / _zip, just null).
-        for sub in _LOCATION_SUBFIELDS:
+        # location was explicitly None — write explicit nulls so the wire
+        # shape is stable (consumers always see the subfields, just null).
+        for sub in subfields:
             data[f"location_{sub}"] = None
         return data
     if not isinstance(nested, dict):
@@ -244,7 +250,7 @@ def flatten_location_on_dump(model: BaseModel, data: dict[str, Any]) -> dict[str
         # key so the caller doesn't silently lose data.
         data["location"] = nested
         return data
-    for sub in _LOCATION_SUBFIELDS:
+    for sub in subfields:
         if sub in nested:
             data[f"location_{sub}"] = nested[sub]
     return data

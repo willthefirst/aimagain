@@ -145,8 +145,6 @@ def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
         sliding_scale_label: ``"Yes"`` or ``"No"``.
         cost: pass-through optional free-text.
     """
-    from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
-
     if org is None:
         org = getattr(affiliation, "org", None)
     org_id = getattr(affiliation, "org_id", None)
@@ -154,22 +152,17 @@ def affiliation_card_view(affiliation, org=None) -> dict[str, Any]:
         "org_id": org_id,
         "org_name": (getattr(org, "name", None) if org else None),
         "org_url": (f"/organizations/{org_id}" if org_id is not None else None),
+        # City/area + state, no ZIP (the affiliation models a region like a
+        # referral). Delivery format + cost moved onto the opening post.
         "full_address": full_address(
             getattr(affiliation, "location_city", None),
             getattr(affiliation, "location_state", None),
-            getattr(affiliation, "location_zip", None),
-        ),
-        "in_person_label": LOCATION_AVAILABILITY_LABELS.get(
-            getattr(affiliation, "in_person_sessions", None) or ""
-        ),
-        "virtual_label": LOCATION_AVAILABILITY_LABELS.get(
-            getattr(affiliation, "virtual_sessions", None) or ""
+            None,
         ),
         "insurance_summary": _affiliation_insurance_summary(affiliation),
         "sliding_scale_label": (
             "Yes" if getattr(affiliation, "sliding_scale", False) else "No"
         ),
-        "cost": getattr(affiliation, "cost", None),
     }
 
 
@@ -220,30 +213,23 @@ def clinician_card_view(clinician) -> dict[str, Any]:
             :func:`affiliation_card_view`. The detail page renders one
             stacked card per entry.
     """
-    from src.domain.models.enums import LOCATION_AVAILABILITY_LABELS
-
     org = getattr(clinician, "org", None)
     org_id = _role_attr(clinician, "org_id")
     affiliations = list(getattr(clinician, "clinician_affiliations", None) or [])
     return {
         "practice_name": (getattr(org, "name", None) if org else None),
         "practice_url": (f"/organizations/{org_id}" if org_id is not None else None),
+        # City/area + state, no ZIP. Delivery format + cost moved onto the
+        # opening post.
         "full_address": full_address(
             _role_attr(clinician, "location_city"),
             _role_attr(clinician, "location_state"),
-            _role_attr(clinician, "location_zip"),
-        ),
-        "in_person_label": LOCATION_AVAILABILITY_LABELS.get(
-            _role_attr(clinician, "in_person_sessions") or ""
-        ),
-        "virtual_label": LOCATION_AVAILABILITY_LABELS.get(
-            _role_attr(clinician, "virtual_sessions") or ""
+            None,
         ),
         "insurance_summary": _insurance_summary(clinician),
         "sliding_scale_label": (
             "Yes" if _role_attr(clinician, "sliding_scale", False) else "No"
         ),
-        "cost": _role_attr(clinician, "cost"),
         "npi": getattr(clinician, "npi", None),
         # Person-level matching-dimension lists (#1358 PR-a/c/f). The
         # detail-page facts block surfaces these; empty lists are

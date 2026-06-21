@@ -8,16 +8,24 @@ on the per-announcement detail row onto the steady-state home. This
 sub-PR (#3) drops the per-announcement columns entirely; the dual-
 write is gone and so is the fallback-to-detail read in the view layer.
 
-These tests pin the post-sub-3 contract:
+A later remodel then reversed the split for the opening's
+*per-announcement* dimensions: ``OpeningDetail`` regained
+``services`` / ``age_groups`` / ``genders`` and gained
+``session_format`` / ``services_other_text`` / ``cost`` — the opening
+is self-describing now. ``IntakeDetail`` was untouched and stays thin.
 
-  * ``OpeningDetail`` / ``IntakeDetail`` no longer expose the steady-
-    state profile columns at all (attribute access on a fresh row
-    raises). The thin shape carries only the announcement core plus
-    the context FK(s).
-  * Creating an ``OpeningDetail`` / ``IntakeDetail`` does **not**
-    overwrite the linked affiliation / clinician / program's profile —
-    the steady-state home is the canonical source and is edited
-    through its own pages.
+These tests pin the current contract:
+
+  * ``OpeningDetail`` carries the announcement core, the context FKs,
+    and the self-describing profile; only the truly steady-state
+    columns (``settings`` / ``modalities`` / ``languages`` /
+    ``website`` / ``referral_instructions``) stay off it.
+  * ``IntakeDetail`` exposes no steady-state profile columns at all —
+    the thin shape carries only the announcement core plus the
+    context FK.
+  * Writing an opening's profile to its detail row does **not** touch
+    the linked affiliation's steady-state context (and creating an
+    ``IntakeDetail`` does not overwrite the linked Program's profile).
 
 (The file kept its ``test_dual_write.py`` name so PR-f sub-PR 2's
 tests can be archived in `git log`; the dual-write window closed with
@@ -47,7 +55,23 @@ from tests.helpers import (
     make_program,
 )
 
+# The opening remodel reversed the #1358 split for the *per-announcement*
+# dimensions: `services` / `age_groups` / `genders` are back on
+# `OpeningDetail` (it's self-describing now), alongside the new
+# `session_format` / `services_other_text` / `cost`. Only the truly
+# steady-state columns stay off the opening row.
 _REMOVED_COLUMNS_OPENING = (
+    "settings",
+    "modalities",
+    "languages",
+    "website",
+    "referral_instructions",
+)
+# IntakeDetail is unchanged by the opening remodel — it stays thin, with
+# its whole steady-state profile (services / settings / modalities /
+# age_groups / genders / languages / website / referral_instructions) on
+# the linked `Program`.
+_REMOVED_COLUMNS_INTAKE = (
     "services",
     "settings",
     "modalities",
@@ -57,18 +81,21 @@ _REMOVED_COLUMNS_OPENING = (
     "website",
     "referral_instructions",
 )
-_REMOVED_COLUMNS_INTAKE = _REMOVED_COLUMNS_OPENING  # intake also lost languages
 
 
 def test_opening_detail_has_no_steady_state_columns():
-    """Every steady-state profile column moved off ``OpeningDetail``
-    onto ``ClinicianAffiliation`` (and ``languages`` onto ``Clinician``)
-    in sub-PR 3. The columns themselves are gone — not just unused."""
+    """Only the truly steady-state columns stayed off ``OpeningDetail``
+    (``settings`` / ``modalities`` dropped entirely; ``languages`` /
+    ``website`` / ``referral_instructions`` live on the affiliation /
+    clinician). The per-announcement dimensions (``services`` /
+    ``age_groups`` / ``genders``) came back when the opening became
+    self-describing — they are asserted present in
+    ``test_opening_detail_thin_shape``."""
     column_names = {c.name for c in OpeningDetail.__table__.columns}
     for col in _REMOVED_COLUMNS_OPENING:
         assert (
             col not in column_names
-        ), f"OpeningDetail still carries removed steady-state column {col!r}"
+        ), f"OpeningDetail still carries removed column {col!r}"
 
 
 def test_intake_detail_has_no_steady_state_columns():
@@ -81,14 +108,25 @@ def test_intake_detail_has_no_steady_state_columns():
 
 
 def test_opening_detail_thin_shape():
-    """OpeningDetail's surviving columns are exactly the announcement
-    core plus the context FKs."""
+    """OpeningDetail's columns are the announcement core + context FKs +
+    the self-describing announcement profile (`session_format` /
+    `services` / `services_other_text` / `age_groups` / `genders` /
+    `cost`). The opening reverses the #1358 split for these
+    per-announcement dimensions while leaving steady-state context
+    (location, insurance, how-to-refer, languages) on the affiliation /
+    clinician."""
     expected = {
         "post_id",
         "clinician_id",
         "clinician_affiliation_id",
         "schedule_text",
         "description",
+        "session_format",
+        "services",
+        "services_other_text",
+        "age_groups",
+        "genders",
+        "cost",
     }
     assert {c.name for c in OpeningDetail.__table__.columns} == expected
 
@@ -112,7 +150,12 @@ async def _seed_opening_world(db_test_session_manager):
     """Persist a User + Clinician + Org + ClinicianAffiliation linked
     to that clinician. Returns ``(owner_id, clinician_id, org_id,
     affiliation_id)`` — plain UUIDs so callers don't have to worry
-    about session-bound state across the per-step session boundaries."""
+    about session-bound state across the per-step session boundaries.
+
+    The affiliation carries only steady-state *context* now — the
+    per-announcement profile (services / age_groups / genders /
+    session_format / cost) moved back onto the opening, so it's set on
+    the ``OpeningDetail`` by the callers, not here."""
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
     clinician = make_clinician_with_org(owner_id=owner.id)
     async with db_test_session_manager() as session:
@@ -126,11 +169,8 @@ async def _seed_opening_world(db_test_session_manager):
     affiliation = ClinicianAffiliation(
         clinician_id=clinician_id,
         org_id=org_id,
-        services=["psychotherapy"],
-        settings=["outpatient"],
-        modalities=["cbt"],
-        age_groups=["adults_25_64"],
-        genders=["female"],
+        in_network_carriers=["aetna"],
+        sliding_scale=True,
         website="https://aff.example",
         referral_instructions="Email intake@aff.example",
     )
@@ -143,12 +183,13 @@ async def _seed_opening_world(db_test_session_manager):
 
 
 @pytest.mark.asyncio
-async def test_create_opening_does_not_touch_affiliation_profile(
+async def test_create_opening_stores_profile_on_detail_not_affiliation(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """The thin OpeningDetail carries no steady-state profile. Creating
-    one must NOT overwrite the affiliation's standing profile — the
-    steady-state home is the canonical source after sub-PR 3."""
+    """The opening is self-describing: its announcement profile
+    (session_format / services / age_groups / genders / cost) lands on
+    the ``OpeningDetail`` row, while the linked affiliation's
+    steady-state *context* (insurance, how-to-refer) is left untouched."""
     owner_id, clinician_id, _, affiliation_id = await _seed_opening_world(
         db_test_session_manager
     )
@@ -160,11 +201,17 @@ async def test_create_opening_does_not_touch_affiliation_profile(
             clinician_id=clinician_id,
             clinician_affiliation_id=affiliation_id,
             description="Caseload opening this fall.",
+            session_format=["virtual"],
+            services=["psychotherapy"],
+            age_groups=["adults_25_64", "adolescents_14_18"],
+            genders=["female"],
+            cost="$150/session",
         )
         await repo.create_polymorphic(
             post, detail, detail_relationship="opening_detail"
         )
         await session.commit()
+        post_id = post.id
 
     async with db_test_session_manager() as session:
         aff_row = (
@@ -178,25 +225,36 @@ async def test_create_opening_does_not_touch_affiliation_profile(
             .scalars()
             .one()
         )
+        detail_row = (
+            (
+                await session.execute(
+                    select(OpeningDetail).filter(OpeningDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .one()
+        )
 
-    # Affiliation profile untouched — the announcement carried no
-    # steady-state fields, so nothing to mirror and nothing to overwrite.
-    assert aff_row.services == ["psychotherapy"]
-    assert aff_row.settings == ["outpatient"]
-    assert aff_row.modalities == ["cbt"]
-    assert aff_row.age_groups == ["adults_25_64"]
-    assert aff_row.genders == ["female"]
+    # Announcement profile is on the opening detail row.
+    assert detail_row.session_format == ["virtual"]
+    assert detail_row.services == ["psychotherapy"]
+    assert detail_row.age_groups == ["adults_25_64", "adolescents_14_18"]
+    assert detail_row.genders == ["female"]
+    assert detail_row.cost == "$150/session"
+    # Affiliation steady-state context untouched.
+    assert aff_row.in_network_carriers == ["aetna"]
+    assert aff_row.sliding_scale is True
     assert aff_row.website == "https://aff.example"
     assert aff_row.referral_instructions == "Email intake@aff.example"
 
 
 @pytest.mark.asyncio
-async def test_patch_opening_announcement_core_does_not_touch_affiliation(
+async def test_patch_opening_profile_does_not_touch_affiliation(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """PATCH-ing announcement-core fields (description, schedule) on the
-    detail row does not propagate into the affiliation's profile —
-    there's no longer any mirror path."""
+    """PATCH-ing the opening's announcement profile (description,
+    schedule, services, cost) on the detail row does not propagate into
+    the affiliation's steady-state context — they're separate homes."""
     owner_id, clinician_id, _, affiliation_id = await _seed_opening_world(
         db_test_session_manager
     )
@@ -221,6 +279,8 @@ async def test_patch_opening_announcement_core_does_not_touch_affiliation(
             post.opening_detail,
             description="Updated copy",
             schedule_text="Tues PM",
+            services=["medication_management"],
+            cost="$200",
         )
         await session.commit()
 
@@ -246,12 +306,14 @@ async def test_patch_opening_announcement_core_does_not_touch_affiliation(
             .one()
         )
 
-    # Detail picks up the announcement-core change.
+    # Detail picks up the announcement change.
     assert detail_row.description == "Updated copy"
     assert detail_row.schedule_text == "Tues PM"
-    # Affiliation profile is unchanged — no dual-write any more.
-    assert aff_row.services == ["psychotherapy"]
-    assert aff_row.modalities == ["cbt"]
+    assert detail_row.services == ["medication_management"]
+    assert detail_row.cost == "$200"
+    # Affiliation context is unchanged.
+    assert aff_row.in_network_carriers == ["aetna"]
+    assert aff_row.website == "https://aff.example"
 
 
 async def _seed_intake_world(db_test_session_manager):

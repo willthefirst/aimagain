@@ -127,6 +127,14 @@ REFERRAL_CONDITIONAL_RULES: tuple[ConditionalRequiredRule, ...] = (
     _other_text_rule("pronouns", "Pronouns"),
 )
 
+# Openings reuse the same `services` "Other → free-text" rule. Location
+# isn't here: an opening's city/area lives on the linked affiliation
+# (always present), so an in-person opening is always locatable — there's
+# no per-post city to conditionally require.
+OPENING_CONDITIONAL_RULES: tuple[ConditionalRequiredRule, ...] = (
+    _other_text_rule("services", "Services"),
+)
+
 
 def enforce_conditional_required(
     model: Any, rules: tuple[ConditionalRequiredRule, ...] = REFERRAL_CONDITIONAL_RULES

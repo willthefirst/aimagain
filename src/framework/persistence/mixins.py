@@ -24,11 +24,15 @@ from sqlalchemy.orm import declared_attr
 class LocationMixin:
     """``(city, state, zip)`` postal-address column group.
 
-    Mixed into ORM models that carry a location triple.
-    ``ReferralDetail`` keeps ``nullable=False`` (a referral is always
-    location-specific).  ``ClinicianAffiliation`` sets
-    ``_location_nullable = True`` so location can be deferred during
-    onboarding and filled in later.
+    Available for any ORM model that carries a full location triple. It
+    is **not currently mixed into any model**: both location-bearing
+    models in the domain — ``ReferralDetail`` and ``ClinicianAffiliation``
+    — declare ``(city, state)`` *inline* with no ZIP, because each models a
+    city/area + state (a practice region, not a postal address) rather
+    than the full triple this mixin provides. The mixin is kept for the
+    next consumer that genuinely needs ``zip`` alongside ``city`` /
+    ``state``; subclasses that allow NULL location set
+    ``_location_nullable = True``.
 
     Each column is declared via :func:`declared_attr` so SQLAlchemy
     builds a fresh :class:`Column` per subclass (a bare ``Column(...)``

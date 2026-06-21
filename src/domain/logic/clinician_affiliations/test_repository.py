@@ -81,9 +81,6 @@ async def test_repository_creates_and_fetches_affiliation(session):
         last_name="Smith",
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=["aetna"],
         sliding_scale=False,
@@ -97,13 +94,9 @@ async def test_repository_creates_and_fetches_affiliation(session):
         org_id=org_b_id,
         location_city="Manhattan",
         location_state="NY",
-        location_zip="10001",
-        in_person_sessions="no",
-        virtual_sessions="yes",
         accepts_out_of_network=False,
         in_network_carriers=[],
         sliding_scale=True,
-        cost="$200/session",
     )
     persisted = await repo.create(new_aff)
     assert persisted.id is not None

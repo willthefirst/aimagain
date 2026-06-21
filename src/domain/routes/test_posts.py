@@ -1014,17 +1014,18 @@ async def test_opening_create_form_renders_practice_profile_preview(
     logged_in_user,
 ):
     """The opening create form shows a read-only preview of the selected
-    practice's steady-state profile (the same `affiliation_facts` rows
-    the practice page and the post detail render), so the author sees the
-    full post without navigating away. The default (first) affiliation's
-    card renders visible; the picker's value drives which card the inline
-    script reveals."""
+    practice's steady-state *context* (the `affiliation_facts` rows — now
+    insurance posture + how-to-refer only), so the author sees the
+    practice context without navigating away. The self-describing
+    announcement profile (services / age groups / etc.) is entered in the
+    form's own sections, not previewed here. The default (first)
+    affiliation's card renders visible; the picker's value drives which
+    card the inline script reveals."""
     clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, practice_name="Acme Health"
     )
     clinician.id = clinician.id or uuid.uuid4()
     aff = clinician.primary_clinician_affiliation
-    aff.services = ["psychotherapy"]
     aff.sliding_scale = True
     aff.website = "https://acme.example.com"
     async with db_test_session_manager() as session:
@@ -1041,11 +1042,21 @@ async def test_opening_create_form_renders_practice_profile_preview(
     assert card is not None, "no preview card for the affiliation"
     # The default (first) affiliation's card is visible without JS.
     assert "hidden" not in card.attributes, "first preview card should be visible"
-    # Profile rows come from the shared affiliation_facts macro.
-    assert card.css_first('div[data-fact="services"]') is not None
-    assert "Psychotherapy" in card.text()
+    # Context rows come from the shared affiliation_facts macro (insurance
+    # posture + website); the opening's own services are NOT previewed here.
     assert "Sliding scale" in card.text()
     assert "https://acme.example.com" in card.text()
+
+    # The opening is self-describing now: the form carries its own
+    # service-type / delivery / clients-served / cost sections, on the
+    # same vocabularies the referral request side uses.
+    page_text = tree.body.text()
+    for legend in ("Service type", "Delivery", "Clients served", "Cost"):
+        assert legend in page_text, f"opening form missing {legend!r} section/field"
+    for field_name in ("services", "session_format", "age_groups", "genders", "cost"):
+        assert (
+            tree.css_first(f'[name="{field_name}"]') is not None
+        ), f"opening form must render a {field_name!r} input"
 
 
 async def test_intake_create_form_renders_program_profile_preview(
@@ -1323,10 +1334,10 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     logged_in_user,
 ):
     """Opening detail renders the post's own facts (schedule notes) in
-    the top facts block and the steady-state practice profile inside the
-    `practice-profile` owner-context card — profile rows (services,
-    availability, insurance, website) live in the card, not the flat
-    grid, so it's structurally obvious which page edits them."""
+    the top facts block and the steady-state practice *context* inside the
+    `provider-profile` owner-context card — the affiliation now models
+    only insurance posture + how-to-refer (website), so those rows live in
+    the card, structurally separate from the announcement copy."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
@@ -1337,10 +1348,8 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     clinician = make_clinician_with_org(owner_id=author.id, practice_name="Acme Health")
     clinician.id = clinician.id or uuid.uuid4()
     aff = clinician.primary_clinician_affiliation
-    aff.services = ["psychotherapy"]
     aff.sliding_scale = True
     aff.website = "https://acme.example.com"
-    aff.referral_instructions = "Email intake@acme.example.com."
     post = _opening_post(owner_id=author.id, clinician=clinician)
     post.opening_detail.schedule_text = "Mornings only"
     async with db_test_session_manager() as session:
@@ -1366,8 +1375,11 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
         provider_dd.css_first(f"a[href='/organizations/{clinician.org.id}']")
         is not None
     ), "org name should link to the organization detail page"
-    # Profile rows live inside the card...
-    for fact_key in ("services", "insurance", "website", "referral_instructions"):
+    # Steady-state context rows live inside the card (insurance posture +
+    # how-to-refer website). The opening's self-describing profile
+    # (services / age groups / etc.) is no longer on the affiliation, so
+    # it isn't rendered through this card.
+    for fact_key in ("insurance", "website"):
         assert (
             card.css_first(f'div[data-fact="{fact_key}"]') is not None
         ), f"{fact_key} should render inside the provider-profile card"
