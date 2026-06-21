@@ -10,7 +10,7 @@ defaults must not silently bypass).
 from __future__ import annotations
 
 from scripts.dev.seed.lint_coverage import _json_default_is_object, main
-from src.domain.models import Program, SavedSearch
+from src.domain.models import IntakeDetail, SavedSearch
 
 
 def test_dict_default_json_column_is_object():
@@ -20,7 +20,7 @@ def test_dict_default_json_column_is_object():
 def test_list_default_json_column_is_not_object():
     # A list-default JSON column must NOT register as an object — those
     # still flow through JSON_LIST_SOURCE.
-    assert _json_default_is_object(Program.__table__.c.services) is False
+    assert _json_default_is_object(IntakeDetail.__table__.c.services) is False
 
 
 def test_seed_coverage_has_no_drift():

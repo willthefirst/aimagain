@@ -8,11 +8,15 @@ on the per-announcement detail row onto the steady-state home. This
 sub-PR (#3) drops the per-announcement columns entirely; the dual-
 write is gone and so is the fallback-to-detail read in the view layer.
 
-A later remodel then reversed the split for the opening's
-*per-announcement* dimensions: ``OpeningDetail`` regained
+A later remodel then reversed the split for the *per-announcement*
+dimensions on BOTH provider kinds: ``OpeningDetail`` regained
 ``services`` / ``age_groups`` / ``genders`` and gained
-``session_format`` / ``services_other_text`` / ``cost`` — the opening
-is self-describing now. ``IntakeDetail`` was untouched and stays thin.
+``session_format`` / ``services_other_text`` / ``cost``, and
+``IntakeDetail`` regained ``services`` / ``age_groups`` / ``genders``
+and gained ``services_other_text`` / ``cost`` (no ``session_format`` —
+a Program is a single group offering with no in-person/virtual axis).
+Both are self-describing now; only ``settings`` / ``modalities`` were
+dropped entirely (no kind models them anymore).
 
 These tests pin the current contract:
 
@@ -20,12 +24,13 @@ These tests pin the current contract:
     and the self-describing profile; only the truly steady-state
     columns (``settings`` / ``modalities`` / ``languages`` /
     ``website`` / ``referral_instructions``) stay off it.
-  * ``IntakeDetail`` exposes no steady-state profile columns at all —
-    the thin shape carries only the announcement core plus the
-    context FK.
-  * Writing an opening's profile to its detail row does **not** touch
-    the linked affiliation's steady-state context (and creating an
-    ``IntakeDetail`` does not overwrite the linked Program's profile).
+  * ``IntakeDetail`` carries the same self-describing profile (minus
+    ``session_format``) plus the announcement core + context FK; only
+    the steady-state columns (``languages`` / ``website`` /
+    ``referral_instructions``) stay on the linked ``Program``.
+  * Writing a provider post's profile to its detail row does **not**
+    touch the linked steady-state context (the opening's affiliation,
+    the intake's Program).
 
 (The file kept its ``test_dual_write.py`` name so PR-f sub-PR 2's
 tests can be archived in `git log`; the dual-write window closed with
@@ -67,16 +72,14 @@ _REMOVED_COLUMNS_OPENING = (
     "website",
     "referral_instructions",
 )
-# IntakeDetail is unchanged by the opening remodel — it stays thin, with
-# its whole steady-state profile (services / settings / modalities /
-# age_groups / genders / languages / website / referral_instructions) on
-# the linked `Program`.
+# The program-intake remodel made `IntakeDetail` self-describing too:
+# `services` / `age_groups` / `genders` came back (plus new
+# `services_other_text` / `cost`). Only the truly steady-state columns
+# stay off it — `languages` / `website` / `referral_instructions` live on
+# the linked `Program`; `settings` / `modalities` were dropped entirely.
 _REMOVED_COLUMNS_INTAKE = (
-    "services",
     "settings",
     "modalities",
-    "age_groups",
-    "genders",
     "languages",
     "website",
     "referral_instructions",
@@ -99,7 +102,13 @@ def test_opening_detail_has_no_steady_state_columns():
 
 
 def test_intake_detail_has_no_steady_state_columns():
-    """Mirror invariant for IntakeDetail → Program."""
+    """Mirror invariant for IntakeDetail → Program. Only the truly
+    steady-state columns (``languages`` / ``website`` /
+    ``referral_instructions``) stayed off the detail row; ``settings`` /
+    ``modalities`` were dropped entirely. The per-announcement dimensions
+    (``services`` / ``age_groups`` / ``genders``) came back when the
+    intake became self-describing — asserted present in
+    ``test_intake_detail_thin_shape``."""
     column_names = {c.name for c in IntakeDetail.__table__.columns}
     for col in _REMOVED_COLUMNS_INTAKE:
         assert (
@@ -132,13 +141,22 @@ def test_opening_detail_thin_shape():
 
 
 def test_intake_detail_thin_shape():
-    """IntakeDetail's surviving columns are exactly the announcement
-    core plus the context FK."""
+    """IntakeDetail's columns are the announcement core + context FK +
+    the self-describing announcement profile (`services` /
+    `services_other_text` / `age_groups` / `genders` / `cost`). It carries
+    no `session_format` — a Program is a single group offering with no
+    in-person/virtual axis. Steady-state context (languages, how-to-refer)
+    stays on the linked `Program`."""
     expected = {
         "post_id",
         "program_id",
         "schedule_text",
         "description",
+        "services",
+        "services_other_text",
+        "age_groups",
+        "genders",
+        "cost",
     }
     assert {c.name for c in IntakeDetail.__table__.columns} == expected
 
@@ -317,7 +335,9 @@ async def test_patch_opening_profile_does_not_touch_affiliation(
 
 
 async def _seed_intake_world(db_test_session_manager):
-    """Persist a User + Org + Program with a populated profile."""
+    """Persist a User + Org + Program carrying only steady-state context.
+    The intake's own profile (services / age_groups / genders / cost)
+    lives on the IntakeDetail the callers create, not the Program."""
     owner = create_test_user(username=f"owner-{uuid.uuid4()}")
     clinician = make_clinician_with_org(owner_id=owner.id)
     async with db_test_session_manager() as session:
@@ -330,10 +350,6 @@ async def _seed_intake_world(db_test_session_manager):
     program = make_program(
         owner_id=owner_id,
         org_id=org_id,
-        services=["group_therapy"],
-        settings=["iop"],
-        modalities=["dbt"],
-        age_groups=["adolescents_14_18"],
         languages=["en", "es"],
         website="https://prog.example",
         referral_instructions="Call intake",
@@ -347,11 +363,13 @@ async def _seed_intake_world(db_test_session_manager):
 
 
 @pytest.mark.asyncio
-async def test_create_intake_does_not_touch_program_profile(
+async def test_create_intake_stores_profile_on_detail_not_program(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """Creating an IntakeDetail does not overwrite the Program's
-    steady-state profile — the Program is the canonical source."""
+    """The intake is self-describing: its announcement profile
+    (services / age_groups / genders / cost) lands on the ``IntakeDetail``
+    row, while the linked Program's steady-state context (languages,
+    how-to-refer) is left untouched."""
     owner_id, program_id = await _seed_intake_world(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -360,9 +378,14 @@ async def test_create_intake_does_not_touch_program_profile(
         detail = make_intake_detail(
             program_id=program_id,
             description="Fall cohort intake opening.",
+            services=["therapy_group"],
+            age_groups=["adolescents_14_18"],
+            genders=["female"],
+            cost="$120/session",
         )
         await repo.create_polymorphic(post, detail, detail_relationship="intake_detail")
         await session.commit()
+        post_id = post.id
 
     async with db_test_session_manager() as session:
         prog_row = (
@@ -370,11 +393,22 @@ async def test_create_intake_does_not_touch_program_profile(
             .scalars()
             .one()
         )
+        detail_row = (
+            (
+                await session.execute(
+                    select(IntakeDetail).filter(IntakeDetail.post_id == post_id)
+                )
+            )
+            .scalars()
+            .one()
+        )
 
-    assert prog_row.services == ["group_therapy"]
-    assert prog_row.settings == ["iop"]
-    assert prog_row.modalities == ["dbt"]
-    assert prog_row.age_groups == ["adolescents_14_18"]
+    # Announcement profile is on the intake detail row.
+    assert detail_row.services == ["therapy_group"]
+    assert detail_row.age_groups == ["adolescents_14_18"]
+    assert detail_row.genders == ["female"]
+    assert detail_row.cost == "$120/session"
+    # Program steady-state context untouched.
     assert prog_row.languages == ["en", "es"]
     assert prog_row.website == "https://prog.example"
     assert prog_row.referral_instructions == "Call intake"

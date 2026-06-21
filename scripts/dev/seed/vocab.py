@@ -42,8 +42,6 @@ from src.domain.models.enums import (
     PRONOUNS,
     REFERRAL_SERVICES,
     SESSION_FORMATS,
-    TREATMENT_MODALITIES,
-    TREATMENT_SETTINGS,
     US_STATES,
 )
 
@@ -729,9 +727,7 @@ CLINICAL_NICHES_SEED: Final[tuple[str, ...]] = (
 JSON_LIST_SOURCE: Final[dict[str, tuple[str, ...]]] = {
     "age_groups": CLIENT_AGE_GROUPS,
     "languages": LANGUAGES,
-    "modalities": TREATMENT_MODALITIES,
     "services": REFERRAL_SERVICES,
-    "settings": TREATMENT_SETTINGS,
     "desired_times": DESIRED_TIME_SLOTS,
     "genders": GENDERS,
     "in_network_carriers": INSURANCE_CARRIERS,

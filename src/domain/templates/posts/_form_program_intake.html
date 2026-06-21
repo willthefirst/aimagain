@@ -21,18 +21,18 @@ The wrapper templates `posts/new_program_intake.html` /
 when `current_user.programs` is empty, so this macro always renders
 with at least one Program available.
 
-After #1358 PR-f sub-3 the announcement is **thin by design**: only
-program picker + availability + announcement-specific free text. The
-steady-state profile (services / settings / modalities / age_groups /
-languages / genders / website / referral_instructions) is managed on
-the linked Program — see `src/domain/models/programs/README.md`.
+The intake is **self-describing** (like the opening): it carries its own
+service lines, the cohort it serves, and cost. It has no session-format
+section — a Program is a single group offering with no in-person/virtual
+axis. Only steady-state context — state served, languages, how-to-refer —
+lives on the linked Program; the picker shows a read-only preview of it.
 
-Field order:
-  1. Which program — establishes context for the whole form
-     (followed by a read-only preview of that program's profile)
-  2. About — description (free-text announcement copy)
-  3. Availability — desired times / schedule notes
-  4. Subject — optional, auto-generates; last because most users skip it
+Field order (opening-aligned):
+  1. Which program — establishes context (with a read-only preview)
+  2. Service type — services multi-select + "Other" free-text
+  3. Clients served — age groups + genders
+  4. About — description (free-text announcement copy)
+  5. Availability — schedule notes + cost
 #}
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected
@@ -40,7 +40,7 @@ Field order:
    re-render (see `POST_ENTITY.form_error_render` + the docstring at
    the top of `_shared/form_fields.html`). No per-field error or value
    threading is required at the callsite. #}
-{%- from "_shared/form_fields.html" import composite_select_field, multi_select_field, field_for, form_section with context -%}
+{%- from "_shared/form_fields.html" import text_field, textarea_field, composite_select_field, multi_select_field, field_for, form_section, conditional_field with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -88,13 +88,26 @@ Field order:
           </div>
         {%- endfor -%}
       </div>
-      {# About: free-text announcement copy. Other steady-state profile
-     fields are managed on the Program, not on the announcement. #}
+      {# The intake describes itself. `services` uses the same
+       `ReferralService` vocab as the referral + opening sides; `other`
+       reveals the free-text via the shared `services:other` rule. #}
+      {% call form_section("Service type") %}
+        {{ multi_select_field("services", "Services offered", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None, required=false) }}
+        {% call conditional_field("services:other") %}
+          {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
+        {% endcall %}
+      {% endcall %}
+      {# Clients served — the cohort this intake is for (multi-valued). #}
+      {% call form_section("Clients served") %}
+        {{ multi_select_field("age_groups", "Age groups", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_groups if d else None, required=false) }}
+        {{ multi_select_field("genders", "Genders", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None, required=false) }}
+      {% endcall %}
       {% call form_section("About") %}
         {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
       {% endcall %}
       {% call form_section("Availability") %}
         {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
+        {{ text_field("cost", "Cost", current=d.cost if d else None, required=false, help="Per-session fee or fee range for this intake.") }}
       {% endcall %}
       {{ actions(submit_label, cancel_url=cancel_url) }}
     {%- endcall -%}

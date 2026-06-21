@@ -41,12 +41,11 @@ class PostRepository(BaseRepository):
     * ``city`` (Text) — ILIKE substring across the same two location
       paths as ``state``.
     * ``age_group`` (Choice, multi) — JSON-array contains check on
-      ``ReferralDetail.age_groups`` and ``OpeningDetail.age_groups``
-      (both per-announcement), plus ``Program.age_groups`` (intake-side
-      steady-state home). Uses ``LIKE '%"<token>"%'`` against the
-      JSON-as-text representation — portable across SQLite (dev/test)
-      without a JSON-specific extension; Postgres would prefer
-      ``@>``/``?|`` operators on a ``JSONB`` column.
+      ``ReferralDetail.age_groups``, ``OpeningDetail.age_groups``, and
+      ``IntakeDetail.age_groups`` — all per-announcement now. Uses
+      ``LIKE '%"<token>"%'`` against the JSON-as-text representation —
+      portable across SQLite (dev/test) without a JSON-specific extension;
+      Postgres would prefer ``@>``/``?|`` operators on a ``JSONB`` column.
     * ``language`` (Choice, multi) — same JSON contains pattern against
       ``ReferralDetail.languages``, ``Clinician.languages``
       (opening-side, person-level), and ``Program.languages``
@@ -59,13 +58,6 @@ class PostRepository(BaseRepository):
       ``geography`` filter to also include openings whose own
       ``session_format`` contains ``virtual`` and whose linked
       affiliation is licensed in CA.
-    * ``level_of_care`` (Choice, multi) — ``Program.settings`` JSON-array
-      contains check (intake-side only). The opening side dropped
-      ``settings`` when services collapsed onto the ``ReferralService``
-      vocabulary; referrals never had it.
-    * ``modality`` (Choice, multi) — ``Program.modalities`` JSON-array
-      contains check (intake-side only). The opening side dropped
-      ``modalities`` in the same collapse; referrals never had it.
     * ``insurance`` (Choice, multi) — ``insurance_carriers`` JSON-array
       contains check on ``ReferralDetail`` OR ``in_network_carriers``
       JSON-contains on linked ``ClinicianAffiliation`` (#1358 PR-e —
@@ -88,8 +80,6 @@ class PostRepository(BaseRepository):
         language: list[str] | None = None,
         geography: str | None = None,
         include_telehealth: str | None = None,
-        level_of_care: list[str] | None = None,
-        modality: list[str] | None = None,
         insurance: list[str] | None = None,
         since: datetime | None = None,
         exclude_owner_id: int | None = None,
@@ -109,32 +99,23 @@ class PostRepository(BaseRepository):
                 language,
                 geography,
                 include_telehealth,
-                level_of_care,
-                modality,
                 insurance,
             )
         )
-        # #1358 PR-f sub-3 — the steady-state profile (services,
-        # settings, modalities, age_groups, genders, languages,
-        # in/out-of-network carriers, etc.) lives exclusively on
-        # ``ClinicianAffiliation`` / ``Clinician`` / ``Program``. The
-        # per-announcement detail rows are thin and carry no profile
-        # columns. ``ClinicianAffiliation`` joins whenever an opening-
-        # side profile filter is active; ``Program`` joins whenever an
-        # intake-side profile filter is active; ``Clinician`` joins only
-        # for ``language`` (the one column whose new home is the person,
-        # not the affiliation). ``IntakeDetail`` is joined when the
-        # ``Program`` join needs its ``program_id`` key.
-        # ``ClinicianAffiliation`` carries only steady-state context now
-        # (location + insurance); the opening's `age_groups` / `settings` /
-        # `modalities` moved onto ``OpeningDetail`` (read via the detail
-        # join) or were dropped, so those filters no longer join it.
+        # Both provider post kinds carry their announcement profile
+        # (services / age_groups / genders / cost) on the detail row now;
+        # only steady-state *context* reads from the linked entity. So:
+        # ``ClinicianAffiliation`` joins for the opening's location +
+        # insurance; ``Program`` joins only for the intake's program-level
+        # ``languages``; ``Clinician`` joins only for the opening's
+        # person-level ``languages``; ``IntakeDetail`` joins for the
+        # intake's own ``age_groups`` (and as the ``Program`` join key).
         needs_clinician_join = bool(
             state or city or geography or include_telehealth or insurance
         )
-        needs_intake_join = bool(level_of_care or modality or insurance)
         needs_owner_join = bool(posted_by)
-        needs_program_join = bool(level_of_care or modality or age_group or language)
+        needs_intake_join = bool(age_group or language)
+        needs_program_join = bool(language)
         needs_person_join = bool(language)
 
         if needs_owner_join:
@@ -202,16 +183,16 @@ class PostRepository(BaseRepository):
                 )
             )
         if age_group:
-            # Per-announcement: ReferralDetail (one client) and
-            # OpeningDetail (the cohort the opening serves). Intake reads
-            # its steady-state ``age_groups`` from the linked Program.
+            # Per-announcement on all three detail rows now: ReferralDetail
+            # (one client), OpeningDetail + IntakeDetail (the cohort the
+            # opening / intake serves).
             stmt = stmt.filter(
                 _json_array_contains_any_multi(
                     age_group,
                     (
                         (ReferralDetail, "age_groups"),
                         (OpeningDetail, "age_groups"),
-                        (Program, "age_groups"),
+                        (IntakeDetail, "age_groups"),
                     ),
                 )
             )
@@ -252,28 +233,10 @@ class PostRepository(BaseRepository):
         # include_telehealth alone (no geography) adds no constraint — it
         # only expands the geography filter when both are active.
 
-        if level_of_care:
-            # Intake-side only: ``Program.settings``. The opening side no
-            # longer models treatment settings (the field was dropped when
-            # services collapsed onto the `ReferralService` vocabulary);
-            # referrals never had it.
-            stmt = stmt.filter(
-                _json_array_contains_any_multi(
-                    level_of_care,
-                    ((Program, "settings"),),
-                )
-            )
-
-        if modality:
-            # Intake-side only: ``Program.modalities``. The opening side no
-            # longer models modalities (dropped in the same collapse);
-            # referrals never had it.
-            stmt = stmt.filter(
-                _json_array_contains_any_multi(
-                    modality,
-                    ((Program, "modalities"),),
-                )
-            )
+        # `level_of_care` (settings) and `modality` filters were removed:
+        # no post kind models treatment settings or modalities anymore —
+        # services collapsed onto the single `ReferralService` "what care"
+        # axis across all three kinds.
 
         if insurance:
             clauses = []

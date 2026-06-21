@@ -1,7 +1,7 @@
 {% extends "views/form_edit.html" %}
-{%- from "_shared/form_fields.html" import entity_select_field, form_section, checkbox_field, select_field, text_field, multi_select_field, textarea_field, url_field -%}
+{%- from "_shared/form_fields.html" import entity_select_field, form_section, checkbox_field, select_field, text_field, textarea_field, url_field -%}
 {%- from "_shared/forms.html" import entity_form -%}
-{%- from "_shared/form_copy.html" import org_picker_help, select_all_help -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/actions.html" import actions -%}
 {% block resource_label %}Programs{% endblock %}
 {% block current_label %}{{ program.name }}{% endblock %}
@@ -25,23 +25,9 @@
     {% call form_section("Intake") %}
       {{ checkbox_field("accepting_referrals", "Currently accepting referrals", current=program.accepting_referrals) }}
     {% endcall %}
-    {# Steady-state practice profile (#1358 PR-f). Same grouping as
-       `_form_new_fragment.html` — services / settings / modalities
-       are the "what we deliver" cluster, age_groups / genders the
-       "who we serve" cluster, website / referral_instructions the
-       "how to reach us" cluster. Edit form uses the typed macros
-       directly (no `field_for(schema, ...)` ) because `schema`
-       isn't injected into the edit context — same shape as the
-       state/start/end rows above. #}
-    {% call form_section("Services offered") %}
-      {{ multi_select_field("services", "Services", OPENING_SERVICES, labels=OPENING_SERVICE_LABELS, current=program.services, help=select_all_help() ) }}
-      {{ multi_select_field("settings", "Treatment settings", TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS, current=program.settings, help=select_all_help() ) }}
-      {{ multi_select_field("modalities", "Treatment modalities", TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS, current=program.modalities, help=select_all_help() ) }}
-    {% endcall %}
-    {% call form_section("Clients served") %}
-      {{ multi_select_field("age_groups", "Age groups", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=program.age_groups, help=select_all_help() ) }}
-      {{ multi_select_field("genders", "Genders", GENDERS, labels=GENDER_LABELS, current=program.genders, help=select_all_help() ) }}
-    {% endcall %}
+    {# The program holds steady-state context only — how-to-refer. The
+       per-announcement profile (services / age groups / genders / cost)
+       moved onto the intake post (`posts/_form_program_intake.html`). #}
     {% call form_section("How to refer") %}
       {{ url_field("website", "Website", current=program.website, required=false) }}
       {{ textarea_field("referral_instructions", "Referral instructions", current=program.referral_instructions, required=false) }}

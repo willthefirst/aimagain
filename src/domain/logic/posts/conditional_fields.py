@@ -127,11 +127,11 @@ REFERRAL_CONDITIONAL_RULES: tuple[ConditionalRequiredRule, ...] = (
     _other_text_rule("pronouns", "Pronouns"),
 )
 
-# Openings reuse the same `services` "Other → free-text" rule. Location
-# isn't here: an opening's city/area lives on the linked affiliation
-# (always present), so an in-person opening is always locatable — there's
-# no per-post city to conditionally require.
-OPENING_CONDITIONAL_RULES: tuple[ConditionalRequiredRule, ...] = (
+# The provider post kinds (clinician_opening + program_intake) reuse the
+# same `services` "Other → free-text" rule. Location isn't here: a
+# provider post's city/area lives on its linked affiliation/program
+# (always present), so there's no per-post city to conditionally require.
+PROVIDER_POST_CONDITIONAL_RULES: tuple[ConditionalRequiredRule, ...] = (
     _other_text_rule("services", "Services"),
 )
 

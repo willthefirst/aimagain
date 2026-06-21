@@ -16,12 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.models import Organization, Program, User
 from src.domain.models.enums import (
-    CLIENT_AGE_GROUPS,
-    GENDERS,
     LANGUAGES,
-    OPENING_SERVICES,
-    TREATMENT_MODALITIES,
-    TREATMENT_SETTINGS,
     US_STATES,
 )
 
@@ -54,22 +49,10 @@ async def generate_programs(
             description = rng.choice(INTAKE_SUBJECTS)
             start_date = date(2025, 1 + (i % 12), 1) if i % 3 == 1 else None
             end_date = date(2025, 6 + (i % 6), 1) if i % 3 == 1 else None
-        # ---- Steady-state profile (added #1358 PR-f sub-1) ----
-        # Symmetric to the affiliation override; see
-        # ``overrides/clinicians.py`` for the rationale. ``languages``
-        # lands on the Program (not on a person) since the Program is
-        # the offering. Use **index-driven round-robin** rather than
-        # `rng.*` calls so adding fields here doesn't perturb the
-        # downstream coverage tests.
-        services = [OPENING_SERVICES[i % len(OPENING_SERVICES)]]
-        settings = (
-            [] if i % 5 == 0 else [TREATMENT_SETTINGS[i % len(TREATMENT_SETTINGS)]]
-        )
-        modalities = (
-            [] if i % 6 == 0 else [TREATMENT_MODALITIES[i % len(TREATMENT_MODALITIES)]]
-        )
-        age_groups = [CLIENT_AGE_GROUPS[i % len(CLIENT_AGE_GROUPS)]]
-        genders = [] if i % 5 == 0 else [GENDERS[i % len(GENDERS)]]
+        # Steady-state context only — the per-announcement profile
+        # (services / age groups / genders / cost) moved onto the intake
+        # post and is seeded in ``overrides/posts.py``. ``languages`` lands
+        # on the Program (not a person) since the Program is the offering.
         # Two languages on every other row, one on the rest — never
         # empty (the Program is the offering; an empty languages list
         # is unusual in practice).
@@ -99,11 +82,6 @@ async def generate_programs(
             start_date=start_date,
             end_date=end_date,
             accepting_referrals=rng.random() > 0.2,
-            services=services,
-            settings=settings,
-            modalities=modalities,
-            age_groups=age_groups,
-            genders=genders,
             languages=languages,
             website=website,
             referral_instructions=referral_instructions,

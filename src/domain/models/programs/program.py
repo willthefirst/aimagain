@@ -76,33 +76,19 @@ class Program(BaseModel):
     )
 
     # ----------------------------------------------------------------
-    # Steady-state Program profile (#1358 PR-f, sub-PR 1).
+    # Steady-state Program context.
     #
-    # Symmetric to the new columns on `ClinicianAffiliation` — see
-    # `models/clinician_affiliations/clinician_affiliation.py` for the
-    # full design rationale. These are the new home for fields that
-    # previously lived on `IntakeDetail` (the per-announcement row for
-    # a program). A Program's services / settings / modalities / age
-    # groups / genders / languages / website / referral_instructions
-    # don't change every time the Program reposts an intake window —
-    # they're steady-state attributes of the offering itself.
-    #
-    # Sub-PR 1 is purely additive: columns added with empty defaults,
-    # backfilled from any existing IntakeDetail rows attached to this
-    # Program. Reads still come from IntakeDetail; writes still go to
-    # IntakeDetail. Sub-PR 2 flips reads + dual-writes; sub-PR 3
-    # removes the columns from IntakeDetail.
+    # The per-announcement profile (services / age_groups / genders /
+    # cost) moved onto `IntakeDetail` (the intake post) — a Program can
+    # post two intakes targeting different cohorts/services, so those are
+    # per-announcement, not per-program. What remains here is the
+    # steady-state context that doesn't vary per intake window.
     #
     # `languages` lands here (and not only on Clinician) because a
     # Program is the offering, not a person — the Program's stated
     # language coverage is a property of the *program*, distinct from
     # whichever individual clinician picks up the case.
     # ----------------------------------------------------------------
-    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    settings = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    modalities = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
-    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
     languages = Column(
         JSON,
         nullable=False,

@@ -446,41 +446,33 @@ async def test_delete_program(
     assert any(r.action == "delete_program" for r in rows)
 
 
-# --- Steady-state profile UI (#1358 PR-f) -------------------------------
+# --- Steady-state context UI (website / referral instructions) ----------
 #
-# The steady-state practice profile columns landed on Program in #1380
-# (PR-f sub-1) and became canonical in #1398 (sub-3 dropped the per-
-# announcement copies on IntakeDetail). The wire schema and UI surface
-# both grew the matching field set in this PR — these tests pin the
-# render contract (every field has an input on the form, every set
-# value renders on the detail page) and the round-trip (POST/PATCH
-# persists, GET surfaces).
+# The per-announcement profile (services / settings / modalities /
+# age_groups / genders) moved off Program onto IntakeDetail. What
+# remains on the program form / detail page is the steady-state context:
+# `website` and `referral_instructions`. These tests pin the render
+# contract (each field has an input on the form, each set value renders
+# on the detail page) and the round-trip (POST/PATCH persists, GET
+# surfaces).
 
 
-async def test_form_new_renders_steady_state_profile_fields(
+async def test_form_new_renders_context_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Each new profile field renders at least one input/textarea on the
+    """Each context field renders at least one input/textarea on the
     create form. Asserts by `name=` because that's the wire contract."""
     await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     response = await authenticated_client.get("/programs/form")
     assert response.status_code == 200
     body = response.text
-    for field in (
-        "services",
-        "settings",
-        "modalities",
-        "age_groups",
-        "genders",
-        "website",
-        "referral_instructions",
-    ):
+    for field in ("website", "referral_instructions"):
         assert f'name="{field}"' in body, f"missing input for {field}"
 
 
-async def test_form_edit_renders_steady_state_profile_fields(
+async def test_form_edit_renders_context_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
@@ -492,34 +484,21 @@ async def test_form_edit_renders_steady_state_profile_fields(
     response = await authenticated_client.get(f"/programs/{program_id}/form")
     assert response.status_code == 200
     body = response.text
-    for field in (
-        "services",
-        "settings",
-        "modalities",
-        "age_groups",
-        "genders",
-        "website",
-        "referral_instructions",
-    ):
+    for field in ("website", "referral_instructions"):
         assert f'name="{field}"' in body, f"missing input for {field}"
 
 
-async def test_form_edit_pre_checks_persisted_profile_values(
+async def test_form_edit_pre_fills_persisted_context_values(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A profile field that was previously saved renders pre-checked
-    (multi-selects) or pre-filled (free-text). Mirrors PR #1403's
-    pre-check assertions on the referral edit form."""
+    """Context fields that were previously saved render pre-filled."""
     org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     program = Program(
         owner_id=logged_in_user.id,
         org_id=org_id,
         name="Profiled IOP",
-        services=["psychotherapy"],
-        modalities=["dbt"],
-        age_groups=["adults_25_64"],
         website="https://example.com/intake",
         referral_instructions="Email intake@example.com.",
     )
@@ -532,13 +511,6 @@ async def test_form_edit_pre_checks_persisted_profile_values(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    svc_checked = tree.css('input[name="services"][checked]')
-    assert {c.attributes.get("value") for c in svc_checked} == {"psychotherapy"}
-    mod_checked = tree.css('input[name="modalities"][checked]')
-    assert {c.attributes.get("value") for c in mod_checked} == {"dbt"}
-    age_checked = tree.css('input[name="age_groups"][checked]')
-    assert {c.attributes.get("value") for c in age_checked} == {"adults_25_64"}
-
     website_input = tree.css_first('input[name="website"]')
     assert website_input is not None
     assert website_input.attributes.get("value") == "https://example.com/intake"
@@ -547,20 +519,17 @@ async def test_form_edit_pre_checks_persisted_profile_values(
     assert "Email intake@example.com." in instructions.text()
 
 
-async def test_create_program_persists_steady_state_profile(
+async def test_create_program_persists_context(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """POST the new profile fields end-to-end; the row carries every value."""
+    """POST the context fields (plus a list-valued `languages`) end-to-end;
+    the row carries every value."""
     org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     payload = _program_payload(
         org_id=org_id,
-        services=["psychotherapy", "medication_management"],
-        settings=["outpatient"],
-        modalities=["dbt"],
-        age_groups=["adults_25_64"],
-        genders=["female"],
+        languages=["en", "es"],
         website="https://example.com",
         referral_instructions="Call intake.",
     )
@@ -573,56 +542,47 @@ async def test_create_program_persists_steady_state_profile(
     async with db_test_session_manager() as session:
         loaded = await session.get(Program, new_id)
         assert loaded is not None
-        assert loaded.services == ["psychotherapy", "medication_management"]
-        assert loaded.settings == ["outpatient"]
-        assert loaded.modalities == ["dbt"]
-        assert loaded.age_groups == ["adults_25_64"]
-        assert loaded.genders == ["female"]
+        assert loaded.languages == ["en", "es"]
         assert loaded.website == "https://example.com"
         assert loaded.referral_instructions == "Call intake."
 
 
-async def test_patch_updates_steady_state_profile(
+async def test_patch_updates_context(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """PATCH a single profile field; the row is updated and the rest
-    untouched. Mirrors `test_patch_updates_name`."""
+    """PATCH context fields (one free-text, one list-valued); the row is
+    updated. Mirrors `test_patch_updates_name`."""
     org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     program_id = await _seed_program_for(
         db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
     )
     response = await authenticated_client.patch(
         f"/programs/{program_id}",
-        data={"services": ["psychotherapy"], "website": "https://updated.example"},
+        data={"languages": ["es"], "website": "https://updated.example"},
     )
     assert response.status_code in (200, 204)
 
     async with db_test_session_manager() as session:
         loaded = await session.get(Program, program_id)
         assert loaded is not None
-        assert loaded.services == ["psychotherapy"]
+        assert loaded.languages == ["es"]
         assert loaded.website == "https://updated.example"
 
 
-async def test_detail_renders_steady_state_profile(
+async def test_detail_renders_context(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """Persisted profile fields surface as facts rows on the detail page,
-    keyed by their stable `data-fact` selectors. Empty fields suppress
-    the row entirely — pin both branches here."""
+    """Persisted context fields surface as facts rows on the detail page,
+    keyed by their stable `data-fact` selectors."""
     org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     program = Program(
         owner_id=logged_in_user.id,
         org_id=org_id,
         name="Detail Profiled",
-        services=["psychotherapy"],
-        modalities=["dbt"],
-        age_groups=["adults_25_64"],
-        genders=["female"],
         website="https://example.com",
         referral_instructions="Email intake@example.com.",
     )
@@ -634,28 +594,19 @@ async def test_detail_renders_steady_state_profile(
     response = await authenticated_client.get(f"/programs/{program.id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    for key in (
-        "services",
-        "modalities",
-        "age_groups",
-        "genders",
-        "website",
-        "referral_instructions",
-    ):
+    for key in ("website", "referral_instructions"):
         assert (
             tree.css_first(f'[data-fact="{key}"]') is not None
         ), f"missing fact row for {key}"
-    # `settings` was never populated — no row should render.
-    assert tree.css_first('[data-fact="settings"]') is None
 
 
-async def test_detail_omits_empty_steady_state_facts(
+async def test_detail_omits_empty_context_facts(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """A Program with no profile values rendered today (the model
-    defaults are empty lists / NULL) skips every steady-state row."""
+    """A Program with no context values rendered today (the model
+    defaults are NULL free-text) skips every context row."""
     org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     program_id = await _seed_program_for(
         db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
@@ -663,15 +614,7 @@ async def test_detail_omits_empty_steady_state_facts(
     response = await authenticated_client.get(f"/programs/{program_id}")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    for key in (
-        "services",
-        "settings",
-        "modalities",
-        "age_groups",
-        "genders",
-        "website",
-        "referral_instructions",
-    ):
+    for key in ("website", "referral_instructions"):
         assert (
             tree.css_first(f'[data-fact="{key}"]') is None
         ), f"unexpected empty-state row for {key}"

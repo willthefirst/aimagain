@@ -86,7 +86,16 @@ def _intake_post(*, owner_id, org_id, program: Program | None = None) -> Post:
     if program.id is None:
         program.id = uuid.uuid4()
     post = Post(kind="program_intake", owner_id=owner_id)
-    detail = make_intake_detail(program_id=program.id)
+    # The intake is self-describing now — its announcement profile
+    # (services / age_groups / genders / cost) lives on the detail row,
+    # not the linked Program.
+    detail = make_intake_detail(
+        program_id=program.id,
+        services=["therapy_group"],
+        age_groups=["adolescents_14_18"],
+        genders=[],
+        cost=None,
+    )
     detail.program = program
     post.intake_detail = detail
     return post
@@ -217,12 +226,12 @@ async def test_search_uses_framework_filter_form(
         sections
     ), "/posts/search did not render any search-checkbox-fieldset elements"
     legends = [s.css_first("legend").text(strip=True) for s in sections]
-    # Multi-choice filters from the spec: kind(Type), state(State), age_group,
-    # language, level_of_care, modality, insurance.
+    # Multi-choice filters from the spec: kind(Type), state(State),
+    # age_group(Age groups), language(Languages), insurance(Insurance).
+    # The `level_of_care` / `modality` axes were removed entirely — no post
+    # kind models treatment settings or modalities anymore.
     assert "Type" in legends, f"Expected 'Type' legend in /posts/search: {legends}"
-    assert (
-        "Level of care" in legends
-    ), f"Expected 'Level of care' in /posts/search: {legends}"
+    assert "Age groups" in legends, f"Expected 'Age groups' in /posts/search: {legends}"
     assert "Insurance" in legends, f"Expected 'Insurance' in /posts/search: {legends}"
 
 
@@ -1065,9 +1074,12 @@ async def test_intake_create_form_renders_program_profile_preview(
     logged_in_user,
 ):
     """The intake create form shows a read-only preview of the selected
-    program's steady-state profile via the shared `program_facts` macro.
-    Requires a verified org rep who owns a program (the
-    `check_program_intake` gate)."""
+    program's steady-state *context* (the `program_facts` rows — now
+    website + referral_instructions only), so the author sees the program
+    context without navigating away. The self-describing announcement
+    profile (services / age groups / etc.) is entered in the form's own
+    sections, not previewed here. Requires a verified org rep who owns a
+    program (the `check_program_intake` gate)."""
     org = make_organization_row(owner_id=logged_in_user.id, name="Acme Health")
     rep = OrgRepresentation(
         user_id=logged_in_user.id,
@@ -1079,7 +1091,6 @@ async def test_intake_create_form_renders_program_profile_preview(
     program = make_program(
         owner_id=logged_in_user.id,
         org_id=org.id,
-        services=["group_therapy"],
         website="https://riseiop.example.com",
     )
     program.organization = org
@@ -1098,9 +1109,21 @@ async def test_intake_create_form_renders_program_profile_preview(
     card = tree.css_first(f'div[data-preview-for="{program.id}"]')
     assert card is not None, "no preview card for the program"
     assert "hidden" not in card.attributes, "first preview card should be visible"
-    assert card.css_first('div[data-fact="services"]') is not None
-    assert "Group therapy" in card.text()
+    # Context rows come from the shared program_facts macro (website +
+    # referral instructions); the intake's own services are NOT previewed.
     assert "https://riseiop.example.com" in card.text()
+
+    # The intake is self-describing now: the form carries its own
+    # service-type / clients-served / cost sections, on the same
+    # vocabularies the referral request side uses. (A Program is a single
+    # group offering, so there is no `session_format` / delivery section.)
+    page_text = tree.body.text()
+    for legend in ("Service type", "Clients served"):
+        assert legend in page_text, f"intake form missing {legend!r} section"
+    for field_name in ("services", "age_groups", "genders", "cost"):
+        assert (
+            tree.css_first(f'[name="{field_name}"]') is not None
+        ), f"intake form must render a {field_name!r} input"
 
 
 # --- Anonymization gate (can_act_as_provider) ---------------------------------
@@ -1394,9 +1417,13 @@ async def test_intake_detail_renders_program_profile_card(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """Intake detail renders the program's steady-state profile inside
-    the `provider-profile` owner-context card via `program_facts`, with
-    the provider identity row linking the program and its org."""
+    """Intake detail renders the program's steady-state *context* inside
+    the `provider-profile` owner-context card via `program_facts` — the
+    Program now models only how-to-refer (website / referral_instructions),
+    so those rows live in the card. The provider identity row links the
+    program and its org. The intake's self-describing profile (services /
+    age groups / etc.) is no longer on the Program, so it isn't rendered
+    through this card."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
@@ -1408,7 +1435,6 @@ async def test_intake_detail_renders_program_profile_card(
     program = make_program(
         owner_id=author.id,
         org_id=org.id,
-        services=["group_therapy"],
         website="https://riseiop.example.com",
     )
     program.organization = org
@@ -1433,10 +1459,11 @@ async def test_intake_detail_renders_program_profile_card(
     assert (
         provider_dd.css_first(f"a[href='/organizations/{org.id}']") is not None
     ), "org name should link to the organization detail page"
-    for fact_key in ("services", "website"):
-        assert (
-            card.css_first(f'div[data-fact="{fact_key}"]') is not None
-        ), f"{fact_key} should render inside the provider-profile card"
+    # Steady-state context row lives inside the card (how-to-refer website).
+    assert (
+        card.css_first('div[data-fact="website"]') is not None
+    ), "website should render inside the provider-profile card"
+    assert "https://riseiop.example.com" in card.text()
 
 
 # --- POST /posts/{id}/message (in-app contact form) --------------------------

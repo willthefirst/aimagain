@@ -302,25 +302,6 @@ class ReferralService(LabeledChoice):
 REFERRAL_SERVICES: Final[tuple[str, ...]] = ReferralService.values()
 
 
-# Service-line categories used by opening/intake/affiliation/program.
-# The original 8-value vocab: kept on the provider side while referrals
-# move to the 12-leaf `ReferralService` flat shape. Provider-side forms
-# offer broader categories (psychotherapy / allied_health) rather than
-# the finer leaves a referrer fills in for a single client.
-class OpeningService(LabeledChoice):
-    evaluation = "evaluation", "Evaluation", "clipboard-list"
-    medication_management = "medication_management", "Medication management", "pill"
-    psychotherapy = "psychotherapy", "Psychotherapy", "message-circle"
-    case_management = "case_management", "Case management", "briefcase"
-    allied_health = "allied_health", "Allied health", "heart-pulse"
-    group_therapy = "group_therapy", "Group therapy", "users"
-    family_therapy = "family_therapy", "Family therapy", "users-round"
-    couples_therapy = "couples_therapy", "Couples therapy", "heart-handshake"
-
-
-OPENING_SERVICES: Final[tuple[str, ...]] = OpeningService.values()
-
-
 # Gender identity vocabulary. Single-axis enum that folds trans/cis into
 # the value (`female` / `trans_female`) rather than splitting into two
 # fields — for the listing row the reader wants one labeled chunk
@@ -357,38 +338,6 @@ class Pronouns(LabeledChoice):
 
 
 PRONOUNS: Final[tuple[str, ...]] = Pronouns.values()
-
-
-# Treatment settings categories. `opening` only; required-min-1.
-class TreatmentSetting(LabeledChoice):
-    outpatient = "outpatient", "Outpatient", "house"
-    iop = "iop", "IOP", "calendar-clock"
-    crisis_care = "crisis_care", "Crisis care", "siren"
-    php = "php", "PHP", "calendar-days"
-    residential = "residential", "Residential", "hospital"
-    day_program = "day_program", "Day program", "sun"
-
-
-TREATMENT_SETTINGS: Final[tuple[str, ...]] = TreatmentSetting.values()
-
-
-# Therapeutic modality vocabulary. Structured alternative to the legacy
-# `treatment_modality` free-text column; new posts use this multi-value
-# list for filterable, controlled-vocabulary modality data.
-class TreatmentModality(LabeledChoice):
-    psychodynamic = "psychodynamic", "Psychodynamic"
-    emdr = "emdr", "EMDR"
-    ifs = "ifs", "IFS"
-    somatic = "somatic", "Somatic"
-    cbt = "cbt", "CBT"
-    dbt = "dbt", "DBT"
-    act = "act", "ACT"
-    motivational_interviewing = "motivational_interviewing", "Motivational interviewing"
-    narrative = "narrative", "Narrative"
-    gottman = "gottman", "Gottman"
-
-
-TREATMENT_MODALITIES: Final[tuple[str, ...]] = TreatmentModality.values()
 
 
 # --- Display labels for select <option>s --------------------------------
@@ -434,9 +383,6 @@ DESIRED_TIME_SLOT_LABELS: Final[dict[str, str]] = {
     for part in DESIRED_TIME_PARTS
 }
 REFERRAL_SERVICE_LABELS: Final[dict[str, str]] = ReferralService.labels()
-OPENING_SERVICE_LABELS: Final[dict[str, str]] = OpeningService.labels()
-TREATMENT_SETTINGS_LABELS: Final[dict[str, str]] = TreatmentSetting.labels()
-TREATMENT_MODALITY_LABELS: Final[dict[str, str]] = TreatmentModality.labels()
 GENDER_LABELS: Final[dict[str, str]] = Gender.labels()
 PRONOUNS_LABELS: Final[dict[str, str]] = Pronouns.labels()
 
