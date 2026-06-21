@@ -22,20 +22,17 @@
      handler injects it via context).
 #}
 {%- from "_shared/form_fields.html" import text_field, select_field, checkbox_field, multi_select_field, entity_select_field, textarea_field, url_field, form_section with context -%}
-{%- from "_shared/form_copy.html" import org_picker_help, select_all_help -%}
+{%- from "_shared/form_copy.html" import org_picker_help -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/actions.html" import actions -%}
-{# Steady-state practice profile fields (#1358 PR-f UI) are surfaced as
-   three clusters mirroring the same grouping used on
-   `posts/_form_clinician_opening.html` and `programs/form_edit.html`:
-   "Services offered" (what the clinician delivers), "Clients served"
-   (who they serve), and "How to refer" (how to reach them). The wire
-   schema in `src/domain/logic/clinician_affiliations/schema.py`
-   accepts these on both Create and Update; `currently_accepting_new_patients`
-   is intentionally NOT here — it's a server-managed denormalized
-   cache toggled by the OpeningDetail lifecycle (see the schema docstring
-   and `src/domain/models/clinician_affiliations/README.md#steady-state-profile-1358-pr-f`).
-   `languages` is also NOT here — it's person-level on `Clinician`. #}
+{# The affiliation holds steady-state context only — location, insurance
+   posture, and how-to-refer. The per-announcement profile (services /
+   session format / clients served / cost) moved onto the opening post
+   (`posts/_form_clinician_opening.html`). `currently_accepting_new_patients`
+   is NOT here — it's a server-managed denormalized cache toggled by the
+   OpeningDetail lifecycle (see the schema docstring and
+   `src/domain/models/clinician_affiliations/README.md`). `languages` is
+   also NOT here — it's person-level on `Clinician`. #}
 {% macro affiliation_form(action_url, method, heading, cancel_url, orgs, delete_url=None, delete_confirm=None, current=None) -%}
   <div class="entity-form-page">
     {% call entity_form(action_url, method=method) %}
@@ -45,24 +42,11 @@
                 current=(current.org_id if current else None) ,
         blank_label="(Solo practice — no organization)",
         help=org_picker_help()) }}
-        {{ text_field("location_city", "City", required=false,
+        {{ text_field("location_city", "City or area", required=false,
                 current=(current.location_city if current else None) ,
         maxlength=120) }}
         {{ select_field("location_state", "State", US_STATES,
                 current=(current.location_state if current else None) ,
-        required=false, placeholder=true) }}
-        {{ text_field("location_zip", "ZIP",
-                current=(current.location_zip if current else None) ,
-        required=false, pattern="\\d{5}", maxlength=5) }}
-        {{ select_field("in_person_sessions", "In-person sessions",
-                LOCATION_AVAILABILITY_OPTIONS,
-                labels=LOCATION_AVAILABILITY_LABELS,
-                current=(current.in_person_sessions if current else None) ,
-        required=false, placeholder=true) }}
-        {{ select_field("virtual_sessions", "Virtual sessions",
-                LOCATION_AVAILABILITY_OPTIONS,
-                labels=LOCATION_AVAILABILITY_LABELS,
-                current=(current.virtual_sessions if current else None) ,
         required=false, placeholder=true) }}
         {{ multi_select_field("in_network_carriers", "In-network carriers",
                 INSURANCE_CARRIERS,
@@ -73,32 +57,6 @@
                 current=(current.accepts_out_of_network if current else true) ) }}
         {{ checkbox_field("sliding_scale", "Offers sliding scale",
                 current=(current.sliding_scale if current else false) ) }}
-        {{ text_field("cost", "Cost", required=false,
-                current=(current.cost if current else None) ) }}
-      {% endcall %}
-      {% call form_section("Services offered") %}
-        {{ multi_select_field("services", "Services",
-                OPENING_SERVICES, labels=OPENING_SERVICE_LABELS,
-                current=(current.services if current else None) ,
-        help=select_all_help()) }}
-        {{ multi_select_field("settings", "Treatment settings",
-                TREATMENT_SETTINGS, labels=TREATMENT_SETTINGS_LABELS,
-                current=(current.settings if current else None) ,
-        help=select_all_help()) }}
-        {{ multi_select_field("modalities", "Treatment modalities",
-                TREATMENT_MODALITIES, labels=TREATMENT_MODALITY_LABELS,
-                current=(current.modalities if current else None) ,
-        help=select_all_help()) }}
-      {% endcall %}
-      {% call form_section("Clients served") %}
-        {{ multi_select_field("age_groups", "Age groups",
-                CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS,
-                current=(current.age_groups if current else None) ,
-        help=select_all_help()) }}
-        {{ multi_select_field("genders", "Genders",
-                GENDERS, labels=GENDER_LABELS,
-                current=(current.genders if current else None) ,
-        help=select_all_help()) }}
       {% endcall %}
       {% call form_section("How to refer") %}
         {{ url_field("website", "Website", required=false,

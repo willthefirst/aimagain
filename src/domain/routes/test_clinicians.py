@@ -425,7 +425,6 @@ async def test_list_clinicians_row_shows_all_affiliations(
         practice_name="Bedlam Health",
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
         in_network_carriers=["aetna"],
     )
     second_org_id = await _seed_org(
@@ -442,13 +441,9 @@ async def test_list_clinicians_row_shows_all_affiliations(
                     org_id=second_org_id,
                     location_city="Queens",
                     location_state="NY",
-                    location_zip="11101",
-                    in_person_sessions="yes",
-                    virtual_sessions="no",
                     accepts_out_of_network=True,
                     in_network_carriers=["anthem_bcbs"],
                     sliding_scale=False,
-                    cost=None,
                 )
             )
 
@@ -504,7 +499,6 @@ async def test_list_clinicians_row_dedupes_identical_locations(
         practice_name="Bedlam Health",
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
     )
     second_org_id = await _seed_org(
         db_test_session_manager,
@@ -520,13 +514,9 @@ async def test_list_clinicians_row_dedupes_identical_locations(
                     org_id=second_org_id,
                     location_city="Brooklyn",
                     location_state="NY",
-                    location_zip="11201",
-                    in_person_sessions="yes",
-                    virtual_sessions="no",
                     accepts_out_of_network=False,
                     in_network_carriers=[],
                     sliding_scale=False,
-                    cost=None,
                 )
             )
 
@@ -1130,12 +1120,8 @@ async def test_post_affiliation_creates_additional_row(
             "org_id": str(second_org_id),
             "location_city": "Queens",
             "location_state": "NY",
-            "location_zip": "11101",
-            "in_person_sessions": "yes",
-            "virtual_sessions": "no",
             "accepts_out_of_network": "true",
             "sliding_scale": "true",
-            "cost": "$220/session",
         },
     )
 
@@ -1157,7 +1143,6 @@ async def test_post_affiliation_creates_additional_row(
     assert extra.org_id == second_org_id
     assert extra.clinician_id == rows[0].clinician_id
     assert extra.sliding_scale is True
-    assert extra.cost == "$220/session"
 
 
 async def test_post_solo_affiliation_with_no_org(
@@ -1184,12 +1169,8 @@ async def test_post_solo_affiliation_with_no_org(
             "org_id": "",
             "location_city": "",
             "location_state": "",
-            "location_zip": "",
-            "in_person_sessions": "",
-            "virtual_sessions": "",
             "accepts_out_of_network": "true",
             "sliding_scale": "false",
-            "cost": "",
         },
     )
     assert response.status_code in (200, 201), response.text
@@ -1209,8 +1190,6 @@ async def test_post_solo_affiliation_with_no_org(
     assert len(rows) == 2
     solo = next(a for a in rows if a.org_id is None)
     assert solo.location_city is None
-    assert solo.in_person_sessions is None
-    assert solo.virtual_sessions is None
 
 
 async def test_patch_affiliation_updates_fields(
@@ -1238,13 +1217,13 @@ async def test_patch_affiliation_updates_fields(
 
     response = await authenticated_client.patch(
         f"/clinicians/{clinician_id}/clinician_affiliations/{aff_id}",
-        data={"sliding_scale": "true", "cost": "$999/session"},
+        data={"sliding_scale": "true", "website": "https://drsmith.example.com"},
     )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["sliding_scale"] is True
-    assert body["cost"] == "$999/session"
+    assert body["website"] == "https://drsmith.example.com"
 
 
 async def test_delete_affiliation_removes_row(
@@ -2178,39 +2157,27 @@ async def test_get_clinician_affiliation_new_form_carries_org_picker(
     assert any("My Practice LLC" in lbl for lbl in option_labels)
 
 
-# --- Steady-state practice profile UI (#1358 PR-f UI) -------------------
+# --- Steady-state how-to-refer UI ---------------------------------------
 #
-# `_form_affiliation.html` surfaces the seven steady-state-profile
-# fields on both the create and edit form: services, settings,
-# modalities, age_groups, genders, website, referral_instructions.
-# `currently_accepting_new_patients` is intentionally NOT on the
-# form — it's a server-managed cache flipped by the OpeningDetail
-# lifecycle (see the schema docstring in
-# `src/domain/logic/clinician_affiliations/schema.py`). The list
-# page (`clinician_affiliations/list.html`) renders these fields in
-# the row's meta line so the clinician's owner can see what they've
-# set without entering the edit page.
+# After the #1358 remodel, the per-(clinician × org) **steady-state
+# practice profile** (services / settings / modalities / age_groups /
+# genders / cost / delivery format) moved off `ClinicianAffiliation`
+# onto `OpeningDetail` (the opening post). The affiliation now carries
+# only location, insurance posture, and the how-to-refer fields
+# (`website`, `referral_instructions`), so `_form_affiliation.html`
+# surfaces just those two free-text fields.
+# `currently_accepting_new_patients` is a server-managed cache flipped by
+# the OpeningDetail lifecycle; the list page renders it as a read-only
+# "Accepting new patients" badge.
 
 
-_PROFILE_FIELD_NAMES = (
-    "services",
-    "settings",
-    "modalities",
-    "age_groups",
-    "genders",
-    "website",
-    "referral_instructions",
-)
-
-
-async def test_get_clinician_affiliation_new_form_renders_profile_fields(
+async def test_get_clinician_affiliation_new_form_renders_how_to_refer_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The create form carries inputs for every steady-state profile
-    field. Pinned because the schema accepts these on Create — without
-    matching inputs the user can't ever set them at create time."""
+    """The create form carries inputs for the how-to-refer fields the
+    affiliation still owns (`website`, `referral_instructions`)."""
     clinician_id = await _seed_clinician_for(
         db_test_session_manager, user_id=logged_in_user.id
     )
@@ -2223,19 +2190,19 @@ async def test_get_clinician_affiliation_new_form_renders_profile_fields(
         f'form[hx-post="/clinicians/{clinician_id}/clinician_affiliations"]'
     )
     assert add_form is not None
-    for name in _PROFILE_FIELD_NAMES:
+    for name in ("website", "referral_instructions"):
         assert (
             add_form.css_first(f'[name="{name}"]') is not None
         ), f"create form missing input name={name}"
 
 
-async def test_get_clinician_affiliation_edit_form_renders_profile_fields_prefilled(
+async def test_get_clinician_affiliation_edit_form_prefills_how_to_refer_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """The edit form pre-checks / pre-fills persisted profile values
-    so the user sees what they previously saved before patching."""
+    """The edit form pre-fills persisted how-to-refer values so the user
+    sees what they previously saved before patching."""
     from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
@@ -2250,11 +2217,6 @@ async def test_get_clinician_affiliation_edit_form_renders_profile_fields_prefil
                     )
                 )
             ).scalar_one()
-            aff.services = ["psychotherapy"]
-            aff.settings = ["outpatient"]
-            aff.modalities = ["cbt"]
-            aff.age_groups = ["adults_25_64"]
-            aff.genders = ["female"]
             aff.website = "https://drsmith.example.com"
             aff.referral_instructions = "Email intake@example.com."
         aff_id = aff.id
@@ -2265,24 +2227,6 @@ async def test_get_clinician_affiliation_edit_form_renders_profile_fields_prefil
     assert response.status_code == 200, response.text
     tree = HTMLParser(response.text)
 
-    # Multi-selects: the selected option is `checked` (bare attribute
-    # on the rendered `<input type=checkbox>`). selectolax exposes a
-    # bare attribute via membership on `.attributes` — not via
-    # `.get(...) is not None` because the value is `None`.
-    def _checked(name: str, value: str) -> bool:
-        for el in tree.css(f'input[name="{name}"][value="{value}"]'):
-            if "checked" in el.attributes:
-                return True
-        for opt in tree.css(f'select[name="{name}"] option[value="{value}"]'):
-            if "selected" in opt.attributes:
-                return True
-        return False
-
-    assert _checked("services", "psychotherapy")
-    assert _checked("settings", "outpatient")
-    assert _checked("modalities", "cbt")
-    assert _checked("age_groups", "adults_25_64")
-    assert _checked("genders", "female")
     website_input = tree.css_first('input[name="website"]')
     assert website_input is not None
     assert website_input.attributes.get("value") == "https://drsmith.example.com"
@@ -2291,13 +2235,13 @@ async def test_get_clinician_affiliation_edit_form_renders_profile_fields_prefil
     assert "intake@example.com" in (ref_textarea.text() or "")
 
 
-async def test_post_affiliation_persists_steady_state_profile(
+async def test_post_affiliation_persists_how_to_refer_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """POST with steady-state-profile fields creates a row carrying
-    them — the create form's full round-trip pin."""
+    """POST with the how-to-refer fields creates a row carrying them —
+    the create form's round-trip pin."""
     from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
@@ -2306,11 +2250,6 @@ async def test_post_affiliation_persists_steady_state_profile(
     response = await authenticated_client.post(
         f"/clinicians/{clinician_id}/clinician_affiliations",
         data={
-            "services": ["psychotherapy", "medication_management"],
-            "settings": ["outpatient"],
-            "modalities": ["dbt"],
-            "age_groups": ["adults_25_64"],
-            "genders": ["female"],
             "website": "https://example.com",
             "referral_instructions": "Email intake@example.com.",
         },
@@ -2331,24 +2270,18 @@ async def test_post_affiliation_persists_steady_state_profile(
         )
     # Find the newly created row (the seed clinician comes with one
     # default affiliation; the POST added a second).
-    new_row = next(r for r in rows if "psychotherapy" in (r.services or []))
-    assert sorted(new_row.services) == ["medication_management", "psychotherapy"]
-    assert new_row.settings == ["outpatient"]
-    assert new_row.modalities == ["dbt"]
-    assert new_row.age_groups == ["adults_25_64"]
-    assert new_row.genders == ["female"]
+    new_row = next(r for r in rows if (r.website or "") == "https://example.com")
     assert new_row.website == "https://example.com"
     assert new_row.referral_instructions == "Email intake@example.com."
 
 
-async def test_patch_affiliation_updates_steady_state_profile(
+async def test_patch_affiliation_updates_how_to_refer_fields(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """PATCH replaces profile lists and free-text fields on the row.
-    Empty-list PATCH clears (covered by `test_update_accepts_empty_list_to_clear`
-    in the schema tests); this asserts the wire-to-DB round-trip."""
+    """PATCH replaces the how-to-refer free-text fields on the row —
+    the wire-to-DB round-trip pin."""
     from src.domain.models import ClinicianAffiliation
 
     clinician_id = await _seed_clinician_for(
@@ -2366,59 +2299,14 @@ async def test_patch_affiliation_updates_steady_state_profile(
     response = await authenticated_client.patch(
         f"/clinicians/{clinician_id}/clinician_affiliations/{aff_id}",
         data={
-            "services": ["psychotherapy"],
-            "modalities": ["emdr", "dbt"],
             "website": "https://updated.example.com",
+            "referral_instructions": "Call the front desk.",
         },
     )
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["services"] == ["psychotherapy"]
-    assert sorted(body["modalities"]) == ["dbt", "emdr"]
     assert body["website"] == "https://updated.example.com"
-
-
-async def test_clinician_affiliations_list_displays_profile_fields(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user: User,
-):
-    """The list page surfaces non-empty profile fields and the
-    `currently_accepting_new_patients` badge so the user sees what they've
-    set without entering each row's edit page. Empty values suppress
-    their own meta entry — pinned by checking the badge appears only
-    when the underlying flag is True."""
-    from src.domain.models import ClinicianAffiliation
-
-    clinician_id = await _seed_clinician_for(
-        db_test_session_manager, user_id=logged_in_user.id
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            aff = (
-                await session.execute(
-                    select(ClinicianAffiliation).where(
-                        ClinicianAffiliation.clinician_id == clinician_id
-                    )
-                )
-            ).scalar_one()
-            aff.services = ["psychotherapy"]
-            aff.modalities = ["cbt"]
-            aff.age_groups = ["adults_25_64"]
-            aff.website = "https://drsmith.example.com"
-            aff.currently_accepting_new_patients = True
-
-    response = await authenticated_client.get(
-        f"/clinicians/{clinician_id}/clinician_affiliations"
-    )
-    assert response.status_code == 200, response.text
-    body = response.text
-    # Human-readable labels from the registered choice-label dicts.
-    assert "Psychotherapy" in body
-    assert "CBT" in body or "Cognitive Behavioral" in body
-    assert "Adults" in body or "adults" in body
-    assert "https://drsmith.example.com" in body
-    assert "Accepting new patients" in body
+    assert body["referral_instructions"] == "Call the front desk."
 
 
 async def test_clinician_affiliations_list_hides_accepting_badge_when_false(
@@ -2472,7 +2360,7 @@ async def test_patch_affiliation_profile_blocked_for_non_owner(
     logged_in_user: User,
 ):
     """A non-owner can't PATCH another clinician's affiliation profile —
-    the auth policy applies to the new fields just like the existing ones."""
+    the auth policy applies to every field on the affiliation."""
     from src.domain.models import ClinicianAffiliation
 
     _, other_clinician_id = await _seed_other_user_with_clinician(
@@ -2489,7 +2377,7 @@ async def test_patch_affiliation_profile_blocked_for_non_owner(
 
     response = await authenticated_client.patch(
         f"/clinicians/{other_clinician_id}/clinician_affiliations/{other_aff_id}",
-        data={"services": ["psychotherapy"]},
+        data={"website": "https://hijacked.example.com"},
     )
     assert response.status_code in (403, 404)
 

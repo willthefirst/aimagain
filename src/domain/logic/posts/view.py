@@ -29,33 +29,26 @@ the title).
 
 `post_card_view(post)` is the unified view-model that both the listing
 card (`_item.html`) and the detail page (`detail.html`) read from. Each
-kind's underlying detail relationship has a different field set and
-naming — CR holds its own (city, state, zip) location; PA reads
-location and insurance from the linked ClinicianAffiliation (the
-practice the opening announces, NOT the clinician's primary-affiliation
-proxies — a multi-affiliation clinician's opening must show the
-posting practice's facts); program reads identity from the linked
-Program. The function collapses those three shapes into one flat dict
-so templates iterate over keys rather than branching on `post.kind`.
-Values that don't apply to a kind are ``None`` (or empty lists);
-templates render via ``{% if view.x %}``. Raw enum values are returned
-— display-label lookup is the template's job (it's the same label dict
-pattern as elsewhere).
+kind's underlying detail relationship has a different field set — CR and
+PA (opening) are both **self-describing**: each holds its own
+``services`` / ``session_format`` / ``age_groups`` / ``genders`` (and
+CR its location, PA its ``cost``) on the detail row. PA reads only
+steady-state *context* — location + insurance — from the linked
+``ClinicianAffiliation`` (the practice the opening announces, NOT the
+clinician's primary-affiliation proxies — a multi-affiliation clinician's
+opening must show the posting practice's facts), and ``languages`` from
+the linked ``Clinician``. Program (intake) still reads its steady-state
+profile from the linked ``Program``. The function collapses those shapes
+into one flat dict so templates iterate over keys rather than branching
+on `post.kind`. Values that don't apply to a kind are ``None`` (or empty
+lists — e.g. openings carry no ``settings`` / ``modalities`` anymore);
+templates render via ``{% if view.x %}``. Raw enum values are returned —
+display-label lookup is the template's job.
 
-The opening and intake branches additionally consult the linked
-``ClinicianAffiliation`` (and the linked ``Clinician`` for the
-person-level ``languages``) — for openings — or the linked
-``Program`` — for intakes — when reading the steady-state profile
-fields (`services` / `settings` / `modalities` / `age_groups` /
-`genders` / `website` / `referral_instructions` / `languages`). These
-fields moved off the per-announcement detail row to their steady-state
-homes in #1358 PR-f; sub-3 dropped the detail-row columns, so reads
-come exclusively from the new home.
-
-`post_feed_headline(post)` builds the two-part headline for the
-feed-row component used in the home and browse list views. Format is
-``"<identity> — <clinical focus>"``: demographics + services for
-referrals, practice name + services/settings for openings.
+`post_feed_headline(post)` builds the feed-row headline for the home and
+browse list views: client demographics for referrals, the practice's org
+name for openings, the program name for intakes (the clinical detail
+trails as a separate `service_labels` fact row, not in the title).
 
 All helpers are exposed as Jinja globals by
 `src/framework/rendering/templating.py`.
@@ -128,9 +121,9 @@ def insurance_posture_for_post(post) -> str | None:
             return "in_network"
         if getattr(affiliation, "accepts_out_of_network", None):
             return "out_of_network"
-        if getattr(affiliation, "sliding_scale", None) or getattr(
-            affiliation, "cost", None
-        ):
+        # `cost` is per-announcement now (on the opening detail); sliding
+        # scale stays on the affiliation.
+        if getattr(affiliation, "sliding_scale", None) or getattr(detail, "cost", None):
             return "self_pay"
         return None
     if kind == "program_intake":
@@ -171,32 +164,30 @@ def _location_chunk(
 _SCALAR_PASSTHROUGH: dict[str, str] = {
     "description": "description",
     "schedule_text": "schedule_text",
+    # `cost` is per-announcement on the referral + opening detail rows;
+    # intake has no `cost` attr (→ None). Referral has none either.
+    "cost": "cost",
 }
 _LIST_PASSTHROUGH: dict[str, str] = {
     "services": "services",
     "settings": "settings",
     "ages": "age_groups",
+    "genders": "genders",
     "languages": "languages",
 }
 
-# #1358 PR-f sub-3 — steady-state profile fields read exclusively from
-# the new homes. The opening side reads these from the linked
-# ``ClinicianAffiliation`` (and ``languages`` from the linked
-# ``Clinician``); the intake side reads from the linked ``Program``.
-# The detail rows no longer carry these columns at all after sub-3.
-_OPENING_AFFILIATION_FIELDS: tuple[tuple[str, str], ...] = (
-    # (view_key, column-on-affiliation)
+# Intake still reads its steady-state profile from the linked ``Program``
+# (Program is the intake-side equivalent of the affiliation). The opening
+# side no longer needs an affiliation list-field map — the opening detail
+# now carries its own ``services`` / ``age_groups`` / ``genders`` (read
+# via the passthrough above); only ``languages`` is steady-state for an
+# opening (person-level on the linked ``Clinician``).
+_INTAKE_PROGRAM_LIST_FIELDS: tuple[tuple[str, str], ...] = (
     ("services", "services"),
     ("settings", "settings"),
     ("modalities", "modalities"),
     ("ages", "age_groups"),
     ("genders", "genders"),
-)
-_INTAKE_PROGRAM_LIST_FIELDS: tuple[tuple[str, str], ...] = (
-    *_OPENING_AFFILIATION_FIELDS,
-    # `languages` is person-level for openings (lives on `Clinician`) but
-    # program-level for intakes — Program is the equivalent of the
-    # affiliation here.
     ("languages", "languages"),
 )
 
@@ -326,11 +317,12 @@ def post_card_view(post) -> dict[str, Any]:
             ``in_network_carriers`` comes back as an empty list when
             unset; the other two are ``None`` for other kinds.
 
-    PA ``cost`` and the "how to refer" pair (website, referral
-    instructions) are NOT view-model keys — the detail page's
-    owner-context card renders them straight off the linked
-    ``ClinicianAffiliation`` / ``Program`` via the shared
-    ``affiliation_facts`` / ``program_facts`` macros.
+    Opening ``cost`` is a view-model key (per-announcement, read off the
+    opening detail). The "how to refer" pair (website, referral
+    instructions) are NOT view-model keys — the detail page's owner-context
+    card renders them straight off the linked ``ClinicianAffiliation`` /
+    ``Program`` via the shared ``affiliation_facts`` / ``program_facts``
+    macros.
     """
     kind = getattr(post, "kind", None)
     base: dict[str, Any] = {
@@ -340,9 +332,9 @@ def post_card_view(post) -> dict[str, Any]:
         "header_state": None,
         "in_person": None,
         "virtual": None,
-        # Referral-only — the collapsed session-format axis (#1359).
-        # Opening / intake set it None; templates that want the
-        # cross-kind shape still read `in_person` / `virtual`.
+        # Referral + opening carry `session_format` (a list subset of
+        # {in_person, virtual}); the two `in_person`/`virtual` keys are
+        # back-derived from it. Intake sets it None.
         "session_format": None,
         "services": [],
         "settings": [],
@@ -351,6 +343,7 @@ def post_card_view(post) -> dict[str, Any]:
         "genders": [],
         "insurance_posture": insurance_posture_for_post(post),
         "modalities": [],
+        "cost": None,
         "location_chunk": None,
         "description": None,
         "schedule_text": None,
@@ -468,16 +461,20 @@ def post_card_view(post) -> dict[str, Any]:
             return base
         _forward_detail_passthrough(base, d)
         p = getattr(d, "clinician", None)
-        # Practice-role facts (org, location, sessions) read from the
-        # affiliation the opening announces — NOT through the
-        # Clinician's primary-affiliation proxy properties, which would
-        # show the wrong practice for a multi-affiliation clinician.
-        # `languages` stays person-level on the Clinician (#1358 PR-f
-        # sub-3 dropped the detail-row columns for all of these).
+        # The opening's announcement profile (services / age_groups /
+        # genders / session_format / cost / services_other_text) is read
+        # off the detail row itself — services / ages / genders land via
+        # the passthrough above; the rest are set below. Only steady-state
+        # context (org, location, insurance) reads from the affiliation the
+        # opening announces — NOT through the Clinician's primary-affiliation
+        # proxy, which would show the wrong practice for a multi-affiliation
+        # clinician. `languages` stays person-level on the Clinician.
         affiliation = getattr(d, "clinician_affiliation", None)
-        for view_key, attr in _OPENING_AFFILIATION_FIELDS:
-            base[view_key] = _read_list(affiliation, attr)
         base["languages"] = _read_list(p, "languages")
+        base["session_format"] = list(getattr(d, "session_format", None) or [])
+        base["in_person"] = _in_person_from_session_format(base["session_format"])
+        base["virtual"] = _virtual_from_session_format(base["session_format"])
+        base["services_other_text"] = getattr(d, "services_other_text", None)
         _org = _read_scalar(affiliation, "org")
         _org_name = getattr(_org, "name", None) if _org else None
         _org_ref = (
@@ -505,13 +502,14 @@ def post_card_view(post) -> dict[str, Any]:
             # location surfaces, so the list card's header line stays
             # uncluttered for both.
             header_state=None,
+            # Affiliation location is city/area + state, no ZIP. `in_person`
+            # / `virtual` are derived from the opening's own `session_format`
+            # above (not from the affiliation).
             location_chunk=_location_chunk(
                 _read_scalar(affiliation, "location_city"),
                 _read_scalar(affiliation, "location_state"),
-                _read_scalar(affiliation, "location_zip"),
+                None,
             ),
-            in_person=_read_scalar(affiliation, "in_person_sessions"),
-            virtual=_read_scalar(affiliation, "virtual_sessions"),
             practice_link=(
                 {"id": p.id, "name": _org_name}
                 if _org_name and p and getattr(p, "id", None)
@@ -521,7 +519,7 @@ def post_card_view(post) -> dict[str, Any]:
             full_address=full_address(
                 _read_scalar(affiliation, "location_city"),
                 _read_scalar(affiliation, "location_state"),
-                _read_scalar(affiliation, "location_zip"),
+                None,
             ),
             # Owner-context card reads `owner_address` (the provider's
             # address). For an opening that's the same affiliation as
@@ -531,7 +529,7 @@ def post_card_view(post) -> dict[str, Any]:
             owner_address=full_address(
                 _read_scalar(affiliation, "location_city"),
                 _read_scalar(affiliation, "location_state"),
-                _read_scalar(affiliation, "location_zip"),
+                None,
             ),
             # Feed-row meta strip (`_feed_row.html`) reads these three
             # for the opening insurance chunk.
@@ -620,10 +618,10 @@ def service_labels(view) -> list[str]:
 
     `psychotherapy` and `medication_management` lead; the remaining
     services follow in the post's stored order; treatment `settings`
-    (opening / intake) trail. ``view["kind"]`` picks the vocab —
-    referrals use the `ReferralService` leaves, the availability kinds
-    use `OpeningService`. Returns ``[]`` when the post states neither
-    services nor settings.
+    (intake only) trail. ``view["kind"]`` picks the vocab — referrals and
+    openings share the `ReferralService` leaves; only `program_intake`
+    still uses the provider-side `OpeningService` set. Returns ``[]`` when
+    the post states neither services nor settings.
 
     Registered as a template global so all three service surfaces — the
     framework feed row, the domain list card (`services_fact`), and the
@@ -634,9 +632,9 @@ def service_labels(view) -> list[str]:
     services = list(view.get("services") or [])
     settings = list(view.get("settings") or [])
     svc_map = (
-        REFERRAL_SERVICE_LABELS
-        if view.get("kind") == "referral"
-        else OPENING_SERVICE_LABELS
+        OPENING_SERVICE_LABELS
+        if view.get("kind") == "program_intake"
+        else REFERRAL_SERVICE_LABELS
     )
     priority = ("psychotherapy", "medication_management")
     labels = [svc_map.get(s, s) for s in priority if s in services]
@@ -729,18 +727,15 @@ def post_row_summary(post) -> str:
         if desc:
             parts.append(desc[:100])
         else:
-            # `age_groups` / `services` read from the linked
-            # ClinicianAffiliation (#1358 PR-f).
-            ages = _read_list(affiliation, "age_groups")
-            services = _read_list(affiliation, "services")
+            # `age_groups` / `services` are per-announcement (on the
+            # opening detail); services use the `ReferralService` vocab.
+            ages = list(getattr(d, "age_groups", None) or [])
+            services = list(getattr(d, "services", None) or [])
             age_labels = [CLIENT_AGE_GROUP_LABELS_SINGULAR.get(a, a) for a in ages[:2]]
-            svc_labels = [OPENING_SERVICE_LABELS.get(s, s) for s in services[:2]]
+            svc_labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
             combined = age_labels + svc_labels
             if combined:
                 parts.append(", ".join(combined))
-        settings = _read_list(affiliation, "settings")
-        if settings:
-            parts.append(TREATMENT_SETTINGS_LABELS.get(settings[0], settings[0]))
         if _read_scalar(affiliation, "sliding_scale"):
             parts.append("sliding scale")
         return " · ".join(parts) if parts else "Opening"

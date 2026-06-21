@@ -22,13 +22,9 @@ def _stub_affiliation(**overrides):
         org=SimpleNamespace(name="Acme Counseling"),
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         in_network_carriers=["aetna"],
         accepts_out_of_network=False,
         sliding_scale=False,
-        cost=None,
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
@@ -56,13 +52,9 @@ def _stub_clinician(**overrides):
         npi=None,
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         in_network_carriers=["aetna"],
         accepts_out_of_network=False,
         sliding_scale=False,
-        cost=None,
         licensures=[],
         educations=[],
         certifications=[],
@@ -209,17 +201,7 @@ def test_view_practice_url_links_to_owning_org():
 
 def test_view_full_address_composes_location_columns():
     v = clinician_card_view(_stub_clinician())
-    assert v["full_address"] == "Brooklyn, NY 11201"
-
-
-def test_view_in_person_and_virtual_resolved_to_display_labels():
-    """Template doesn't need to call LOCATION_AVAILABILITY_LABELS — the
-    view-model pre-resolves to display strings."""
-    v = clinician_card_view(
-        _stub_clinician(in_person_sessions="yes", virtual_sessions="no")
-    )
-    assert v["in_person_label"] == "Yes"
-    assert v["virtual_label"] == "No"
+    assert v["full_address"] == "Brooklyn, NY"
 
 
 def test_view_insurance_summary_collapses_three_conditionals():
@@ -241,9 +223,8 @@ def test_view_sliding_scale_label_no():
     assert v["sliding_scale_label"] == "No"
 
 
-def test_view_passes_through_optional_cost_and_npi():
-    v = clinician_card_view(_stub_clinician(cost="$150/session", npi="1234567890"))
-    assert v["cost"] == "$150/session"
+def test_view_passes_through_optional_npi():
+    v = clinician_card_view(_stub_clinician(npi="1234567890"))
     assert v["npi"] == "1234567890"
 
 
@@ -313,38 +294,24 @@ def test_view_prefers_affiliation_over_legacy_clinician_columns():
     """
     clinician_stub = _stub_clinician(
         # Legacy columns on `clinician` carry the "old" values
-        in_person_sessions="no",
-        virtual_sessions="no",
         sliding_scale=False,
-        cost="$50/session",
         location_city="Old City",
         location_state="NY",
-        location_zip="00000",
         in_network_carriers=[],
         accepts_out_of_network=False,
         # `primary_clinician_affiliation` carries the post-PR-3 source of truth.
         primary_clinician_affiliation=SimpleNamespace(
-            in_person_sessions="yes",
-            virtual_sessions="no",
             sliding_scale=True,
-            cost="$200/session",
             location_city="New City",
             location_state="CA",
-            location_zip="90210",
             in_network_carriers=["aetna"],
             accepts_out_of_network=True,
         ),
     )
     v = clinician_card_view(clinician_stub)
-    assert v["in_person_label"] is not None
-    # affiliation says yes → label maps to the Yes branch, not the
-    # legacy "no" → "No" branch.
-    assert "yes" in v["in_person_label"].lower() or v["in_person_label"] == "Yes"
     assert v["sliding_scale_label"] == "Yes"
-    assert v["cost"] == "$200/session"
     assert "New City" in v["full_address"]
     assert "CA" in v["full_address"]
-    assert "90210" in v["full_address"]
     # ClinicianAffiliation has both Aetna in-network and accepts_oon=True →
     # summary mentions both.
     assert "Aetna" in v["insurance_summary"]
@@ -364,24 +331,17 @@ def test_affiliation_card_view_shape():
         org=SimpleNamespace(name="Bedlam Health"),
         location_city="Queens",
         location_state="NY",
-        location_zip="11101",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         in_network_carriers=["aetna"],
         accepts_out_of_network=True,
         sliding_scale=True,
-        cost="$220/session",
     )
     card = affiliation_card_view(aff)
     assert card["org_id"] == "org-7"
     assert card["org_name"] == "Bedlam Health"
     assert card["org_url"] == "/organizations/org-7"
-    assert card["full_address"] == "Queens, NY 11101"
-    assert card["in_person_label"] == "Yes"
-    assert card["virtual_label"] == "No"
+    assert card["full_address"] == "Queens, NY"
     assert card["insurance_summary"] == "In-network (Aetna) · Out-of-network"
     assert card["sliding_scale_label"] == "Yes"
-    assert card["cost"] == "$220/session"
 
 
 def test_affiliation_card_view_uses_explicit_org_when_passed():
@@ -407,14 +367,12 @@ def test_view_returns_affiliations_list_one_per_row():
         org=SimpleNamespace(name="Bedlam Health"),
         location_city="Brooklyn",
         sliding_scale=False,
-        cost=None,
     )
     aff_b = _stub_affiliation(
         org_id="org-b",
         org=SimpleNamespace(name="Wellspring"),
         location_city="Queens",
         sliding_scale=True,
-        cost="$220/session",
     )
     v = clinician_card_view(_stub_clinician(clinician_affiliations=[aff_a, aff_b]))
     assert isinstance(v["clinician_affiliations"], list)
@@ -425,7 +383,6 @@ def test_view_returns_affiliations_list_one_per_row():
     assert v["clinician_affiliations"][1]["org_name"] == "Wellspring"
     assert v["clinician_affiliations"][1]["org_url"] == "/organizations/org-b"
     assert v["clinician_affiliations"][1]["sliding_scale_label"] == "Yes"
-    assert v["clinician_affiliations"][1]["cost"] == "$220/session"
 
 
 def test_view_affiliations_is_empty_list_when_clinician_has_none():

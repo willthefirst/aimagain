@@ -39,13 +39,13 @@ universes aligned with the source tuples.
 import re
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator
 
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
-    Location,
+    ReferralLocationPartial,
 )
 from src.domain.models.enums import (
     AFFIRMING_IDENTITIES,
@@ -227,6 +227,8 @@ class ClinicianCertificationUpdate(PartialUpdate):
 
 
 class ClinicianRead(FlatLocationSchema, ReadProjection):
+    _location_subfields: ClassVar[tuple[str, ...]] = ("city", "state")
+
     id: uuid.UUID
     owner_id: uuid.UUID
     created_at: datetime
@@ -246,20 +248,20 @@ class ClinicianRead(FlatLocationSchema, ReadProjection):
     # Legal first / last name — required on the model (NOT NULL).
     first_name: str
     last_name: str
-    # `(city, state, zip)` arrive flat — from ORM attributes via
+    # `(city, state)` arrive flat — from ORM attributes via
     # ``from_attributes`` or from a flat dict — and dump flat (JSON
-    # responses still expose ``location_city`` / ``location_state`` /
-    # ``location_zip`` at the top level). ``gather_flat_location`` rolls
-    # the flat input into a nested ``location`` block before validation
-    # so the ``Location`` value object owns the cleaning rules; the
-    # ``@model_serializer`` below unrolls it back to flat on dump.
-    location: Location | None = None
-    in_person_sessions: str | None = None
-    virtual_sessions: str | None = None
+    # responses still expose ``location_city`` / ``location_state`` at the
+    # top level). No ZIP — the affiliation models a city/area + state like
+    # a referral. ``gather_flat_location`` rolls the flat input into a
+    # nested ``location`` block before validation; the ``@model_serializer``
+    # unrolls it back to flat on dump.
+    location: ReferralLocationPartial | None = None
+    # Delivery format + per-announcement cost moved onto the opening post,
+    # so they are no longer affiliation-derived clinician fields. Insurance
+    # posture stays steady-state on the affiliation.
     accepts_out_of_network: bool | None = None
     in_network_carriers: list[str] = []
     sliding_scale: bool | None = None
-    cost: str | None = None
     # Affirming-identity claims. JSON list of `AFFIRMING_IDENTITIES`
     # tokens; person-level (lives directly on the clinician, not on an
     # affiliation). Empty list = "none stated".

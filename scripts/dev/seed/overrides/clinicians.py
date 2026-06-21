@@ -8,10 +8,15 @@ Cardinality:
 
 Coverage:
   - `location_state` round-robins all 51 US_STATES so every state
-    appears at least once (CLINICIAN_COUNT > 51).
-  - `in_person_sessions` and `virtual_sessions` independently
-    round-robin LOCATION_AVAILABILITY_OPTIONS — produces rows for
-    (in-person only), (virtual only), (both), (neither).
+    appears at least once (CLINICIAN_COUNT > 51); ~20% of affiliations
+    get a null location, exercising the deferred "complete your profile"
+    path. `location_city` is a city/area (no ZIP).
+  - The affiliation seeds steady-state context only — insurance posture
+    (`accepts_out_of_network` / `in_network_carriers` / `sliding_scale`),
+    how-to-refer (`website` / `referral_instructions`), and a mix of
+    `currently_accepting_new_patients`. The per-announcement profile
+    (session format, services, age groups, genders, cost) lives on the
+    opening post and is seeded in `overrides/posts.py`.
 """
 
 from __future__ import annotations
@@ -20,15 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.models import Clinician, ClinicianAffiliation, Organization, User
 from src.domain.models.enums import (
-    CLIENT_AGE_GROUPS,
-    GENDERS,
     INSURANCE_CARRIERS,
     LANGUAGES,
-    LOCATION_AVAILABILITY_OPTIONS,
     NPI_MATCH_STATUSES,
-    OPENING_SERVICES,
-    TREATMENT_MODALITIES,
-    TREATMENT_SETTINGS,
     US_STATES,
 )
 from src.domain.routes.dev_personas import PERSONAS
@@ -36,7 +35,7 @@ from src.domain.routes.dev_personas import PERSONAS
 from .. import counts
 from ..generators import SeedPool
 from ..rng import SeededRandom, deterministic_uuid
-from ..vocab import COLUMN_VOCAB, _zip_for_state
+from ..vocab import COLUMN_VOCAB
 from . import register
 
 
@@ -133,12 +132,11 @@ async def generate_clinicians(
 
 
 def _affiliation_kwargs(rng: SeededRandom, index: int) -> dict:
-    """Per-affiliation column values. Round-robin every CHECK-bound
-    column so the dataset hits every allowed combination at least once
-    across the COUNT axis."""
+    """Per-affiliation column values — steady-state context only
+    (location + insurance + how-to-refer). The per-announcement profile
+    (services / session_format / age_groups / genders / cost) lives on the
+    opening post now; see `overrides/posts.py`."""
     state = rng.round_robin(US_STATES, index)
-    in_person = rng.round_robin(LOCATION_AVAILABILITY_OPTIONS, index)
-    virtual = rng.round_robin(LOCATION_AVAILABILITY_OPTIONS, index + 1)
     return {
         "location_state": state,
         "location_city": (
@@ -146,43 +144,11 @@ def _affiliation_kwargs(rng: SeededRandom, index: int) -> dict:
             if state not in {"CA", "TX", "NY", "FL", "IL", "PA", "OH"}
             else state
         ),  # placeholder; the runner override below uses CITIES_BY_STATE
-        "location_zip": _zip_for_state(rng, state),
-        # `in_person_sessions` / `virtual_sessions` are nullable: a stub
-        # affiliation created at NPI verify time hasn't been asked yet.
-        # ~20% NULL each so the nullable-coverage test (and any consumer
-        # that reads through `clinician.in_person_sessions`) hits both
-        # branches.
-        "in_person_sessions": None if rng.bool(0.2) else in_person,
-        "virtual_sessions": None if rng.bool(0.2) else virtual,
         "accepts_out_of_network": rng.bool(0.5),
         "in_network_carriers": rng.nullable_subset(
             INSURANCE_CARRIERS, min_size=0, max_size=6, p_empty=0.25
         ),
         "sliding_scale": rng.bool(0.3),
-        "cost": (None if rng.bool(0.6) else COLUMN_VOCAB["cost"](rng, index)),
-        # ---- Steady-state profile (added #1358 PR-f sub-1) ----
-        # These columns are the new per-affiliation home for fields
-        # that used to live on `OpeningDetail`. Use **index-driven
-        # round-robin** rather than `rng.*` calls so adding these
-        # fields does not perturb the shared seed RNG sequence —
-        # that sequence drives downstream coverage tests (notably
-        # `clinician_affiliations.location_state` round-robin via
-        # `test_enum_coverage_for_every_check_constraint`). Index-
-        # driven also makes the seeded shape stable as new fields
-        # are added later in the chain.
-        "services": [OPENING_SERVICES[index % len(OPENING_SERVICES)]],
-        "settings": (
-            []
-            if index % 5 == 0
-            else [TREATMENT_SETTINGS[index % len(TREATMENT_SETTINGS)]]
-        ),
-        "modalities": (
-            []
-            if index % 6 == 0
-            else [TREATMENT_MODALITIES[index % len(TREATMENT_MODALITIES)]]
-        ),
-        "age_groups": [CLIENT_AGE_GROUPS[index % len(CLIENT_AGE_GROUPS)]],
-        "genders": ([] if index % 5 == 0 else [GENDERS[index % len(GENDERS)]]),
         "website": (
             None if index % 3 == 0 else f"https://example.com/clinician/{index}"
         ),
@@ -192,8 +158,8 @@ def _affiliation_kwargs(rng: SeededRandom, index: int) -> dict:
             else COLUMN_VOCAB["referral_instructions"](rng, index)
         ),
         # `currently_accepting_new_patients` defaults to False on the
-        # column; lifecycle code (sub-PR 2/3) flips it. Seeding a mix
-        # exercises the directory filter today.
+        # column; lifecycle code flips it. Seeding a mix exercises the
+        # directory filter today.
         "currently_accepting_new_patients": index % 2 == 0,
     }
 
@@ -225,7 +191,6 @@ async def generate_affiliations(
         if rng.bool(0.2):
             kwargs["location_city"] = None
             kwargs["location_state"] = None
-            kwargs["location_zip"] = None
         else:
             kwargs["location_city"] = _city_for_state(rng, kwargs["location_state"])
         primary = ClinicianAffiliation(

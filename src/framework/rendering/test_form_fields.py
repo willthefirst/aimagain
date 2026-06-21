@@ -156,15 +156,14 @@ def test_zip_text_alias_carries_pattern_in_real_schema():
     """End-to-end: the `ZipText` alias in `src/framework/schema_validators.py`
     is the production wiring this prototype targets. If someone removes
     the `HtmlPattern` marker on `ZipText`, the form's client-side
-    validation silently drops — catch it here. Targets
-    `ClinicianAffiliationCreate` which routes through
-    `LocationPartial.zip: ZipText | None` (#1320), so this test also
-    pins the field_spec fix for surfacing markers through Optional."""
-    from src.domain.logic.clinician_affiliations.schema import (
-        ClinicianAffiliationCreate,
-    )
+    validation silently drops — catch it here. Targets the production
+    `LocationPartial.zip: ZipText | None` value object (the affiliation /
+    clinician location surfaces dropped ZIP, but `Location` /
+    `LocationPartial` still carry it), so this test also pins the
+    field_spec fix for surfacing markers through Optional (#1320)."""
+    from src.domain.logic.value_objects.location import LocationPartial
 
-    spec = field_spec(ClinicianAffiliationCreate, "location_zip")
+    spec = field_spec(LocationPartial, "zip")
     assert spec["pattern"] == r"\d{5}"
     assert spec["maxlength"] == 5
 

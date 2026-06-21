@@ -47,14 +47,11 @@ def _make_clinician(
         first_name="Jane",
         last_name="Smith",
         npi=npi,
-        in_person_sessions="yes",
-        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=[],
         sliding_scale=False,
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
     )
 
 
@@ -94,14 +91,11 @@ async def test_clinician_construct_with_existing_affiliation_skips_auto_create()
     existing = ClinicianAffiliation(
         clinician_id=uuid.uuid4(),
         org_id=org.id,
-        in_person_sessions="yes",
-        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=[],
         sliding_scale=False,
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
     )
     clinician = Clinician(
         owner_id=user.id,
@@ -171,14 +165,11 @@ async def test_clinician_construct_passes_names_as_kwargs():
         org_id=org.id,
         first_name="Frank",
         last_name="Tucker",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         accepts_out_of_network=True,
         in_network_carriers=[],
         sliding_scale=False,
         location_city="Brooklyn",
         location_state="NY",
-        location_zip="11201",
     )
     assert clinician.first_name == "Frank"
     assert clinician.last_name == "Tucker"
@@ -225,13 +216,9 @@ async def test_setting_per_affiliation_field_with_no_affiliation_raises():
         ("org_id", uuid.uuid4()),
         ("location_city", "Brooklyn"),
         ("location_state", "NY"),
-        ("location_zip", "11201"),
-        ("in_person_sessions", "yes"),
-        ("virtual_sessions", "no"),
         ("accepts_out_of_network", True),
         ("in_network_carriers", []),
         ("sliding_scale", False),
-        ("cost", "$150"),
     ):
         with pytest.raises(ValueError, match=f"cannot set '{attr}'"):
             setattr(clinician, attr, value)
@@ -248,11 +235,7 @@ async def test_setting_per_affiliation_field_with_affiliation_writes_through():
     assert clinician.primary_clinician_affiliation is not None
 
     clinician.location_city = "Queens"
-    clinician.in_person_sessions = "no"
-    clinician.cost = "$200"
     assert clinician.primary_clinician_affiliation.location_city == "Queens"
-    assert clinician.primary_clinician_affiliation.in_person_sessions == "no"
-    assert clinician.primary_clinician_affiliation.cost == "$200"
 
 
 # --- Claim A verification columns -----------------------------------------

@@ -30,13 +30,9 @@ _PER_ROLE_ATTRS = (
     "org_id",
     "location_city",
     "location_state",
-    "location_zip",
-    "in_person_sessions",
-    "virtual_sessions",
     "accepts_out_of_network",
     "in_network_carriers",
     "sliding_scale",
-    "cost",
 )
 
 
@@ -46,9 +42,11 @@ class Clinician(BaseModel):
 
     A Clinician holds the person-level attributes (NPI, name, credentials)
     that are invariant across affiliations, plus `owner_id` (the user
-    account that manages this entry). Practice-role attributes (location,
-    insurance, modality) live on `ClinicianAffiliation` — the (clinician × org)
-    join row. A clinician may hold multiple affiliations.
+    account that manages this entry). Steady-state context attributes
+    (location, insurance posture) live on `ClinicianAffiliation` — the
+    (clinician × org) join row. A clinician may hold multiple affiliations.
+    Per-announcement dimensions (services, session format, cohort, cost)
+    live on the opening post, not here or on the affiliation.
     """
 
     __tablename__ = _TABLE
@@ -173,13 +171,9 @@ class Clinician(BaseModel):
                     org_id=per_role.get("org_id"),
                     location_city=per_role.get("location_city"),
                     location_state=per_role.get("location_state"),
-                    location_zip=per_role.get("location_zip"),
-                    in_person_sessions=per_role.get("in_person_sessions"),
-                    virtual_sessions=per_role.get("virtual_sessions"),
                     accepts_out_of_network=per_role.get("accepts_out_of_network", True),
                     in_network_carriers=per_role.get("in_network_carriers") or [],
                     sliding_scale=per_role.get("sliding_scale", False),
-                    cost=per_role.get("cost"),
                 )
             ]
 
@@ -190,9 +184,10 @@ class Clinician(BaseModel):
     def _require_primary_affiliation(self, attr_name: str):
         """Setter guard for every per-affiliation proxy below.
 
-        Per-affiliation fields (location, availability, insurance posture,
-        cost, org_id) live on :class:`ClinicianAffiliation`, not on this
-        row. Writing through the proxy when no affiliation exists used to
+        Steady-state context fields (``org_id``, location, insurance
+        posture — see :data:`_PER_ROLE_ATTRS`) live on
+        :class:`ClinicianAffiliation`, not on this row. Writing through
+        the proxy when no affiliation exists used to
         silently no-op — :class:`Clinician` accepted the write and dropped
         it, which surfaced in production as "the edit form returned 200
         but nothing saved" once create-time affiliation became optional.
@@ -251,35 +246,6 @@ class Clinician(BaseModel):
         self._require_primary_affiliation("location_state").location_state = value
 
     @property
-    def location_zip(self) -> str | None:
-        aff = self.primary_clinician_affiliation
-        return aff.location_zip if aff is not None else None
-
-    @location_zip.setter
-    def location_zip(self, value) -> None:
-        self._require_primary_affiliation("location_zip").location_zip = value
-
-    @property
-    def in_person_sessions(self) -> str | None:
-        aff = self.primary_clinician_affiliation
-        return aff.in_person_sessions if aff is not None else None
-
-    @in_person_sessions.setter
-    def in_person_sessions(self, value) -> None:
-        self._require_primary_affiliation("in_person_sessions").in_person_sessions = (
-            value
-        )
-
-    @property
-    def virtual_sessions(self) -> str | None:
-        aff = self.primary_clinician_affiliation
-        return aff.virtual_sessions if aff is not None else None
-
-    @virtual_sessions.setter
-    def virtual_sessions(self, value) -> None:
-        self._require_primary_affiliation("virtual_sessions").virtual_sessions = value
-
-    @property
     def accepts_out_of_network(self) -> bool | None:
         aff = self.primary_clinician_affiliation
         return aff.accepts_out_of_network if aff is not None else None
@@ -311,12 +277,3 @@ class Clinician(BaseModel):
     @sliding_scale.setter
     def sliding_scale(self, value) -> None:
         self._require_primary_affiliation("sliding_scale").sliding_scale = value
-
-    @property
-    def cost(self) -> str | None:
-        aff = self.primary_clinician_affiliation
-        return aff.cost if aff is not None else None
-
-    @cost.setter
-    def cost(self, value) -> None:
-        self._require_primary_affiliation("cost").cost = value

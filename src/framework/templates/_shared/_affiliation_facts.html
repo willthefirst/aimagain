@@ -1,5 +1,10 @@
-{# `affiliation_facts(aff)` — the steady-state profile of one
+{# `affiliation_facts(aff)` — the steady-state context of one
    `ClinicianAffiliation` as a stack of `fact(...)` rows.
+
+   The affiliation models only steady-state context now (insurance
+   posture + how-to-refer); the per-announcement profile (services /
+   age_groups / genders / session_format / cost) lives on the opening
+   post and is rendered from the post view, not here.
 
    Emits ROWS, not the `facts_block()` wrapper — callers compose it
    inside whatever chrome their surface already uses (the practices
@@ -11,23 +16,13 @@
 
    Lives at the framework level (not under the
    `clinician_affiliations/` cluster) because post surfaces render the
-   same profile and cross-cluster template imports aren't allowed —
+   same context and cross-cluster template imports aren't allowed —
    same rationale as `_clinician_card.html` (see the layering rule in
    the README).
 
-   Every row suppresses itself when its field is empty. Label
-   vocabularies (`REFERRAL_SERVICE_LABELS`, `TREATMENT_SETTINGS_LABELS`,
-   `TREATMENT_MODALITY_LABELS`, `CLIENT_AGE_GROUP_LABELS`,
-   `GENDER_LABELS`, `LOCATION_AVAILABILITY_LABELS`) are Jinja globals. #}
+   Every row suppresses itself when its field is empty. #}
 {%- from "_shared/sections.html" import fact -%}
 {% macro affiliation_facts(aff) -%}
-  {%- set availability_parts = [] -%}
-  {%- if aff.in_person_sessions -%}
-    {%- set _ = availability_parts.append("In-person: " ~ LOCATION_AVAILABILITY_LABELS[aff.in_person_sessions]) -%}
-  {%- endif -%}
-  {%- if aff.virtual_sessions -%}
-    {%- set _ = availability_parts.append("Virtual: " ~ LOCATION_AVAILABILITY_LABELS[aff.virtual_sessions]) -%}
-  {%- endif -%}
   {%- set insurance_parts = [] -%}
   {%- if aff.in_network_carriers -%}
     {%- set _ = insurance_parts.append("In-network: " ~ (aff.in_network_carriers | map('lower') | map('capitalize') | join(', '))) -%}
@@ -38,23 +33,6 @@
   {%- if aff.sliding_scale -%}
     {%- set _ = insurance_parts.append("Sliding scale") -%}
   {%- endif -%}
-  {%- set _svc_labels = [] -%}
-  {%- for s in (aff.services or []) -%}{%- set _ = _svc_labels.append(OPENING_SERVICE_LABELS[s]) -%}{%- endfor -%}
-    {%- set _setting_labels = [] -%}
-    {%- for s in (aff.settings or []) -%}{%- set _ = _setting_labels.append(TREATMENT_SETTINGS_LABELS[s]) -%}{%- endfor -%}
-      {%- set _mod_labels = [] -%}
-      {%- for m in (aff.modalities or []) -%}{%- set _ = _mod_labels.append(TREATMENT_MODALITY_LABELS[m]) -%}{%- endfor -%}
-        {%- set _age_labels = [] -%}
-        {%- for g in (aff.age_groups or []) -%}{%- set _ = _age_labels.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-          {%- set _gender_labels = [] -%}
-          {%- for g in (aff.genders or []) -%}{%- set _ = _gender_labels.append(GENDER_LABELS[g]) -%}{%- endfor -%}
-            {%- if availability_parts -%}{{ fact('availability', 'Availability', availability_parts | join(" · ") ) }}{%- endif %}
-              {%- if insurance_parts -%}{{ fact('insurance', 'Insurance', insurance_parts | join(" · ") ) }}{%- endif %}
-                {%- if aff.cost -%}{{ fact('cost', 'Cost', aff.cost) }}{%- endif %}
-                  {%- if _svc_labels -%}{{ fact('services', 'Services', _svc_labels | join(', ') ) }}{%- endif %}
-                    {%- if _setting_labels -%}{{ fact('settings', 'Settings', _setting_labels | join(', ') ) }}{%- endif %}
-                      {%- if _mod_labels -%}{{ fact('modalities', 'Modalities', _mod_labels | join(', ') ) }}{%- endif %}
-                        {%- if _age_labels -%}{{ fact('age_groups', 'Ages', _age_labels | join(', ') ) }}{%- endif %}
-                          {%- if _gender_labels -%}{{ fact('genders', 'Genders', _gender_labels | join(', ') ) }}{%- endif %}
-                            {%- if aff.website -%}{{ fact('website', 'Website', aff.website) }}{%- endif %}
-                            {%- endmacro %}
+  {%- if insurance_parts -%}{{ fact('insurance', 'Insurance', insurance_parts | join(" · ") ) }}{%- endif %}
+    {%- if aff.website -%}{{ fact('website', 'Website', aff.website) }}{%- endif %}
+    {%- endmacro %}
