@@ -19,14 +19,12 @@ from src.domain.logic.posts.view import (
 
 def _cr_post(
     *,
-    accepts_in_network: bool = False,
     accepts_private_pay: bool = False,
     insurance_carriers: list[str] | None = None,
 ):
     return SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
-            accepts_in_network=accepts_in_network,
             accepts_private_pay=accepts_private_pay,
             insurance_carriers=insurance_carriers or [],
         ),
@@ -47,17 +45,11 @@ def _pa_post(**affiliation_attrs):
 
 
 def test_cr_posture_prefers_in_network():
-    """In-network is the highest-signal payment-path; show it even when
-    private-pay is also accepted."""
-    post = _cr_post(
-        accepts_in_network=True,
-        accepts_private_pay=True,
-    )
+    """In-network is the highest-signal posture, read off carrier presence
+    (a non-empty `insurance_carriers` list); it wins even when private pay
+    is also accepted."""
+    post = _cr_post(insurance_carriers=["cigna"], accepts_private_pay=True)
     assert insurance_posture_for_post(post) == "in_network"
-    # Carrier presence is irrelevant to the posture — same answer with
-    # or without `insurance_carriers`.
-    post_with_carrier = _cr_post(accepts_in_network=True, insurance_carriers=["cigna"])
-    assert insurance_posture_for_post(post_with_carrier) == "in_network"
 
 
 def test_cr_posture_falls_back_to_private_pay_then_none():
@@ -206,7 +198,6 @@ def _make_cr_post(
         languages=["en", "es"],
         description="Looking for a therapist who takes BCBS.",
         services=["psychotherapy", "medication_management"],
-        accepts_in_network=True,
         accepts_private_pay=False,
         insurance_carriers=["anthem_bcbs"],
     )
@@ -411,10 +402,10 @@ def test_view_cr_full_address_composes_city_state():
 
 
 def test_view_cr_cr_only_fields_set_pa_only_fields_none():
-    """CR populates payment-paths booleans + `insurance_carriers`;
-    the link keys (PA/program identity) stay at their None defaults."""
+    """CR populates `accepts_private_pay` + `insurance_carriers` (the
+    carrier list is the in-network signal — no boolean); the link keys
+    (PA/program identity) stay at their None defaults."""
     v = post_card_view(_make_cr_post())
-    assert v["accepts_in_network"] is True
     assert v["accepts_private_pay"] is False
     assert v["insurance_carriers"] == ["anthem_bcbs"]
     assert v["practice_link"] is None

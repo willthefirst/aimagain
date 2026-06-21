@@ -52,8 +52,8 @@ class ConditionalRequiredRule:
     ``trigger_field`` / ``trigger_value`` describe what activates the
     rule and double as the form's reveal selector (see
     :attr:`reveal_token`): ``trigger_value=None`` means a boolean-truthy
-    trigger (a single checkbox, e.g. ``accepts_in_network``); a string
-    means "this token is checked in the multi-select ``trigger_field``".
+    trigger (a single checkbox); a string means "this token is checked in
+    the multi-select ``trigger_field``" (e.g. ``other`` in ``services``).
     """
 
     field: str
@@ -120,13 +120,6 @@ REFERRAL_CONDITIONAL_RULES: tuple[ConditionalRequiredRule, ...] = (
             _str_empty(getattr(m.location, "city", None)) if m.location else True
         ),
         current=lambda m: getattr(m.location, "city", None) if m.location else None,
-    ),
-    ConditionalRequiredRule(
-        field="insurance_carriers",
-        trigger_field="accepts_in_network",
-        trigger_value=None,
-        message="Select at least one carrier (choose “Other” if it isn’t listed).",
-        is_empty=lambda m: not (m.insurance_carriers or []),
     ),
     _other_text_rule("services", "Services"),
     _other_text_rule("insurance_carriers", "Insurance carriers"),

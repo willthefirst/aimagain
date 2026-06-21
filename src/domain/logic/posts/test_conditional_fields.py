@@ -77,28 +77,21 @@ def test_other_token_requires_its_free_text(list_field, text_field):
 # --- in-network → at least one carrier ----------------------------------
 
 
-def test_in_network_requires_a_carrier():
-    errs = _create_errors(accepts_in_network=True, insurance_carriers=[])
-    assert "insurance_carriers" in errs
-
-
-def test_not_in_network_allows_empty_carriers():
+def test_empty_carriers_always_allowed():
+    """`insurance_carriers` is always optional (no in-network gate) — an
+    empty list validates."""
     post_create_adapter.validate_python(
-        referral_payload(
-            accepts_in_network=False, accepts_private_pay=True, insurance_carriers=[]
-        )
+        referral_payload(accepts_private_pay=True, insurance_carriers=[])
     )
 
 
-def test_in_network_other_carrier_needs_text_too():
-    """`other` carrier satisfies the ≥1 rule but still needs its free text."""
+def test_other_carrier_still_needs_text():
+    """`other` in the carrier list requires its free-text branch."""
     errs = _create_errors(
-        accepts_in_network=True,
         insurance_carriers=["other"],
         insurance_carriers_other_text=None,
     )
     assert "insurance_carriers_other_text" in errs
-    assert "insurance_carriers" not in errs  # the ≥1 rule is satisfied
 
 
 # --- multiple violations surface together -------------------------------

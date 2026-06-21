@@ -93,17 +93,15 @@ def test_cr_enum_defaults_render_via_label_dict():
     members so the detail template's display-label lookup resolves.
     Pin each column to its `_ENUM_DEFAULTS["referral"]` value.
 
-    The payment-path booleans (`accepts_in_network` /
-    `accepts_private_pay`) and `insurance_carriers` JSON list fall
-    under the generic Boolean / JSON type-dispatch defaults — no
+    The `accepts_private_pay` boolean and `insurance_carriers` JSON list
+    fall under the generic Boolean / JSON type-dispatch defaults — no
     per-kind enum entry needed."""
     cr = make_post_stub("referral", owner_id=uuid.uuid4())
     d = cr.referral_detail
     assert d.location_state == "NY"
-    # Boolean payment-paths default to False; JSON `insurance_carriers`
-    # defaults to []. The detail template renders nothing when both
-    # booleans are False and the list is empty.
-    assert d.accepts_in_network is False
+    # `accepts_private_pay` defaults to False; JSON `insurance_carriers`
+    # defaults to [] (a non-empty list is the in-network signal — there's
+    # no boolean). The detail renders no Coverage rows in this state.
     assert d.accepts_private_pay is False
     assert d.insurance_carriers == []
 

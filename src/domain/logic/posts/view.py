@@ -4,11 +4,11 @@ The listing row in `src/domain/templates/posts/_item.html` needs a single
 3-state "insurance posture" axis to render as one icon badge. The two
 kinds model the underlying data with parallel shapes:
 
-  * `referral` — two independent payment-path booleans
-    (`accepts_in_network` / `accepts_private_pay`) plus an
-    `insurance_carriers` JSON list of `INSURANCE_CARRIERS` tokens.
-    The posture is derived from the booleans in priority order:
-    in-network → private-pay → `None` (no signal set).
+  * `referral` — an `insurance_carriers` JSON list of
+    `INSURANCE_CARRIERS` tokens (non-empty = in-network; no boolean) plus
+    an independent `accepts_private_pay` boolean. The posture is derived
+    in priority order: in-network (carriers present) → private-pay →
+    `None` (no signal set).
   * `opening` → linked `ClinicianAffiliation` — the
     `in_network_carriers` list (empty = no in-network) plus the
     `accepts_out_of_network` / `sliding_scale` booleans.
@@ -105,11 +105,12 @@ def insurance_posture_for_post(post) -> str | None:
         detail = getattr(post, "referral_detail", None)
         if detail is None:
             return None
-        # Map the payment-path booleans to the unified posture vocab in
-        # priority order: in-network > private-pay > None (no signal
-        # set). Priority matches the provider-side collapse below —
-        # in-network is the loudest signal.
-        if getattr(detail, "accepts_in_network", False):
+        # Map the referral's payment signals to the unified posture vocab
+        # in priority order: in-network > private-pay > None. In-network is
+        # read off carrier presence (a non-empty `insurance_carriers` list
+        # is the in-network statement — no separate boolean), matching the
+        # provider-side collapse below.
+        if getattr(detail, "insurance_carriers", None):
             return "in_network"
         if getattr(detail, "accepts_private_pay", False):
             return "self_pay"
@@ -317,8 +318,9 @@ def post_card_view(post) -> dict[str, Any]:
             (``referral_detail.clinician_affiliation``, distinct from the
             client location in ``full_address``); program returns
             ``None`` (programs have no address).
-        accepts_in_network / accepts_private_pay: CR-only payment-path
-            booleans from the detail row; ``None`` for other kinds.
+        accepts_private_pay: CR-only payment-path boolean from the detail
+            row; ``None`` for other kinds. (Referrals have no in-network
+            boolean — carrier presence is the in-network signal.)
         insurance_carriers: CR-only list of carrier tokens; empty list
             for CR with no carriers specified, ``[]`` for other kinds.
         in_network_carriers / accepts_out_of_network / sliding_scale:
@@ -365,7 +367,6 @@ def post_card_view(post) -> dict[str, Any]:
         "full_address": None,
         "owner_address": None,
         "sliding_scale": None,
-        "accepts_in_network": None,
         "accepts_private_pay": None,
         "insurance_carriers": [],
         "in_network_carriers": [],
@@ -453,7 +454,6 @@ def post_card_view(post) -> dict[str, Any]:
                 getattr(d, "location_state", None),
                 None,
             ),
-            accepts_in_network=getattr(d, "accepts_in_network", None),
             accepts_private_pay=getattr(d, "accepts_private_pay", None),
             sliding_scale=getattr(d, "sliding_scale", None),
             insurance_carriers_other_text=getattr(

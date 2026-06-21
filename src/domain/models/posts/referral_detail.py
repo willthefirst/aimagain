@@ -101,24 +101,16 @@ class ReferralDetail(Base):
     # surfaces it as a textarea adjacent to the services list.
     services_other_text = Column(Text, nullable=True)
 
-    # Section 5 — payment paths. Independent booleans; a single referral
-    # may accept any subset.
+    # Section 5 — payment paths.
     #
-    #   * ``accepts_in_network`` — the patient has a carrier and wants
-    #     the provider to bill it directly. Paired with
-    #     ``insurance_carriers`` (multi-select; empty array allowed when
-    #     the carrier is undecided / "any" / TBD).
-    #   * ``accepts_private_pay`` — the patient is willing to pay
-    #     out-of-pocket with no insurance involvement.
-    #
-    # Both default to ``False`` server-side; at least one is expected to
-    # be true in practice, but the schema doesn't enforce that. The
-    # unified ``INSURANCE_POSTURES`` view collapse (in
-    # ``src/domain/logic/posts/view.py``) prioritizes
-    # in-network → private-pay, and yields ``None`` when neither is set.
-    accepts_in_network = Column(
-        Boolean, nullable=False, server_default=text("0"), default=False
-    )
+    # In-network has no boolean: a non-empty ``insurance_carriers`` list
+    # *is* the in-network statement (the referrer names the carriers to
+    # bill), mirroring the provider side where ``in_network_carriers``
+    # carries the same signal. ``accepts_private_pay`` is an independent
+    # opt-in for out-of-pocket clients. The unified ``INSURANCE_POSTURES``
+    # view collapse (in ``src/domain/logic/posts/view.py``) reads
+    # in-network off carrier presence, falls back to private-pay, and
+    # yields ``None`` when neither is set.
     accepts_private_pay = Column(
         Boolean, nullable=False, server_default=text("0"), default=False
     )

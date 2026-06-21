@@ -59,7 +59,6 @@
    uses on `<fieldset>` (framework.css). A `block` wrapper would trap the
    field in its own formatting context and break column alignment. */
 form:has(input[name="session_format"][value="in_person"]:checked) .conditional-field[data-reveal-when="session_format:in_person"] { display: contents; }
-form:has(input[name="accepts_in_network"][value="true"]:checked) .conditional-field[data-reveal-when="accepts_in_network:true"] { display: contents; }
 form:has(input[name="services"][value="other"]:checked) .conditional-field[data-reveal-when="services:other"] { display: contents; }
 form:has(input[name="insurance_carriers"][value="other"]:checked) .conditional-field[data-reveal-when="insurance_carriers:other"] { display: contents; }
 form:has(input[name="languages"][value="other"]:checked) .conditional-field[data-reveal-when="languages:other"] { display: contents; }

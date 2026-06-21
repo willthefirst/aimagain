@@ -212,7 +212,6 @@ class ReferralRead(_PostReadBase):
     # Payment paths — independent booleans the corpus treats as
     # non-mutually-exclusive. See :class:`ReferralCreate` for the
     # full rationale.
-    accepts_in_network: bool = False
     accepts_private_pay: bool = False
     sliding_scale: bool = False
     # Multi-select of `InsuranceCarrier` tokens; empty list = "no carrier
@@ -333,13 +332,11 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # Free-text describing the "Other" services branch. Required iff
     # `services` contains `other` — see `REFERRAL_CONDITIONAL_RULES`.
     services_other_text: StrippedOptionalText = None
-    # Payment paths. Independent booleans; not mutually exclusive;
-    # default all-false is shape-valid (some referrers genuinely leave
-    # it blank) but the form encourages picking at least one. When
-    # `accepts_in_network` is true, at least one `insurance_carriers`
-    # token is required (`other` covers carriers off the closed list)
-    # — see `REFERRAL_CONDITIONAL_RULES`.
-    accepts_in_network: bool = False
+    # Payment paths. In-network is implied by a non-empty
+    # `insurance_carriers` list (no boolean); `accepts_private_pay` is an
+    # independent opt-in. `insurance_carriers` is always optional; `other`
+    # in the list requires `insurance_carriers_other_text` — see
+    # `REFERRAL_CONDITIONAL_RULES`.
     accepts_private_pay: bool = False
     sliding_scale: bool = False
     insurance_carriers: InsuranceCarriersField = []
@@ -478,7 +475,6 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     # `None` = leave unchanged; any bool sets the flag. The payment
     # paths are independent — a PATCH may flip just one or any subset
     # without disturbing the others.
-    accepts_in_network: bool | None = None
     accepts_private_pay: bool | None = None
     sliding_scale: bool | None = None
     # `None` = leave unchanged; `[]` = clear all carriers. List-valued
@@ -573,7 +569,6 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     description: str
     services: ServicesField = []
     services_other_text: str | None = None
-    accepts_in_network: bool = False
     accepts_private_pay: bool = False
     sliding_scale: bool = False
     insurance_carriers: InsuranceCarriersField = []

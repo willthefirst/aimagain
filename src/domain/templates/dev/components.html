@@ -455,9 +455,9 @@ it's dev-only chrome that should never ship to production. #}
         </p>
         <div class="entity-form-page">
           <form>
-            {{ checkbox_field('accepts_in_network', "In-network — bill the client's carrier") }}
-            {% call conditional_field("accepts_in_network:true") %}
-              {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, required=false) }}
+            {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, required=false) }}
+            {% call conditional_field("insurance_carriers:other") %}
+              {{ text_field("insurance_carriers_other_text", "Other carrier (specify)", required=false) }}
             {% endcall %}
           </form>
         </div>
