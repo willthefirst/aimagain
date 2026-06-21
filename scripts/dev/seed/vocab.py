@@ -438,15 +438,19 @@ MODALITIES_FREETEXT: Final[tuple[str, ...]] = (
     "Mindfulness-based",
     "Exposure and response prevention",
 )
+# Free-text title overrides a referrer may type. Gender was dropped from
+# the referral schema, so these read in the current vocabulary: singular
+# age noun + range (matching `referral_headline`), optional pronouns
+# (`PRONOUNS` labels), and an optional clinical focus — never a gender.
 REFERRAL_SUBJECTS: Final[tuple[str, ...]] = (
-    "Child female (0–5) — Group therapy, Family therapy",
-    "Adult male seeking CBT, in-person only",
-    "Adolescent — trauma-informed care, Telehealth OK",
-    "Adult female — perinatal, EMDR preferred",
-    "Senior with depression, SF Bay Area",
-    "Adult — anxiety/OCD, sliding scale needed",
-    "Child (6–12) — ADHD, family involvement required",
-    "Young adult — first episode psychosis, Aetna",
+    "Child (0–5) — early intervention, family involvement",
+    "Adult (25–64), she/her — individual therapy, in-person only",
+    "Adolescent (14–18), they/them — trauma-informed care, telehealth OK",
+    "Adult (25–64), she/her — perinatal mood, EMDR preferred",
+    "Older adult (65+) — depression, SF Bay Area",
+    "Adult (25–64) — anxiety/OCD, sliding scale needed",
+    "Preteen (11–13) — ADHD, family therapy",
+    "Young adult (19–24), he/him — first-episode psychosis",
 )
 OPENING_SUBJECTS: Final[tuple[str, ...]] = (
     "3 slots — adults, relational/psychodynamic · $200/session",
@@ -501,15 +505,18 @@ AGE_DESCRIPTORS: Final[dict[str, str]] = {
     "adults_25_64": "adult",
     "older_adults_65_plus": "older adult",
 }
+# Natural-prose phrase per service, drawn for the `{service_word}` slot in
+# the description templates. Keys track the current `REFERRAL_SERVICES`
+# vocabulary (the old `psychotherapy` / `case_management` / `couples_therapy`
+# tokens are gone); only the prose values reach the seed text.
 SERVICE_WORDS: Final[dict[str, str]] = {
-    "evaluation": "evaluation",
     "medication_management": "medication management",
-    "psychotherapy": "psychotherapy",
-    "case_management": "case management",
-    "allied_health": "allied health support",
-    "group_therapy": "group therapy",
-    "family_therapy": "family therapy",
-    "couples_therapy": "couples therapy",
+    "therapy_individual": "individual therapy",
+    "therapy_group": "group therapy",
+    "therapy_family": "family therapy",
+    "allied_social_work": "clinical social work",
+    "allied_ot": "occupational therapy",
+    "allied_creative_arts": "creative arts therapy",
 }
 INSURANCE_NOTES: Final[tuple[str, ...]] = (
     "Aetna preferred but flexible.",
