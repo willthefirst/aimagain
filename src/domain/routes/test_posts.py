@@ -374,7 +374,6 @@ async def test_referral_detail_groups_facts_like_the_form(
         age_groups=["adults_25_64"],
         pronouns=["she_her"],
         languages=["en"],
-        accepts_in_network=True,
         insurance_carriers=["aetna"],
         accepts_private_pay=True,
         sliding_scale=True,
@@ -399,9 +398,9 @@ async def test_referral_detail_groups_facts_like_the_form(
 
     facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
     assert {
+        # Logistics is now one consolidated location row (key `address`),
+        # not separate address + in-person/virtual session rows.
         "address",
-        "in_person_sessions",
-        "virtual_sessions",
         "services",
         "age",
         "pronouns",
@@ -409,11 +408,16 @@ async def test_referral_detail_groups_facts_like_the_form(
         # Narrative is a row of "About the client" (mirrors the form's
         # "Narrative" field), not a separate section.
         "narrative",
-        "accepts_in_network",
+        # No in-network row — a non-empty carrier list is the in-network
+        # statement.
         "insurance_carriers",
         "accepts_private_pay",
         "sliding_scale",
     } <= facts, facts
+    assert "accepts_in_network" not in facts, facts
+    # The separate session rows folded into the location row.
+    assert "in_person_sessions" not in facts, facts
+    assert "virtual_sessions" not in facts, facts
 
 
 async def test_referral_detail_renders_list_facts_one_per_line(
@@ -456,10 +460,11 @@ async def test_referral_detail_meta_omits_modality_chips(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """The referral detail's Logistics group carries In-person / Virtual
-    as labeled rows, so the subtitle `.meta` line no longer repeats them
-    as chips — only the date remains there. (Opening/intake keep the
-    chips; that's covered by their own kinds, not pinned here.)"""
+    """The referral detail's Logistics group carries the modality in its
+    consolidated location row ("· Telehealth"), so the `.post-meta` identity
+    line no longer repeats it as chips — only the type pill, date, and
+    referring clinician live there. (Opening/intake keep the chips; that's
+    covered by their own kinds, not pinned here.)"""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(owner_id=author.id, session_format=["in_person", "virtual"])
@@ -473,12 +478,15 @@ async def test_referral_detail_meta_omits_modality_chips(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    meta_chips = [s.text(strip=True) for s in tree.css("small.meta span")]
-    assert "In-person" not in meta_chips, meta_chips
-    assert "Virtual" not in meta_chips, meta_chips
-    # The Logistics rows still carry the modality (it moved, not vanished).
-    facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
-    assert {"in_person_sessions", "virtual_sessions"} <= facts, facts
+    meta = tree.css_first(".post-meta")
+    assert meta is not None, "the .post-meta identity line should render"
+    assert "In-person" not in meta.text(), meta.text()
+    assert "Virtual" not in meta.text(), meta.text()
+    # The modality moved into the consolidated location row (it moved, not
+    # vanished): an in-person + virtual referral reads "…· Telehealth".
+    location_dd = tree.css_first('[data-fact="address"] dd')
+    assert location_dd is not None, response.text
+    assert "Telehealth" in location_dd.text(strip=True), location_dd.text(strip=True)
 
 
 async def test_referral_detail_suppresses_empty_coverage_group(
@@ -493,7 +501,6 @@ async def test_referral_detail_suppresses_empty_coverage_group(
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(
         owner_id=author.id,
-        accepts_in_network=False,
         accepts_private_pay=False,
         sliding_scale=False,
         insurance_carriers=[],
@@ -612,9 +619,9 @@ async def test_referral_detail_links_referring_clinician_in_meta_not_a_card(
 
     # No owner-context card on a referral detail page.
     assert tree.css_first('article[data-row-id="provider-profile"]') is None
-    # The referring clinician is a linked reference in the meta line.
-    meta = tree.css_first("small.meta")
-    assert meta is not None, "subtitle meta line should render"
+    # The referring clinician is a linked reference in the .post-meta line.
+    meta = tree.css_first(".post-meta")
+    assert meta is not None, ".post-meta identity line should render"
     assert "Referred by" in meta.text(), meta.text()
     assert (
         meta.css_first(f'a[href="/clinicians/{referring.id}"]') is not None
@@ -966,10 +973,11 @@ async def test_referral_form_uses_client_oriented_section_labels(
     assert "Service type" in page_text
     assert "About the client" in page_text
     assert "Coverage" in page_text
-    # The checkbox still binds the same wire field; only its section moved.
+    # Coverage leads with the insurance-carrier multi-select (the in-network
+    # statement — there's no separate "has insurance" checkbox).
     assert (
-        tree.css_first('input[name="accepts_in_network"]') is not None
-    ), "renaming the section must not drop the accepts_in_network field"
+        tree.css_first('input[name="insurance_carriers"]') is not None
+    ), "the Coverage section must carry the insurance_carriers field"
 
 
 async def test_referral_form_age_group_options_are_singular(

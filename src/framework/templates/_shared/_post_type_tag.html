@@ -1,0 +1,14 @@
+{# `post_type_tag(kind)` — the kind pill ("Referral" / "Opening" /
+   "Intake") shared by the feed row and the post detail page so the
+   post-type chip looks identical in both. `kind` is the post's
+   discriminator (`referral` / `clinician_opening` / `program_intake`).
+
+   Lives at the framework level for the same reason as `_feed_row.html`:
+   the chip renders across the posts, home, clinicians, and organizations
+   clusters, and cross-cluster template imports aren't allowed. CSS is the
+   `.post-type-tag*` rules in `domain.css`. #}
+{% macro post_type_tag(kind) -%}
+  {%- set kind_class = "referral" if kind == "referral" else ("intake" if kind == "program_intake" else "opening") -%}
+  {%- set kind_label = "Referral" if kind == "referral" else ("Intake" if kind == "program_intake" else "Opening") -%}
+  <span class="post-type-tag post-type-tag--{{ kind_class }}">{{ kind_label }}</span>
+{%- endmacro %}

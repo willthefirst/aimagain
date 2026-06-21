@@ -1,10 +1,11 @@
 """Tests for `_shared/_provider_ref.html`.
 
-`provider_ref(ref, redacted)` is the single home for the hyperlinked
-"<name> · <org>" denotation the post detail card and the feed byline
-both render. These pin the four cases — linked clinician/program + org,
-sole-prop (no org), name-only (no entity), and redacted — plus the
-CSS-driven middot (no literal `·` in the markup).
+`provider_ref(ref, redacted, linked)` is the single home for the
+"<name> · <org>" denotation the post detail card (linked) and the feed
+row (unlinked) both render. These pin the cases — linked clinician/program
++ org, sole-prop (no org), name-only (no entity), redacted, and the
+`linked=False` plain-text variant — plus the CSS-driven middot (no
+literal `·` in the markup).
 """
 
 from __future__ import annotations
@@ -15,13 +16,15 @@ from src.framework.templates._test_env import make_test_env
 
 _TEMPLATE = (
     '{%- from "_shared/_provider_ref.html" import provider_ref -%}'
-    "{{ provider_ref(ref, redacted=redacted) }}"
+    "{{ provider_ref(ref, redacted=redacted, linked=linked) }}"
 )
 
 
-def _render(ref, *, redacted=False) -> HTMLParser:
+def _render(ref, *, redacted=False, linked=True) -> HTMLParser:
     env = make_test_env()
-    return HTMLParser(env.from_string(_TEMPLATE).render(ref=ref, redacted=redacted))
+    return HTMLParser(
+        env.from_string(_TEMPLATE).render(ref=ref, redacted=redacted, linked=linked)
+    )
 
 
 def test_clinician_with_org_links_both_parts() -> None:
@@ -67,6 +70,27 @@ def test_name_only_reference_renders_plain_text_no_anchor() -> None:
     tree = _render({"name": "Carlos Rivera", "entity": None, "id": None, "org": None})
     assert tree.css("a") == []
     assert "Carlos Rivera" in (tree.body.text() or "")
+
+
+def test_linked_false_renders_name_and_org_as_plain_text() -> None:
+    """The feed row passes `linked=False`: same "<name> · <org>" text, but
+    no anchors to the author or their org."""
+    tree = _render(
+        {
+            "name": "Jane Smith",
+            "entity": "clinician",
+            "id": "c1",
+            "org": {"id": "o1", "name": "Acme Counseling"},
+        },
+        linked=False,
+    )
+    assert tree.css("a") == []
+    body_text = tree.body.text() or ""
+    assert "Jane Smith" in body_text
+    assert "Acme Counseling" in body_text
+    # Still the meta_list wrapper, so the CSS middot still joins the parts.
+    assert tree.css_first("span.meta") is not None
+    assert "·" not in body_text
 
 
 def test_redacted_withholds_name_and_org_behind_locks() -> None:

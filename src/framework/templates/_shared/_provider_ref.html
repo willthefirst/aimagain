@@ -1,6 +1,7 @@
-{# `provider_ref(ref, redacted=False)` — the canonical "who's behind
-   this post" denotation, rendered identically on the post detail card
-   and the feed byline (the single home for the format + the links).
+{# `provider_ref(ref, redacted=False, linked=True)` — the canonical
+   "who's behind this post" denotation, rendered on the post detail card
+   (linked) and the feed-row subtitle (unlinked) — the single home for
+   the "<name> · <org>" format.
 
    `ref` is the `view.provider_ref` dict from `post_card_view`:
    `{name, entity, id, org}` where `entity` is `"clinician"` /
@@ -11,9 +12,14 @@
 
    Renders the canonical "<name> · <org>" shape — the same one the form
    pickers use — via `meta_list` so the middot comes from CSS, never a
-   literal `·`. Each part links to its detail page; a sole-prop clinician
-   shows just the name; a name with no `entity`/`id` (referral) renders
-   as plain text.
+   literal `·`. By default each part links to its detail page; a sole-prop
+   clinician shows just the name; a name with no `entity`/`id` (referral)
+   renders as plain text.
+
+   `linked=False` renders the whole denotation as plain `<span>`s — same
+   "<name> · <org>" text, no anchors. The feed row passes this: a list
+   row's job is to open the post, not to send the reader off to the
+   author's or org's page. The detail card keeps the default links.
 
    When `redacted` (the viewer can't read the full feed), the name and
    org are withheld behind `locked_name` placeholders — the row still
@@ -21,7 +27,7 @@
    caller's decision (it passes the flag); this macro only renders. #}
 {%- from "_shared/sections.html" import meta_list -%}
 {%- from "_shared/_locked.html" import entity_link, locked_name -%}
-{% macro provider_ref(ref, redacted=False) -%}
+{% macro provider_ref(ref, redacted=False, linked=True) -%}
   {%- if ref and (ref.name or ref.id) -%}
     {%- call meta_list() -%}
       {%- if redacted -%}
@@ -29,12 +35,18 @@
         {%- if ref.org %}{{ locked_name("Doe Health Group") }}{% endif %}
         {# title-case-ignore: placeholder org name #}
       {%- else -%}
-        {%- if ref.id and ref.entity -%}
+        {%- if linked and ref.id and ref.entity -%}
           <a href="{{ entity_url(ref.entity, id=ref.id) }}">{{ ref.name }}</a>
         {%- else -%}
           <span>{{ ref.name }}</span>
         {%- endif -%}
-        {%- if ref.org %}{{ entity_link('organization', ref.org.name, id=ref.org.id) }}{% endif %}
+        {%- if ref.org -%}
+          {%- if linked -%}
+            {{ entity_link('organization', ref.org.name, id=ref.org.id) }}
+          {%- else -%}
+            <span>{{ ref.org.name }}</span>
+          {%- endif -%}
+        {%- endif -%}
       {%- endif -%}
     {%- endcall -%}
   {%- endif -%}

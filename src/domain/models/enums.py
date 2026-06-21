@@ -444,10 +444,10 @@ PRONOUNS_LABELS: Final[dict[str, str]] = Pronouns.labels()
 # --- Unified insurance posture -----------------------------------------
 #
 # The two post kinds model "insurance situation" with parallel vocab:
-#   * `referral` — three independent payment-path booleans
-#     (`accepts_in_network` / `accepts_out_of_network_superbill` /
-#     `accepts_private_pay`) plus an `insurance_carriers` JSON list of
-#     `INSURANCE_CARRIERS` tokens.
+#   * `referral` — an `insurance_carriers` JSON list of
+#     `INSURANCE_CARRIERS` tokens (non-empty = in-network; there's no
+#     separate boolean) plus the `accepts_private_pay` / `sliding_scale`
+#     booleans.
 #   * `opening` → linked `Clinician` carries the
 #     `in_network_carriers` list (empty = no in-network) plus the
 #     `accepts_out_of_network` / `sliding_scale` booleans.

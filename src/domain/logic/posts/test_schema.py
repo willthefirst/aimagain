@@ -50,10 +50,8 @@ def test_post_create_dispatches_referral():
     # flat — see ``test_post_create_referral_dump_keeps_flat_location``.
     assert p.location.city == "Springfield"
     assert p.location.state == "IL"
-    # Payment-paths (#1358 PR-e): defaults to in-network per the test
-    # helper, which now carries a representative carrier (in-network
-    # requires ≥1 — see conditional_fields.py).
-    assert p.accepts_in_network is True
+    # Payment-paths: in-network is implied by the carrier list (no boolean);
+    # the helper's representative referral names one carrier.
     assert p.accepts_private_pay is False
     assert p.insurance_carriers == ["aetna"]
 
@@ -220,71 +218,48 @@ def test_post_create_referral_rejects_unknown_insurance_carrier():
         )
 
 
-def test_post_create_referral_empty_carriers_ok_when_not_in_network():
-    """Empty `insurance_carriers` is valid as long as the referral is not
-    in-network — e.g. a private-pay-only referral, or one with no payment
-    path set. (In-network requires ≥1 carrier; see the next test.)"""
+def test_post_create_referral_empty_carriers_always_ok():
+    """Empty `insurance_carriers` is always valid — there's no in-network
+    gate. A private-pay-only referral, or one with no payment path set at
+    all, is shape-valid."""
     for bools in (
         {"accepts_private_pay": True},
         {},  # All false — shape-valid even if uncommon.
     ):
         p = post_create_adapter.validate_python(
-            referral_payload(insurance_carriers=[], accepts_in_network=False, **bools)
+            referral_payload(insurance_carriers=[], **bools)
         )
         assert p.insurance_carriers == []
 
 
-def test_post_create_referral_in_network_requires_a_carrier():
-    """In-network referrals must name at least one carrier (the `other`
-    token + free text covers carriers off the closed list). The error
-    lands on the `insurance_carriers` field."""
-    with pytest.raises(ValidationError) as ei:
-        post_create_adapter.validate_python(
-            referral_payload(accepts_in_network=True, insurance_carriers=[])
-        )
-    assert any(e["loc"][-1] == "insurance_carriers" for e in ei.value.errors())
-
-
 def test_post_create_referral_accepts_multiple_carriers():
-    """Multi-select: a referral can list multiple acceptable carriers.
-    Mirrors `ClinicianAffiliation.in_network_carriers` (#1358 PR-e)."""
+    """Multi-select: a referral can list multiple acceptable carriers. The
+    non-empty list is itself the in-network statement (no boolean)."""
     p = post_create_adapter.validate_python(
-        referral_payload(
-            accepts_in_network=True,
-            insurance_carriers=["cigna", "aetna"],
-        )
+        referral_payload(insurance_carriers=["cigna", "aetna"])
     )
-    assert p.accepts_in_network is True
     assert p.insurance_carriers == ["cigna", "aetna"]
 
 
 def test_post_create_referral_payment_paths_independent():
-    """The two payment-path booleans are independent — any subset
-    (including all-true or all-false) round-trips through the schema."""
+    """Private pay is independent of the carrier list — both can be set."""
     p = post_create_adapter.validate_python(
         referral_payload(
-            accepts_in_network=True,
             accepts_private_pay=True,
             insurance_carriers=["anthem_bcbs"],
         )
     )
-    assert p.accepts_in_network is True
     assert p.accepts_private_pay is True
     assert p.insurance_carriers == ["anthem_bcbs"]
 
 
 def test_post_create_referral_payment_paths_default_false():
-    """When a payment-path bool is omitted entirely it defaults to
-    False — the schema does not require any to be true."""
+    """When `accepts_private_pay` is omitted it defaults to False and an
+    omitted carrier list defaults to empty — nothing is required."""
     payload = referral_payload()
-    for key in (
-        "accepts_in_network",
-        "accepts_private_pay",
-    ):
-        payload.pop(key, None)
+    payload.pop("accepts_private_pay", None)
     payload.pop("insurance_carriers", None)
     p = post_create_adapter.validate_python(payload)
-    assert p.accepts_in_network is False
     assert p.accepts_private_pay is False
     assert p.insurance_carriers == []
 
@@ -412,7 +387,6 @@ def test_audit_snapshot_for_referral_post():
     assert snap["owner_id"] == str(owner_id)
     assert snap["description"] == detail_attrs["description"]
     assert snap["location_city"] == detail_attrs["location_city"]
-    assert snap["accepts_in_network"] == detail_attrs["accepts_in_network"]
     assert snap["accepts_private_pay"] == detail_attrs["accepts_private_pay"]
     assert snap["insurance_carriers"] == detail_attrs["insurance_carriers"]
 

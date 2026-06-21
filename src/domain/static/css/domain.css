@@ -59,7 +59,6 @@
    uses on `<fieldset>` (framework.css). A `block` wrapper would trap the
    field in its own formatting context and break column alignment. */
 form:has(input[name="session_format"][value="in_person"]:checked) .conditional-field[data-reveal-when="session_format:in_person"] { display: contents; }
-form:has(input[name="accepts_in_network"][value="true"]:checked) .conditional-field[data-reveal-when="accepts_in_network:true"] { display: contents; }
 form:has(input[name="services"][value="other"]:checked) .conditional-field[data-reveal-when="services:other"] { display: contents; }
 form:has(input[name="insurance_carriers"][value="other"]:checked) .conditional-field[data-reveal-when="insurance_carriers:other"] { display: contents; }
 form:has(input[name="languages"][value="other"]:checked) .conditional-field[data-reveal-when="languages:other"] { display: contents; }
@@ -95,27 +94,45 @@ ul.post-feed-list {
   margin: 0;
 }
 ul.post-feed-list > li { list-style: none; padding: 0; }
-/* Header line — pill · poster · timestamp */
+/* Row — stack the header, title/subtitle hgroup, and facts with one
+   consistent gap. Zero the children's own block margins so the flex gap
+   is the sole spacer (otherwise hgroup / section margins stack on it). */
+.post-feed-row {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--pico-spacing) * 0.5);
+}
+.post-feed-row > * { margin-block: 0; }
+/* Keep each fact value (services, location) on a single line — truncate
+   with an ellipsis rather than wrap. `min-width: 0` is the non-obvious
+   bit: the <dd> is a grid item (the `dl > div { display: contents }` rule
+   promotes dt/dd to grid items), and grid items default to `min-width:
+   auto`, which refuses to shrink below their content — so nowrap text
+   would overflow the card instead of truncating. The full value is always
+   on the post's detail page. */
+.post-feed-row .entity-facts dd {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Header line — pill · timestamp (pushed to opposite ends) */
 .post-feed-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 0.25em;
   color: var(--pico-muted-color);
 }
-.post-feed-byline > small + small::before {
-  content: "·";
-  margin: 0 0.4em;
-}
-@media (max-width: 576px) {
-  .post-feed-byline {
-    flex-basis: 100%;
-  }
-}
-/* Headline link */
+/* Title + poster subtitle live in an <hgroup> (Pico styles the title as the
+   <h3> heading and the poster line as its muted subtitle — no custom CSS).
+   The inner <a> just carries the :visited treatment below. */
 .post-feed-headline-text { display: block; }
-/* Type-tag pill */
-.post-feed-type-tag {
+/* Type-tag pill — the `post_type_tag(kind)` macro; shared by the feed row
+   header and the post detail's `.post-meta` line so the chip is identical
+   in both. */
+.post-type-tag {
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -125,29 +142,28 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   white-space: nowrap;
   flex-shrink: 0;
 }
-.post-feed-type-tag--referral {
+.post-type-tag--referral {
   color: var(--pico-muted-color);
   background: color-mix(in srgb, var(--pico-muted-color) 8%, transparent);
 }
-.post-feed-type-tag--opening {
+.post-type-tag--opening {
   color: var(--pico-primary);
   background: color-mix(in srgb, var(--pico-primary) 10%, transparent);
 }
-.post-feed-type-tag--intake {
+.post-type-tag--intake {
   color: var(--pico-secondary);
   background: color-mix(in srgb, var(--pico-secondary) 10%, transparent);
 }
-/* Metadata strip */
-.post-feed-meta {
+/* Post detail identity line — pill + date + author/modality, the detail-page
+   counterpart to the feed row's header. Muted via Pico's `--pico-muted-color`
+   (no <small> tag); the inner `.meta` span draws the middots between the date
+   and the author/modality. Spacing comes from Pico's `--pico-spacing`. */
+.post-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 1em;
+  align-items: center;
+  gap: calc(var(--pico-spacing) * 0.5);
   color: var(--pico-muted-color);
-}
-@media (max-width: 576px) {
-  .post-feed-meta {
-    flex-direction: column;
-  }
 }
 /* Empty state */
 .post-feed-empty { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }

@@ -156,9 +156,9 @@ async def test_referral_persists_payment_paths_and_carriers(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
     """The surviving payment-path columns round-trip through the detail
-    row. The two booleans (`accepts_in_network` / `accepts_private_pay`)
-    are NOT NULL with server-side default `false`; `insurance_carriers`
-    is NOT NULL JSON with server-side default `[]`."""
+    row. `accepts_private_pay` is NOT NULL with server-side default
+    `false`; `insurance_carriers` is NOT NULL JSON with server-side default
+    `[]` (a non-empty list is the in-network signal — no boolean)."""
     owner = await _seed_owner(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -168,7 +168,6 @@ async def test_referral_persists_payment_paths_and_carriers(
             Post(kind="referral", owner_id=owner.id),
             make_referral_detail(
                 description="cigna patient",
-                accepts_in_network=True,
                 accepts_private_pay=True,
                 insurance_carriers=["cigna"],
             ),
@@ -178,7 +177,6 @@ async def test_referral_persists_payment_paths_and_carriers(
             Post(kind="referral", owner_id=owner.id),
             make_referral_detail(
                 description="self-pay patient",
-                accepts_in_network=False,
                 accepts_private_pay=True,
                 insurance_carriers=[],
             ),
@@ -206,10 +204,8 @@ async def test_referral_persists_payment_paths_and_carriers(
             .scalars()
             .first()
         )
-        assert in_row.accepts_in_network is True
         assert in_row.accepts_private_pay is True
         assert in_row.insurance_carriers == ["cigna"]
-        assert pp_row.accepts_in_network is False
         assert pp_row.accepts_private_pay is True
         assert pp_row.insurance_carriers == []
 

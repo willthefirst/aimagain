@@ -59,6 +59,7 @@
 .icon-shield-alert:before    { content: "\e1fd"; }
 .icon-shield-check:before    { content: "\e1fe"; }
 .icon-shield-x:before        { content: "\e1ff"; }
+.icon-stethoscope:before     { content: "\e2f0"; }
 .icon-tag:before             { content: "\e182"; }
 .icon-user:before            { content: "\e19e"; }
 .icon-users:before           { content: "\e1a3"; }

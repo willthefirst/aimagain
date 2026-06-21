@@ -68,7 +68,6 @@ _STUB_CLINICIAN_AFFILIATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000003
 # ORM factory defaults: FK fields must be None (nullable columns).
 # SQLAlchemy's UUID column type calls .hex on the value — plain strings blow up.
 _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
-    "subject": None,
     "location_city": "Springfield",
     "location_state": "IL",
     "session_format": ["in_person"],
@@ -82,11 +81,10 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
     "pronouns_other_text": None,
     "sliding_scale": False,
     "insurance_carriers_other_text": None,
-    # Payment paths — independent booleans + a carrier list. Default
-    # emulates the most common corpus shape ("in-network preferred,
-    # Aetna patient") so existing tests that don't override get a
-    # representative referral.
-    "accepts_in_network": True,
+    # Payment paths — a carrier list (non-empty = in-network; no boolean)
+    # plus independent private-pay / sliding-scale opt-ins. The ORM default
+    # leaves the carrier list empty; the wire default below names one for a
+    # representative "Aetna patient" referral.
     "accepts_private_pay": False,
     "insurance_carriers": [],
     # FK fields: always None here. Add stub string UUIDs to _REFERRAL_WIRE_DEFAULTS instead.
@@ -100,12 +98,9 @@ _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
 # here as a stub so schema round-trip tests still exercise it.
 _REFERRAL_WIRE_DEFAULTS: dict[str, Any] = {
     **_REFERRAL_ORM_DEFAULTS,
-    # The default is in-network (`accepts_in_network=True`), which the
-    # conditional-required rules now require to carry ≥1 carrier — so the
-    # representative wire payload picks one ("Aetna patient"). The ORM
-    # default leaves the list empty (ORM rows aren't wire-validated); only
-    # the wire factory needs a carrier. Tests exercising the empty-carrier
-    # path override `accepts_in_network=False` (or pass `insurance_carriers`).
+    # The representative referral is in-network ("Aetna patient"), so the
+    # wire payload names a carrier. `insurance_carriers` is always optional
+    # now; tests exercising the no-coverage path override it back to `[]`.
     "insurance_carriers": ["aetna"],
     "referring_clinician_id": str(_STUB_REFERRING_CLINICIAN_ID),
     "clinician_affiliation_id": str(_STUB_CLINICIAN_AFFILIATION_ID),

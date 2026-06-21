@@ -40,7 +40,6 @@ from ..rng import SeededRandom, deterministic_uuid
 from ..vocab import (
     intake_subject,
     opening_subject,
-    referral_subject,
     render_intake_description,
     render_opening_description,
     render_referral_description,
@@ -100,7 +99,8 @@ async def generate_posts(
             if detail.age_groups
             else [rng.choice(CLIENT_AGE_GROUPS)]
         )
-        detail.subject = None if rng.bool(0.2) else referral_subject(rng, i)
+        # Referrals have no `subject` column — the title is always derived
+        # from demographics (`post_feed_headline`).
         detail.description = render_referral_description(rng, i)
         # Sidecar PK isn't an FK-pool target; just give it a stable
         # ID equal to its post_id (post_id is PK on detail).

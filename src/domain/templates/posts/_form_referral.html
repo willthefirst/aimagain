@@ -20,10 +20,10 @@ keep preferences open text:
   3. About the client — age, pronouns, languages, narrative
   4. Coverage — payment-path booleans + carrier notes
 
-`subject` is NOT a form field — it's derived in the view layer
-(`post_feed_headline` in `domain/logic/posts/view.py`) from
-demographics + services when persisted as None, which is the
-overwhelming corpus default.
+Referrals have no `subject` field at all (unlike openings/intakes): the
+title is always derived in the view layer (`post_feed_headline` in
+`domain/logic/posts/view.py`) from demographics. There's no poster-set
+custom title to override it.
 #}
 {# `with context` lets the form_fields macros auto-resolve per-field
    `error=`/`current=` from the `form_errors`/`form_values` injected
@@ -86,13 +86,11 @@ overwhelming corpus default.
       {% endcall %}
       {{ textarea_field("description", "Narrative", current=d.description if d else None, help="The client's story, what you're hoping for in treatment, and what would make a provider a good fit. Please don't include identifying details.") }}
     {% endcall %}
-    {# Coverage — the accept-path booleans are independent (a referral
-     may accept any subset). #}
+    {# Coverage — list the carriers the client is covered by (this is the
+     in-network statement; there's no separate "has insurance" checkbox).
+     Private pay and sliding scale are independent opt-ins. #}
     {% call form_section("Coverage") %}
-      {{ checkbox_field("accepts_in_network", "In-network — bill the client's carrier", current=(d.accepts_in_network if d else False) ) }}
-      {% call conditional_field("accepts_in_network:true") %}
-        {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false) }}
-      {% endcall %}
+      {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="The carrier(s) to bill in-network. Leave empty if none apply.") }}
       {% call conditional_field("insurance_carriers:other") %}
         {{ text_field("insurance_carriers_other_text", "Other carrier (specify)", current=d.insurance_carriers_other_text if d else None, required=false, help="Name the carrier — it isn't in the list above.") }}
       {% endcall %}

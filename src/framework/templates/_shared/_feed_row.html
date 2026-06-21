@@ -1,131 +1,83 @@
-{%- from "_shared/icon_label.html" import icon_label -%}
 {%- from "_shared/_provider_ref.html" import provider_ref -%}
+{%- from "_shared/_post_type_tag.html" import post_type_tag -%}
+{%- from "_shared/sections.html" import fact, facts_block -%}
 {# Feed-row macro — renders a single clickable row for the home feed and
    browse list views.
 
 Layout per row:
 
-  [OPENING|INTAKE]  Jane Smith · Acme Counseling · 2h ago
-  Headline text that wraps freely across the full width
-  City, ST · In-person · Aetna
+  [REFERRAL]                                              2h ago
+  Adult (25–64) · she/her               ← <hgroup>: <h2> title +
+  Dr. Jane Smith · Acme Counseling      ←   Pico-styled poster subtitle
+  Seeking   Psychotherapy, DBT          ← fact rows (reused card macros)
+  Location  CA · In-person in San Francisco · Telehealth
 
-Header line — type-tag pill + poster identity + timestamp, all inline.
-The poster identity is the shared `provider_ref` denotation (clinician /
-program, hyperlinked, with org), withheld behind `locked_name` for
-viewers who can't read the full feed.
-Headline — full-width link, wraps naturally.
-Meta strip — location, modality, insurance (muted, small).
+Header line — type-tag pill + timestamp.
+Title + subtitle — an `<hgroup>`: an `<h2>` headline link (the base
+identity — client demographics `age (range) · pronouns` for a referral,
+the practice / program name otherwise via `post_feed_headline`) followed
+by the poster line, which Pico styles as the heading's muted subtitle.
+The poster is the shared `provider_ref` denotation (the referring
+clinician for a referral; the posting practice / program otherwise),
+withheld behind redaction for viewers who can't read the full feed.
+Facts — the two things that matter at a glance, rendered through the same
+`fact` macro the list card and detail page use: the services row
+("Seeking" / "Providing" via `view.kind_verb` + `service_labels`,
+comma-joined on one wrapping line) and the location row (`location_summary`
+— state always, then the offered modalities: "In-person in <city>" and/or
+"Telehealth").
 
-The macro reads view data via the `post_card_view(post)` global and the
-`post_feed_headline(post)` global.  Both are registered in
+The macro reads view data via the `post_card_view(post)` global, the
+`post_feed_headline(post)` global, and the `service_labels(view)` /
+`location_summary(view)` globals.  All are registered in
 `src/domain/template_globals.py`.
 
 Parameters
   post        — any `Post` ORM instance (referral / clinician_opening /
                 program_intake).
-  show_poster — when False the poster-name item is suppressed (useful for
-                "My active posts" where the viewer is the poster).
-                Defaults to True.
+  show_poster — when False the subtitle (poster identity) is suppressed
+                (useful for "My active posts" where the viewer is the
+                poster).  Defaults to True.
 
-CSS lives in the `<style>` block of `src/framework/templates/base.html`
-under the "Feed rows" section. #}
+CSS lives in the "Feed rows" section of `src/domain/static/css/domain.css`. #}
 {% macro post_feed_row(post, show_poster=True) -%}
-{%- set view = post_card_view(post) -%}
-{%- set headline = post_feed_headline(post) -%}
-{%- set kind_class = "referral" if post.kind == "referral" else ("intake" if post.kind == "program_intake" else "opening") -%}
-{%- set kind_label = "Referral" if post.kind == "referral" else ("Intake" if post.kind == "program_intake" else "Opening") -%}
-<article class="post-feed-row" data-kind="{{ post.kind }}">
-{# ── Header: pill · poster · timestamp ───────────────────────── #}
-<div class="post-feed-header">
-<span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
-<span class="post-feed-byline">
-{# Poster identity — the shared `provider_ref` denotation (clinician /
-   program, hyperlinked, with org), withheld behind `locked_name` for
-   viewers who can't read the full feed. Same macro the detail card uses,
-   so the byline and the card can't drift. #}
-{%- if show_poster and post.owner and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
-<small>{{ provider_ref(view.provider_ref, redacted=not can_act_as_provider) }}</small>
-{%- endif -%}
-<small>{{ post.created_at | days_ago }}</small>
-</span>
-</div>
-{# ── Headline ─────────────────────────────────────────────────── #}
-<a href="{{ entity_url('post', id=post.id) }}" class="post-feed-headline-text"><strong>{{ headline }}</strong></a>
-{# ── Meta strip ───────────────────────────────────────────────── #}
-<div class="post-feed-meta">
-{# Item 1 ── Geography #}
-{%- if view.location_chunk -%}
-<span>
-<i class="icon-map-pin"></i>
-{%- if view.location_chunk.city -%}
-{{ view.location_chunk.city -}}
-{%- if view.location_chunk.state %}, {{ view.location_chunk.state }}{% endif %}
-{%- elif view.location_chunk.state -%}
-{{ view.location_chunk.state }}
-{%- endif -%}
-</span>
-{%- endif -%}
-{# Item 2 ── Modality / level of care #}
-{%- if post.kind == "referral" -%}
-{%- set _mod = [] -%}
-{%- if view.in_person == "yes" -%}{%- set _ = _mod.append("In-person") -%}{%- endif -%}
-{%- if view.virtual == "yes" -%}{%- set _ = _mod.append("Telehealth") -%}{%- endif -%}
-{%- if _mod -%}
-<span>{{ icon_label("monitor", _mod | join(" · ") ) }}</span>
-{%- endif -%}
-{%- else -%}
-{%- if view.settings -%}
-<span><i class="icon-layers"></i>
-{%- for s in view.settings[:3] -%}
-{%- if not loop.first %} ·
-{% endif -%}
-{{ TREATMENT_SETTINGS_LABELS[s] }}
-{%- endfor -%}
-</span>
-{%- endif -%}
-{%- endif -%}
-{# Item 3 ── Insurance (#1358 PR-e — three independent payment paths) #}
-{%- if post.kind == "referral" -%}
-{%- if view.insurance_carriers -%}
-<span><i class="icon-shield"></i>
-{%- for c in view.insurance_carriers[:2] -%}
-{%- if not loop.first %},
-{% endif -%}
-{{ INSURANCE_CARRIER_LABELS[c] }}
-{%- endfor -%}
-{%- if view.insurance_carriers | length > 2 %} +{{ view.insurance_carriers | length - 2 }}
-{% endif -%}
-</span>
-{%- elif view.accepts_in_network -%}
-<span>{{ icon_label('shield', 'In-network') }}</span>
-{%- elif view.accepts_private_pay -%}
-<span>{{ icon_label('shield', 'Private pay') }}</span>
-{%- endif -%}
-{%- else -%}
-{%- if view.in_network_carriers -%}
-<span><i class="icon-shield"></i>
-{%- for c in view.in_network_carriers[:2] -%}
-{%- if not loop.first %},
-{% endif -%}
-{{ INSURANCE_CARRIER_LABELS[c] }}
-{%- endfor -%}
-{%- if view.in_network_carriers | length > 2 %} +{{ view.in_network_carriers | length - 2 }}
-{% endif -%}
-</span>
-{%- elif view.accepts_out_of_network -%}
-<span>{{ icon_label('shield', 'Out-of-network') }}</span>
-{%- elif view.sliding_scale -%}
-<span>{{ icon_label('shield', 'Sliding scale') }}</span>
-{%- endif -%}
-{%- endif -%}
-</div>
-</article>
+  {%- set view = post_card_view(post) -%}
+  {%- set headline = post_feed_headline(post) -%}
+  <article class="post-feed-row" data-kind="{{ post.kind }}">
+    {# ── Header: pill · timestamp ─────────────────────────────────── #}
+    <div class="post-feed-header">
+      {{ post_type_tag(post.kind) }}
+      <small>{{ post.created_at | days_ago }}</small>
+    </div>
+    {# ── Title + poster subtitle — an <hgroup> so Pico styles the poster
+       line as the heading's subtitle (muted, tight) with no custom CSS. #}
+    <hgroup>
+      <h2>
+        <a href="{{ entity_url('post', id=post.id) }}"
+           class="post-feed-headline-text">{{ headline }}</a>
+      </h2>
+      {%- if show_poster and post.owner and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
+        <p>{{ provider_ref(view.provider_ref, redacted=not can_act_as_provider, linked=False) }}</p>
+      {%- endif -%}
+    </hgroup>
+    {# ── Facts: services sought + location, via the shared card macros ── #}
+    {%- set _services = service_labels(view) -%}
+    {%- set _location = location_summary(view) -%}
+    {%- if _services or _location -%}
+      {%- call facts_block() -%}
+        {%- if _services %}{{ fact('services', view.kind_verb, _services | join(", ") , icon='stethoscope') }}
+        {% endif -%}
+        {%- if _location %}{{ fact('location', 'Location', _location, icon='map-pin') }}
+        {% endif -%}
+      {%- endcall -%}
+    {%- endif -%}
+  </article>
 {%- endmacro %}
 {% macro post_feed_empty(message="No recent posts match your filters.", link_href=None, link_label="See all recent activity →") -%}
-<article class="post-feed-empty">
-<p>{{ message }}</p>
-{%- if link_href -%}
-<a href="{{ link_href }}">{{ link_label }}</a>
-{%- endif -%}
-</article>
+  <article class="post-feed-empty">
+    <p>{{ message }}</p>
+    {%- if link_href -%}
+      <a href="{{ link_href }}">{{ link_label }}</a>
+    {%- endif -%}
+  </article>
 {%- endmacro %}
