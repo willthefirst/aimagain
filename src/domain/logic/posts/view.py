@@ -770,10 +770,11 @@ def post_row_summary(post) -> str:
 def post_feed_headline(post) -> str:
     """Build the feed-row title — the post's base identity line only.
 
-    Referrals: the client demographics (`referral_headline`), e.g.
-    ``"Adult (25–64)"``. Openings: the practice's org name. Program
-    intakes: the program name. A ``subject`` override, when set, replaces
-    the auto-generated title.
+    Referrals: always the client demographics (`referral_headline`), e.g.
+    ``"Adult (25–64)"`` — referrals have no `subject` column, so there's no
+    poster-set override. Openings: the practice's org name. Program
+    intakes: the program name. For those two kinds a ``subject`` override,
+    when set, replaces the auto-generated title.
 
     The clinical services that used to trail the title (the
     ``"… — Psychotherapy"`` suffix) now render as the `service_labels`
@@ -786,8 +787,6 @@ def post_feed_headline(post) -> str:
         d = getattr(post, "referral_detail", None)
         if d is None:
             return "Referral"
-        if subject := getattr(d, "subject", None):
-            return subject
         return referral_headline(d)
 
     if kind == "clinician_opening":

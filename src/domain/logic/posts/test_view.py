@@ -422,15 +422,10 @@ def test_view_cr_cr_only_fields_set_pa_only_fields_none():
     assert v["organization_link"] is None
 
 
-def test_view_cr_subject_when_set():
-    """`subject` propagates from the detail row into the view dict."""
-    v = post_card_view(_make_cr_post(subject="Anxiety + ADHD evaluation"))
-    assert v["subject"] == "Anxiety + ADHD evaluation"
-
-
-def test_view_cr_subject_none_when_absent():
-    """No subject on the detail row → `subject` key is None in view."""
-    v = post_card_view(_make_cr_post(subject=None))
+def test_view_cr_has_no_subject():
+    """Referrals carry no `subject` — the view key is always None for a CR,
+    so the title can't be overridden (it's always `referral_headline`)."""
+    v = post_card_view(_make_cr_post())
     assert v["subject"] is None
 
 
@@ -977,27 +972,15 @@ def test_feed_headline_unknown_kind_returns_empty_string():
 # --- subject override ---------------------------------------------------
 
 
-def test_feed_headline_referral_subject_overrides_auto_generation():
-    """When subject is set on a referral, it is returned as-is."""
+def test_feed_headline_referral_ignores_any_subject_attr():
+    """Referrals have no subject column — the title is always derived from
+    demographics, never overridden, even if a stray `subject` attribute is
+    present on the detail."""
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
-            subject="Child (0–5) — Group therapy",
-            age_groups=["children_0_5"],
-            services=["group_therapy"],
-        ),
-    )
-    assert post_feed_headline(post) == "Child (0–5) — Group therapy"
-
-
-def test_feed_headline_referral_none_subject_falls_back_to_auto():
-    """When subject is None, the demographics title is generated."""
-    post = SimpleNamespace(
-        kind="referral",
-        referral_detail=SimpleNamespace(
-            subject=None,
+            subject="Should be ignored",
             age_groups=["adults_25_64"],
-            services=["therapy_individual"],
         ),
     )
     assert post_feed_headline(post) == "Adult (25–64)"

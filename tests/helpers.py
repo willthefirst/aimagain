@@ -68,7 +68,6 @@ _STUB_CLINICIAN_AFFILIATION_ID = uuid.UUID("00000000-0000-0000-0000-000000000003
 # ORM factory defaults: FK fields must be None (nullable columns).
 # SQLAlchemy's UUID column type calls .hex on the value — plain strings blow up.
 _REFERRAL_ORM_DEFAULTS: dict[str, Any] = {
-    "subject": None,
     "location_city": "Springfield",
     "location_state": "IL",
     "session_format": ["in_person"],

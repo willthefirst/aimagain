@@ -206,7 +206,6 @@ class ReferralRead(_PostReadBase):
     languages_other_text: str | None = None
     pronouns: PronounsField = []
     pronouns_other_text: str | None = None
-    subject: str | None = None
     description: str
     services: ServicesField = []
     services_other_text: str | None = None
@@ -329,7 +328,6 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
     # Free-text "Other" branch of `pronouns`. Required iff `pronouns`
     # contains `other` — see `REFERRAL_CONDITIONAL_RULES`.
     pronouns_other_text: StrippedOptionalText = None
-    subject: StrippedOptionalText = None
     description: StrippedText
     services: ServicesField = []
     # Free-text describing the "Other" services branch. Required iff
@@ -474,7 +472,6 @@ class ReferralUpdate(FlatLocationSchema, PartialUpdate):
     languages_other_text: StrippedOptionalText = None
     pronouns: PronounsField | None = None
     pronouns_other_text: StrippedOptionalText = None
-    subject: StrippedOptionalText = None
     description: StrippedText | None = None
     services: ServicesField | None = None
     services_other_text: StrippedOptionalText = None
@@ -573,7 +570,6 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
     languages_other_text: str | None = None
     pronouns: PronounsField = []
     pronouns_other_text: str | None = None
-    subject: str | None = None
     description: str
     services: ServicesField = []
     services_other_text: str | None = None

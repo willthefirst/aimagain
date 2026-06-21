@@ -438,20 +438,9 @@ MODALITIES_FREETEXT: Final[tuple[str, ...]] = (
     "Mindfulness-based",
     "Exposure and response prevention",
 )
-# Free-text title overrides a referrer may type. Gender was dropped from
-# the referral schema, so these read in the current vocabulary: singular
-# age noun + range (matching `referral_headline`), optional pronouns
-# (`PRONOUNS` labels), and an optional clinical focus — never a gender.
-REFERRAL_SUBJECTS: Final[tuple[str, ...]] = (
-    "Child (0–5) — early intervention, family involvement",
-    "Adult (25–64), she/her — individual therapy, in-person only",
-    "Adolescent (14–18), they/them — trauma-informed care, telehealth OK",
-    "Adult (25–64), she/her — perinatal mood, EMDR preferred",
-    "Older adult (65+) — depression, SF Bay Area",
-    "Adult (25–64) — anxiety/OCD, sliding scale needed",
-    "Preteen (11–13) — ADHD, family therapy",
-    "Young adult (19–24), he/him — first-episode psychosis",
-)
+# Referrals have no `subject` column — their title is always derived from
+# demographics (`post_feed_headline`), so there are no referral subjects to
+# seed. Openings and intakes still carry a poster-set subject.
 OPENING_SUBJECTS: Final[tuple[str, ...]] = (
     "3 slots — adults, relational/psychodynamic · $200/session",
     "Accepting new clients for trauma work",
@@ -819,10 +808,6 @@ def render_intake_description(rng: SeededRandom, index: int) -> str:
     )
 
 
-def referral_subject(rng: SeededRandom, index: int) -> str:
-    return rng.round_robin(REFERRAL_SUBJECTS, index)
-
-
 def opening_subject(rng: SeededRandom, index: int) -> str:
     return rng.round_robin(OPENING_SUBJECTS, index)
 
@@ -866,7 +851,6 @@ __all__ = [
     "render_intake_description",
     "practice_name",
     "program_name",
-    "referral_subject",
     "opening_subject",
     "intake_subject",
     "US_STATES",
