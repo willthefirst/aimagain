@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 
 from src.domain.models import (
     Clinician,
@@ -50,14 +50,14 @@ class PostRepository(BaseRepository):
       ``ReferralDetail.languages``, ``Clinician.languages``
       (opening-side, person-level), and ``Program.languages``
       (intake-side, program-level).
-    * ``geography`` (Text) — ILIKE across city and state on both
-      ``ReferralDetail`` (its own location) and ``ClinicianAffiliation``
-      (opening/intake's linked practice location). No ZIP — neither side
-      models one.
-    * ``include_telehealth`` (Flag) — when present, expands the
-      ``geography`` filter to also include openings whose own
-      ``session_format`` contains ``virtual`` and whose linked
-      affiliation is licensed in CA.
+    * ``session_format`` (Choice, multi) — JSON-array contains check on
+      ``ReferralDetail.session_format`` + ``OpeningDetail.session_format``
+      (in-person / virtual). Intakes carry no session-format axis, so they
+      never match this filter.
+    * ``services`` (Choice, multi) — the unified "what care" axis: JSON
+      contains check on ``services`` across all three detail rows
+      (``ReferralDetail`` / ``OpeningDetail`` / ``IntakeDetail``), every
+      kind on the same ``ReferralService`` vocabulary.
     * ``insurance`` (Choice, multi) — ``insurance_carriers`` JSON-array
       contains check on ``ReferralDetail`` OR ``in_network_carriers``
       JSON-contains on linked ``ClinicianAffiliation`` (#1358 PR-e —
@@ -78,8 +78,8 @@ class PostRepository(BaseRepository):
         city: str | None = None,
         age_group: list[str] | None = None,
         language: list[str] | None = None,
-        geography: str | None = None,
-        include_telehealth: str | None = None,
+        session_format: list[str] | None = None,
+        services: list[str] | None = None,
         insurance: list[str] | None = None,
         since: datetime | None = None,
         exclude_owner_id: int | None = None,
@@ -97,8 +97,8 @@ class PostRepository(BaseRepository):
                 city,
                 age_group,
                 language,
-                geography,
-                include_telehealth,
+                session_format,
+                services,
                 insurance,
             )
         )
@@ -110,11 +110,11 @@ class PostRepository(BaseRepository):
         # ``languages``; ``Clinician`` joins only for the opening's
         # person-level ``languages``; ``IntakeDetail`` joins for the
         # intake's own ``age_groups`` (and as the ``Program`` join key).
-        needs_clinician_join = bool(
-            state or city or geography or include_telehealth or insurance
-        )
+        needs_clinician_join = bool(state or city or insurance)
         needs_owner_join = bool(posted_by)
-        needs_intake_join = bool(age_group or language)
+        # ``services`` reads ``IntakeDetail.services`` too, so it needs the
+        # intake-detail join alongside the referral/opening detail join.
+        needs_intake_join = bool(age_group or language or services)
         needs_program_join = bool(language)
         needs_person_join = bool(language)
 
@@ -211,32 +211,39 @@ class PostRepository(BaseRepository):
                 )
             )
 
-        if geography:
-            needle = f"%{geography}%"
-            geo_clauses = [
-                ReferralDetail.location_city.ilike(needle),
-                ReferralDetail.location_state.ilike(needle),
-                ClinicianAffiliation.location_city.ilike(needle),
-                ClinicianAffiliation.location_state.ilike(needle),
-            ]
-            if include_telehealth:
-                # Telehealth is now per-announcement (the opening's
-                # `session_format`), paired with the affiliation's CA
-                # licensing state.
-                geo_clauses.append(
-                    and_(
-                        OpeningDetail.session_format.like('%"virtual"%'),
-                        ClinicianAffiliation.location_state == "CA",
-                    )
+        if session_format:
+            # Per-announcement delivery format — ReferralDetail (the
+            # client's preference) and OpeningDetail (the opening's). Intake
+            # has no session_format axis (a Program is one group offering),
+            # so intakes never match this filter.
+            stmt = stmt.filter(
+                _json_array_contains_any_multi(
+                    session_format,
+                    (
+                        (ReferralDetail, "session_format"),
+                        (OpeningDetail, "session_format"),
+                    ),
                 )
-            stmt = stmt.filter(or_(*geo_clauses))
-        # include_telehealth alone (no geography) adds no constraint — it
-        # only expands the geography filter when both are active.
+            )
 
-        # `level_of_care` (settings) and `modality` filters were removed:
-        # no post kind models treatment settings or modalities anymore —
-        # services collapsed onto the single `ReferralService` "what care"
-        # axis across all three kinds.
+        if services:
+            # The unified "what care" axis — every kind carries its own
+            # ``services`` list on the same ``ReferralService`` vocabulary.
+            stmt = stmt.filter(
+                _json_array_contains_any_multi(
+                    services,
+                    (
+                        (ReferralDetail, "services"),
+                        (OpeningDetail, "services"),
+                        (IntakeDetail, "services"),
+                    ),
+                )
+            )
+
+        # `geography` (free-text location) and the `include_telehealth` flag
+        # were folded into the structured `state` / `city` / `session_format`
+        # filters. `level_of_care` / `modality` were removed when settings /
+        # modalities collapsed onto the single `ReferralService` axis.
 
         if insurance:
             clauses = []
