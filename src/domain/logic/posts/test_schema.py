@@ -412,8 +412,9 @@ def test_post_create_dispatches_opening():
     p = post_create_adapter.validate_python(opening_payload())
     assert isinstance(p, ClinicianOpeningCreate)
     assert p.kind == "clinician_opening"
-    # Insurance posture moved to Clinician in #449; PA no longer carries
-    # `sliding_scale` / `payment_situation` / `cost` on the wire.
+    # The opening is self-describing now: it carries session_format /
+    # services / age_groups / genders / cost. Insurance posture
+    # (sliding_scale / in-network carriers) stays on the affiliation.
 
 
 def test_post_create_opening_accepts_schedule_text():
@@ -486,12 +487,131 @@ def test_post_create_rejects_unknown_fields_on_opening():
 
 
 def test_post_create_rejects_cross_kind_field_bleed():
-    """Cross-kind field bleed must not validate. `session_format`
-    is a client-referral-only field; it has no place in a PA payload."""
+    """Cross-kind field bleed must not validate. `pronouns` is a
+    client-referral-only field (the client's pronouns); it has no place
+    in an opening payload. (`session_format` / `services` / `age_groups`
+    / `genders` are now *shared* — the opening is self-describing — so
+    they no longer make a cross-kind probe.)"""
     with pytest.raises(ValidationError):
-        post_create_adapter.validate_python(
-            opening_payload(session_format=["in_person"])
+        post_create_adapter.validate_python(opening_payload(pronouns=["she_her"]))
+
+
+# --- opening self-describing profile ------------------------------------
+#
+# The opening carries its own `session_format` / `services` /
+# `services_other_text` / `age_groups` / `genders` / `cost` (the
+# announcement profile), on the same vocabularies the referral request
+# side uses. These pin the wire-accepted shapes + the `other` conditional.
+
+
+def test_post_create_opening_accepts_session_format():
+    """`session_format` is now an opening field (the opening describes its
+    own delivery format), any subset of {in_person, virtual}."""
+    p = post_create_adapter.validate_python(
+        opening_payload(session_format=["in_person", "virtual"])
+    )
+    assert p.session_format == ["in_person", "virtual"]
+
+
+def test_post_create_opening_session_format_defaults_empty():
+    p = post_create_adapter.validate_python(opening_payload())
+    assert p.session_format == []
+
+
+def test_post_create_opening_accepts_services_on_referral_vocab():
+    """`services` uses the same `ReferralService` vocab as the request
+    side (one "what care" axis for both ends)."""
+    p = post_create_adapter.validate_python(
+        opening_payload(services=["therapy_individual", "medication_management"])
+    )
+    assert p.services == ["therapy_individual", "medication_management"]
+
+
+def test_post_create_opening_services_coerces_scalar_to_singleton_list():
+    p = post_create_adapter.validate_python(
+        opening_payload(services="therapy_individual")
+    )
+    assert p.services == ["therapy_individual"]
+
+
+def test_post_create_opening_services_rejects_unknown_token():
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(opening_payload(services=["telekinesis"]))
+
+
+def test_post_create_opening_accepts_age_groups_multi():
+    """Unlike a referral (one client, exactly one bucket), an opening
+    serves a cohort — `age_groups` is multi-valued with no cardinality
+    cap."""
+    p = post_create_adapter.validate_python(
+        opening_payload(age_groups=["adolescents_14_18", "adults_25_64"])
+    )
+    assert p.age_groups == ["adolescents_14_18", "adults_25_64"]
+
+
+def test_post_create_opening_age_groups_defaults_empty():
+    p = post_create_adapter.validate_python(opening_payload())
+    assert p.age_groups == []
+
+
+def test_post_create_opening_accepts_genders():
+    p = post_create_adapter.validate_python(
+        opening_payload(genders=["female", "non_binary"])
+    )
+    assert p.genders == ["female", "non_binary"]
+
+
+def test_post_create_opening_genders_defaults_empty():
+    p = post_create_adapter.validate_python(opening_payload())
+    assert p.genders == []
+
+
+def test_post_create_opening_accepts_cost():
+    p = post_create_adapter.validate_python(opening_payload(cost="$150/session"))
+    assert p.cost == "$150/session"
+
+
+def test_post_create_opening_cost_strips_whitespace_to_none():
+    p = post_create_adapter.validate_python(opening_payload(cost="   "))
+    assert p.cost is None
+
+
+def test_post_create_opening_services_other_requires_text():
+    """`other` in `services` requires `services_other_text` — the uniform
+    "Other → specify" conditional rule (OPENING_CONDITIONAL_RULES)."""
+    with pytest.raises(ValidationError):
+        post_create_adapter.validate_python(opening_payload(services=["other"]))
+
+
+def test_post_create_opening_services_other_with_text_ok():
+    p = post_create_adapter.validate_python(
+        opening_payload(
+            services=["other"], services_other_text="Equine-assisted therapy"
         )
+    )
+    assert p.services == ["other"]
+    assert p.services_other_text == "Equine-assisted therapy"
+
+
+def test_post_update_opening_accepts_profile_fields():
+    """The Update variant carries the same self-describing profile;
+    `None` = leave unchanged, `[]` = clear."""
+    p = post_update_adapter.validate_python(
+        {
+            "kind": "clinician_opening",
+            "session_format": ["virtual"],
+            "services": ["therapy_individual"],
+            "age_groups": ["adults_25_64"],
+            "genders": ["male"],
+            "cost": "$120",
+        }
+    )
+    assert isinstance(p, ClinicianOpeningUpdate)
+    assert p.session_format == ["virtual"]
+    assert p.services == ["therapy_individual"]
+    assert p.age_groups == ["adults_25_64"]
+    assert p.genders == ["male"]
+    assert p.cost == "$120"
 
 
 def test_post_create_opening_accepts_description():
@@ -571,7 +691,17 @@ def test_audit_snapshot_for_opening_post():
     """Snapshotting a `kind='clinician_opening'` post flattens through
     `opening_detail`."""
     owner_id = uuid.uuid4()
-    detail_attrs = opening_payload()
+    # The opening detail row now carries its self-describing announcement
+    # profile; supply every column the registry-driven flatten reads so
+    # the SimpleNamespace stub mirrors a real `OpeningDetail`.
+    detail_attrs = opening_payload(
+        session_format=["virtual"],
+        services=["therapy_individual"],
+        services_other_text=None,
+        age_groups=["adults_25_64"],
+        genders=["female"],
+        cost="$150/session",
+    )
     detail_attrs.pop("kind")
     post = SimpleNamespace(
         kind="clinician_opening",
@@ -583,12 +713,20 @@ def test_audit_snapshot_for_opening_post():
     assert snap["kind"] == "clinician_opening"
     assert snap["owner_id"] == str(owner_id)
     # The audit row records the FK to the Clinician, not the
-    # dereferenced practice fields. Practice-name/location/sessions live
-    # on Clinician's ClinicianAffiliation — snapshotted via that entity's audit path.
+    # dereferenced practice context. Practice-name/location/insurance live
+    # on Clinician's ClinicianAffiliation — snapshotted via that entity's
+    # audit path. The opening's self-describing announcement profile
+    # (session_format / services / age_groups / genders / cost) IS on the
+    # snapshot now (it's per-announcement, lives on the detail row).
     assert snap["clinician_id"] == detail_attrs["clinician_id"]
+    assert "session_format" in snap
+    assert "services" in snap
+    assert "age_groups" in snap
+    assert "genders" in snap
+    assert "cost" in snap
+    # Insurance posture stays on the affiliation, not the opening snapshot.
     assert "sliding_scale" not in snap
     assert "payment_situation" not in snap
-    assert "cost" not in snap
 
 
 # --- Schema-literal vs model-tuple guardrail ----------------------------

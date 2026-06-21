@@ -380,17 +380,16 @@ class MockDataFactory:
             # this stub via `from_attributes`.
             org_id=UUID("55555555-5555-5555-5555-555555555555"),
             org_name="Acme Counseling",
+            # Location is city/area + state, no ZIP. Delivery format + cost
+            # moved onto the opening post, so they're no longer
+            # affiliation-derived clinician fields.
             location_city="Brooklyn",
             location_state="NY",
-            location_zip="11201",
-            in_person_sessions="yes",
-            virtual_sessions="no",
             # Insurance posture on Clinician: empty carrier list (no
             # in-network) + OON off keeps this stub deterministic.
             accepts_out_of_network=False,
             in_network_carriers=[],
             sliding_scale=False,
-            cost=None,
             licensures=[],
             educations=[],
             certifications=[],

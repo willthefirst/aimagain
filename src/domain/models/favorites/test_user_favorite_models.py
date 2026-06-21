@@ -27,11 +27,8 @@ async def _seed_user_and_clinician(
         org_id=org.id,
         first_name="Jane",
         last_name="Smith",
-        in_person_sessions="yes",
-        virtual_sessions="no",
         location_city="Springfield",
         location_state="IL",
-        location_zip="62701",
     )
     clinician.org = org
     async with db_test_session_manager() as session:

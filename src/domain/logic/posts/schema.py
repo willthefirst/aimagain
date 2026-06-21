@@ -46,7 +46,10 @@ from pydantic import (
     model_validator,
 )
 
-from src.domain.logic.posts.conditional_fields import enforce_conditional_required
+from src.domain.logic.posts.conditional_fields import (
+    OPENING_CONDITIONAL_RULES,
+    enforce_conditional_required,
+)
 from src.domain.logic.value_objects.location import (
     FlatLocationSchema,
     ReferralLocation,
@@ -57,6 +60,7 @@ from src.domain.logic.value_objects.location import (
 from src.domain.models import POST_KINDS
 from src.domain.models.enums import (
     CLIENT_AGE_GROUPS,
+    GENDERS,
     INSURANCE_CARRIERS,
     LANGUAGES,
     PRONOUNS,
@@ -121,6 +125,9 @@ RequiredLanguagesField = Annotated[LanguagesField, Field(min_length=1)]
 AgeGroupsField = Annotated[
     list[Literal[*CLIENT_AGE_GROUPS]], BeforeValidator(scalar_to_list)
 ]
+# `opening.genders` — the cohort an opening serves (multi-checkbox). Empty
+# list = "not stated". Referral has no gender column; this is provider-side.
+GendersField = Annotated[list[Literal[*GENDERS]], BeforeValidator(scalar_to_list)]
 # `referral.age_groups` is required-*exactly*-one on the wire. A referral
 # describes a single client, so it has exactly one age bucket — the form
 # renders a single `<select>` (see `_form_referral.html`). The wire shape
@@ -239,27 +246,36 @@ class ReferralRead(_PostReadBase):
 
 
 class ClinicianOpeningRead(_PostReadBase):
-    """Read projection for a thin opening detail row (#1358 PR-f sub-3).
+    """Read projection for a self-describing opening detail row.
 
-    The steady-state profile fields (services / settings / modalities /
-    age_groups / genders / languages / website / referral_instructions)
-    moved off this row onto the linked ``ClinicianAffiliation`` /
-    ``Clinician`` in PR-f. Templates dereference via
-    ``post.opening_detail.clinician_affiliation.<field>`` (and
-    ``.clinician.languages`` for the person-level one).
+    The opening carries its own announcement profile: delivery format
+    (``session_format``), service lines (``services`` /
+    ``services_other_text`` on the ``ReferralService`` vocabulary), the
+    cohort it serves (``age_groups`` / ``genders``), and ``cost``. The
+    linked ``ClinicianAffiliation`` keeps only steady-state context
+    (location, insurance, website / referral_instructions); ``languages``
+    is person-level on the linked ``Clinician``.
     """
 
     kind: Literal["clinician_opening"]
     description: str | None = None
-    # Practice + location + delivery-format + insurance posture all live
-    # on the linked Clinician (#448, #449). Read projections expose the
-    # FK; templates dereference via
+    # Practice context: location + insurance posture live on the linked
+    # ClinicianAffiliation; languages on the linked Clinician. Read
+    # projections expose the FK; templates dereference via
     # `post.opening_detail.clinician.<field>`.
     clinician_id: uuid.UUID
     # Context affiliation this opening is offered under. Nullable — see
     # `ReferralRead.clinician_affiliation_id`.
     clinician_affiliation_id: uuid.UUID | None = None
     schedule_text: str | None = None
+    # Self-describing announcement profile (per-announcement, not on the
+    # affiliation). Multi-valued `age_groups` (a cohort, not one client).
+    session_format: SessionFormatField = []
+    services: ServicesField = []
+    services_other_text: str | None = None
+    age_groups: AgeGroupsField = []
+    genders: GendersField = []
+    cost: str | None = None
 
 
 class ProgramIntakeRead(_PostReadBase):
@@ -367,14 +383,12 @@ class ReferralCreate(FlatLocationSchema, WirePayload):
 class ClinicianOpeningCreate(WirePayload):
     """Create payload for `kind='clinician_opening'`.
 
-    After #1358 PR-f sub-3, the steady-state practice profile fields
-    (services / settings / modalities / age_groups / genders / languages
-    / website / referral_instructions) are no longer part of the
-    announcement payload — those live on the linked
-    ``ClinicianAffiliation`` (and ``languages`` on the linked
-    ``Clinician``) and are managed through the affiliation / clinician
-    edit pages. The opening form collects only the announcement core
-    plus the practice picker.
+    The opening is self-describing: it carries its own ``session_format`` /
+    ``services`` / ``age_groups`` / ``genders`` / ``cost`` (the
+    announcement profile), not just the practice picker. Only steady-state
+    context — location, insurance, website / referral_instructions — lives
+    on the linked ``ClinicianAffiliation`` (and ``languages`` on the linked
+    ``Clinician``), managed through their own edit pages.
     """
 
     kind: Literal["clinician_opening"]
@@ -396,6 +410,21 @@ class ClinicianOpeningCreate(WirePayload):
     # Free-text for cohort dates / fixed program hours. Single-line
     # input; not a textarea.
     schedule_text: StrippedOptionalText = None
+    # Self-describing announcement profile. `services` uses the same
+    # `ReferralService` vocab as the request side; `age_groups` is
+    # multi-valued (a cohort). `other` in `services` requires
+    # `services_other_text` — see `OPENING_CONDITIONAL_RULES`.
+    session_format: SessionFormatField = []
+    services: ServicesField = []
+    services_other_text: StrippedOptionalText = None
+    age_groups: AgeGroupsField = []
+    genders: GendersField = []
+    cost: StrippedOptionalText = None
+
+    @model_validator(mode="after")
+    def _enforce_conditional_required(self) -> "ClinicianOpeningCreate":
+        enforce_conditional_required(self, OPENING_CONDITIONAL_RULES)
+        return self
 
 
 class ProgramIntakeCreate(WirePayload):
@@ -508,6 +537,20 @@ class ClinicianOpeningUpdate(PartialUpdate):
     # when the picker changes context; ownership verified on update.
     clinician_id: uuid.UUID | None = None
     schedule_text: StrippedOptionalText = None
+    # Announcement profile — `None` = leave unchanged; `[]` = clear.
+    # Same conditional `other`→`services_other_text` rule as Create
+    # (skipped when `services` is absent from the patch).
+    session_format: SessionFormatField | None = None
+    services: ServicesField | None = None
+    services_other_text: StrippedOptionalText = None
+    age_groups: AgeGroupsField | None = None
+    genders: GendersField | None = None
+    cost: StrippedOptionalText = None
+
+    @model_validator(mode="after")
+    def _enforce_conditional_required(self) -> "ClinicianOpeningUpdate":
+        enforce_conditional_required(self, OPENING_CONDITIONAL_RULES)
+        return self
 
 
 class ProgramIntakeUpdate(PartialUpdate):
@@ -578,6 +621,13 @@ class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     clinician_id: uuid.UUID
     clinician_affiliation_id: uuid.UUID | None = None
     schedule_text: str | None = None
+    # Self-describing announcement profile (mirrors the Read shape).
+    session_format: SessionFormatField = []
+    services: ServicesField = []
+    services_other_text: str | None = None
+    age_groups: AgeGroupsField = []
+    genders: GendersField = []
+    cost: str | None = None
 
 
 class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):

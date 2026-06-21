@@ -30,34 +30,18 @@ def _render(aff) -> HTMLParser:
 
 def _full_aff() -> SimpleNamespace:
     return SimpleNamespace(
-        in_person_sessions="yes",
-        virtual_sessions="no",
         in_network_carriers=["aetna", "anthem_bcbs"],
         accepts_out_of_network=True,
         sliding_scale=True,
-        cost="$150–200/session",
-        services=["psychotherapy"],
-        settings=["outpatient"],
-        modalities=["cbt", "emdr"],
-        age_groups=["children_0_5"],
-        genders=["female"],
         website="https://drsmith.example.com",
     )
 
 
 def _empty_aff() -> SimpleNamespace:
     return SimpleNamespace(
-        in_person_sessions=None,
-        virtual_sessions=None,
         in_network_carriers=[],
         accepts_out_of_network=False,
         sliding_scale=False,
-        cost=None,
-        services=[],
-        settings=[],
-        modalities=[],
-        age_groups=[],
-        genders=[],
         website=None,
     )
 
@@ -66,27 +50,16 @@ def test_full_profile_renders_every_row_by_stable_key() -> None:
     tree = _render(_full_aff())
     keys = [row.attributes.get("data-fact") for row in tree.css("div[data-fact]")]
     assert keys == [
-        "availability",
         "insurance",
-        "cost",
-        "services",
-        "settings",
-        "modalities",
-        "age_groups",
-        "genders",
         "website",
     ]
 
 
 def test_rows_carry_human_readable_labels() -> None:
     html = _render(_full_aff()).html or ""
-    assert "In-person: Yes" in html
-    assert "Virtual: No" in html
+    assert "In-network: Aetna, Anthem_bcbs" in html
     assert "Out-of-network OK" in html
     assert "Sliding scale" in html
-    assert "Psychotherapy" in html
-    assert "Outpatient" in html
-    assert "CBT, EMDR" in html
     assert "https://drsmith.example.com" in html
 
 

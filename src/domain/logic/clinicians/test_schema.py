@@ -171,13 +171,9 @@ def test_clinician_read_round_trips_npi():
             "last_name": "Smith",
             "location_city": "Boise",
             "location_state": "ID",
-            "location_zip": "83702",
-            "in_person_sessions": "yes",
-            "virtual_sessions": "no",
             "accepts_out_of_network": True,
             "in_network_carriers": [],
             "sliding_scale": False,
-            "cost": None,
         }
     )
     assert p.npi == "1234567890"
@@ -200,7 +196,6 @@ def test_clinician_read_tolerates_missing_affiliation_fields():
     )
     assert p.org_id is None
     assert p.org_name is None
-    assert p.in_person_sessions is None
     assert p.in_network_carriers == []
     assert p.sliding_scale is None
 
@@ -220,13 +215,9 @@ def test_clinician_read_validates_from_nested_dict():
         "last_name": "Smith",
         "location_city": "Boise",
         "location_state": "ID",
-        "location_zip": "83702",
-        "in_person_sessions": "yes",
-        "virtual_sessions": "no",
         "accepts_out_of_network": False,
         "in_network_carriers": [],
         "sliding_scale": False,
-        "cost": None,
         "licensures": [
             {
                 "id": uuid.uuid4(),

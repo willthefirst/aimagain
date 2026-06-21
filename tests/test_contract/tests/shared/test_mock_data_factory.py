@@ -45,16 +45,26 @@ def test_json_columns_default_to_empty_list(kind):
             ), f"{kind}.{json_field} expected []; got {getattr(detail, json_field)!r}"
 
 
-def test_pa_and_program_detail_rows_have_no_settings_or_genders_columns():
-    """After #1358 PR-f sub-3, PA + program detail rows are thin —
-    ``settings`` / ``genders`` live on the linked affiliation / program,
-    not on the detail row itself. The factory should not generate a
-    placeholder for a column that no longer exists."""
-    for kind in ("clinician_opening", "program_intake"):
-        post = make_post_stub(kind, owner_id=uuid.uuid4())
-        detail = getattr(post, POST_KINDS[kind].detail_relationship)
-        assert not hasattr(detail, "settings")
-        assert not hasattr(detail, "genders")
+def test_opening_detail_row_is_self_describing():
+    """The clinician-opening detail row carries its own announcement
+    profile (services / age_groups / genders / session_format / cost). It
+    never carries ``settings`` (that collapsed into the `ReferralService`
+    vocabulary)."""
+    post = make_post_stub("clinician_opening", owner_id=uuid.uuid4())
+    detail = getattr(post, POST_KINDS["clinician_opening"].detail_relationship)
+    assert hasattr(detail, "genders")
+    assert hasattr(detail, "services")
+    assert hasattr(detail, "session_format")
+    assert not hasattr(detail, "settings")
+
+
+def test_program_intake_detail_row_has_no_profile_columns():
+    """The program-intake detail row stays thin — ``settings`` / ``genders``
+    live on the linked Program, not on the detail row itself."""
+    post = make_post_stub("program_intake", owner_id=uuid.uuid4())
+    detail = getattr(post, POST_KINDS["program_intake"].detail_relationship)
+    assert not hasattr(detail, "settings")
+    assert not hasattr(detail, "genders")
 
 
 def test_uuid_columns_get_fresh_uuids():

@@ -38,9 +38,6 @@ def _make_clinician(user, **overrides) -> Clinician:
         last_name="Smith",
         location_city="Springfield",
         location_state="IL",
-        location_zip="62701",
-        in_person_sessions="yes",
-        virtual_sessions="no",
     )
     clinician = Clinician(**{**defaults, **overrides})
     clinician.org = org

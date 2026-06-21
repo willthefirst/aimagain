@@ -202,7 +202,8 @@ async def test_npi_defaults_to_null(
 async def test_insurance_fields_round_trip(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """The five #449 insurance/payment columns persist + read back."""
+    """The insurance posture columns persist + read back through the
+    affiliation proxies."""
     user = await _seed_user(db_test_session_manager)
     created = await _seed_clinician(
         db_test_session_manager,
@@ -211,7 +212,6 @@ async def test_insurance_fields_round_trip(
         accepts_out_of_network=True,
         in_network_carriers=["aetna", "cigna"],
         sliding_scale=True,
-        cost="$200 - $400 per session",
     )
 
     async with db_test_session_manager() as session:
@@ -227,7 +227,6 @@ async def test_insurance_fields_round_trip(
         assert row.accepts_out_of_network is True
         assert row.in_network_carriers == ["aetna", "cigna"]
         assert row.sliding_scale is True
-        assert row.cost == "$200 - $400 per session"
 
 
 async def test_insurance_fields_default_to_oon_only(
@@ -252,7 +251,6 @@ async def test_insurance_fields_default_to_oon_only(
         assert row.accepts_out_of_network is True
         assert row.in_network_carriers == []
         assert row.sliding_scale is False
-        assert row.cost is None
 
 
 async def test_delete_clinician_cascades_to_credentials(

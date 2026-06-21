@@ -833,9 +833,6 @@ async def test_after_create_clinician_verification_creates_verification_row(
                 org_id=org_id,
                 location_city="Springfield",
                 location_state="IL",
-                location_zip="62701",
-                in_person_sessions="yes",
-                virtual_sessions="no",
                 first_name="Jane",
                 last_name="Smith",
                 npi="9999999999",
@@ -930,9 +927,6 @@ async def test_after_create_clinician_verification_raises_when_no_npi(
                 last_name="Smith",
                 location_city="Springfield",
                 location_state="IL",
-                location_zip="62701",
-                in_person_sessions="yes",
-                virtual_sessions="no",
                 npi=None,
             )
             created = await repo.create(clinician)
@@ -1010,9 +1004,6 @@ async def test_after_create_clinician_verification_raises_when_npi_not_found(
                 last_name="Smith",
                 location_city="Springfield",
                 location_state="IL",
-                location_zip="62701",
-                in_person_sessions="yes",
-                virtual_sessions="no",
                 npi="9999999999",
             )
             created = await repo.create(clinician)
@@ -1125,8 +1116,8 @@ async def test_after_create_clinician_verification_auto_creates_stub_affiliation
             assert len(affs) == 1
             stub = affs[0]
             assert stub.org_id is None
-            assert stub.in_person_sessions is None
-            assert stub.virtual_sessions is None
+            assert stub.location_city is None
+            assert stub.location_state is None
     finally:
         if old_path is None:
             os.environ.pop("LEIE_CSV_PATH", None)
@@ -1178,8 +1169,6 @@ async def test_after_create_clinician_verification_skips_stub_when_affiliation_e
                 first_name="Jane",
                 last_name="Smith",
                 npi="9999999999",
-                in_person_sessions="yes",
-                virtual_sessions="no",
             )
             created = await repo.create(clinician)
             assert len(created.clinician_affiliations) == 1
