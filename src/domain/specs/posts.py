@@ -34,6 +34,10 @@ from src.domain.models.enums import (
     INSURANCE_CARRIERS,
     LANGUAGE_LABELS,
     LANGUAGES,
+    REFERRAL_SERVICE_LABELS,
+    REFERRAL_SERVICES,
+    SESSION_FORMAT_LABELS,
+    SESSION_FORMATS,
     US_STATES,
 )
 from src.framework.audit.core import make_audited_resource
@@ -44,7 +48,7 @@ from src.framework.dispatch.entity_spec import (
     RouteSet,
     Templates,
 )
-from src.framework.dispatch.filters import ChoiceFilter, FlagFilter, TextFilter
+from src.framework.dispatch.filters import ChoiceFilter, TextFilter
 from src.framework.dispatch.redirects import Redirects
 
 POST_AUDITED_RESOURCE: Final = make_audited_resource(
@@ -80,6 +84,14 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     # ``/posts``. Each kind's display label comes from `POST_KINDS[k].noun`
     # — the same SOT the /posts/form picker headings and the H1 / CTA
     # chain read from.
+    # Order mirrors the post forms' own grammar — Type, then where
+    # (state / city / session format), then what (services), then who
+    # (age / languages), then coverage (insurance) — with the broad
+    # free-text filters (keyword, posted-by) trailing at the bottom. The
+    # old free-text ``geography`` + the ``include_telehealth`` flag were
+    # folded into the structured ``state`` / ``city`` / ``session_format``
+    # filters; ``level_of_care`` / ``modality`` were dropped when settings /
+    # modalities collapsed onto the single ``services`` axis.
     filters=(
         ChoiceFilter(
             name="kind",
@@ -87,17 +99,27 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             choices=tuple((k, POST_KINDS[k].noun) for k in POST_KINDS.names),
             multi=True,
         ),
-        TextFilter(name="q", label="Description", placeholder="Search descriptions…"),
-        TextFilter(
-            name="posted_by", label="Posted by", placeholder="Username contains…"
-        ),
         ChoiceFilter(
             name="state",
             label="State",
             choices=tuple((s, s) for s in US_STATES),
             multi=True,
         ),
-        TextFilter(name="city", label="City", placeholder="City contains…"),
+        TextFilter(
+            name="city", label="City or area", placeholder="City or area contains…"
+        ),
+        ChoiceFilter(
+            name="session_format",
+            label="Session format",
+            choices=tuple((v, SESSION_FORMAT_LABELS[v]) for v in SESSION_FORMATS),
+            multi=True,
+        ),
+        ChoiceFilter(
+            name="services",
+            label="Services",
+            choices=tuple((v, REFERRAL_SERVICE_LABELS[v]) for v in REFERRAL_SERVICES),
+            multi=True,
+        ),
         ChoiceFilter(
             name="age_group",
             label="Age groups",
@@ -110,21 +132,17 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             choices=tuple((v, LANGUAGE_LABELS[v]) for v in LANGUAGES),
             multi=True,
         ),
-        TextFilter(
-            name="geography",
-            label="Location",
-            placeholder="City, state, or ZIP…",
-        ),
-        FlagFilter(
-            name="include_telehealth",
-            label="Telehealth",
-            label_checked="Include telehealth in CA",
-        ),
         ChoiceFilter(
             name="insurance",
             label="Insurance",
             choices=tuple((v, INSURANCE_CARRIER_LABELS[v]) for v in INSURANCE_CARRIERS),
             multi=True,
+        ),
+        # Broad free-text filters trail at the bottom — reached for less
+        # often than the structured facets above.
+        TextFilter(name="q", label="Keyword", placeholder="Search descriptions…"),
+        TextFilter(
+            name="posted_by", label="Posted by", placeholder="Username contains…"
         ),
     ),
     templates=Templates(
