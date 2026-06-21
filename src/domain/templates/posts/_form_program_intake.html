@@ -40,7 +40,7 @@ Field order:
    re-render (see `POST_ENTITY.form_error_render` + the docstring at
    the top of `_shared/form_fields.html`). No per-field error or value
    threading is required at the callsite. #}
-{%- from "_shared/form_fields.html" import text_field, composite_select_field, multi_select_field, field_for, form_section with context -%}
+{%- from "_shared/form_fields.html" import composite_select_field, multi_select_field, field_for, form_section with context -%}
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
@@ -96,7 +96,6 @@ Field order:
       {% call form_section("Availability") %}
         {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
       {% endcall %}
-      {{ text_field("subject", "Subject", required=False, maxlength=120, help="Leave blank to auto-generate.", current=d.subject if d else None) }}
       {{ actions(submit_label, cancel_url=cancel_url) }}
     {%- endcall -%}
     {# Reveal the preview card matching the selected program; re-sync on

@@ -169,10 +169,8 @@ def _location_chunk(
 # field to a post kind means one line here, not an edit to three per-kind
 # blocks — so a passthrough field can't be silently dropped from the view-model.
 _SCALAR_PASSTHROUGH: dict[str, str] = {
-    "subject": "subject",
     "description": "description",
     "schedule_text": "schedule_text",
-    "treatment_modality": "treatment_modality",
 }
 _LIST_PASSTHROUGH: dict[str, str] = {
     "services": "services",
@@ -269,7 +267,6 @@ def post_card_view(post) -> dict[str, Any]:
         insurance_posture: one of ``INSURANCE_POSTURES`` or ``None``
             (intake has no posture). Same value
             ``insurance_posture_for_post`` returns.
-        treatment_modality: free-text modality string or ``None``.
         location_chunk: ``{city, state, zip}`` for CR (from the
             detail row) and PA (from the linked ClinicianAffiliation) —
             the demographics-column icon-only row both render. ``None``
@@ -339,7 +336,6 @@ def post_card_view(post) -> dict[str, Any]:
     base: dict[str, Any] = {
         "kind": kind,
         "kind_verb": _KIND_VERB.get(kind),
-        "subject": None,
         "headline": None,
         "header_state": None,
         "in_person": None,
@@ -354,7 +350,6 @@ def post_card_view(post) -> dict[str, Any]:
         "languages": [],
         "genders": [],
         "insurance_posture": insurance_posture_for_post(post),
-        "treatment_modality": None,
         "modalities": [],
         "location_chunk": None,
         "description": None,
@@ -771,10 +766,9 @@ def post_feed_headline(post) -> str:
     """Build the feed-row title — the post's base identity line only.
 
     Referrals: always the client demographics (`referral_headline`), e.g.
-    ``"Adult (25–64)"`` — referrals have no `subject` column, so there's no
-    poster-set override. Openings: the practice's org name. Program
-    intakes: the program name. For those two kinds a ``subject`` override,
-    when set, replaces the auto-generated title.
+    ``"Adult (25–64)"``. Openings: the practice's org name. Program
+    intakes: the program name. No kind carries a poster-set ``subject``
+    override — every headline is derived, matching the referral model.
 
     The clinical services that used to trail the title (the
     ``"… — Psychotherapy"`` suffix) now render as the `service_labels`
@@ -793,8 +787,6 @@ def post_feed_headline(post) -> str:
         d = getattr(post, "opening_detail", None)
         if d is None:
             return "Opening"
-        if subject := getattr(d, "subject", None):
-            return subject
         affiliation = getattr(d, "clinician_affiliation", None)
         _org = _read_scalar(affiliation, "org")
         return (getattr(_org, "name", None) if _org else None) or "Opening"
@@ -803,8 +795,6 @@ def post_feed_headline(post) -> str:
         d = getattr(post, "intake_detail", None)
         if d is None:
             return "Program"
-        if subject := getattr(d, "subject", None):
-            return subject
         prog = getattr(d, "program", None)
         return (getattr(prog, "name", None) if prog else None) or "Program"
 

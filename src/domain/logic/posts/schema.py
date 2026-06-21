@@ -250,7 +250,6 @@ class ClinicianOpeningRead(_PostReadBase):
     """
 
     kind: Literal["clinician_opening"]
-    subject: str | None = None
     description: str | None = None
     # Practice + location + delivery-format + insurance posture all live
     # on the linked Clinician (#448, #449). Read projections expose the
@@ -261,7 +260,6 @@ class ClinicianOpeningRead(_PostReadBase):
     # `ReferralRead.clinician_affiliation_id`.
     clinician_affiliation_id: uuid.UUID | None = None
     schedule_text: str | None = None
-    treatment_modality: str | None = None
 
 
 class ProgramIntakeRead(_PostReadBase):
@@ -272,7 +270,6 @@ class ProgramIntakeRead(_PostReadBase):
     """
 
     kind: Literal["program_intake"]
-    subject: str | None = None
     description: str | None = None
     # FK to the Program this announcement is for. The Program's name,
     # state preference, intake window, owning Org, and steady-state
@@ -280,7 +277,6 @@ class ProgramIntakeRead(_PostReadBase):
     # `post.intake_detail.program.<field>`.
     program_id: uuid.UUID
     schedule_text: str | None = None
-    treatment_modality: str | None = None
 
 
 PostRead = Annotated[
@@ -382,7 +378,6 @@ class ClinicianOpeningCreate(WirePayload):
     """
 
     kind: Literal["clinician_opening"]
-    subject: StrippedOptionalText = None
     # Optional initially — graduates to required once seed posts confirm
     # the shape works.
     description: TextareaOptional = None
@@ -401,7 +396,6 @@ class ClinicianOpeningCreate(WirePayload):
     # Free-text for cohort dates / fixed program hours. Single-line
     # input; not a textarea.
     schedule_text: StrippedOptionalText = None
-    treatment_modality: StrippedOptionalText = None
 
 
 class ProgramIntakeCreate(WirePayload):
@@ -412,7 +406,6 @@ class ProgramIntakeCreate(WirePayload):
     linked ``Program`` (#1358 PR-f sub-3)."""
 
     kind: Literal["program_intake"]
-    subject: StrippedOptionalText = None
     description: TextareaOptional = None
     # FK to one of the requesting user's Programs. The form restricts the
     # dropdown to Programs owned by the user; the spec's `payload_authz_path`
@@ -420,7 +413,6 @@ class ProgramIntakeCreate(WirePayload):
     # reference another user's Program.
     program_id: uuid.UUID
     schedule_text: StrippedOptionalText = None
-    treatment_modality: StrippedOptionalText = None
 
 
 PostCreate = Annotated[
@@ -506,7 +498,6 @@ class ClinicianOpeningUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
     kind: Literal["clinician_opening"]
-    subject: StrippedOptionalText = None
     description: TextareaOptional = None
     # `None` = leave unchanged. The form picker submits this; the server
     # re-derives `clinician_id` from it (and re-checks ownership of the
@@ -517,21 +508,18 @@ class ClinicianOpeningUpdate(PartialUpdate):
     # when the picker changes context; ownership verified on update.
     clinician_id: uuid.UUID | None = None
     schedule_text: StrippedOptionalText = None
-    treatment_modality: StrippedOptionalText = None
 
 
 class ProgramIntakeUpdate(PartialUpdate):
     at_least_one_field_exclude = frozenset({"kind"})
 
     kind: Literal["program_intake"]
-    subject: StrippedOptionalText = None
     description: TextareaOptional = None
     # FK to a Program owned by the requesting user. `None` = leave
     # unchanged. The spec's `payload_authz_path` verifies ownership on
     # update too — repointing at an unowned Program is 403.
     program_id: uuid.UUID | None = None
     schedule_text: StrippedOptionalText = None
-    treatment_modality: StrippedOptionalText = None
 
 
 PostUpdate = Annotated[
@@ -584,23 +572,19 @@ class ReferralAuditSnapshot(_PostAuditSnapshotBase):
 
 class ClinicianOpeningAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["clinician_opening"]
-    subject: str | None = None
     description: str | None = None
     # Audit row records the FK, not the dereferenced practice fields —
     # standard pattern for relational audit snapshots.
     clinician_id: uuid.UUID
     clinician_affiliation_id: uuid.UUID | None = None
     schedule_text: str | None = None
-    treatment_modality: str | None = None
 
 
 class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
     kind: Literal["program_intake"]
-    subject: str | None = None
     description: str | None = None
     program_id: uuid.UUID
     schedule_text: str | None = None
-    treatment_modality: str | None = None
 
 
 PostAuditSnapshot = Annotated[

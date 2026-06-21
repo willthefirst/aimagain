@@ -88,8 +88,6 @@ def test_opening_detail_thin_shape():
         "clinician_id",
         "clinician_affiliation_id",
         "schedule_text",
-        "treatment_modality",
-        "subject",
         "description",
     }
     assert {c.name for c in OpeningDetail.__table__.columns} == expected
@@ -102,8 +100,6 @@ def test_intake_detail_thin_shape():
         "post_id",
         "program_id",
         "schedule_text",
-        "treatment_modality",
-        "subject",
         "description",
     }
     assert {c.name for c in IntakeDetail.__table__.columns} == expected

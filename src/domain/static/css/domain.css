@@ -38,8 +38,7 @@
   max-width: 12rem;
 }
 .entity-form-page input[name="location_city"],
-.entity-form-page input[name="cost"],
-.entity-form-page input[name="treatment_modality"] {
+.entity-form-page input[name="cost"] {
   max-width: 20rem;
 }
 /* Conditional-field reveal rules for the referral form. One rule per
