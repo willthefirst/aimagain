@@ -1,9 +1,10 @@
 """Tests for `_shared/_program_facts.html`.
 
 `program_facts(program)` is the single home for rendering a `Program`'s
-steady-state profile (#1358 PR-f) as `fact(...)` rows. The program
-detail page (and any post surface showing the same profile) composes
-this macro; these tests pin the row keys, label derivation, the
+steady-state context as `fact(...)` rows — now just `website` and
+`referral_instructions` (the per-announcement profile moved onto the
+intake post). The program detail page (and any post surface showing the
+same context) composes this macro; these tests pin the row keys, the
 website-link treatment, and the empty-suppression contract.
 """
 
@@ -29,11 +30,6 @@ def _render(program) -> HTMLParser:
 
 def _full_program() -> SimpleNamespace:
     return SimpleNamespace(
-        services=["psychotherapy", "group_therapy"],
-        settings=["iop"],
-        modalities=["dbt"],
-        age_groups=["children_0_5"],
-        genders=["non_binary"],
         website="https://program.example.org",
         referral_instructions="Email intake@program.example.org.",
     )
@@ -41,11 +37,6 @@ def _full_program() -> SimpleNamespace:
 
 def _empty_program() -> SimpleNamespace:
     return SimpleNamespace(
-        services=[],
-        settings=[],
-        modalities=[],
-        age_groups=[],
-        genders=[],
         website=None,
         referral_instructions=None,
     )
@@ -55,22 +46,14 @@ def test_full_profile_renders_every_row_by_stable_key() -> None:
     tree = _render(_full_program())
     keys = [row.attributes.get("data-fact") for row in tree.css("div[data-fact]")]
     assert keys == [
-        "services",
-        "settings",
-        "modalities",
-        "age_groups",
-        "genders",
         "website",
         "referral_instructions",
     ]
 
 
-def test_rows_carry_human_readable_labels_and_website_link() -> None:
+def test_rows_carry_referral_instructions_and_website_link() -> None:
     tree = _render(_full_program())
     html = tree.html or ""
-    assert "Psychotherapy, Group therapy" in html
-    assert "IOP" in html
-    assert "DBT" in html
     assert "Email intake@program.example.org." in html
     link = tree.css_first('div[data-fact="website"] a')
     assert link is not None

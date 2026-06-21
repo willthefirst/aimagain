@@ -16,13 +16,13 @@ that compares against or stores the plain value keeps working unchanged.
 
 Derived artifacts come off the class, so downstream stays declarative:
 
-    class TreatmentModality(LabeledChoice):
-        emdr = "emdr", "EMDR"
-        cbt = "cbt", "CBT"
+    class SessionFormat(LabeledChoice):
+        in_person = "in_person", "In-person"
+        virtual = "virtual", "Virtual"
 
-    TreatmentModality.values()   # ("emdr", "cbt")          -> Literal / CHECK / seed
-    TreatmentModality.labels()   # {"emdr": "EMDR", ...}     -> form options, rows
-    TreatmentModality.choices()  # (("emdr", "EMDR"), ...)   -> ordered (value, label)
+    SessionFormat.values()   # ("in_person", "virtual")           -> Literal / CHECK / seed
+    SessionFormat.labels()   # {"in_person": "In-person", ...}    -> form options, rows
+    SessionFormat.choices()  # (("in_person", "In-person"), ...)  -> ordered (value, label)
 
 Members with an icon pass a third element; `icons()` then maps value -> icon
 (`None` for members that omit it):

@@ -91,60 +91,25 @@ def test_update_rejects_unknown_state_preference():
         ProgramUpdate(state_preference="ZZ")
 
 
-# --- Steady-state profile (#1358 PR-f) ----------------------------------
+# --- Steady-state context (website / referral instructions) -------------
 
 
-def test_create_defaults_steady_state_profile_to_empty():
-    """Multi-selects default to empty lists; free-text fields to ``None``.
-    Mirrors the field defaults on the post-side ``ReferralCreate`` /
-    ``ClinicianOpeningCreate``."""
+def test_create_defaults_free_text_to_none():
+    """Free-text fields default to ``None``."""
     payload = ProgramCreate(**_create_kwargs())
-    assert payload.services == []
-    assert payload.settings == []
-    assert payload.modalities == []
-    assert payload.age_groups == []
-    assert payload.genders == []
     assert payload.website is None
     assert payload.referral_instructions is None
 
 
-def test_create_accepts_steady_state_profile():
+def test_create_accepts_free_text_context():
     payload = ProgramCreate(
         **_create_kwargs(
-            services=["psychotherapy", "medication_management"],
-            settings=["outpatient"],
-            modalities=["dbt", "emdr"],
-            age_groups=["adults_25_64"],
-            genders=["female"],
             website="https://example.com",
             referral_instructions="Email intake@example.com.",
         )
     )
-    assert payload.services == ["psychotherapy", "medication_management"]
-    assert payload.settings == ["outpatient"]
-    assert payload.modalities == ["dbt", "emdr"]
-    assert payload.age_groups == ["adults_25_64"]
-    assert payload.genders == ["female"]
     assert payload.website == "https://example.com"
     assert payload.referral_instructions == "Email intake@example.com."
-
-
-def test_create_normalizes_scalar_multi_select_to_list():
-    """A 1-checkbox-checked HTML form posts a scalar string;
-    ``scalar_to_list`` rewraps it to a single-element list before the
-    ``Literal`` check fires."""
-    payload = ProgramCreate(**_create_kwargs(services="psychotherapy"))
-    assert payload.services == ["psychotherapy"]
-
-
-def test_create_rejects_unknown_service():
-    with pytest.raises(ValidationError):
-        ProgramCreate(**_create_kwargs(services=["not_a_service"]))
-
-
-def test_create_rejects_unknown_age_group():
-    with pytest.raises(ValidationError):
-        ProgramCreate(**_create_kwargs(age_groups=["not_a_group"]))
 
 
 def test_create_strips_blank_website_to_none():
@@ -154,21 +119,9 @@ def test_create_strips_blank_website_to_none():
     assert payload.website is None
 
 
-def test_update_accepts_steady_state_profile_field():
-    payload = ProgramUpdate(services=["psychotherapy"])
-    assert payload.services == ["psychotherapy"]
-
-
-def test_update_accepts_empty_list_to_clear():
-    """List-valued PATCH replaces the whole list; an explicit empty list
-    clears the field. Mirrors `ReferralUpdate` semantics."""
-    payload = ProgramUpdate(services=[])
-    assert payload.services == []
-
-
-def test_update_rejects_unknown_modality():
-    with pytest.raises(ValidationError):
-        ProgramUpdate(modalities=["not_a_modality"])
+def test_update_accepts_website():
+    payload = ProgramUpdate(website="https://example.com")
+    assert payload.website == "https://example.com"
 
 
 # --- Languages (#1358 PR-f, parent-schema extension) --------------------

@@ -1,54 +1,30 @@
-{# `program_facts(program)` — the steady-state profile of one `Program`
-   (#1358 PR-f) as a stack of `fact(...)` rows: what the program offers,
-   whom it serves, and how to reach it.
+{# `program_facts(program)` — the steady-state context of one `Program`
+   as a stack of `fact(...)` rows: how to reach it.
+
+   The per-announcement profile (services / age_groups / genders / cost)
+   moved onto the intake post and is rendered from the post view, not
+   here. Program-identity rows (organization, state served, dates,
+   accepting-referrals) are NOT context and stay with the callers that
+   want them.
 
    Emits ROWS, not the `facts_block()` wrapper — callers compose it
    inside their own chrome (the program detail page's facts block, a
-   post detail page's program-context card) and may append sibling
-   rows. Program-identity rows (organization, state served, dates,
-   accepting-referrals) are NOT profile and stay with the callers that
-   want them.
+   post detail page's program-context card) and may append sibling rows.
 
    Lives at the framework level (not under the `programs/` cluster)
-   because post surfaces render the same profile and cross-cluster
+   because post surfaces render the same context and cross-cluster
    template imports aren't allowed — same rationale as
    `_clinician_card.html` (see the layering rule in the README).
 
-   Every row suppresses itself when its field is empty. Label
-   vocabularies are Jinja globals. #}
+   Every row suppresses itself when its field is empty. #}
 {%- from "_shared/sections.html" import fact -%}
 {% macro program_facts(program) -%}
-  {%- if program.services %}
-    {%- set _svc = [] -%}
-    {%- for s in program.services -%}{%- set _ = _svc.append(OPENING_SERVICE_LABELS[s]) -%}{%- endfor -%}
-      {{ fact('services', 'Services', _svc | join(", ") ) }}
-    {%- endif %}
-    {%- if program.settings %}
-      {%- set _set = [] -%}
-      {%- for s in program.settings -%}{%- set _ = _set.append(TREATMENT_SETTINGS_LABELS[s]) -%}{%- endfor -%}
-        {{ fact('settings', 'Treatment settings', _set | join(", ") ) }}
-      {%- endif %}
-      {%- if program.modalities %}
-        {%- set _mod = [] -%}
-        {%- for m in program.modalities -%}{%- set _ = _mod.append(TREATMENT_MODALITY_LABELS[m]) -%}{%- endfor -%}
-          {{ fact('modalities', 'Treatment modalities', _mod | join(", ") ) }}
-        {%- endif %}
-        {%- if program.age_groups %}
-          {%- set _ages = [] -%}
-          {%- for g in program.age_groups -%}{%- set _ = _ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-            {{ fact('age_groups', 'Age groups', _ages | join(", ") ) }}
-          {%- endif %}
-          {%- if program.genders %}
-            {%- set _gs = [] -%}
-            {%- for g in program.genders -%}{%- set _ = _gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
-              {{ fact('genders', 'Genders', _gs | join(", ") ) }}
-            {%- endif %}
-            {%- if program.website %}
-              {%- call fact('website', 'Website') -%}
-                <a href="{{ program.website }}" rel="noopener" target="_blank">{{ program.website }}</a>
-              {%- endcall %}
-            {%- endif %}
-            {%- if program.referral_instructions %}
-              {{ fact('referral_instructions', 'Referral instructions', program.referral_instructions) }}
-            {%- endif %}
-          {%- endmacro %}
+  {%- if program.website %}
+    {%- call fact('website', 'Website') -%}
+      <a href="{{ program.website }}" rel="noopener" target="_blank">{{ program.website }}</a>
+    {%- endcall %}
+  {%- endif %}
+  {%- if program.referral_instructions %}
+    {{ fact('referral_instructions', 'Referral instructions', program.referral_instructions) }}
+  {%- endif %}
+{%- endmacro %}

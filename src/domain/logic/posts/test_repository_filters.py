@@ -1,15 +1,19 @@
 """Tests for PostRepository.list_posts() filter dimensions.
 
-Covers: geography, include_telehealth, level_of_care, modality, insurance,
-age_group, language. Each dimension is tested in isolation, then
-AND-combination and multi-value OR-within-field cases are pinned. Absent
-params are verified to skip the WHERE clause (all posts returned).
+Covers: geography, include_telehealth, insurance, age_group, language.
+Each dimension is tested in isolation, then multi-value OR-within-field
+cases are pinned. Absent params are verified to skip the WHERE clause
+(all posts returned).
 
-After the opening remodel the opening became self-describing:
-``age_group`` matches ``OpeningDetail.age_groups`` and ``include_telehealth``
-matches ``OpeningDetail.session_format`` containing ``virtual``; the
-``level_of_care`` / ``modality`` axes dropped off the opening side and now
-match the intake-side ``Program`` only.
+After the program-intake remodel every post kind is self-describing on
+its own detail row: ``age_group`` matches ``ReferralDetail.age_groups``,
+``OpeningDetail.age_groups``, AND ``IntakeDetail.age_groups`` (no longer
+the linked ``Program``); ``include_telehealth`` matches
+``OpeningDetail.session_format`` containing ``virtual``. The
+``level_of_care`` / ``modality`` axes were removed entirely — no post
+kind models treatment settings or modalities anymore (services collapsed
+onto the single ``ReferralService`` "what care" axis across all three
+kinds).
 """
 
 from __future__ import annotations
@@ -304,25 +308,10 @@ async def test_include_telehealth_alone_adds_no_constraint(db_test_session_manag
 
 
 # ---------------------------------------------------------------------------
-# level_of_care filter
+# Shared intake-seed helpers (a Program needs an Org parent; the intake's
+# own profile — services / age_groups / genders / cost — lives on its
+# IntakeDetail, not the Program).
 # ---------------------------------------------------------------------------
-
-
-async def _seed_program(db_test_session_manager, owner_id, org_id, **program_kwargs):
-    """Persist a Program with a custom profile under ``org_id``. Returns
-    the program id. After the opening remodel ``level_of_care`` /
-    ``modality`` match the *intake* side only (``Program.settings`` /
-    ``Program.modalities``); the opening side dropped both axes when its
-    services collapsed onto the ``ReferralService`` vocabulary, so these
-    filters are seeded on Programs, not affiliations."""
-    name = program_kwargs.pop("name", f"P-{uuid.uuid4()}")
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            program = make_program(
-                owner_id=owner_id, org_id=org_id, name=name, **program_kwargs
-            )
-            session.add(program)
-        return program.id
 
 
 async def _seed_org(db_test_session_manager, owner_id):
@@ -333,345 +322,19 @@ async def _seed_org(db_test_session_manager, owner_id):
         return org.id
 
 
-async def test_level_of_care_matches_opening_settings(db_test_session_manager):
-    """The opening side no longer models treatment settings (dropped when
-    services collapsed onto the ``ReferralService`` vocabulary), so an
-    opening never matches ``level_of_care`` — only intakes
-    (``Program.settings``) do. Pin that an opening is excluded even when a
-    matching intake exists."""
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    match_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["php"]
-    )
-
+async def _seed_program(db_test_session_manager, owner_id, org_id, **program_kwargs):
+    """Persist a Program under ``org_id`` and return its id. The Program
+    now carries only steady-state context (name / state_preference /
+    languages / website / referral_instructions); the per-announcement
+    profile lives on each ``IntakeDetail``."""
+    name = program_kwargs.pop("name", f"P-{uuid.uuid4()}")
     async with db_test_session_manager() as session:
         async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-        cid = clinician.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            intake_match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=match_pid),
-                "intake_detail",
+            program = make_program(
+                owner_id=owner_id, org_id=org_id, name=name, **program_kwargs
             )
-            # An opening exists but carries no settings axis at all — it
-            # must not appear in a level_of_care-filtered result.
-            opening = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(clinician_id=cid),
-                "opening_detail",
-            )
-
-    results = await _list(db_test_session_manager, level_of_care=["php"])
-    ids = {p.id for p in results}
-    assert intake_match.id in ids
-    assert opening.id not in ids
-
-
-async def test_level_of_care_matches_intake_settings(db_test_session_manager):
-    """Intake-side settings live on ``Program``."""
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            org = make_organization_row(owner_id=owner.id)
-            session.add(org)
-        org_id = org.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match_prog = make_program(
-                owner_id=owner.id, org_id=org_id, name="P1", settings=["iop"]
-            )
-            no_prog = make_program(
-                owner_id=owner.id, org_id=org_id, name="P2", settings=["outpatient"]
-            )
-            session.add(match_prog)
-            session.add(no_prog)
-        match_pid = match_prog.id
-        no_pid = no_prog.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=match_pid),
-                "intake_detail",
-            )
-            no_match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=no_pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, level_of_care=["iop"])
-    ids = {p.id for p in results}
-    assert match.id in ids
-    assert no_match.id not in ids
-
-
-async def test_level_of_care_multi_value_or(db_test_session_manager):
-    """Two level_of_care values → intakes matching either appear
-    (intake-side ``Program.settings``)."""
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    php_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["php"]
-    )
-    iop_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["iop"]
-    )
-    out_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["outpatient"]
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            php_post = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=php_pid),
-                "intake_detail",
-            )
-            iop_post = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=iop_pid),
-                "intake_detail",
-            )
-            outpatient_post = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=out_pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, level_of_care=["php", "iop"])
-    ids = {p.id for p in results}
-    assert php_post.id in ids
-    assert iop_post.id in ids
-    assert outpatient_post.id not in ids
-
-
-async def test_level_of_care_absent_returns_all(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    php_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["php"]
-    )
-    out_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["outpatient"]
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            p1 = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=php_pid),
-                "intake_detail",
-            )
-            p2 = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=out_pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, level_of_care=None)
-    ids = {p.id for p in results}
-    assert p1.id in ids
-    assert p2.id in ids
-
-
-# ---------------------------------------------------------------------------
-# modality filter
-# ---------------------------------------------------------------------------
-
-
-async def test_modality_excludes_openings(db_test_session_manager):
-    """The opening side dropped ``modalities`` in the services collapse,
-    so an opening never matches ``modality`` — only intakes
-    (``Program.modalities``) do. Pin that the opening is excluded even
-    when a matching intake exists."""
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    match_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=["ifs"]
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            clinician = make_clinician_with_org(owner_id=owner.id)
-            session.add(clinician)
-        cid = clinician.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            intake_match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=match_pid),
-                "intake_detail",
-            )
-            opening = await _add_post(
-                session,
-                owner.id,
-                make_opening_detail(clinician_id=cid),
-                "opening_detail",
-            )
-
-    results = await _list(db_test_session_manager, modality=["ifs"])
-    ids = {p.id for p in results}
-    assert intake_match.id in ids
-    assert opening.id not in ids
-
-
-async def test_modality_matches_intake_modalities(db_test_session_manager):
-    """Intake-side modalities live on ``Program``."""
-    owner = await _seed_user(db_test_session_manager)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            org = make_organization_row(owner_id=owner.id)
-            session.add(org)
-        org_id = org.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match_prog = make_program(
-                owner_id=owner.id, org_id=org_id, name="P1", modalities=["somatic"]
-            )
-            no_prog = make_program(
-                owner_id=owner.id, org_id=org_id, name="P2", modalities=["act"]
-            )
-            session.add(match_prog)
-            session.add(no_prog)
-        match_pid = match_prog.id
-        no_pid = no_prog.id
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=match_pid),
-                "intake_detail",
-            )
-            no_match = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=no_pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, modality=["somatic"])
-    ids = {p.id for p in results}
-    assert match.id in ids
-    assert no_match.id not in ids
-
-
-async def test_modality_multi_value_or(db_test_session_manager):
-    """Two modality values → intakes matching either appear
-    (``Program.modalities``)."""
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    emdr_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=["emdr"]
-    )
-    cbt_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=["cbt"]
-    )
-    dbt_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=["dbt"]
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            emdr_post = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=emdr_pid),
-                "intake_detail",
-            )
-            cbt_post = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=cbt_pid),
-                "intake_detail",
-            )
-            dbt_post = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=dbt_pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, modality=["emdr", "cbt"])
-    ids = {p.id for p in results}
-    assert emdr_post.id in ids
-    assert cbt_post.id in ids
-    assert dbt_post.id not in ids
-
-
-async def test_modality_absent_returns_all(db_test_session_manager):
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    a_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=["emdr"]
-    )
-    b_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=[]
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            p1 = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=a_pid),
-                "intake_detail",
-            )
-            p2 = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=b_pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, modality=None)
-    ids = {p.id for p in results}
-    assert p1.id in ids
-    assert p2.id in ids
-
-
-async def test_modality_unknown_value_returns_no_match(db_test_session_manager):
-    """Unknown modality value is silently ignored — no error, no match."""
-    owner = await _seed_user(db_test_session_manager)
-    org_id = await _seed_org(db_test_session_manager, owner.id)
-    pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, modalities=["emdr"]
-    )
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            p = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=pid),
-                "intake_detail",
-            )
-
-    results = await _list(db_test_session_manager, modality=["not_a_real_modality"])
-    assert p.id not in {post.id for post in results}
+            session.add(program)
+        return program.id
 
 
 # ---------------------------------------------------------------------------
@@ -788,8 +451,10 @@ async def test_insurance_absent_returns_all(db_test_session_manager):
 
 
 # ---------------------------------------------------------------------------
-# age_group filter — per-announcement on both seeking (ReferralDetail) and
-# offering (OpeningDetail) sides; intake reads its steady-state Program.
+# age_group filter — per-announcement on ALL three detail rows now:
+# ReferralDetail (the single client), OpeningDetail + IntakeDetail (the
+# cohort the announcement serves). The intake no longer reads age_groups
+# from its linked Program.
 # ---------------------------------------------------------------------------
 
 
@@ -865,65 +530,46 @@ async def test_age_group_matches_referral_age_groups(db_test_session_manager):
     assert no_match.id not in ids
 
 
-# ---------------------------------------------------------------------------
-# AND-combination across filters
-# ---------------------------------------------------------------------------
-
-
-async def test_and_combination_modality_and_level_of_care(db_test_session_manager):
-    """An intake must satisfy BOTH active filters to appear (both axes are
-    intake-side ``Program`` columns now)."""
+async def test_age_group_matches_intake_age_groups(db_test_session_manager):
+    """After the program-intake remodel ``age_group`` matches the intake's
+    own ``IntakeDetail.age_groups`` (the cohort it serves), not the linked
+    Program (which no longer carries the column)."""
     owner = await _seed_user(db_test_session_manager)
     org_id = await _seed_org(db_test_session_manager, owner.id)
-    both_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["php"], modalities=["emdr"]
-    )
-    modality_only_pid = await _seed_program(
-        db_test_session_manager,
-        owner.id,
-        org_id,
-        settings=["outpatient"],
-        modalities=["emdr"],
-    )
-    level_only_pid = await _seed_program(
-        db_test_session_manager, owner.id, org_id, settings=["php"], modalities=["cbt"]
-    )
+    pid = await _seed_program(db_test_session_manager, owner.id, org_id)
 
     async with db_test_session_manager() as session:
         async with session.begin():
-            both = await _add_post(
+            match = await _add_post(
                 session,
                 owner.id,
-                make_intake_detail(program_id=both_pid),
+                make_intake_detail(
+                    program_id=pid,
+                    age_groups=["adolescents_14_18", "adults_25_64"],
+                ),
                 "intake_detail",
             )
-            modality_only = await _add_post(
+            no_match = await _add_post(
                 session,
                 owner.id,
-                make_intake_detail(program_id=modality_only_pid),
-                "intake_detail",
-            )
-            _level_only = await _add_post(
-                session,
-                owner.id,
-                make_intake_detail(program_id=level_only_pid),
+                make_intake_detail(program_id=pid, age_groups=["older_adults_65_plus"]),
                 "intake_detail",
             )
 
-    results = await _list(
-        db_test_session_manager, modality=["emdr"], level_of_care=["php"]
-    )
+    results = await _list(db_test_session_manager, age_group=["adolescents_14_18"])
     ids = {p.id for p in results}
-    assert both.id in ids
-    assert modality_only.id not in ids
+    assert match.id in ids
+    assert no_match.id not in ids
 
 
 # ---------------------------------------------------------------------------
-# Filter homes after the opening remodel: the opening's per-announcement
-# profile (``age_groups`` / ``session_format``) lives on ``OpeningDetail``;
-# its steady-state context (location / insurance) on ``ClinicianAffiliation``;
-# its ``languages`` on the ``Clinician`` (person-level). The intake side
-# reads its whole steady-state profile from ``Program``. This last test
+# Filter homes after the program-intake remodel: every kind's
+# per-announcement profile (``age_groups`` / ``genders`` / ``services`` /
+# ``cost`` — and ``session_format`` for the opening) lives on its own
+# detail row. Steady-state context still lives off the detail row: the
+# opening's location / insurance on ``ClinicianAffiliation`` and its
+# ``languages`` on the ``Clinician`` (person-level); the intake's
+# ``languages`` on the linked ``Program`` (program-level). This last test
 # pins the ``languages`` ↔ ``Clinician`` link specifically, since
 # ``languages`` lives on the person — not the affiliation — for openings.
 # ---------------------------------------------------------------------------

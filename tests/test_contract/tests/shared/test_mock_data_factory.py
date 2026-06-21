@@ -58,13 +58,18 @@ def test_opening_detail_row_is_self_describing():
     assert not hasattr(detail, "settings")
 
 
-def test_program_intake_detail_row_has_no_profile_columns():
-    """The program-intake detail row stays thin — ``settings`` / ``genders``
-    live on the linked Program, not on the detail row itself."""
+def test_intake_detail_row_is_self_describing():
+    """The program-intake detail row carries its own announcement profile
+    (services / age_groups / genders / cost) — like the opening, minus
+    ``session_format`` (a Program has no in-person/virtual axis). It never
+    carries ``settings`` (dropped with the `ReferralService` collapse)."""
     post = make_post_stub("program_intake", owner_id=uuid.uuid4())
     detail = getattr(post, POST_KINDS["program_intake"].detail_relationship)
+    assert hasattr(detail, "genders")
+    assert hasattr(detail, "services")
+    assert hasattr(detail, "cost")
     assert not hasattr(detail, "settings")
-    assert not hasattr(detail, "genders")
+    assert not hasattr(detail, "session_format")
 
 
 def test_uuid_columns_get_fresh_uuids():
