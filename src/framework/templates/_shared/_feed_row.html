@@ -6,13 +6,13 @@
 Layout per row:
 
   [REFERRAL]                                              2h ago
-  Adult (25–64) · she/her               ← <hgroup>: <h3> title +
+  Adult (25–64) · she/her               ← <hgroup>: <h2> title +
   Dr. Jane Smith · Acme Counseling      ←   Pico-styled poster subtitle
   Seeking   Psychotherapy, DBT          ← fact rows (reused card macros)
   Location  CA · In-person in San Francisco · Telehealth
 
 Header line — type-tag pill + timestamp.
-Title + subtitle — an `<hgroup>`: an `<h3>` headline link (the base
+Title + subtitle — an `<hgroup>`: an `<h2>` headline link (the base
 identity — client demographics `age (range) · pronouns` for a referral,
 the practice / program name otherwise via `post_feed_headline`) followed
 by the poster line, which Pico styles as the heading's muted subtitle.
@@ -53,10 +53,10 @@ CSS lives in the "Feed rows" section of `src/domain/static/css/domain.css`. #}
     {# ── Title + poster subtitle — an <hgroup> so Pico styles the poster
        line as the heading's subtitle (muted, tight) with no custom CSS. #}
     <hgroup>
-      <h3>
+      <h2>
         <a href="{{ entity_url('post', id=post.id) }}"
            class="post-feed-headline-text">{{ headline }}</a>
-      </h3>
+      </h2>
       {%- if show_poster and post.owner and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
         <p>{{ provider_ref(view.provider_ref, redacted=not can_act_as_provider, linked=False) }}</p>
       {%- endif -%}
