@@ -66,7 +66,7 @@ CSS lives in the "Feed rows" section of `src/domain/static/css/domain.css`. #}
     {%- set _location = location_summary(view) -%}
     {%- if _services or _location -%}
       {%- call facts_block() -%}
-        {%- if _services %}{{ fact('services', view.kind_verb, _services | join(", ") , icon='layers') }}
+        {%- if _services %}{{ fact('services', view.kind_verb, _services | join(", ") , icon='stethoscope') }}
         {% endif -%}
         {%- if _location %}{{ fact('location', 'Location', _location, icon='map-pin') }}
         {% endif -%}

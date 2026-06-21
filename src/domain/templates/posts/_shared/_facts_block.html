@@ -59,7 +59,7 @@ globals. #}
     {%- if multiline %}
       {{ fact_list('services', view.kind_verb, _labels) }}
     {%- else %}
-      {{ fact('services', view.kind_verb, _labels | join(", ") , icon='layers') }}
+      {{ fact('services', view.kind_verb, _labels | join(", ") , icon='stethoscope') }}
     {%- endif %}
   {%- endif %}
 {%- endmacro %}
