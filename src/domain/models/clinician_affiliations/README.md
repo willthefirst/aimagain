@@ -25,7 +25,7 @@ The PR-f refactor shipped in three sub-PRs:
 
 1. **Add the columns + backfill** (`e3e0a73e9bc5` + `f3c128112fa7`). Columns added with defaults; data migration copied values from the most-recent `OpeningDetail` attached to each affiliation.
 2. **Flip reads + dual-write** (`PostRepository` / `view.py` changes in #1386). Reads flipped to the new home with a fallback-to-detail safety net; writes dual-wrote the detail row's profile fields onto the affiliation.
-3. **Drop the detail-row columns** (`57161384b6db`). `OpeningDetail` collapsed to the announcement core (`desired_times` / `schedule_text` / `subject` / `description` / `treatment_modality` + the context FKs). The dual-write and the fallback read are both gone — the affiliation is now the canonical source.
+3. **Drop the detail-row columns** (`57161384b6db`). `OpeningDetail` collapsed to the announcement core plus the context FKs; the dual-write and the fallback read are both gone — the affiliation is now the canonical source. (The announcement core later shed its `subject` / `treatment_modality` overrides too; see [`../posts/README.md`](../posts/README.md) for the current `OpeningDetail` shape.)
 
 `languages` is *not* in this set on the affiliation — it moves to `Clinician` (a person attribute, invariant across affiliations). See [`../clinicians/README.md`](../clinicians/README.md).
 

@@ -386,9 +386,10 @@ async def test_create_post_persists_parent_and_opening_detail(
 async def test_create_post_round_trips_announcement_core(
     db_test_session_manager: async_sessionmaker[AsyncSession],
 ):
-    """``description`` / ``schedule_text`` / ``subject`` persist + read
-    back. ``referral_instructions`` / ``website`` moved to the
-    affiliation in #1358 PR-f sub-3 and are no longer detail columns."""
+    """``description`` / ``schedule_text`` persist + read back.
+    ``referral_instructions`` / ``website`` moved to the affiliation in
+    #1358 PR-f sub-3, and ``subject`` / ``treatment_modality`` were later
+    dropped — none are detail columns anymore."""
     owner, clinician = await _seed_owner_and_clinician(db_test_session_manager)
 
     async with db_test_session_manager() as session:
@@ -397,7 +398,6 @@ async def test_create_post_round_trips_announcement_core(
             clinician_id=clinician.id,
             description="Lead pitch",
             schedule_text="Tues PM",
-            subject="Spring cohort",
         )
         created = await _create_post(
             repo,
@@ -419,7 +419,6 @@ async def test_create_post_round_trips_announcement_core(
         )
         assert detail_row.description == "Lead pitch"
         assert detail_row.schedule_text == "Tues PM"
-        assert detail_row.subject == "Spring cohort"
 
 
 async def test_create_post_announcement_core_defaults_null(
@@ -452,7 +451,6 @@ async def test_create_post_announcement_core_defaults_null(
             .first()
         )
         assert detail_row.description is None
-        assert detail_row.subject is None
         assert detail_row.schedule_text is None
 
 

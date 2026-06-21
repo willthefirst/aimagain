@@ -438,17 +438,10 @@ MODALITIES_FREETEXT: Final[tuple[str, ...]] = (
     "Mindfulness-based",
     "Exposure and response prevention",
 )
-# Referrals have no `subject` column — their title is always derived from
-# demographics (`post_feed_headline`), so there are no referral subjects to
-# seed. Openings and intakes still carry a poster-set subject.
-OPENING_SUBJECTS: Final[tuple[str, ...]] = (
-    "3 slots — adults, relational/psychodynamic · $200/session",
-    "Accepting new clients for trauma work",
-    "2 openings — perinatal, EMDR, sliding scale",
-    "Adolescent caseload openings — DBT, Anthem in-network",
-    "Immediate availability — adults, CBT, Telehealth",
-    "Opening: older adults, grief/loss, in-person SF",
-)
+# No post kind carries a poster-set `subject` column — every title is
+# derived (`post_feed_headline`: demographics for referrals, org name for
+# openings, program name for intakes). `INTAKE_SUBJECTS` survives only as a
+# free-text description source for the Program seed override.
 INTAKE_SUBJECTS: Final[tuple[str, ...]] = (
     "Program intake — adolescents, DBT",
     "IOP accepting referrals — adults, anxiety/depression",
@@ -627,13 +620,6 @@ def _description_fallback(rng: SeededRandom, index: int) -> str:
     return render_opening_description(rng, index)
 
 
-def _subject_fallback(rng: SeededRandom, index: int) -> str:
-    """Generic subject fallback — uses opening subjects as the neutral
-    option. Per-kind overrides in `overrides/posts.py` replace this with
-    kind-appropriate vocabulary before it reaches the DB."""
-    return opening_subject(rng, index)
-
-
 def _name_fallback(rng: SeededRandom, index: int) -> str:
     """Late-binding wrapper around `practice_name` — same module-order
     rationale as `_description_fallback`."""
@@ -657,7 +643,6 @@ COLUMN_VOCAB: Final[dict[str, ColumnStrategy]] = {
     "username": _username_clinician,
     "website": _website,
     "cost": _round_robin(COST_TEMPLATES),
-    "treatment_modality": _round_robin(MODALITIES_FREETEXT),
     "schedule_text": _round_robin(SCHEDULE_TEXT_TEMPLATES),
     "referral_instructions": _round_robin(REFERRAL_INSTRUCTIONS),
     "month_completed": _month_completed,
@@ -675,7 +660,6 @@ COLUMN_VOCAB: Final[dict[str, ColumnStrategy]] = {
     # populating a column.
     "name": _name_fallback,
     "description": _description_fallback,
-    "subject": _subject_fallback,
 }
 
 # Columns whose values the generator may auto-fill with
@@ -808,14 +792,6 @@ def render_intake_description(rng: SeededRandom, index: int) -> str:
     )
 
 
-def opening_subject(rng: SeededRandom, index: int) -> str:
-    return rng.round_robin(OPENING_SUBJECTS, index)
-
-
-def intake_subject(rng: SeededRandom, index: int) -> str:
-    return rng.round_robin(INTAKE_SUBJECTS, index)
-
-
 def practice_name(rng: SeededRandom, index: int) -> str:
     adj = rng.round_robin(PRACTICE_ADJECTIVES, index)
     nature = rng.round_robin(PRACTICE_NATURE, index // len(PRACTICE_ADJECTIVES))
@@ -851,8 +827,6 @@ __all__ = [
     "render_intake_description",
     "practice_name",
     "program_name",
-    "opening_subject",
-    "intake_subject",
     "US_STATES",
     "EDUCATION_TYPES",
     "LICENSE_TYPES",

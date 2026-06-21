@@ -17,9 +17,9 @@ class IntakeDetail(Base):
     names a specific clinician.
 
     After #1358 PR-f sub-3 this row is **thin by design**: it carries
-    only per-announcement attributes (``schedule_text`` / ``subject`` /
-    ``description`` / ``treatment_modality``) plus the ``program_id``
-    context FK. The steady-state profile (services, settings, modalities,
+    only per-announcement attributes (``schedule_text`` / ``description``)
+    plus the ``program_id`` context FK. The steady-state profile (services,
+    settings, modalities,
     age_groups, genders, languages, website, referral_instructions) lives
     on the linked ``Program`` — see
     [`../programs/README.md`](../programs/README.md).
@@ -50,8 +50,6 @@ class IntakeDetail(Base):
     # Section 3 — availability
     schedule_text = Column(Text, nullable=True)
 
-    # Per-announcement free-text overrides — see :class:`OpeningDetail`
-    # for the modeling rationale.
-    treatment_modality = Column(Text, nullable=True)
-    subject = Column(Text, nullable=True)
+    # Per-announcement narrative — see :class:`OpeningDetail` for why the
+    # ``subject`` / ``treatment_modality`` overrides were dropped.
     description = Column(Text, nullable=True)

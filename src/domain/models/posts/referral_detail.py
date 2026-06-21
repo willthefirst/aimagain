@@ -89,9 +89,9 @@ class ReferralDetail(Base):
     # `services_other_text`; nullable. See `posts/conditional_fields.py`.
     pronouns_other_text = Column(Text, nullable=True)
 
-    # Section 3 — description. Referrals have no `subject` column: unlike
-    # openings/intakes, the title is always derived from demographics +
-    # services (`post_feed_headline`), never a poster-set custom string.
+    # Section 3 — description. No post kind has a `subject` column: the
+    # title is always derived (`post_feed_headline`) — for referrals from
+    # demographics + services — never a poster-set custom string.
     description = Column(Text, nullable=False)
 
     # Section 4 — services

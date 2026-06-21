@@ -258,17 +258,14 @@ _PA_CLINICIAN_PERSON_DEFAULTS = dict(
     languages=["en"],
 )
 _PA_OPENING_CORE_DEFAULTS = dict(
-    treatment_modality="DBT",
     description="Accepting new clients.",
     schedule_text="Mon-Wed 9-5",
-    subject=None,
 )
 
 
 def _make_pa_post(*, clinician_attrs=None, **overrides):
     """Realistic PA stub. ``overrides`` can target the announcement core
-    (``description`` / ``schedule_text`` /
-    ``treatment_modality`` / ``subject``) or any steady-state profile
+    (``description`` / ``schedule_text``) or any steady-state profile
     field — steady-state fields land on the affiliation (or, for
     ``languages``, on the clinician), matching the post-#1358 PR-f
     storage layout."""
@@ -310,10 +307,8 @@ _PROGRAM_PROFILE_DEFAULTS = dict(
     referral_instructions=None,
 )
 _PROGRAM_INTAKE_CORE_DEFAULTS = dict(
-    treatment_modality="DBT",
     description="Intake cohort opens June 1.",
     schedule_text="M-F 9-3",
-    subject=None,
 )
 
 
@@ -413,13 +408,6 @@ def test_view_cr_cr_only_fields_set_pa_only_fields_none():
     assert v["organization_link"] is None
 
 
-def test_view_cr_has_no_subject():
-    """Referrals carry no `subject` — the view key is always None for a CR,
-    so the title can't be overridden (it's always `referral_headline`)."""
-    v = post_card_view(_make_cr_post())
-    assert v["subject"] is None
-
-
 # --- post_card_view: opening ------------------------------
 
 
@@ -487,16 +475,6 @@ def test_view_pa_settings_populated_genders_as_list():
     assert v["genders"] == ["female", "non_binary"]
 
 
-def test_view_pa_subject_when_set():
-    v = post_card_view(_make_pa_post(subject="Spring intake cohort"))
-    assert v["subject"] == "Spring intake cohort"
-
-
-def test_view_pa_subject_none_when_absent():
-    v = post_card_view(_make_pa_post(subject=None))
-    assert v["subject"] is None
-
-
 def test_view_pa_location_chunk_pulled_from_clinician():
     """PA's `location_chunk` reads city/state/zip from the linked
     Clinician so the listing card renders the same "Location" row
@@ -517,10 +495,8 @@ def test_view_pa_no_location_chunk_when_clinician_missing():
         opening_detail=SimpleNamespace(
             clinician=None,
             clinician_affiliation=None,
-            treatment_modality=None,
             description=None,
             schedule_text=None,
-            subject=None,
         ),
     )
     v = post_card_view(post)
@@ -622,10 +598,8 @@ def test_view_pa_missing_clinician_returns_partial_view():
         opening_detail=SimpleNamespace(
             clinician=None,
             clinician_affiliation=SimpleNamespace(services=["psychotherapy"]),
-            treatment_modality=None,
             description="x",
             schedule_text=None,
-            subject=None,
         ),
     )
     v = post_card_view(post)
@@ -682,7 +656,6 @@ def test_poster_name_opening_none_when_no_clinician():
             age_groups=[],
             languages=[],
             genders=[],
-            treatment_modality=None,
             description=None,
             schedule_text=None,
             website=None,
@@ -938,7 +911,6 @@ def test_feed_headline_opening_missing_clinician_returns_fallback():
             clinician_affiliation=SimpleNamespace(
                 services=["psychotherapy"], settings=[]
             ),
-            subject=None,
         ),
     )
     # Practice name cannot be derived; title falls back to "Opening".
@@ -960,34 +932,23 @@ def test_feed_headline_unknown_kind_returns_empty_string():
     assert post_feed_headline(post) == ""
 
 
-# --- subject override ---------------------------------------------------
+# --- derived headlines (no subject override) ----------------------------
 
 
-def test_feed_headline_referral_ignores_any_subject_attr():
-    """Referrals have no subject column — the title is always derived from
-    demographics, never overridden, even if a stray `subject` attribute is
-    present on the detail."""
+def test_feed_headline_referral_derives_from_demographics():
+    """Referrals derive their title from client demographics — there is no
+    poster-set subject override on any kind."""
     post = SimpleNamespace(
         kind="referral",
-        referral_detail=SimpleNamespace(
-            subject="Should be ignored",
-            age_groups=["adults_25_64"],
-        ),
+        referral_detail=SimpleNamespace(age_groups=["adults_25_64"]),
     )
     assert post_feed_headline(post) == "Adult (25–64)"
 
 
-def test_feed_headline_opening_subject_overrides_auto_generation():
-    """When subject is set on an opening, it is returned as-is."""
+def test_feed_headline_opening_is_practice_org_name():
+    """An opening's title is always the linked practice's org name — the
+    per-announcement `subject` override was dropped (#1507 follow-up)."""
     post = _make_pa_post()
-    post.opening_detail.subject = "3 slots — adults, relational/psychodynamic"
-    assert post_feed_headline(post) == "3 slots — adults, relational/psychodynamic"
-
-
-def test_feed_headline_opening_none_subject_falls_back_to_auto():
-    """When subject is None on an opening, the practice name is used."""
-    post = _make_pa_post()
-    post.opening_detail.subject = None
     assert post_feed_headline(post) == "Acme Counseling"
 
 
@@ -1125,12 +1086,10 @@ def test_passthrough_forwards_detail_values_for_opening():
         _make_pa_post(
             description="Forwarded description",
             schedule_text="Forwarded schedule",
-            treatment_modality="ACT",
         )
     )
     assert v["description"] == "Forwarded description"
     assert v["schedule_text"] == "Forwarded schedule"
-    assert v["treatment_modality"] == "ACT"
 
 
 def test_passthrough_missing_attr_falls_back_to_base_default():
@@ -1382,7 +1341,6 @@ def test_feed_headline_opening_reads_practice_name_from_affiliation():
     linked affiliation's org; the services fact reads its services via the
     view-model + `service_labels`."""
     post = _make_pa_post()
-    post.opening_detail.subject = None  # force the auto-generated branch
     post.opening_detail.clinician_affiliation = SimpleNamespace(
         org=SimpleNamespace(id="org-1", name="Acme Counseling"),
         services=["medication_management"],

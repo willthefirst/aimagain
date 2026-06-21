@@ -23,7 +23,7 @@ whole card (see #663-followup).
 
 This macro is the COMPACT, single-`<dl>` glance-line for the list
 card: location_chunk OR ages, genders (PA/program only), languages
-(suppressed when ["en"] alone), insurance_posture, treatment_modality.
+(suppressed when ["en"] alone), insurance_posture.
 The ages row is labeled ``Ages`` for `opening` / `intake` (the cohort
 the practice accepts); referral skips it on the card because its age
 lives in the headline.
@@ -98,6 +98,5 @@ globals. #}
           {%- if view.insurance_posture %}
             {{ fact('insurance', 'Insurance', INSURANCE_POSTURE_LABELS[view.insurance_posture], icon='shield') }}
           {%- endif %}
-          {%- if view.treatment_modality %}{{ fact('modality', 'Modality', view.treatment_modality, icon='brain') }}{%- endif %}
-          {%- endcall %}
-        {%- endmacro %}
+        {%- endcall %}
+      {%- endmacro %}

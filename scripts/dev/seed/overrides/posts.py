@@ -38,8 +38,6 @@ from .. import counts
 from ..generators import SeedPool, build_row
 from ..rng import SeededRandom, deterministic_uuid
 from ..vocab import (
-    intake_subject,
-    opening_subject,
     render_intake_description,
     render_opening_description,
     render_referral_description,
@@ -121,7 +119,6 @@ async def generate_posts(
         detail.clinician_id = opening_clin.id
         # Context affiliation must belong to this opening's clinician.
         detail.clinician_affiliation_id = primary_aff_by_clinician.get(opening_clin.id)
-        detail.subject = None if rng.bool(0.2) else opening_subject(rng, i)
         # `description` is nullable — populate most rows for narrative,
         # leave a slice NULL so the empty-state card renders too.
         detail.description = (
@@ -142,7 +139,6 @@ async def generate_posts(
             detail = build_row(IntakeDetail, i, rng, pool)
             detail.post_id = post_id
             detail.program_id = programs[i % len(programs)].id
-            detail.subject = None if rng.bool(0.2) else intake_subject(rng, i)
             # `description` is nullable — same posture as OpeningDetail.
             detail.description = (
                 None if rng.bool(0.15) else render_intake_description(rng, i)

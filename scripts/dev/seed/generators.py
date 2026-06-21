@@ -50,7 +50,6 @@ SYSTEM_COLUMNS: frozenset[str] = frozenset({"created_at", "updated_at", "deleted
 # fields where the empty-state UI most needs exercise — bigger sample
 # of NULLs makes filter combinations / "no value" rendering visible.
 _NULL_PROBABILITY_BOOST: dict[str, float] = {
-    "treatment_modality": 0.5,
     "cost": 0.6,
     "end_date": 0.5,
     "start_date": 0.4,

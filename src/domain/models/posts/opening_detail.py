@@ -11,9 +11,9 @@ class OpeningDetail(Base):
     """1:1 detail row for posts of kind = 'clinician_opening'.
 
     After #1358 PR-f sub-3 this row is **thin by design**: it carries only
-    per-announcement attributes (``schedule_text`` / ``subject`` /
-    ``description`` / ``treatment_modality``) plus the two context FKs
-    (``clinician_id``, ``clinician_affiliation_id``). The steady-state
+    per-announcement attributes (``schedule_text`` / ``description``) plus
+    the two context FKs (``clinician_id``, ``clinician_affiliation_id``).
+    The steady-state
     practice profile (services, settings, modalities, age_groups, genders,
     languages, website, referral_instructions) lives on the linked
     ``ClinicianAffiliation`` (and ``languages`` on the linked
@@ -39,12 +39,12 @@ class OpeningDetail(Base):
 
     schedule_text = Column(Text, nullable=True)
 
-    # Per-announcement free-text overrides. ``treatment_modality`` is the
-    # one-string scalar companion to the steady-state ``modalities`` list
-    # (kept here because some announcements name a single targeted
-    # modality that's not part of the affiliation's standing list).
-    treatment_modality = Column(Text, nullable=True)
-    subject = Column(Text, nullable=True)
+    # Per-announcement narrative. The headline is derived from the linked
+    # practice's org name (no custom ``subject`` override), and modality is
+    # read from the affiliation's structured ``modalities`` list (no
+    # free-text ``treatment_modality`` override) — both dropped to align
+    # with the referral model, which derives its headline and uses
+    # controlled-vocabulary modality data.
     description = Column(Text, nullable=True)
 
     # Context: the specific `ClinicianAffiliation` this opening is offered
