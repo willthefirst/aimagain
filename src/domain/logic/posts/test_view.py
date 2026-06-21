@@ -324,13 +324,22 @@ def _make_pa_post(*, clinician_attrs=None, **overrides):
     )
 
 
-_PROGRAM_PROFILE_DEFAULTS = dict(
-    services=["psychotherapy"],
-    settings=["group"],
+# After the program-intake remodel the intake is self-describing too —
+# `services` / `services_other_text` / `age_groups` / `genders` / `cost`
+# live on the `IntakeDetail` row itself (on the same `ReferralService`
+# vocab the referral + opening sides use). Only steady-state context —
+# the Program name / `state_preference` / `languages` / `website` /
+# `referral_instructions` / owning org — stays on the linked `Program`.
+# `settings` / `modalities` were dropped entirely (no kind models them).
+_PROGRAM_INTAKE_PROFILE_DEFAULTS = dict(
+    services=["medication_management"],
+    services_other_text=None,
     age_groups=["adolescents_14_18"],
-    languages=["en"],
     genders=[],
-    modalities=[],
+    cost=None,
+)
+_PROGRAM_STEADY_STATE_DEFAULTS = dict(
+    languages=["en"],
     website="https://riseiop.example.com",
     referral_instructions=None,
 )
@@ -341,16 +350,24 @@ _PROGRAM_INTAKE_CORE_DEFAULTS = dict(
 
 
 def _make_program_post(*, program_attrs=None, **overrides):
+    """Realistic intake stub. ``overrides`` can target the announcement
+    core (``description`` / ``schedule_text``), the self-describing intake
+    profile (``services`` / ``age_groups`` / ``genders`` / ``cost`` — all
+    on the IntakeDetail row), or the steady-state Program context
+    (``languages`` / ``website`` / ``referral_instructions``)."""
     p = dict(
         id="prog-1",
         name="RISE IOP",
         state_preference="CT",
         organization=SimpleNamespace(id="org-h", name="Acme Health"),
-        **_PROGRAM_PROFILE_DEFAULTS,
+        **_PROGRAM_STEADY_STATE_DEFAULTS,
     )
+    detail = dict(**_PROGRAM_INTAKE_PROFILE_DEFAULTS)
     core = dict(**_PROGRAM_INTAKE_CORE_DEFAULTS)
     for k, v in overrides.items():
-        if k in _PROGRAM_PROFILE_DEFAULTS:
+        if k in _PROGRAM_INTAKE_PROFILE_DEFAULTS:
+            detail[k] = v
+        elif k in _PROGRAM_STEADY_STATE_DEFAULTS:
             p[k] = v
         else:
             core[k] = v
@@ -360,6 +377,7 @@ def _make_program_post(*, program_attrs=None, **overrides):
         kind="program_intake",
         intake_detail=SimpleNamespace(
             program=SimpleNamespace(**p),
+            **detail,
             **core,
         ),
     )
@@ -585,10 +603,9 @@ def test_view_program_no_in_person_virtual_no_insurance_no_address():
 
 # --- post_card_view: modalities -----------------------------------------
 #
-# `modalities` was removed from `ReferralDetail` and dropped from the
-# opening side entirely (the opening's services collapsed onto the
-# `ReferralService` vocab). On the offering side it survives only on
-# `Program` (intake).
+# `modalities` was removed from every detail row and steady-state home
+# (the services collapsed onto the single `ReferralService` vocab across
+# all three kinds). The view-model key stays `[]` for every kind.
 
 
 def test_view_pa_modalities_always_empty():
@@ -598,10 +615,11 @@ def test_view_pa_modalities_always_empty():
     assert v["modalities"] == []
 
 
-def test_view_program_modalities_populated():
-    post = _make_program_post(modalities=["somatic"])
-    v = post_card_view(post)
-    assert v["modalities"] == ["somatic"]
+def test_view_program_modalities_always_empty():
+    """Intakes dropped `modalities` too (it left the `Program`); the
+    view-model key stays `[]`."""
+    v = post_card_view(_make_program_post())
+    assert v["modalities"] == []
 
 
 # --- post_card_view: defensiveness --------------------------------------
@@ -993,13 +1011,13 @@ def test_feed_headline_opening_is_practice_org_name():
 # --- service_labels -----------------------------------------------------
 
 
-def test_service_labels_priority_sorts_psychotherapy_and_meds_first():
-    """`psychotherapy` and `medication_management` lead regardless of stored
-    order; the rest follow in stored order."""
+def test_service_labels_priority_sorts_medication_management_first():
+    """`medication_management` leads regardless of stored order; the rest
+    follow in stored order. Every kind shares the one `ReferralService`
+    vocab now."""
     view = {
         "kind": "referral",
         "services": ["therapy_group", "medication_management", "therapy_individual"],
-        "settings": [],
     }
     assert service_labels(view) == [
         "Psychiatry / medication management",
@@ -1012,7 +1030,6 @@ def test_service_labels_referral_uses_referral_vocab():
     view = {
         "kind": "referral",
         "services": ["therapy_individual", "medication_management"],
-        "settings": [],
     }
     assert service_labels(view) == [
         "Psychiatry / medication management",
@@ -1020,19 +1037,21 @@ def test_service_labels_referral_uses_referral_vocab():
     ]
 
 
-def test_service_labels_settings_trail_services_for_intakes():
-    """Intake settings render after services, via the provider (OpeningService)
-    vocab — the only kind that still carries `settings`."""
+def test_service_labels_intake_uses_referral_vocab():
+    """Intakes now share the single `ReferralService` vocab (no separate
+    `settings` axis). `medication_management` still leads."""
     view = {
         "kind": "program_intake",
-        "services": ["psychotherapy"],
-        "settings": ["outpatient", "iop"],
+        "services": ["therapy_group", "medication_management"],
     }
-    assert service_labels(view) == ["Psychotherapy", "Outpatient", "IOP"]
+    assert service_labels(view) == [
+        "Psychiatry / medication management",
+        "Therapy — Group",
+    ]
 
 
-def test_service_labels_empty_when_no_services_or_settings():
-    assert service_labels({"kind": "referral", "services": [], "settings": []}) == []
+def test_service_labels_empty_when_no_services():
+    assert service_labels({"kind": "referral", "services": []}) == []
 
 
 # --- location_summary ---------------------------------------------------
@@ -1356,47 +1375,46 @@ def test_owner_address_opening_matches_full_address():
     assert v["owner_address"] == "Brooklyn, NY"
 
 
-def test_intake_reads_services_from_program():
-    """Intake reads steady-state from the linked ``Program``."""
+def test_intake_reads_services_and_genders_from_detail():
+    """After the program-intake remodel the intake's announcement profile
+    (``services`` / ``age_groups`` / ``genders`` / ``cost``) is
+    self-describing — read off the ``IntakeDetail`` row, not the linked
+    ``Program``."""
     post = _make_program_post()
-    post.intake_detail.program.services = ["medication_management"]
-    post.intake_detail.program.languages = []
-    post.intake_detail.program.settings = []
-    post.intake_detail.program.modalities = []
-    post.intake_detail.program.age_groups = []
-    post.intake_detail.program.genders = []
-    post.intake_detail.program.website = None
-    post.intake_detail.program.referral_instructions = None
+    post.intake_detail.services = ["medication_management"]
+    post.intake_detail.age_groups = ["children_6_10", "adolescents_14_18"]
+    post.intake_detail.genders = ["female"]
+    post.intake_detail.cost = "$80/session"
     v = post_card_view(post)
     assert v["services"] == ["medication_management"]
+    assert v["ages"] == ["children_6_10", "adolescents_14_18"]
+    assert v["genders"] == ["female"]
+    assert v["cost"] == "$80/session"
 
 
 def test_intake_reads_languages_from_program():
-    """``languages`` is Program-level on the intake side (#1358) —
-    distinct from the opening side, where it's on the Clinician."""
+    """``languages`` is the one field that stays Program-level on the
+    intake side — distinct from the opening side, where it's on the
+    Clinician. The intake's profile (services / age_groups / genders /
+    cost) reads off the detail row instead."""
     post = _make_program_post()
     post.intake_detail.program.languages = ["en", "es"]
-    for field_name in (
-        "services",
-        "settings",
-        "modalities",
-        "age_groups",
-        "genders",
-    ):
-        setattr(post.intake_detail.program, field_name, [])
-    post.intake_detail.program.website = None
-    post.intake_detail.program.referral_instructions = None
     v = post_card_view(post)
     assert v["languages"] == ["en", "es"]
 
 
-def test_intake_no_program_yields_empty_lists():
-    """Defensive — intake without a program relationship (unrealistic
-    but possible for stub fixtures) reads as empty after sub-3."""
+def test_intake_no_program_still_reads_self_describing_profile():
+    """Defensive — an intake without a Program relationship (unrealistic
+    but possible for stub fixtures) reads ``languages`` empty (it lived on
+    the Program), but its own self-describing profile (services, on the
+    detail row) still populates."""
     post = _make_program_post()
+    post.intake_detail.services = ["medication_management"]
     post.intake_detail.program = None
     v = post_card_view(post)
-    assert v["services"] == []
+    # Self-describing profile still reads (it's on the detail row).
+    assert v["services"] == ["medication_management"]
+    # `languages` was Program-level → empty without a Program.
     assert v["languages"] == []
 
 

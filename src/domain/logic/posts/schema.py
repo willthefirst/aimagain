@@ -47,7 +47,7 @@ from pydantic import (
 )
 
 from src.domain.logic.posts.conditional_fields import (
-    OPENING_CONDITIONAL_RULES,
+    PROVIDER_POST_CONDITIONAL_RULES,
     enforce_conditional_required,
 )
 from src.domain.logic.value_objects.location import (
@@ -66,7 +66,6 @@ from src.domain.models.enums import (
     PRONOUNS,
     REFERRAL_SERVICES,
     SESSION_FORMATS,
-    TREATMENT_SETTINGS,
 )
 from src.framework.rendering.form_fields import HtmlTextarea
 from src.framework.schema_validators import (
@@ -113,9 +112,6 @@ InsuranceCarriersField = Annotated[
 # (see `scalar_to_list` in `framework/schema_validators.py`); `Literal[*TUPLE]` then validates each member.
 ServicesField = Annotated[
     list[Literal[*REFERRAL_SERVICES]], BeforeValidator(scalar_to_list)
-]
-SettingsField = Annotated[
-    list[Literal[*TREATMENT_SETTINGS]], BeforeValidator(scalar_to_list)
 ]
 LanguagesField = Annotated[list[Literal[*LANGUAGES]], BeforeValidator(scalar_to_list)]
 # `opening.languages` is required-min-1 on the wire — every
@@ -279,20 +275,30 @@ class ClinicianOpeningRead(_PostReadBase):
 
 
 class ProgramIntakeRead(_PostReadBase):
-    """Read projection for a thin program-intake detail row (#1358 PR-f sub-3).
+    """Read projection for a self-describing program-intake detail row.
 
-    Same shape as :class:`ClinicianOpeningRead` minus the clinician
-    context — Program is the steady-state home for the intake side.
+    Same self-describing shape as :class:`ClinicianOpeningRead` minus the
+    clinician context and ``session_format`` (a Program is a single group
+    offering with no in-person/virtual axis). Only the Program's
+    steady-state context (name, state_preference, languages, website /
+    referral_instructions) lives on the linked row.
     """
 
     kind: Literal["program_intake"]
     description: str | None = None
     # FK to the Program this announcement is for. The Program's name,
     # state preference, intake window, owning Org, and steady-state
-    # profile all live on the linked row; templates dereference via
+    # context all live on the linked row; templates dereference via
     # `post.intake_detail.program.<field>`.
     program_id: uuid.UUID
     schedule_text: str | None = None
+    # Self-describing announcement profile (per-announcement, not on the
+    # Program). Multi-valued `age_groups` (a cohort, not one client).
+    services: ServicesField = []
+    services_other_text: str | None = None
+    age_groups: AgeGroupsField = []
+    genders: GendersField = []
+    cost: str | None = None
 
 
 PostRead = Annotated[
@@ -413,7 +419,7 @@ class ClinicianOpeningCreate(WirePayload):
     # Self-describing announcement profile. `services` uses the same
     # `ReferralService` vocab as the request side; `age_groups` is
     # multi-valued (a cohort). `other` in `services` requires
-    # `services_other_text` — see `OPENING_CONDITIONAL_RULES`.
+    # `services_other_text` — see `PROVIDER_POST_CONDITIONAL_RULES`.
     session_format: SessionFormatField = []
     services: ServicesField = []
     services_other_text: StrippedOptionalText = None
@@ -423,16 +429,17 @@ class ClinicianOpeningCreate(WirePayload):
 
     @model_validator(mode="after")
     def _enforce_conditional_required(self) -> "ClinicianOpeningCreate":
-        enforce_conditional_required(self, OPENING_CONDITIONAL_RULES)
+        enforce_conditional_required(self, PROVIDER_POST_CONDITIONAL_RULES)
         return self
 
 
 class ProgramIntakeCreate(WirePayload):
     """Create payload for `kind='program_intake'`. Mirrors
-    :class:`ClinicianOpeningCreate` one-to-one but swaps the Clinician
-    FK for a Program FK — the referrer is choosing a Program (intake door),
-    not a specific clinician. The steady-state profile lives on the
-    linked ``Program`` (#1358 PR-f sub-3)."""
+    :class:`ClinicianOpeningCreate` (self-describing announcement profile)
+    but swaps the Clinician FK for a Program FK — the referrer is choosing
+    a Program (intake door), not a specific clinician — and carries no
+    ``session_format`` (a Program has no in-person/virtual axis). The
+    steady-state context lives on the linked ``Program``."""
 
     kind: Literal["program_intake"]
     description: TextareaOptional = None
@@ -442,6 +449,19 @@ class ProgramIntakeCreate(WirePayload):
     # reference another user's Program.
     program_id: uuid.UUID
     schedule_text: StrippedOptionalText = None
+    # Self-describing announcement profile (same `ReferralService` vocab as
+    # the opening + referral sides). `other` in `services` requires
+    # `services_other_text` — see `PROVIDER_POST_CONDITIONAL_RULES`.
+    services: ServicesField = []
+    services_other_text: StrippedOptionalText = None
+    age_groups: AgeGroupsField = []
+    genders: GendersField = []
+    cost: StrippedOptionalText = None
+
+    @model_validator(mode="after")
+    def _enforce_conditional_required(self) -> "ProgramIntakeCreate":
+        enforce_conditional_required(self, PROVIDER_POST_CONDITIONAL_RULES)
+        return self
 
 
 PostCreate = Annotated[
@@ -549,7 +569,7 @@ class ClinicianOpeningUpdate(PartialUpdate):
 
     @model_validator(mode="after")
     def _enforce_conditional_required(self) -> "ClinicianOpeningUpdate":
-        enforce_conditional_required(self, OPENING_CONDITIONAL_RULES)
+        enforce_conditional_required(self, PROVIDER_POST_CONDITIONAL_RULES)
         return self
 
 
@@ -563,6 +583,18 @@ class ProgramIntakeUpdate(PartialUpdate):
     # update too — repointing at an unowned Program is 403.
     program_id: uuid.UUID | None = None
     schedule_text: StrippedOptionalText = None
+    # Announcement profile — `None` = leave unchanged; `[]` = clear. Same
+    # conditional `other`→`services_other_text` rule as Create.
+    services: ServicesField | None = None
+    services_other_text: StrippedOptionalText = None
+    age_groups: AgeGroupsField | None = None
+    genders: GendersField | None = None
+    cost: StrippedOptionalText = None
+
+    @model_validator(mode="after")
+    def _enforce_conditional_required(self) -> "ProgramIntakeUpdate":
+        enforce_conditional_required(self, PROVIDER_POST_CONDITIONAL_RULES)
+        return self
 
 
 PostUpdate = Annotated[
@@ -635,6 +667,12 @@ class ProgramIntakeAuditSnapshot(_PostAuditSnapshotBase):
     description: str | None = None
     program_id: uuid.UUID
     schedule_text: str | None = None
+    # Self-describing announcement profile (mirrors the Read shape).
+    services: ServicesField = []
+    services_other_text: str | None = None
+    age_groups: AgeGroupsField = []
+    genders: GendersField = []
+    cost: str | None = None
 
 
 PostAuditSnapshot = Annotated[

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Text
+from sqlalchemy import JSON, Column, ForeignKey, Text, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Uuid
 
@@ -16,13 +16,16 @@ class IntakeDetail(Base):
     a clinician internally. Distinct from ``clinician_opening``, which
     names a specific clinician.
 
-    After #1358 PR-f sub-3 this row is **thin by design**: it carries
-    only per-announcement attributes (``schedule_text`` / ``description``)
-    plus the ``program_id`` context FK. The steady-state profile (services,
-    settings, modalities,
-    age_groups, genders, languages, website, referral_instructions) lives
-    on the linked ``Program`` — see
-    [`../programs/README.md`](../programs/README.md).
+    Like the opening, the intake is **self-describing**: it carries its own
+    service lines (``services`` / ``services_other_text``, on the
+    ``ReferralService`` vocab), the cohort it serves (``age_groups`` /
+    ``genders``), ``cost``, plus ``schedule_text`` / ``description`` and the
+    ``program_id`` context FK. It carries no ``session_format`` — a Program
+    is a single group offering with no per-announcement in-person/virtual
+    axis. Only the steady-state context that doesn't vary per announcement —
+    the Program name, ``state_preference``, ``languages``, ``website`` /
+    ``referral_instructions``, owning Org — lives on the linked
+    ``Program`` (see [`../programs/README.md`](../programs/README.md)).
     """
 
     __tablename__ = _TABLE
@@ -35,7 +38,7 @@ class IntakeDetail(Base):
 
     # FK to the Program this announcement is for. The Program's name,
     # state preference, intake window, owning Org, and steady-state
-    # profile all live on the linked row — looked up via ``program.*``
+    # context all live on the linked row — looked up via ``program.*``
     # in templates and read projections. ``ondelete='CASCADE'`` mirrors
     # ``OpeningDetail.clinician_id``: deleting the Program tears down
     # its announcements with it (a post about a deleted Program is stale
@@ -50,6 +53,23 @@ class IntakeDetail(Base):
     # Section 3 — availability
     schedule_text = Column(Text, nullable=True)
 
-    # Per-announcement narrative — see :class:`OpeningDetail` for why the
-    # ``subject`` / ``treatment_modality`` overrides were dropped.
+    # Per-announcement narrative. The headline is derived from the linked
+    # program's name (no custom subject override).
     description = Column(Text, nullable=True)
+
+    # Service lines offered, on the same `ReferralService` 12-leaf vocab
+    # the referral + opening sides use (one "what care" axis for every post
+    # kind). `other` in the list pairs with `services_other_text`. Same
+    # JSON-list shape + wire-only vocabulary check as the opening; no SQL
+    # CHECK against array members.
+    services = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    services_other_text = Column(Text, nullable=True)
+
+    # Who this intake is for. Multi-valued cohort (no cardinality CHECK,
+    # unlike referral's single client). `genders` empty = "not stated".
+    age_groups = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+    genders = Column(JSON, nullable=False, server_default=text("'[]'"), default=list)
+
+    # Per-announcement fee note (free text). A program may post different
+    # intakes at different rates.
+    cost = Column(Text, nullable=True)

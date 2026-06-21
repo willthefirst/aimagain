@@ -28,22 +28,21 @@ schema still allows multi for forward-compat but only the first drives
 the title).
 
 `post_card_view(post)` is the unified view-model that both the listing
-card (`_item.html`) and the detail page (`detail.html`) read from. Each
-kind's underlying detail relationship has a different field set — CR and
-PA (opening) are both **self-describing**: each holds its own
-``services`` / ``session_format`` / ``age_groups`` / ``genders`` (and
-CR its location, PA its ``cost``) on the detail row. PA reads only
-steady-state *context* — location + insurance — from the linked
-``ClinicianAffiliation`` (the practice the opening announces, NOT the
-clinician's primary-affiliation proxies — a multi-affiliation clinician's
-opening must show the posting practice's facts), and ``languages`` from
-the linked ``Clinician``. Program (intake) still reads its steady-state
-profile from the linked ``Program``. The function collapses those shapes
-into one flat dict so templates iterate over keys rather than branching
-on `post.kind`. Values that don't apply to a kind are ``None`` (or empty
-lists — e.g. openings carry no ``settings`` / ``modalities`` anymore);
-templates render via ``{% if view.x %}``. Raw enum values are returned —
-display-label lookup is the template's job.
+card (`_item.html`) and the detail page (`detail.html`) read from. All
+three kinds are **self-describing**: each detail row holds its own
+``services`` / ``age_groups`` / ``genders`` / ``cost`` (referral + opening
+also ``session_format``; referral its location). Each reads only
+steady-state *context* from its linked entity: the opening reads location
++ insurance from the linked ``ClinicianAffiliation`` (the practice it
+announces, NOT the clinician's primary-affiliation proxies — a
+multi-affiliation clinician's opening must show the posting practice's
+facts) and ``languages`` from the linked ``Clinician``; the intake reads
+``languages`` from the linked ``Program``. The function collapses those
+shapes into one flat dict so templates iterate over keys rather than
+branching on `post.kind`. Values that don't apply to a kind are ``None``
+(or empty lists — e.g. no kind carries ``settings`` / ``modalities``
+anymore); templates render via ``{% if view.x %}``. Raw enum values are
+returned — display-label lookup is the template's job.
 
 `post_feed_headline(post)` builds the feed-row headline for the home and
 browse list views: client demographics for referrals, the practice's org
@@ -60,10 +59,8 @@ from src.domain.models.enums import (
     CLIENT_AGE_GROUP_LABELS_SINGULAR,
     CLIENT_AGE_GROUPS_BY_KEY,
     INSURANCE_CARRIER_LABELS,
-    OPENING_SERVICE_LABELS,
     PRONOUNS_LABELS,
     REFERRAL_SERVICE_LABELS,
-    TREATMENT_SETTINGS_LABELS,
 )
 from src.framework.rendering.address import full_address
 
@@ -164,8 +161,8 @@ def _location_chunk(
 _SCALAR_PASSTHROUGH: dict[str, str] = {
     "description": "description",
     "schedule_text": "schedule_text",
-    # `cost` is per-announcement on the referral + opening detail rows;
-    # intake has no `cost` attr (→ None). Referral has none either.
+    # `cost` is per-announcement on the opening + intake detail rows.
+    # Referral has no `cost` attr (→ None).
     "cost": "cost",
 }
 _LIST_PASSTHROUGH: dict[str, str] = {
@@ -176,20 +173,11 @@ _LIST_PASSTHROUGH: dict[str, str] = {
     "languages": "languages",
 }
 
-# Intake still reads its steady-state profile from the linked ``Program``
-# (Program is the intake-side equivalent of the affiliation). The opening
-# side no longer needs an affiliation list-field map — the opening detail
-# now carries its own ``services`` / ``age_groups`` / ``genders`` (read
-# via the passthrough above); only ``languages`` is steady-state for an
-# opening (person-level on the linked ``Clinician``).
-_INTAKE_PROGRAM_LIST_FIELDS: tuple[tuple[str, str], ...] = (
-    ("services", "services"),
-    ("settings", "settings"),
-    ("modalities", "modalities"),
-    ("ages", "age_groups"),
-    ("genders", "genders"),
-    ("languages", "languages"),
-)
+# Both provider post kinds now carry their own announcement profile
+# (``services`` / ``age_groups`` / ``genders`` / ``cost``) on the detail
+# row — read via the passthrough above. Only ``languages`` is steady-state:
+# person-level on the linked ``Clinician`` for an opening, program-level on
+# the linked ``Program`` for an intake. Each kind's block sets it directly.
 
 
 def _forward_detail_passthrough(base: dict[str, Any], d: Any) -> None:
@@ -546,12 +534,13 @@ def post_card_view(post) -> dict[str, Any]:
         _forward_detail_passthrough(base, d)
         prog = getattr(d, "program", None)
         _prog_org = getattr(prog, "organization", None) if prog else None
-        # #1358 PR-f sub-3: steady-state profile fields read exclusively
-        # from the linked Program. `languages` is also Program-level on
-        # this side (unlike openings, where it's person-level on the
+        # The intake's announcement profile (services / age_groups /
+        # genders / cost) is read off the detail row via the passthrough
+        # above. Only `languages` is steady-state — program-level on the
+        # linked Program (unlike openings, where it's person-level on the
         # Clinician).
-        for view_key, attr in _INTAKE_PROGRAM_LIST_FIELDS:
-            base[view_key] = _read_list(prog, attr)
+        base["languages"] = _read_list(prog, "languages")
+        base["services_other_text"] = getattr(d, "services_other_text", None)
         _prog_name = getattr(prog, "name", None) if prog else None
         _org_ref = (
             {"id": _prog_org.id, "name": _prog_org.name}
@@ -614,14 +603,13 @@ def referral_headline(detail) -> str:
 
 
 def service_labels(view) -> list[str]:
-    """Priority-sorted display labels for a post's services + settings.
+    """Priority-sorted display labels for a post's services.
 
-    `psychotherapy` and `medication_management` lead; the remaining
-    services follow in the post's stored order; treatment `settings`
-    (intake only) trail. ``view["kind"]`` picks the vocab — referrals and
-    openings share the `ReferralService` leaves; only `program_intake`
-    still uses the provider-side `OpeningService` set. Returns ``[]`` when
-    the post states neither services nor settings.
+    `medication_management` leads; the remaining services follow in the
+    post's stored order. Every post kind now shares the one
+    `ReferralService` vocabulary (referral request side + the provider
+    opening/intake sides), so there's a single label map. Returns ``[]``
+    when the post states no services.
 
     Registered as a template global so all three service surfaces — the
     framework feed row, the domain list card (`services_fact`), and the
@@ -630,16 +618,9 @@ def service_labels(view) -> list[str]:
     import.
     """
     services = list(view.get("services") or [])
-    settings = list(view.get("settings") or [])
-    svc_map = (
-        OPENING_SERVICE_LABELS
-        if view.get("kind") == "program_intake"
-        else REFERRAL_SERVICE_LABELS
-    )
-    priority = ("psychotherapy", "medication_management")
-    labels = [svc_map.get(s, s) for s in priority if s in services]
-    labels += [svc_map.get(s, s) for s in services if s not in priority]
-    labels += [TREATMENT_SETTINGS_LABELS.get(s, s) for s in settings]
+    priority = ("medication_management",)
+    labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in priority if s in services]
+    labels += [REFERRAL_SERVICE_LABELS.get(s, s) for s in services if s not in priority]
     return labels
 
 
