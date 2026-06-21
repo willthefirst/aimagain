@@ -488,12 +488,12 @@ it's dev-only chrome that should never ship to production. #}
       <section class="gallery-section" id="type-tags">
         <h2>Type-tag pills</h2>
         <p>
-          <small>CSS classes <code>.post-feed-type-tag--referral/opening/intake</code>. used in feed row headers.</small>
+          <small>The <code>post_type_tag(kind)</code> macro (<code>_shared/_post_type_tag.html</code>); classes <code>.post-type-tag--referral/opening/intake</code>. Shared by the feed row header and the post detail's <code>.post-meta</code> line.</small>
         </p>
         <div class="gallery-row">
-          <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
-          <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
-          <span class="post-feed-type-tag post-feed-type-tag--intake">Intake</span>
+          <span class="post-type-tag post-type-tag--referral">Referral</span>
+          <span class="post-type-tag post-type-tag--opening">Opening</span>
+          <span class="post-type-tag post-type-tag--intake">Intake</span>
         </div>
       </section>
       <section class="gallery-section" id="feed-rows">
@@ -505,7 +505,7 @@ it's dev-only chrome that should never ship to production. #}
           <li>
             <article class="post-feed-row" data-kind="referral">
               <div class="post-feed-header">
-                <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+                <span class="post-type-tag post-type-tag--referral">Referral</span>
                 <small>2h ago</small>
               </div>
               <hgroup>
@@ -539,7 +539,7 @@ it's dev-only chrome that should never ship to production. #}
           <li>
             <article class="post-feed-row" data-kind="clinician_opening">
               <div class="post-feed-header">
-                <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+                <span class="post-type-tag post-type-tag--opening">Opening</span>
                 <small>1d ago</small>
               </div>
               <hgroup>
@@ -575,7 +575,7 @@ it's dev-only chrome that should never ship to production. #}
             <article class="post-feed-row post-feed-row--interest"
                      data-kind="program_intake">
               <div class="post-feed-header">
-                <span class="post-feed-type-tag post-feed-type-tag--intake">Intake</span>
+                <span class="post-type-tag post-type-tag--intake">Intake</span>
                 <small>3d ago</small>
               </div>
               <hgroup>
@@ -637,7 +637,7 @@ it's dev-only chrome that should never ship to production. #}
               <li>
                 <article class="post-feed-row">
                   <div class="post-feed-header">
-                    <span class="post-feed-type-tag post-feed-type-tag--referral">Referral</span>
+                    <span class="post-type-tag post-type-tag--referral">Referral</span>
                     <small>2h ago</small>
                   </div>
                   <hgroup>
@@ -671,7 +671,7 @@ it's dev-only chrome that should never ship to production. #}
               <li>
                 <article class="post-feed-row">
                   <div class="post-feed-header">
-                    <span class="post-feed-type-tag post-feed-type-tag--opening">Opening</span>
+                    <span class="post-type-tag post-type-tag--opening">Opening</span>
                     <small>1d ago</small>
                   </div>
                   <hgroup>

@@ -461,10 +461,10 @@ async def test_referral_detail_meta_omits_modality_chips(
     logged_in_user,
 ):
     """The referral detail's Logistics group carries the modality in its
-    consolidated location row ("· Telehealth"), so the subtitle `.meta`
-    line no longer repeats it as chips — only the date remains there.
-    (Opening/intake keep the chips; that's covered by their own kinds, not
-    pinned here.)"""
+    consolidated location row ("· Telehealth"), so the `.post-meta` identity
+    line no longer repeats it as chips — only the type pill, date, and
+    referring clinician live there. (Opening/intake keep the chips; that's
+    covered by their own kinds, not pinned here.)"""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(owner_id=author.id, session_format=["in_person", "virtual"])
@@ -478,9 +478,10 @@ async def test_referral_detail_meta_omits_modality_chips(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    meta_chips = [s.text(strip=True) for s in tree.css("small.meta span")]
-    assert "In-person" not in meta_chips, meta_chips
-    assert "Virtual" not in meta_chips, meta_chips
+    meta = tree.css_first(".post-meta")
+    assert meta is not None, "the .post-meta identity line should render"
+    assert "In-person" not in meta.text(), meta.text()
+    assert "Virtual" not in meta.text(), meta.text()
     # The modality moved into the consolidated location row (it moved, not
     # vanished): an in-person + virtual referral reads "…· Telehealth".
     location_dd = tree.css_first('[data-fact="address"] dd')
@@ -618,9 +619,9 @@ async def test_referral_detail_links_referring_clinician_in_meta_not_a_card(
 
     # No owner-context card on a referral detail page.
     assert tree.css_first('article[data-row-id="provider-profile"]') is None
-    # The referring clinician is a linked reference in the meta line.
-    meta = tree.css_first("small.meta")
-    assert meta is not None, "subtitle meta line should render"
+    # The referring clinician is a linked reference in the .post-meta line.
+    meta = tree.css_first(".post-meta")
+    assert meta is not None, ".post-meta identity line should render"
     assert "Referred by" in meta.text(), meta.text()
     assert (
         meta.css_first(f'a[href="/clinicians/{referring.id}"]') is not None

@@ -1,4 +1,5 @@
 {%- from "_shared/_provider_ref.html" import provider_ref -%}
+{%- from "_shared/_post_type_tag.html" import post_type_tag -%}
 {%- from "_shared/sections.html" import fact, facts_block -%}
 {# Feed-row macro — renders a single clickable row for the home feed and
    browse list views.
@@ -42,12 +43,10 @@ CSS lives in the "Feed rows" section of `src/domain/static/css/domain.css`. #}
 {% macro post_feed_row(post, show_poster=True) -%}
   {%- set view = post_card_view(post) -%}
   {%- set headline = post_feed_headline(post) -%}
-  {%- set kind_class = "referral" if post.kind == "referral" else ("intake" if post.kind == "program_intake" else "opening") -%}
-  {%- set kind_label = "Referral" if post.kind == "referral" else ("Intake" if post.kind == "program_intake" else "Opening") -%}
   <article class="post-feed-row" data-kind="{{ post.kind }}">
     {# ── Header: pill · timestamp ─────────────────────────────────── #}
     <div class="post-feed-header">
-      <span class="post-feed-type-tag post-feed-type-tag--{{ kind_class }}">{{ kind_label }}</span>
+      {{ post_type_tag(post.kind) }}
       <small>{{ post.created_at | days_ago }}</small>
     </div>
     {# ── Title + poster subtitle — an <hgroup> so Pico styles the poster

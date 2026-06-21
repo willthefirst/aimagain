@@ -129,8 +129,10 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
    <h3> heading and the poster line as its muted subtitle — no custom CSS).
    The inner <a> just carries the :visited treatment below. */
 .post-feed-headline-text { display: block; }
-/* Type-tag pill */
-.post-feed-type-tag {
+/* Type-tag pill — the `post_type_tag(kind)` macro; shared by the feed row
+   header and the post detail's `.post-meta` line so the chip is identical
+   in both. */
+.post-type-tag {
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -140,17 +142,28 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   white-space: nowrap;
   flex-shrink: 0;
 }
-.post-feed-type-tag--referral {
+.post-type-tag--referral {
   color: var(--pico-muted-color);
   background: color-mix(in srgb, var(--pico-muted-color) 8%, transparent);
 }
-.post-feed-type-tag--opening {
+.post-type-tag--opening {
   color: var(--pico-primary);
   background: color-mix(in srgb, var(--pico-primary) 10%, transparent);
 }
-.post-feed-type-tag--intake {
+.post-type-tag--intake {
   color: var(--pico-secondary);
   background: color-mix(in srgb, var(--pico-secondary) 10%, transparent);
+}
+/* Post detail identity line — pill + date + author/modality, the detail-page
+   counterpart to the feed row's header. Muted via Pico's `--pico-muted-color`
+   (no <small> tag); the inner `.meta` span draws the middots between the date
+   and the author/modality. Spacing comes from Pico's `--pico-spacing`. */
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--pico-spacing) * 0.5);
+  color: var(--pico-muted-color);
 }
 /* Empty state */
 .post-feed-empty { text-align: center; padding: 2rem 1rem; color: var(--pico-muted-color); }
