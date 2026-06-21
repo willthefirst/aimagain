@@ -595,13 +595,15 @@ def post_card_view(post) -> dict[str, Any]:
 def referral_headline(detail) -> str:
     """Build the listing-card headline for a `referral`.
 
-    Format: `"<Age noun> [<pronouns>] (<range>)"` — e.g.
-    `"Adult she/her (25–64)"`, `"Adolescent (14–18)"` when no pronouns
-    are stated, or `"Adult she/her, they/them (25–64)"` when multiple.
-    Pronouns are capped at the first two to bound headline length.
-    The age comes from `age_groups[0]` since a CR post describes one
-    client; the schema still allows multi but the headline picks the
-    first value.
+    Format: `"<Age noun> (<range>) · <pronouns>"` — age and range lead,
+    then a mid-dot, then the pronouns: e.g. `"Adult (25–64) · she/her"`,
+    `"Adolescent (14–18)"` when no pronouns are stated, or
+    `"Adult (25–64) · she/her, they/them"` when multiple. Pronouns are
+    capped at the first two to bound headline length. The mid-dot (not a
+    comma) separates age from pronouns so multi-pronoun lists — which are
+    themselves comma-joined — stay unambiguous. The age comes from
+    `age_groups[0]` since a CR post describes one client; the schema still
+    allows multi but the headline picks the first value.
 
     Returns `"Client Referral"` as a fallback when the detail has no
     age groups (defensive — schema requires min-1, so this shouldn't
@@ -614,8 +616,79 @@ def referral_headline(detail) -> str:
     pronouns = list(getattr(detail, "pronouns", None) or [])
     if pronouns:
         pronoun_str = ", ".join(PRONOUNS_LABELS.get(p, p) for p in pronouns[:2])
-        return f"{age.singular} {pronoun_str} ({age.range})"
+        return f"{age.singular} ({age.range}) · {pronoun_str}"
     return f"{age.singular} ({age.range})"
+
+
+def service_labels(view) -> list[str]:
+    """Priority-sorted display labels for a post's services + settings.
+
+    `psychotherapy` and `medication_management` lead; the remaining
+    services follow in the post's stored order; treatment `settings`
+    (opening / intake) trail. ``view["kind"]`` picks the vocab —
+    referrals use the `ReferralService` leaves, the availability kinds
+    use `OpeningService`. Returns ``[]`` when the post states neither
+    services nor settings.
+
+    Registered as a template global so all three service surfaces — the
+    framework feed row, the domain list card (`services_fact`), and the
+    referral detail page — render the identical ordering from one home,
+    instead of the sort living in a domain macro the framework row can't
+    import.
+    """
+    services = list(view.get("services") or [])
+    settings = list(view.get("settings") or [])
+    svc_map = (
+        REFERRAL_SERVICE_LABELS
+        if view.get("kind") == "referral"
+        else OPENING_SERVICE_LABELS
+    )
+    priority = ("psychotherapy", "medication_management")
+    labels = [svc_map.get(s, s) for s in priority if s in services]
+    labels += [svc_map.get(s, s) for s in services if s not in priority]
+    labels += [TREATMENT_SETTINGS_LABELS.get(s, s) for s in settings]
+    return labels
+
+
+def location_summary(view) -> str | None:
+    """Location + session modality for a post, written to answer three
+    questions at a glance — the identical string in the list card, feed
+    row, and referral detail:
+
+      * **State** — always shown first; licensing is state-scoped, so it's
+        relevant even for telehealth-only work.
+      * **In-person?** — and if so *where*: ``"In-person in <city>"`` (or
+        a bare ``"In-person"`` when no city is on file).
+      * **Telehealth?** — ``"Telehealth"`` when virtual sessions are offered.
+
+    The offered modalities are mid-dot-joined after the state, so the
+    reader sees exactly which apply: ``"CA · In-person in San Francisco ·
+    Telehealth"``, ``"CA · Telehealth"`` (telehealth only — no in-person
+    listed), ``"CA · In-person in San Francisco"`` (in-person only), or a
+    bare ``"CA"`` when no modality is recorded. Reads the cross-kind
+    ``in_person`` / ``virtual`` view keys (`LOCATION_AVAILABILITY`
+    ``"yes"`` / ``"no"``) and ``location_chunk``. Returns ``None`` when
+    there's neither a state nor a city to anchor on.
+
+    Registered as a template global so all three surfaces honor the same
+    rule from one home. (On the referral detail the row is redaction-aware
+    — a non-verified viewer gets a locked field, so the in-person city
+    never leaks.)
+    """
+    chunk = view.get("location_chunk") or {}
+    state = chunk.get("state")
+    city = chunk.get("city")
+    if not state and not city:
+        return None
+    modes = []
+    if view.get("in_person") == "yes":
+        modes.append(f"In-person in {city}" if city else "In-person")
+    if view.get("virtual") == "yes":
+        modes.append("Telehealth")
+    if modes:
+        body = " · ".join(modes)
+        return f"{state} · {body}" if state else body
+    return state or city
 
 
 def post_row_summary(post) -> str:
@@ -695,19 +768,17 @@ def post_row_summary(post) -> str:
 
 
 def post_feed_headline(post) -> str:
-    """Build the two-part feed-row headline for any post kind.
+    """Build the feed-row title — the post's base identity line only.
 
-    Referrals: ``"<demographics> — <services>"``, e.g.
-    ``"Adult (25–64) — Psychotherapy, Medication management"``.
-    When the referral carries no services the demographics alone are returned.
+    Referrals: the client demographics (`referral_headline`), e.g.
+    ``"Adult (25–64)"``. Openings: the practice's org name. Program
+    intakes: the program name. A ``subject`` override, when set, replaces
+    the auto-generated title.
 
-    Openings: ``"<practice name> — <clinical focus>"``, e.g.
-    ``"Acme Counseling — Psychotherapy, Outpatient"``. Clinical focus
-    comes from the opening's services list; settings are used as a
-    fallback when services are absent. Falls back to practice name alone
-    when neither is set.
-
-    Program intakes follow the same ``"<name> — <services>"`` pattern.
+    The clinical services that used to trail the title (the
+    ``"… — Psychotherapy"`` suffix) now render as the `service_labels`
+    fact row in the card, so the title stays a short, scannable identity
+    line and the services aren't crammed into it.
     """
     kind = getattr(post, "kind", None)
 
@@ -717,12 +788,7 @@ def post_feed_headline(post) -> str:
             return "Referral"
         if subject := getattr(d, "subject", None):
             return subject
-        demo = referral_headline(d)
-        services = list(getattr(d, "services", None) or [])
-        if services:
-            labels = [REFERRAL_SERVICE_LABELS.get(s, s) for s in services[:2]]
-            return f"{demo} — {', '.join(labels)}"
-        return demo
+        return referral_headline(d)
 
     if kind == "clinician_opening":
         d = getattr(post, "opening_detail", None)
@@ -732,17 +798,7 @@ def post_feed_headline(post) -> str:
             return subject
         affiliation = getattr(d, "clinician_affiliation", None)
         _org = _read_scalar(affiliation, "org")
-        practice = (getattr(_org, "name", None) if _org else None) or "Opening"
-        # #1358 PR-f — services/settings read from the linked
-        # ClinicianAffiliation.
-        services = _read_list(affiliation, "services")
-        focus_parts = [OPENING_SERVICE_LABELS.get(s, s) for s in services[:2]]
-        if not focus_parts:
-            settings = _read_list(affiliation, "settings")
-            focus_parts = [TREATMENT_SETTINGS_LABELS.get(s, s) for s in settings[:2]]
-        if focus_parts:
-            return f"{practice} — {', '.join(focus_parts)}"
-        return practice
+        return (getattr(_org, "name", None) if _org else None) or "Opening"
 
     if kind == "program_intake":
         d = getattr(post, "intake_detail", None)
@@ -751,12 +807,6 @@ def post_feed_headline(post) -> str:
         if subject := getattr(d, "subject", None):
             return subject
         prog = getattr(d, "program", None)
-        name = (getattr(prog, "name", None) if prog else None) or "Program"
-        # `services` read from the linked Program (#1358 PR-f).
-        services = _read_list(prog, "services")
-        focus_parts = [OPENING_SERVICE_LABELS.get(s, s) for s in services[:2]]
-        if focus_parts:
-            return f"{name} — {', '.join(focus_parts)}"
-        return name
+        return (getattr(prog, "name", None) if prog else None) or "Program"
 
     return ""

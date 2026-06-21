@@ -24,10 +24,12 @@ from src.domain.logic.posts.schema import (
 )
 from src.domain.logic.posts.view import (
     insurance_posture_for_post,
+    location_summary,
     post_card_view,
     post_feed_headline,
     post_row_summary,
     referral_headline,
+    service_labels,
 )
 from src.domain.logic.saved_searches.urls import posts_url_for_filters
 from src.domain.logic.users.view import onboarding_readiness
@@ -132,9 +134,15 @@ register_template_globals(
     # `post_row_summary(post)` — compact mid-dot summary line for the row
     # layout used by the home-page widget and list-page compact view.
     post_row_summary=post_row_summary,
-    # `post_feed_headline(post)` — two-part "<identity> — <focus>" headline
-    # for the feed-row component in home and browse list views.
+    # `post_feed_headline(post)` — the feed row's base identity line
+    # (demographics / practice / program name) for home and browse views.
     post_feed_headline=post_feed_headline,
+    # `service_labels(view)` / `location_summary(view)` — the priority-sorted
+    # service labels and the one-line location (state + in-person-where +
+    # telehealth), shared by the feed row, list card, and referral detail so
+    # all three read one home.
+    service_labels=service_labels,
+    location_summary=location_summary,
     # `posts_url_for_filters(filters)` renders a saved search's stored
     # filter_values dict back into a `/posts?…` URL — the "open" half of
     # the saved-search round-trip. See `src.domain.logic.saved_searches.urls`.

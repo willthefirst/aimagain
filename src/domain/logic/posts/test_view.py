@@ -8,10 +8,12 @@ from src.domain.logic.posts.view import (
     _LIST_PASSTHROUGH,
     _SCALAR_PASSTHROUGH,
     insurance_posture_for_post,
+    location_summary,
     post_card_view,
     post_feed_headline,
     post_row_summary,
     referral_headline,
+    service_labels,
 )
 
 
@@ -120,6 +122,21 @@ def test_referral_headline_composes_age(age, expected):
     now `"<noun> (<range>)"`."""
     detail = SimpleNamespace(age_groups=[age])
     assert referral_headline(detail) == expected
+
+
+def test_referral_headline_appends_pronouns_after_age_with_middot():
+    """Age + range lead; pronouns follow after a mid-dot (not a comma, so
+    a multi-pronoun list stays unambiguous)."""
+    detail = SimpleNamespace(age_groups=["adults_25_64"], pronouns=["she_her"])
+    assert referral_headline(detail) == "Adult (25–64) · she/her"
+
+
+def test_referral_headline_caps_pronouns_at_two():
+    detail = SimpleNamespace(
+        age_groups=["adults_25_64"],
+        pronouns=["she_her", "they_them", "he_him"],
+    )
+    assert referral_headline(detail) == "Adult (25–64) · she/her, they/them"
 
 
 def test_referral_headline_uses_first_age_group_only():
@@ -881,8 +898,9 @@ def test_row_summary_unknown_kind_returns_empty_string():
 # --- post_feed_headline -------------------------------------------------
 
 
-def test_feed_headline_referral_with_services():
-    """Demographics form the left half; up to 2 service labels the right half."""
+def test_feed_headline_referral_is_demographics_only():
+    """The title carries the client demographics only — the services that
+    used to trail it now render as the `service_labels` fact row."""
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
@@ -890,10 +908,7 @@ def test_feed_headline_referral_with_services():
             services=["therapy_individual", "medication_management"],
         ),
     )
-    assert (
-        post_feed_headline(post)
-        == "Adult (25–64) — Therapy — Individual, Psychiatry / medication management"
-    )
+    assert post_feed_headline(post) == "Adult (25–64)"
 
 
 def test_feed_headline_referral_no_services_returns_demographics_only():
@@ -907,43 +922,19 @@ def test_feed_headline_referral_no_services_returns_demographics_only():
     assert post_feed_headline(post) == "Adolescent (14–18)"
 
 
-def test_feed_headline_referral_caps_services_at_two():
-    post = SimpleNamespace(
-        kind="referral",
-        referral_detail=SimpleNamespace(
-            age_groups=["adults_25_64"],
-            services=["medication_management", "therapy_individual", "therapy_group"],
-        ),
-    )
-    headline = post_feed_headline(post)
-    # Only first two services should appear; third is dropped.
-    assert "Psychiatry / medication management, Therapy — Individual" in headline
-    assert "Therapy — Group" not in headline
-
-
 def test_feed_headline_referral_missing_detail_returns_fallback():
     post = SimpleNamespace(kind="referral", referral_detail=None)
     assert post_feed_headline(post) == "Referral"
 
 
-def test_feed_headline_opening_with_services():
-    """Practice name forms the left half; service labels the right half."""
+def test_feed_headline_opening_is_practice_name_only():
+    """The title is the practice's org name — services move to the focus."""
     post = _make_pa_post()
-    headline = post_feed_headline(post)
-    assert headline.startswith("Acme Counseling — ")
-    assert "Psychotherapy" in headline
+    assert post_feed_headline(post) == "Acme Counseling"
 
 
-def test_feed_headline_opening_falls_back_to_settings_when_no_services():
-    """When an opening carries no services, settings labels are used for the focus."""
-    post = _make_pa_post(services=[], settings=["outpatient", "iop"])
-    headline = post_feed_headline(post)
-    assert "Outpatient" in headline
-    assert "IOP" in headline
-
-
-def test_feed_headline_opening_practice_name_only_when_no_focus():
-    """Practice name alone is returned when both services and settings are empty."""
+def test_feed_headline_opening_practice_name_when_no_focus():
+    """Practice name is returned regardless of services/settings."""
     post = _make_pa_post(services=[], settings=[])
     assert post_feed_headline(post) == "Acme Counseling"
 
@@ -964,16 +955,13 @@ def test_feed_headline_opening_missing_clinician_returns_fallback():
             subject=None,
         ),
     )
-    # Practice name cannot be derived; headline falls back to "Opening — <service>".
-    headline = post_feed_headline(post)
-    assert "Psychotherapy" in headline
+    # Practice name cannot be derived; title falls back to "Opening".
+    assert post_feed_headline(post) == "Opening"
 
 
-def test_feed_headline_program_with_services():
+def test_feed_headline_program_is_name_only():
     post = _make_program_post()
-    headline = post_feed_headline(post)
-    assert headline.startswith("RISE IOP — ")
-    assert "Psychotherapy" in headline
+    assert post_feed_headline(post) == "RISE IOP"
 
 
 def test_feed_headline_program_no_services_returns_name_only():
@@ -1003,7 +991,7 @@ def test_feed_headline_referral_subject_overrides_auto_generation():
 
 
 def test_feed_headline_referral_none_subject_falls_back_to_auto():
-    """When subject is None, auto-generation runs normally."""
+    """When subject is None, the demographics title is generated."""
     post = SimpleNamespace(
         kind="referral",
         referral_detail=SimpleNamespace(
@@ -1012,7 +1000,7 @@ def test_feed_headline_referral_none_subject_falls_back_to_auto():
             services=["therapy_individual"],
         ),
     )
-    assert post_feed_headline(post) == "Adult (25–64) — Therapy — Individual"
+    assert post_feed_headline(post) == "Adult (25–64)"
 
 
 def test_feed_headline_opening_subject_overrides_auto_generation():
@@ -1023,11 +1011,109 @@ def test_feed_headline_opening_subject_overrides_auto_generation():
 
 
 def test_feed_headline_opening_none_subject_falls_back_to_auto():
-    """When subject is None on an opening, practice name + services are used."""
+    """When subject is None on an opening, the practice name is used."""
     post = _make_pa_post()
     post.opening_detail.subject = None
-    headline = post_feed_headline(post)
-    assert headline.startswith("Acme Counseling — ")
+    assert post_feed_headline(post) == "Acme Counseling"
+
+
+# --- service_labels -----------------------------------------------------
+
+
+def test_service_labels_priority_sorts_psychotherapy_and_meds_first():
+    """`psychotherapy` and `medication_management` lead regardless of stored
+    order; the rest follow in stored order."""
+    view = {
+        "kind": "referral",
+        "services": ["therapy_group", "medication_management", "therapy_individual"],
+        "settings": [],
+    }
+    assert service_labels(view) == [
+        "Psychiatry / medication management",
+        "Therapy — Group",
+        "Therapy — Individual",
+    ]
+
+
+def test_service_labels_referral_uses_referral_vocab():
+    view = {
+        "kind": "referral",
+        "services": ["therapy_individual", "medication_management"],
+        "settings": [],
+    }
+    assert service_labels(view) == [
+        "Psychiatry / medication management",
+        "Therapy — Individual",
+    ]
+
+
+def test_service_labels_settings_trail_services_for_openings():
+    """Opening/intake settings render after services, via the opening vocab."""
+    view = {
+        "kind": "clinician_opening",
+        "services": ["psychotherapy"],
+        "settings": ["outpatient", "iop"],
+    }
+    assert service_labels(view) == ["Psychotherapy", "Outpatient", "IOP"]
+
+
+def test_service_labels_empty_when_no_services_or_settings():
+    assert service_labels({"kind": "referral", "services": [], "settings": []}) == []
+
+
+# --- location_summary ---------------------------------------------------
+
+
+def test_location_summary_in_person_states_modality_city_and_state():
+    """State leads (licensing); in-person names the city explicitly."""
+    view = {
+        "in_person": "yes",
+        "virtual": "no",
+        "location_chunk": {"city": "San Francisco", "state": "CA"},
+    }
+    assert location_summary(view) == "CA · In-person in San Francisco"
+
+
+def test_location_summary_virtual_only_states_telehealth_no_in_person():
+    """Telehealth-only: state leads, Telehealth is named, no in-person
+    listed (and the city isn't shown — the work isn't place-bound)."""
+    view = {
+        "in_person": "no",
+        "virtual": "yes",
+        "location_chunk": {"city": "San Francisco", "state": "CA"},
+    }
+    assert location_summary(view) == "CA · Telehealth"
+
+
+def test_location_summary_both_names_in_person_city_and_telehealth():
+    view = {
+        "in_person": "yes",
+        "virtual": "yes",
+        "location_chunk": {"city": "San Francisco", "state": "CA"},
+    }
+    assert location_summary(view) == "CA · In-person in San Francisco · Telehealth"
+
+
+def test_location_summary_state_always_present_without_modality():
+    view = {
+        "in_person": None,
+        "virtual": None,
+        "location_chunk": {"city": "San Francisco", "state": "CA"},
+    }
+    assert location_summary(view) == "CA"
+
+
+def test_location_summary_in_person_without_city_omits_where():
+    view = {
+        "in_person": "yes",
+        "virtual": "no",
+        "location_chunk": {"city": None, "state": "CA"},
+    }
+    assert location_summary(view) == "CA · In-person"
+
+
+def test_location_summary_none_when_no_city_or_state():
+    assert location_summary({"in_person": "yes", "virtual": "no"}) is None
 
 
 # --- post_card_view: detail-row auto-forward ---------------------
@@ -1317,9 +1403,10 @@ def test_intake_no_program_yields_empty_lists():
     assert v["languages"] == []
 
 
-def test_feed_headline_opening_uses_affiliation_services():
-    """``post_feed_headline`` for openings reads ``services`` AND the
-    practice name from the linked affiliation."""
+def test_feed_headline_opening_reads_practice_name_from_affiliation():
+    """``post_feed_headline`` for openings reads the practice name from the
+    linked affiliation's org; the services fact reads its services via the
+    view-model + `service_labels`."""
     post = _make_pa_post()
     post.opening_detail.subject = None  # force the auto-generated branch
     post.opening_detail.clinician_affiliation = SimpleNamespace(
@@ -1332,7 +1419,8 @@ def test_feed_headline_opening_uses_affiliation_services():
         website=None,
         referral_instructions=None,
     )
-    assert post_feed_headline(post) == "Acme Counseling — Medication management"
+    assert post_feed_headline(post) == "Acme Counseling"
+    assert service_labels(post_card_view(post)) == ["Medication management"]
 
 
 def test_row_summary_opening_uses_affiliation_settings():

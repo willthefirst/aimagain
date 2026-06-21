@@ -4,18 +4,22 @@ Each fact is wrapped in a `<div>` so the `<dl>` grid can treat each
 `dt/dd` pair as one logical row (the wrapper is `display: contents`
 in `base.html`, so the dt/dd still align in the parent's columns).
 Both referral and opening posts surface their location via the
-"Location" row — referral reads it from the post's own detail row,
-opening reads it from the linked `ClinicianAffiliation` (the practice
-the opening announces); the rendering treatment is identical.
+"Location" row, rendered through the shared `location_summary(view)`
+global (state always, then the offered modalities — "In-person in
+<city>" and/or "Telehealth"); referral reads its location from the
+post's own detail row,
+opening from the linked `ClinicianAffiliation` (the practice the
+opening announces); the rendering treatment is identical.
 
 The list leads with the services row (`view.kind_verb` — `Seeking`
 for CR, `Providing` for PA/program/intake) when the post has any
 services or settings to surface. That row is factored out as the
-`services_fact(view)` macro below so the referral detail page
-(`_referral_facts.html`) can reuse the exact same priority-sorted
-treatment under its "Service type" group — the ordering lives in one
-place. Folded into the same `<dl>` as the demographic rows so the
-label column lines up across the whole card (see #663-followup).
+`services_fact(view)` macro below, which reads its priority-sorted
+labels from the `service_labels(view)` global so the referral detail
+page (`_referral_facts.html`) and the framework feed row render the
+exact same ordering — the sort lives in one place. Folded into the same
+`<dl>` as the demographic rows so the label column lines up across the
+whole card (see #663-followup).
 
 This macro is the COMPACT, single-`<dl>` glance-line for the list
 card: location_chunk OR ages, genders (PA/program only), languages
@@ -36,17 +40,13 @@ Reads from `view` (the `post_card_view` dict). Display-label dicts
 `OPENING_SERVICE_LABELS`, `TREATMENT_SETTINGS_LABELS`) are Jinja
 globals. #}
 {%- from "_shared/sections.html" import fact, fact_list, facts_block as _facts_wrapper -%}
-{# Services / settings row — the priority-sorted "Seeking" / "Providing"
-   fact. Factored out so both the compact list card (below) and the
-   referral detail page's "Service type" group render the identical
-   ordering. Emits a single `fact(...)` row (valid `<dl>` content), or
-   nothing when the post has no services/settings.
-
-   Priority sort puts `psychotherapy` and `medication_management`
-   first; the rest follow in vocab declaration order. `view.kind`
-   picks the right vocab: referrals use the 12-leaf ReferralService
-   vocab; opening / intake / program use the 8-value OpeningService
-   vocab. PA + program `settings` render after services.
+{# Services / settings row — the "Seeking" / "Providing" fact. The
+   priority sort (psychotherapy + medication_management first, vocab by
+   `view.kind`, settings trailing) lives in the `service_labels(view)`
+   template global so the framework feed row, this compact list card, and
+   the referral detail page's "Service type" group all render the
+   identical ordering from one home. Emits a single `fact(...)` row (valid
+   `<dl>` content), or nothing when the post has no services/settings.
 
    `multiline=True` stacks one service per line via `fact_list` (the
    detail-page "Service type" group) and drops the leading icon — the
@@ -54,19 +54,8 @@ globals. #}
    organization. The default comma-joins them into one iconed `fact`
    value (the compact list card, where the glyph aids scanning). #}
 {% macro services_fact(view, multiline=False) -%}
-  {%- if view.services or view.settings %}
-    {%- set _svc_labels = REFERRAL_SERVICE_LABELS if view.kind == "referral" else OPENING_SERVICE_LABELS -%}
-    {%- set _priority = ["psychotherapy", "medication_management"] -%}
-    {%- set _labels = [] -%}
-    {%- for s in _priority if s in view.services -%}
-      {%- set _ = _labels.append(_svc_labels[s]) -%}
-    {%- endfor -%}
-    {%- for s in view.services if s not in _priority -%}
-      {%- set _ = _labels.append(_svc_labels[s]) -%}
-    {%- endfor -%}
-    {%- for s in view.settings -%}
-      {%- set _ = _labels.append(TREATMENT_SETTINGS_LABELS[s]) -%}
-    {%- endfor -%}
+  {%- set _labels = service_labels(view) -%}
+  {%- if _labels %}
     {%- if multiline %}
       {{ fact_list('services', view.kind_verb, _labels) }}
     {%- else %}
@@ -77,14 +66,12 @@ globals. #}
 {% macro facts_block(view) -%}
   {%- call _facts_wrapper() %}
     {{ services_fact(view) }}
-    {%- if view.location_chunk %}
-      {#- Compact mode: "City, ST". Both referral and opening kinds
-        populate `location_chunk` so the row renders identically on
-        both cards. -#}
-      {%- call fact('location', 'Location', icon='map-pin') %}
-        {% if view.location_chunk.city %}{{ view.location_chunk.city }},{% endif %}
-        {{ view.location_chunk.state }}
-      {% endcall %}
+    {%- set _location = location_summary(view) -%}
+    {%- if _location %}
+      {#- State always, city only when in-person, "· Telehealth" when
+        virtual — via the shared `location_summary(view)` global so the
+        card, feed row, and detail page tell the same location story. -#}
+      {{ fact('location', 'Location', _location, icon='map-pin') }}
     {%- endif %}
     {%- if view.ages and view.kind != "referral" %}
       {#- `opening` and `intake` describe a cohort the

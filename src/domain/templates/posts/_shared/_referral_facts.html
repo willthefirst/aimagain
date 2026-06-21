@@ -5,7 +5,9 @@
    order. The form groups its fields under four titled sections; this
    partial groups the persisted values under the same four headings:
 
-     1. Logistics       — client location + in-person/virtual sessions
+     1. Logistics       — one redaction-aware `location_summary` row
+                          (state always, then "In-person in <city>" and/or
+                          "Telehealth"; locked for non-verified viewers)
      2. Service type    — services sought (+ "other" free text)
      3. About the client — age, pronouns, languages, narrative
      4. Coverage        — accepted payment paths + insurance carriers
@@ -42,23 +44,27 @@
 {%- from "_shared/_locked.html" import locked_field -%}
 {% macro referral_facts(view, redacted=False) -%}
   {%- call facts_grid() %}
-    {%- if view.full_address or view.in_person is not none or view.virtual is not none %}
+    {%- set _location = location_summary(view) -%}
+    {%- if view.full_address or _location %}
       {{ fact_group("Logistics") }}
       {%- call fact_rows() %}
-        {%- if view.full_address %}
-          {% if redacted %}
-            {%- call fact('address', 'Location') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}
-            {% endcall %}
-          {% else %}
-            {{ fact('address', 'Location', view.full_address) }}
-          {% endif %}
-        {%- endif %}
-        {%- if view.in_person is not none %}
-          {{ fact('in_person_sessions', 'In-person sessions', LOCATION_AVAILABILITY_LABELS[view.in_person]) }}
-        {%- endif %}
-        {%- if view.virtual is not none %}
-          {{ fact('virtual_sessions', 'Virtual sessions', LOCATION_AVAILABILITY_LABELS[view.virtual]) }}
-        {%- endif %}
+        {#- One consolidated location row via the shared `location_summary`
+          global (state always, then "In-person in <city>" and/or
+          "Telehealth") — the same rule the list card and feed row use,
+          replacing the separate address + in-person/virtual session rows.
+          For a referral `full_address` is city/state only (no ZIP), so the
+          summary carries the same precision plus the modality.
+
+          Redaction-aware: the client's city is the sensitive axis, so a
+          non-verified viewer gets a `locked_field` (the row still renders
+          so they know a location exists and how to unlock it). `data-fact`
+          stays `address` — the stable redaction selector. -#}
+        {% if redacted %}
+          {%- call fact('address', 'Location') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}
+          {% endcall %}
+        {% elif _location %}
+          {{ fact('address', 'Location', _location, icon='map-pin') }}
+        {% endif %}
       {%- endcall %}
     {%- endif %}
     {%- if view.services or view.settings or view.services_other_text %}

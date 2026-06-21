@@ -399,9 +399,9 @@ async def test_referral_detail_groups_facts_like_the_form(
 
     facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
     assert {
+        # Logistics is now one consolidated location row (key `address`),
+        # not separate address + in-person/virtual session rows.
         "address",
-        "in_person_sessions",
-        "virtual_sessions",
         "services",
         "age",
         "pronouns",
@@ -414,6 +414,9 @@ async def test_referral_detail_groups_facts_like_the_form(
         "accepts_private_pay",
         "sliding_scale",
     } <= facts, facts
+    # The separate session rows folded into the location row.
+    assert "in_person_sessions" not in facts, facts
+    assert "virtual_sessions" not in facts, facts
 
 
 async def test_referral_detail_renders_list_facts_one_per_line(
@@ -456,10 +459,11 @@ async def test_referral_detail_meta_omits_modality_chips(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """The referral detail's Logistics group carries In-person / Virtual
-    as labeled rows, so the subtitle `.meta` line no longer repeats them
-    as chips — only the date remains there. (Opening/intake keep the
-    chips; that's covered by their own kinds, not pinned here.)"""
+    """The referral detail's Logistics group carries the modality in its
+    consolidated location row ("· Telehealth"), so the subtitle `.meta`
+    line no longer repeats it as chips — only the date remains there.
+    (Opening/intake keep the chips; that's covered by their own kinds, not
+    pinned here.)"""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(owner_id=author.id, session_format=["in_person", "virtual"])
@@ -476,9 +480,11 @@ async def test_referral_detail_meta_omits_modality_chips(
     meta_chips = [s.text(strip=True) for s in tree.css("small.meta span")]
     assert "In-person" not in meta_chips, meta_chips
     assert "Virtual" not in meta_chips, meta_chips
-    # The Logistics rows still carry the modality (it moved, not vanished).
-    facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
-    assert {"in_person_sessions", "virtual_sessions"} <= facts, facts
+    # The modality moved into the consolidated location row (it moved, not
+    # vanished): an in-person + virtual referral reads "…· Telehealth".
+    location_dd = tree.css_first('[data-fact="address"] dd')
+    assert location_dd is not None, response.text
+    assert "Telehealth" in location_dd.text(strip=True), location_dd.text(strip=True)
 
 
 async def test_referral_detail_suppresses_empty_coverage_group(
