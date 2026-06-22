@@ -143,12 +143,13 @@ Child contract:
               {%- if active_filter_count is defined and active_filter_count %}
                 <p class="filter-summary-label">
                   Showing results with
-                  <a href="{{ search_url }}" class="filter-summary-edit">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>
+                  <a href="{{ search_url }}" class="filter-summary-edit">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
                 </p>
               {%- else %}
                 <p class="filter-summary-label">Showing all results.</p>
               {%- endif %}
             </header>
+            <hr>
           {%- endif %}
         {%- endif %}
         {% block list_body %}{% endblock %}
