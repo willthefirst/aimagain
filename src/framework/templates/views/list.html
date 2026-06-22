@@ -28,12 +28,13 @@ Browse layout: when the entity spec declares `filters=(…)`, the
 context. `{% block content %}` detects this and wraps `{% block list_body %}`
 in a two-column `.browse-layout` (220px sidebar + flexible results). The
 sidebar embeds the filter form inline so viewers never leave the list to
-filter. The results column opens with a `.filter-summary` header that both
-reads out the active filters (`active_filters`) defining the result set and
-links to the dedicated `/<collection>/search` page (mounted automatically
-whenever `filters` is declared) for refining them. Entities with no declared
-filters render `list_body` full-width without any sidebar and have no filter
-UI at all.
+filter. The results column opens with a plain `<header>` that states
+whether the result set is filtered: "Showing all results." when nothing is
+active, else "Showing results with <N filters>" where the count links to the
+dedicated `/<collection>/search` page (mounted automatically whenever
+`filters` is declared) for refining them. Entities with no declared filters
+render `list_body` full-width without any sidebar and have no filter UI at
+all.
 
 Child contract:
 
@@ -77,9 +78,10 @@ Child contract:
     resource_label, pager, filters, filter_values, active_filters,
     active_filter_count, filter_heading, search_url. The sidebar
     form consumes `filters` / `filter_values`; the results-column
-    `.filter-summary` header consumes `active_filters` /
-    `active_filter_count` / `filter_heading` / `search_url`; `pager`
-    is read inside the `item_list` macro.
+    summary `<header>` consumes `active_filter_count` /
+    `search_url`; `pager` is read inside the `item_list` macro.
+    (`active_filters` / `filter_heading` are injected for any
+    template that wants them but are not used by this view.)
 
   Context the framework's mount helpers inject for subresource pages:
     _breadcrumb_items — list of (label, href|None) tuples; the last
@@ -130,25 +132,22 @@ Child contract:
           </form>
         </aside>
         <div class="browse-results">
-          {#- Filter summary — the affordance to refine filters (links to the
-            dedicated `/<collection>/search` page) AND the read-out of which
-            filters define this result set. It moved here from the sidebar
-            header so the results column itself states what it's showing.
-            `active_filters` is a list of `{name, value, label}` descriptors
-            (one per selected value); empty means the unfiltered directory. -#}
+          {#- Filter summary — states what the results column is showing. With
+            no active filter it reads "Showing all results."; with one or more,
+            it reads "Showing results with <N filters>", where the count is the
+            link to the dedicated `/<collection>/search` page for refining them.
+            Only `active_filter_count` is rendered (the per-value descriptor
+            pills were dropped); `search_url` is set whenever filters exist. -#}
           {%- if search_url is defined and search_url %}
-            <header class="filter-summary">
-              {%- if active_filters %}
-                <p class="filter-summary-label">Showing results for:</p>
-                <ul class="filter-tags" aria-label="Active filters">
-                  {%- for f in active_filters %}<li>{{ f.label }}</li>{%- endfor %}
-                </ul>
+            <header>
+              {%- if active_filter_count is defined and active_filter_count %}
+                <p>
+                  Showing results with
+                  <a href="{{ search_url }}">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
+                </p>
               {%- else %}
-                <p class="filter-summary-label">Showing all results.</p>
+                <p>Showing all results.</p>
               {%- endif %}
-              <a href="{{ search_url }}" class="filter-summary-edit">{{ filter_heading or "Filters" }}
-                {% if active_filter_count is defined and active_filter_count %}({{ active_filter_count }}){% endif %}
-              </a>
             </header>
           {%- endif %}
         {%- endif %}
