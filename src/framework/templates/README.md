@@ -90,13 +90,15 @@ From top to bottom:
 │   breadcrumb row     ← Resource   (hidden placeholder if none) │  ← captured `{% block breadcrumb %}`
 │   toolbar row        <h1> title              [actions ▶]  │  ← captured `{% block toolbar %}`
 ├───────────────────────────────────────────────────────────┤  ← `border-bottom` on `.page-header`
-│ (onboarding banner removed)                               │
+│ onboarding banner    "Add a clinician or organization…"   │  ← `#onboarding-banner`, gated on `needs_provider_entity` (`base_context`)
 │ subtitle (optional)  NPI · Verified                       │  ← `{% block subtitle %}` (rendered below the boundary, top of `<main>`)
 │ page content                                              │  ← `{% block content %}`
 ├───────────────────────────────────────────────────────────┤
 │ <footer> site chrome           &copy; … · support@ …      │  ← `{% block footer %}` (default body in `base.html`)
 └───────────────────────────────────────────────────────────┘
 ```
+
+**Onboarding banner.** `#onboarding-banner` is a global derived gate ([`../../domain/routes/RESOURCE_GRAMMAR.md`](../../domain/routes/RESOURCE_GRAMMAR.md) §"Derived gates") — not a resource or wizard, just a chrome nudge that dispatches into the two minimal create forms (`entity_form_url('clinician')` / `('organization')`). It renders at the top of `<main>` only when `needs_provider_entity` is set in `base_context` (an authenticated account holding **neither** a clinician profile **nor** an org rep, so no post can be authored yet). It keys on entity *existence*, not verification: adding a clinician or org silences it, and the residual "verify to post" step lives on the `/users/me` card. The matching create-time copy is `posts/_shared/_require_clinician_profile.html`. Contract pinned in [`../../domain/routes/test_chrome_banner.py`](../../domain/routes/test_chrome_banner.py).
 
 `{% include %}` can't see the including template's blocks, so `base.html` captures the `breadcrumb` / `toolbar` / `subtitle` block output into context vars and hands the pre-rendered HTML to the band partial. Children still just override `{% block breadcrumb %}` / `{% block toolbar %}` / `{% block subtitle %}` — the capture indirection is transparent. The band's lower rows render only when there's app chrome to show (any breadcrumb/toolbar content, or an authenticated viewer), so anonymous public pages (landing, the `/auth/*` flow) keep their bare brand nav.
 
