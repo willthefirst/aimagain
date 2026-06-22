@@ -93,6 +93,21 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     # filters; ``level_of_care`` / ``modality`` were dropped when settings /
     # modalities collapsed onto the single ``services`` axis.
     filters=(
+        # `?owner=me` scopes the list to posts the viewer owns
+        # (``Post.owner_id == self._requesting_user.id``) — the same
+        # single-toggle radio clinicians/orgs expose. Rendered first so
+        # the viewer-relative scope sits above the structured facets;
+        # the viewer-id resolution happens in
+        # ``PostRepository.list_posts`` via the ``_requesting_user``
+        # field ``handle_list`` stamps on the repo. Powers the "My
+        # posts" view (`/posts?owner=me`, each row → Edit).
+        ChoiceFilter(
+            name="owner",
+            label="Owner",
+            choices=(("me", "Owned by me"),),
+            multi=False,
+            radio=True,
+        ),
         ChoiceFilter(
             name="kind",
             label="Type",
