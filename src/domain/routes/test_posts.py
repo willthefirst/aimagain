@@ -302,6 +302,51 @@ async def test_list_kind_filter_narrows_to_one_kind(
     }, f"/posts?kind=referral returned: {kinds_filtered!r}"
 
 
+# --- List filter: ?owner=me scopes to the viewer's own posts -------------
+
+
+async def test_list_owner_me_scopes_to_viewer_owned_posts(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """`/posts?owner=me` narrows the feed to posts the viewer owns — the
+    foundation of the "My posts" view. Without the filter both owners'
+    posts list; with it, only the viewer's. Mirrors the clinician/org
+    `?owner=me` radio."""
+    author = create_test_user(username=f"a-{uuid.uuid4()}")
+    mine = _referral_post(owner_id=logged_in_user.id, description="mine")
+    theirs = _referral_post(owner_id=author.id, description="theirs")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(author)
+            session.add(mine)
+            session.add(theirs)
+
+    # Feed rows carry no `data-row-id`; each row's headline links to
+    # `/posts/{id}`, so resolve which posts rendered by their detail hrefs.
+    def _rendered_ids(html: str) -> set[str]:
+        return {
+            a.attributes.get("href", "").rsplit("/", 1)[-1]
+            for a in HTMLParser(html).css(
+                "#posts-list .post-feed-row a.post-feed-headline-text"
+            )
+        }
+
+    # No filter → both owners' posts visible.
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    ids_unfiltered = _rendered_ids(response.text)
+    assert {str(mine.id), str(theirs.id)} <= ids_unfiltered
+
+    # `?owner=me` → only the viewer's own post.
+    response = await authenticated_client.get("/posts?owner=me")
+    assert response.status_code == 200
+    ids_filtered = _rendered_ids(response.text)
+    assert str(mine.id) in ids_filtered
+    assert str(theirs.id) not in ids_filtered
+
+
 # --- Detail / edit-form route works across kinds -------------------------
 
 
