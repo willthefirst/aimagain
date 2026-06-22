@@ -6,8 +6,8 @@ The chrome is three full-width bands stacked above the content, each a
 body-level layout row:
 
   1. ``<header class="page-header">`` — the primary nav only. Its inner
-     ``.container`` caps + centers the nav; the band's ``border-bottom`` spans
-     the full page.
+     ``.container-fluid`` lays the nav out full-width (minus Pico's gutter);
+     the band's ``border-bottom`` spans the full page.
   2. ``<nav class="breadcrumb-bar">`` — its OWN body-level band (a sibling of
      ``<header>``/``<main>``/``<footer>``, NOT nested in the header). Always
      shows a real, visible crumb on authenticated pages — a page-supplied
@@ -97,8 +97,8 @@ def test_detail_toolbar_in_main_and_breadcrumb_is_its_own_band() -> None:
     bar = tree.css_first("body > nav.breadcrumb-bar")
     assert bar is not None
     assert bar.attributes.get("aria-label") == "breadcrumb"
-    # Full Pico chain in a `.container > ul`: Home › Collection › <resource>.
-    crumbs = [li.text(strip=True) for li in bar.css("div.container ul li")]
+    # Full Pico chain in a `.container-fluid > ul`: Home › Collection › <resource>.
+    crumbs = [li.text(strip=True) for li in bar.css("div.container-fluid ul li")]
     assert crumbs == ["Home", "Clinicians", "Sunrise Therapy"]
 
 
@@ -112,7 +112,7 @@ def test_list_page_shows_visible_home_breadcrumb_no_placeholder() -> None:
 
     bar = tree.css_first("body > nav.breadcrumb-bar")
     assert bar is not None
-    crumbs = bar.css("div.container ul li")
+    crumbs = bar.css("div.container-fluid ul li")
     # Home links to the feed; the collection itself is the current leaf.
     assert [li.text(strip=True) for li in crumbs] == ["Home", "Clinicians"]
     assert crumbs[0].css_first("a").attributes.get("href") == "/posts"

@@ -5,8 +5,8 @@
    landing-specific extras: vertically center the hero within `<main>` and
    switch the CTA cluster to a natural-width inline row, both at tablet+.
    `<main>` makes itself a centering grid; its sole child is the
-   `.container` that holds the hero, so `align-content: center` centers the
-   hero block. Mobile relies on Pico defaults — `<a role="button">` is
+   `.container-fluid` that holds the hero, so `align-content: center` centers
+   the hero block. Mobile relies on Pico defaults — `<a role="button">` is
    block-level full-width, which is exactly what we want for stacked
    tappable bars. Scoped to `body:has(.landing-hero)` so the rules don't
    leak to any other page. #}

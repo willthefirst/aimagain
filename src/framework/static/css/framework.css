@@ -535,10 +535,10 @@ dd { margin: 0; }
 /* Page-header band — the top-chrome nav element
    (`_shared/_page_header.html`): the primary nav, closed with a full-width
    `border-bottom`. The band itself is full-width and carries the boundary;
-   its inner `.container` (max-width-capped, centered) holds the nav, so the
-   divider spans the whole page while content stays within the container
-   gutter (matches `<main>` / `<footer>`, which also wrap content in an inner
-   `.container`). The breadcrumb is its own band below; the page `<h1>` +
+   its inner `.container-fluid` (full-width, gutter-padded) holds the nav, so
+   the divider spans the whole page while content fills the viewport width
+   minus the gutter (matches `<main>` / `<footer>`, which also wrap content in
+   an inner `.container-fluid`). The breadcrumb is its own band below; the page `<h1>` +
    actions toolbar lives in `<main>`. Both band dividers use the standard
    subtle `--pico-muted-border-color`. */
 .page-header { border-bottom: 1px solid var(--pico-muted-border-color); color: inherit; }
@@ -662,10 +662,10 @@ td > menu > li > [role="button"] {
   margin-inline: auto;
 }
 /* Page footer (`<footer>` in base.html — sibling of `<header>` and
-   `<main>`, content wrapped in an inner `.container`). Centered chrome
+   `<main>`, content wrapped in an inner `.container-fluid`). Centered chrome
    line, present on every page via the default `{% block footer %}` body.
    `text-align` is set on `<footer>` itself (full width) so it cascades to
-   the centered inner container's text. */
+   the inner container's text. */
 footer { text-align: center; }
 fieldset { border: none; padding: 0; margin: 0 0 1.25rem; }
 legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); font-weight: 500; padding: 0; }

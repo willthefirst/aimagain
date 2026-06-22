@@ -579,7 +579,7 @@ async def test_get_register_page(test_client: AsyncClient):
     assert "Create an account" in response.text
     assert "Create account" in response.text
     # Form wrapper — `.auth-page` caps the form at 28rem and centers it
-    # so it doesn't stretch to the `<main class="container">` width on
+    # so it doesn't stretch to the `<main>` `.container-fluid` width on
     # tablet/desktop (#584). No card chrome: deliberately not styled as
     # a card. The `.auth-page` rule lives in `base.html`.
     assert '<section class="auth-page">' in response.text
