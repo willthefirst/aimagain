@@ -302,72 +302,41 @@ async def test_list_kind_filter_narrows_to_one_kind(
     }, f"/posts?kind=referral returned: {kinds_filtered!r}"
 
 
-# --- Intent toggle: Referrals / Openings over `?kind=` -------------------
+# --- Browse chrome: no toolbar, no intent toggle, filter summary present -
 
 
-async def test_list_renders_binary_intent_toggle(
+async def test_list_omits_toolbar_and_intent_toggle(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """`/posts` browse renders the binary intent toggle (mock §3): a
-    `role="group"` of exactly two links — Referrals (`?kind=referral`) and
-    Openings (`?kind=clinician_opening`). `program_intake` is deliberately
-    absent (browsed via org pages), so the toggle is never a three-way."""
+    """The posts browse suppresses the shared list toolbar (no page `<h1>`,
+    no "Create post" action — posting is offered by the global "+ Post" nav
+    button) and renders no Referrals/Openings intent toggle. The `?kind=`
+    facet is reachable via the sidebar filter form instead."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
-    group = HTMLParser(response.text).css_first(
-        'nav[aria-label="Post intent"] [role="group"]'
-    )
-    assert group is not None, "/posts did not render the intent toggle group"
-    links = group.css("a")
-    hrefs = [a.attributes.get("href") for a in links]
-    labels = [a.text(strip=True) for a in links]
-    assert hrefs == ["/posts?kind=referral", "/posts?kind=clinician_opening"]
-    assert labels == ["Referrals", "Openings"]
-    # Intake is not a toggle option.
-    assert not any("kind=program_intake" in (h or "") for h in hrefs)
+    tree = HTMLParser(response.text)
+    assert tree.css_first("div.toolbar") is None
+    assert tree.css_first('nav[aria-label="Post intent"]') is None
 
 
-@pytest.mark.parametrize(
-    "kind,active_label",
-    [("referral", "Referrals"), ("clinician_opening", "Openings")],
-)
-async def test_intent_toggle_marks_active_kind_current(
-    kind: str,
-    active_label: str,
+async def test_list_filter_summary_reads_active_kind(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """Selecting a kind marks exactly that toggle tab `aria-current="page"`;
-    the other tab is the inactive (outline) variant. Active intent reads the
-    `kind` filter selection (`filter_values.kind == [kind]`)."""
-    response = await authenticated_client.get(f"/posts?kind={kind}")
+    """The results column opens with a `.filter-summary` header that names
+    the active filters and links to the dedicated search page. Filtering by
+    kind surfaces a `Type: …` tag and points the refine link at the search
+    URL carrying the live query string."""
+    response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
-    group = HTMLParser(response.text).css_first(
-        'nav[aria-label="Post intent"] [role="group"]'
-    )
-    assert group is not None
-    current = [
-        a.text(strip=True)
-        for a in group.css("a")
-        if a.attributes.get("aria-current") == "page"
-    ]
-    assert current == [active_label]
-
-
-async def test_intent_toggle_no_current_tab_on_unfiltered_feed(
-    authenticated_client: AsyncClient,
-    logged_in_user,
-):
-    """The default unfiltered feed (every kind) marks neither tab current —
-    the toggle never claims a narrowing that isn't applied."""
-    response = await authenticated_client.get("/posts")
-    assert response.status_code == 200
-    group = HTMLParser(response.text).css_first(
-        'nav[aria-label="Post intent"] [role="group"]'
-    )
-    assert group is not None
-    assert not group.css('a[aria-current="page"]')
+    summary = HTMLParser(response.text).css_first(".browse-results .filter-summary")
+    assert summary is not None
+    tags = [li.text(strip=True) for li in summary.css("ul.filter-tags li")]
+    assert any(t.startswith("Type:") for t in tags), tags
+    link = summary.css_first("a.filter-summary-edit")
+    assert link is not None
+    assert (link.attributes.get("href") or "").startswith("/posts/search")
 
 
 # --- List filter: ?owner=me scopes to the viewer's own posts -------------
@@ -1267,78 +1236,13 @@ async def test_list_has_no_inline_verify_notice_for_unverified(
     assert main.css_first("button.locked-ghost-btn") is None
 
 
-# --- Toolbar Create CTA gate (posting-capable claim) -------------------------
-
-
-async def test_list_hides_create_cta_for_claimless_user(
-    authenticated_client: AsyncClient,
-    logged_in_user,
-):
-    """The `/posts` toolbar 'Create' button is hidden for a user holding
-    no posting-capable claim — clicking it would only land on a server
-    403 / degraded form. Matches the per-kind post gate's universe. Scoped
-    to the toolbar action menu — the global nav `+ Post` button (also an
-    `a[href='/posts/form'][role='button']`) is intentionally always present
-    and is pinned separately in the page-header / nav tests."""
-    response = await authenticated_client.get("/posts")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert (
-        tree.css_first("menu.toolbar-right a[href='/posts/form'][role='button']")
-        is None
-    ), "claimless user must not be offered the toolbar Create CTA"
-
-
-async def test_list_shows_create_cta_for_claim_a_user(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user,
-):
-    """A Claim-A (verified clinician) user sees the toolbar 'Create' CTA —
-    the server post gate would let them through."""
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-
-    response = await authenticated_client.get("/posts")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert (
-        tree.css_first("menu.toolbar-right a[href='/posts/form'][role='button']")
-        is not None
-    ), "Claim-A user should be offered the toolbar Create CTA"
-
-
-async def test_list_shows_create_cta_for_claim_b_org_rep(
-    authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-    logged_in_user,
-):
-    """A verified org rep (no clinician profile) must see the `/posts` toolbar
-    Create CTA — `can_act_as_provider` is the single gate for posting."""
-    org = make_organization_row(owner_id=logged_in_user.id)
-    rep = OrgRepresentation(
-        user_id=logged_in_user.id,
-        org_id=org.id,
-        role="coordinator",
-        authority_method="admin_review",
-        authority_status="verified",
-    )
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(org)
-            session.add(rep)
-
-    response = await authenticated_client.get("/posts")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert (
-        tree.css_first("menu.toolbar-right a[href='/posts/form'][role='button']")
-        is not None
-    ), "Claim-B org rep must be offered the toolbar Create CTA"
+# NOTE: the posts browse no longer renders a toolbar Create CTA (the page
+# suppresses the shared list toolbar entirely — see
+# `test_list_omits_toolbar_and_intent_toggle`). Posting is offered by the
+# always-present global "+ Post" nav button, pinned in the page-header / nav
+# tests; the server-side post gate (claim required) is exercised by the
+# create/patch authz tests above. There is therefore no per-claim toolbar-CTA
+# visibility to assert here.
 
 
 async def test_detail_hides_message_form_and_shows_cta_for_unverified(

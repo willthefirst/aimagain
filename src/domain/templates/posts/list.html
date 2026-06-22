@@ -1,43 +1,18 @@
 {% extends "views/list.html" %}
 {%- from "_shared/_feed_row.html" import post_feed_row, post_feed_empty with context -%}
 {%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/_locked.html" import locked_action -%}
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_fields.html" import text_field with context -%}
 {%- from "_shared/actions.html" import actions -%}
-{% block actions %}
-  {% if can_act_as_provider %}
-    <li>
-      <a href="{{ entity_form_url('post') }}" role="button">{{ entity_create_label("post") }}</a>
-    </li>
-  {% else %}
-    <li>{{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, entity_create_label("post") ) }}</li>
-  {% endif %}
-{% endblock %}
+{#- No page toolbar on the posts browse. The h1 + "Create post" action that
+    the shared list view renders are both suppressed here: posting is offered
+    by the always-present global "+ Post" nav button (see `_page_header.html`),
+    and the results column's `.filter-summary` header (views/list.html) names
+    what's being browsed — so a redundant page title earns no space. The
+    `?kind=` Referrals/Openings switch lives in the sidebar filter form like
+    every other facet; there is no separate intent toggle. -#}
+{% block toolbar %}{% endblock %}
 {% block list_body %}
-  {#- Binary intent toggle (mock §3). Browse is the default landing; the
-      toggle is pure presentation over the existing `?kind=` filter —
-      Referrals ("grow caseload") vs Openings ("place a client"). It is
-      NOT a third "All" state and `program_intake` is deliberately absent:
-      intake is browsed via org pages (`/organizations/:id/intakes`). The
-      structured `kind` checkbox in the sidebar rail still offers every
-      kind; this is the fast two-way switch above the results.
-
-      Active intent reads `filter_values.kind` (a list — the `kind` filter
-      is `multi=True`): a tab is current iff that selection is exactly its
-      one kind. The default unfiltered feed (every kind) leaves neither
-      tab current, so it never lies about a narrowing that isn't applied. -#}
-  {%- set _active_kinds = filter_values.get("kind") or [] -%}
-  <nav class="intent-toggle" aria-label="Post intent">
-    <div role="group">
-      <a href="{{ entity_url("post") }}?kind=referral"
-         role="button"
-         {% if _active_kinds == ["referral"] %}aria-current="page"{% else %}class="outline"{% endif %}>Referrals</a>
-      <a href="{{ entity_url("post") }}?kind=clinician_opening"
-         role="button"
-         {% if _active_kinds == ["clinician_opening"] %}aria-current="page"{% else %}class="outline"{% endif %}>Openings</a>
-    </div>
-  </nav>
   {#- Poster names / contact are anonymized server-side via
       `can_act_as_provider`. The chrome `#onboarding-banner` (base.html)
       is the single place explaining verification unlocks the full view —
