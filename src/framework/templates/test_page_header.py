@@ -86,7 +86,7 @@ def test_detail_toolbar_in_main_and_breadcrumb_is_its_own_band() -> None:
     — not nested inside `header.page-header`."""
     env = _make_env()
     _add_child(env, "stub.html", _DETAIL_STUB)
-    tree = HTMLParser(_render(env, "stub.html"))
+    tree = HTMLParser(_render(env, "stub.html", is_authenticated=True))
 
     # Toolbar H1 is in <main>, not the band.
     assert tree.css_first("header.page-header div.toolbar h1") is None
@@ -97,8 +97,9 @@ def test_detail_toolbar_in_main_and_breadcrumb_is_its_own_band() -> None:
     bar = tree.css_first("body > nav.breadcrumb-bar")
     assert bar is not None
     assert bar.attributes.get("aria-label") == "breadcrumb"
-    # The crumb is wrapped in a `.container` so it aligns with page content.
-    assert bar.css_first("div.container a.breadcrumb-back") is not None
+    # Full Pico chain in a `.container > ul`: Home › Collection › <resource>.
+    crumbs = [li.text(strip=True) for li in bar.css("div.container ul li")]
+    assert crumbs == ["Home", "Clinicians", "Sunrise Therapy"]
 
 
 def test_list_page_shows_visible_home_breadcrumb_no_placeholder() -> None:
@@ -111,8 +112,11 @@ def test_list_page_shows_visible_home_breadcrumb_no_placeholder() -> None:
 
     bar = tree.css_first("body > nav.breadcrumb-bar")
     assert bar is not None
-    back = bar.css_first("a.breadcrumb-back")
-    assert back is not None and back.text(strip=True) == "Home"
+    crumbs = bar.css("div.container ul li")
+    # Home links to the feed; the collection itself is the current leaf.
+    assert [li.text(strip=True) for li in crumbs] == ["Home", "Clinicians"]
+    assert crumbs[0].css_first("a").attributes.get("href") == "/posts"
+    assert crumbs[-1].css_first("a") is None  # current page, no link
     # The hidden-placeholder mechanism is gone entirely.
     assert tree.css_first(".page-header-crumb-placeholder") is None
     assert tree.css_first("main div.toolbar h1") is not None

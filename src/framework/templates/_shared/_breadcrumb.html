@@ -1,71 +1,59 @@
-{# Breadcrumb zone bar primitive.
+{# Breadcrumb band primitive.
 
-Renders the page's location as a single "back" affordance — a
-Lucide arrow-left chevron plus the deepest clickable parent's
-label — wrapped in its OWN `<nav class="breadcrumb-bar">` band. A
-view template fills the `breadcrumb` block; `base.html` captures it
-and renders the result as a body-level sibling of `<header>` /
-`<main>` / `<footer>` (not inside the page-header). The inner
-`.container` keeps the crumb aligned with page content.
+Renders the page's full location as a Pico breadcrumb chain
+(https://picocss.com/docs/nav) — a "Home" root followed by each passed
+segment, with Pico drawing the `>` dividers between items — wrapped in its
+OWN `<nav class="breadcrumb-bar">` band. A view template fills the
+`breadcrumb` block; `base.html` captures it and renders the result as a
+body-level sibling of `<header>` / `<main>` / `<footer>` (not inside the
+page-header). The inner `.container` keeps the chain aligned with page
+content; on narrow viewports the chain scrolls horizontally rather than
+wrapping (see `.breadcrumb-bar` in framework.css).
 
-Each item is a `(label, href, lock_reason)` tuple — the third
-element is optional and defaults to `None`. The last item's
-`href` is typically `None` (the current page); the back target is
-the deepest item with a non-None `href` — for two-level chains
-(collection → current) that's the collection link, for nested
-chains (collection → row → edit) that's the row link.
+Each item is a `(label, href, lock_reason?)` tuple. Per item:
 
-When `lock_reason` is set on the back target (a closed-vocab
-`REASON_*` code — see `_locked.html`), the back affordance
-renders as `locked_link(reason, label)` instead of an `<a>`, so
-the visible link can't disagree with the destination page's
-`read_policy.assert_can_read`. Mount helpers compute the reason via
-`entity_lock_reason(name, user)`; per-template callers (the
-detail-view collection breadcrumb) use the Jinja-global form.
+  - `lock_reason` set (a closed-vocab `REASON_*` code, see `_locked.html`) →
+    a `data-locked-cta` popover trigger with no `href`, so the visible link
+    can't disagree with the destination's `read_policy.assert_can_read`.
+    Mount helpers compute the reason via `entity_lock_reason(name, user)`;
+    per-template callers use the Jinja-global form.
+  - `href` set, no lock → a plain `<a href>` link.
+  - neither → plain current-page text (`aria-current="page"`).
 
-When every item has `href=None` (theoretical edge case — a page
-with no parent), the back affordance falls back to the first
-item's label as plain text so the markup stays valid.
+A "Home" root (→ the posts feed, the authenticated landing surface) is
+prepended to every chain, so callers pass only the ancestors + current
+segment. An empty `items` therefore renders just the Home crumb.
 
     {{ breadcrumb([
         ("Posts", "/posts"),
         ("Post", "/posts/" ~ post.id),
-        ("Edit", None),
+        ("Edit", none),
     ]) }}
+    → Home › Posts › Post › Edit
 #}
-{%- from "_shared/_locked.html" import locked_link -%}
 {% macro breadcrumb(items) -%}
-  {%- if items %}
-    {# Deepest clickable parent — the back target. Walk from the end
-   backward; the current page (last item) typically has `href=None`
-   so its parent is at index -2. For single-item crumbs (detail
-   pages) the only item carries the href. #}
-    {%- set _linkable = items | selectattr(1) | list -%}
-    {%- set _back = _linkable[-1] if _linkable else items[0] -%}
-    {%- set _lock = _back[2] if _back|length > 2 else none -%}
-    {# Self-contained breadcrumb bar: its own `<nav>` rendered at body
-       level (a sibling of `<header>`/`<main>`/`<footer>` — see base.html),
-       with an inner `.container` so the crumb aligns with page content
-       while the bar can span full width. #}
-    <nav aria-label="breadcrumb" class="breadcrumb-bar">
-      <div class="container">
-        {%- if _lock %}
-          {# Locked back affordance: same locked-cta popover wiring as
-       `locked_link`, but keeps the `.breadcrumb-back` chrome (chevron
-       + label sizing) so the bar layout is unchanged. #}
-          <a class="breadcrumb-back locked-link"
-             aria-disabled="true"
-             tabindex="0"
-             data-locked-cta="{{ _lock }}">
-            <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
-          </a>
-        {%- else %}
-          <a class="breadcrumb-back"
-             {% if _back[1] %}href="{{ _back[1] }}"{% endif %}>
-            <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
-          </a>
-        {%- endif %}
-      </div>
-    </nav>
-  {%- endif %}
+  {%- set _chain = [("Home", entity_url("post"), none)] + (items | list if items else []) -%}
+  <nav aria-label="breadcrumb" class="breadcrumb-bar">
+    <div class="container">
+      <ul>
+        {%- for _item in _chain %}
+          {%- set _label = _item[0] -%}
+          {%- set _href = _item[1] -%}
+          {%- set _lock = _item[2] if _item | length > 2 else none -%}
+          <li>
+            {%- if _lock -%}
+              <a class="locked-link"
+                 aria-disabled="true"
+                 tabindex="0"
+                 data-locked-cta="{{ _lock }}">{{ _label }}</a>
+            {%- elif _href -%}
+              <a href="{{ _href }}">{{ _label }}</a>
+            {%- else -%}
+              <span aria-current="page">{{ _label }}</span>
+            {%- endif -%}
+          </li>
+        {%- endfor %}
+      </ul>
+    </div>
+  </nav>
 {%- endmacro %}

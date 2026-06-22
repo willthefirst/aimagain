@@ -68,12 +68,13 @@ Child contract:
       {% block current_label %}{% endblock %}
     {% endset -%}
     {# Collection segment goes through `breadcrumb_entity_item` so the
-       lock_reason is always populated. The second (current-row) segment
-       is a literal href — no lock there because the back target is the
-       row the user just came from. #}
+       lock_reason is always populated. The current resource links to its
+       detail page (the ancestor of this edit form); `Edit` is the unlinked
+       leaf → `Home › Clinicians › <resource> › Edit`. #}
     {{ breadcrumb([
         breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
     (current | trim, resource_detail_url, none),
+    ("Edit", none),
     ]) }}
   {%- endif %}
 {% endblock %}

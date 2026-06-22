@@ -33,13 +33,11 @@ def _make_env() -> Environment:
     return _make_env_impl()
 
 
-def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
-    """``views/list.html`` puts the `resource_label` into the
-    toolbar `<h1>` (the page title) and renders no breadcrumb —
-    a single-segment "Clinicians" trail would duplicate what the
-    active global-nav tab already communicates, so list pages
-    skip the breadcrumb entirely. The child only declares the
-    label."""
+def test_list_view_renders_h1_in_toolbar_and_home_breadcrumb() -> None:
+    """``views/list.html`` puts the `resource_label` into the toolbar `<h1>`
+    (the page title) and, for an authenticated viewer, renders the breadcrumb
+    as `Home › <collection>` — the collection itself is the current (unlinked)
+    leaf. The child only declares the label."""
     env = _make_env()
     _add_child(
         env,
@@ -53,13 +51,14 @@ def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
 
     html = env.get_template("stub.html").render(
         request=_request_stub(),
-        is_authenticated=False,
+        is_authenticated=True,
         is_development=False,
     )
 
     tree = HTMLParser(html)
-    # No breadcrumb on list pages.
-    assert tree.css_first('nav[aria-label="breadcrumb"]') is None
+    crumbs = tree.css('nav[aria-label="breadcrumb"] ul li')
+    assert [li.text(strip=True) for li in crumbs] == ["Home", "Clinicians"]
+    assert crumbs[-1].css_first("a") is None  # collection is the current page
     # The heading lives in the toolbar `<h1>`.
     toolbar_h1 = tree.css_first("div.toolbar h1")
     assert toolbar_h1 is not None
@@ -70,9 +69,10 @@ def test_list_view_renders_h1_in_toolbar_and_omits_breadcrumb() -> None:
 
 def test_list_view_renders_auto_breadcrumb_when_items_injected() -> None:
     """When the mount injects ``_breadcrumb_items`` into the context,
-    ``views/list.html`` renders it as the breadcrumb back-affordance
-    automatically — no per-template ``{% block breadcrumb %}`` needed.
-    The back link points at the deepest parent with a non-None href."""
+    ``views/list.html`` renders the full chain automatically — no
+    per-template ``{% block breadcrumb %}`` needed. Home is prepended; each
+    injected segment with an href links; the trailing href-less segment is
+    the current page."""
     env = _make_env()
     _add_child(
         env,
@@ -90,22 +90,27 @@ def test_list_view_renders_auto_breadcrumb_when_items_injected() -> None:
     ]
     html = env.get_template("stub.html").render(
         request=_request_stub(),
-        is_authenticated=False,
+        is_authenticated=True,
         is_development=False,
         _breadcrumb_items=items,
     )
 
     tree = HTMLParser(html)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None, "breadcrumb must render when _breadcrumb_items is injected"
-    assert back.attributes.get("href") == "/users/me"
-    label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "will"
+    crumbs = tree.css('nav[aria-label="breadcrumb"] ul li')
+    assert [li.text(strip=True) for li in crumbs] == [
+        "Home",
+        "Users",
+        "will",
+        "Clinicians",
+    ]
+    assert crumbs[2].css_first("a").attributes.get("href") == "/users/me"
+    assert crumbs[-1].css_first("a") is None  # current page, no link
 
 
-def test_list_view_omits_breadcrumb_without_items() -> None:
-    """Without ``_breadcrumb_items`` in context the breadcrumb block
-    renders nothing — top-level list pages are unaffected."""
+def test_anonymous_pages_omit_the_breadcrumb_band() -> None:
+    """Breadcrumbs are authenticated-app chrome: an anonymous viewer gets no
+    breadcrumb band at all (bare brand nav only), even on a page whose
+    breadcrumb block would otherwise produce a chain."""
     env = _make_env()
     _add_child(
         env,
@@ -231,17 +236,14 @@ def test_list_view_renders_actions_block_in_toolbar_right() -> None:
     assert '<li><a id="create" href="/posts/form">Create</a></li>' in html
 
 
-def test_detail_view_renders_back_affordance_and_actions() -> None:
-    """``views/detail.html`` builds the single-segment breadcrumb via
-    `breadcrumb_entity_item(entity_name)` and the breadcrumb macro
-    renders it as `<a class="breadcrumb-back" href="/posts">…</a>`.
-    Actions land inside the shared two-zone toolbar — empty left zone
-    (no search link), and a `<menu class="toolbar-right">` carrying
-    the `<li>` commands. Pins the "detail actions land at the same
-    right edge as list-page actions" rule (no per-view-type toolbar
-    shape). Uses `post` (no `read_policy`) so the back link stays an
-    unlocked `<a>` for the chrome assertion; the locked branch is
-    pinned by `test_breadcrumb.py` / route-level tests."""
+def test_detail_view_renders_full_breadcrumb_and_actions() -> None:
+    """``views/detail.html`` builds the full chain `Home › <collection> ›
+    <resource>` — the collection links (via `breadcrumb_entity_item`) and the
+    current resource (`current_label`) is the unlinked leaf. Actions land
+    inside the shared two-zone toolbar — empty left zone (no search link), and
+    a `<menu class="toolbar-right">` carrying the `<li>` commands. Uses `post`
+    (no `read_policy`) so the collection link stays unlocked; the locked
+    branch is pinned by `test_breadcrumb.py` / route-level tests."""
     env = _make_env()
     _add_child(
         env,
@@ -258,16 +260,15 @@ def test_detail_view_renders_back_affordance_and_actions() -> None:
 
     html = env.get_template("stub.html").render(
         request=_request_stub(),
-        is_authenticated=False,
+        is_authenticated=True,
         is_development=False,
     )
 
     tree = HTMLParser(html)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None and back.attributes.get("href") == "/posts"
-    label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Posts"
-    assert "A referral" in html
+    crumbs = tree.css('nav[aria-label="breadcrumb"] ul li')
+    assert [li.text(strip=True) for li in crumbs] == ["Home", "Posts", "A referral"]
+    assert crumbs[1].css_first("a").attributes.get("href") == "/posts"
+    assert crumbs[-1].css_first("a") is None  # current resource, no link
     assert '<div class="toolbar">' in html
     assert '<menu class="toolbar-right">' in html
     # No search link on detail pages — left zone stays empty.
@@ -298,16 +299,17 @@ def test_form_new_view_renders_create_heading_from_context() -> None:
 
     html = env.get_template("stub.html").render(
         request=_request_stub(),
-        is_authenticated=False,
+        is_authenticated=True,
         is_development=False,
         create_heading="Create post",
     )
 
     tree = HTMLParser(html)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None and back.attributes.get("href") == "/posts"
-    label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Posts"
+    crumbs = tree.css('nav[aria-label="breadcrumb"] ul li')
+    # Home › Posts › New — the collection links, `New` is the current leaf.
+    assert [li.text(strip=True) for li in crumbs] == ["Home", "Posts", "New"]
+    assert crumbs[1].css_first("a").attributes.get("href") == "/posts"
+    assert crumbs[-1].css_first("a") is None
     assert "<h1>Create post</h1>" in html
     assert '<form id="x"></form>' in html
 
@@ -357,14 +359,12 @@ def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
 
 
 def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
-    """``views/form_edit.html`` renders a single-link back affordance
-    pointing at the row's detail page (the deepest clickable parent of
-    an edit view) above an `<h1>"Edit <noun>"` sourced from
-    `edit_heading`. The back link's label is the row's identity
-    (`current_label`) — "back to Sunrise Therapy" is the natural verb.
-    The H1 reads the resource noun ("clinician", "Opening", "Referral")
-    rather than the row's identity, mirroring the create-page contract
-    where `create_heading` sources the H1."""
+    """``views/form_edit.html`` renders the full chain `Home › <collection> ›
+    <resource> › Edit`: the collection links, the current resource links to
+    its detail page (the ancestor of this edit form), and `Edit` is the
+    unlinked leaf. The H1 reads the resource noun via `edit_heading`,
+    mirroring the create-page contract where `create_heading` sources the
+    H1."""
     env = _make_env()
     _add_child(
         env,
@@ -381,19 +381,22 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
 
     html = env.get_template("stub.html").render(
         request=_request_stub(),
-        is_authenticated=False,
+        is_authenticated=True,
         is_development=False,
         edit_heading="Edit clinician",
     )
 
     tree = HTMLParser(html)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None, "form-edit must render a back affordance"
-    assert (
-        back.attributes.get("href") == "/clinicians/42"
-    ), "back link points at the deepest clickable parent (the row's detail page)"
-    label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == "Sunrise Therapy"
+    crumbs = tree.css('nav[aria-label="breadcrumb"] ul li')
+    assert [li.text(strip=True) for li in crumbs] == [
+        "Home",
+        "Clinicians",
+        "Sunrise Therapy",
+        "Edit",
+    ]
+    # The resource links to its detail page (ancestor of the edit form).
+    assert crumbs[2].css_first("a").attributes.get("href") == "/clinicians/42"
+    assert crumbs[-1].css_first("a") is None  # `Edit` is the current page
     # H1 in the toolbar reads `edit_heading`, NOT "Edit <current_label>".
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None
