@@ -1,6 +1,6 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/actions.html" import actions, favorite_toggle -%}
-{%- from "_shared/_locked.html" import locked_name -%}
+{%- from "_shared/_locked.html" import locked_name, locked_action -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- from "_shared/icon_label.html" import icon_label -%}
 {%- from "_shared/sections.html" import fact, facts_block -%}
@@ -40,15 +40,27 @@
   {% endif %}
 {% endblock %}
 {% block actions %}
-  {# Primary resource actions (Favorite toggle, Edit, Delete) live in
-   the toolbar — see the "every page's toolbar is the home for
+  {# Primary resource actions (Favorite toggle, Edit, Message, Delete)
+   live in the toolbar — see the "every page's toolbar is the home for
    resource actions" rule in
    [`../../../framework/templates/README.md`](../../../framework/templates/README.md).
    `can_edit` and `is_favorited` are computed by
    handle_get_clinician_detail; templates do not re-derive
    authorization predicates inline. Each action is a `<li>` because
    the toolbar's right zone is a `<menu class="toolbar-right">` of
-   commands. #}
+   commands.
+
+   Owner-vs-visitor split (mock §6): the same URL serves everyone, so
+   the toolbar branches on who's looking. The owner gets the
+   management cluster (Edit / Delete). A non-owner is a *visitor* and
+   gets a Message action instead — gated by the same
+   `can_act_as_provider` / `_locked` pattern the post detail footer
+   uses (`posts/detail.html`): a verified provider gets a live
+   Message link to the clinician's owner profile (where contact
+   happens); everyone else gets the locked affordance whose popover
+   nudges them to verify. This mirrors — and reuses — the post
+   "Message the poster" gating exactly, so the two surfaces can't
+   disagree about who may reach out. #}
   {% if is_authenticated %}{{ favorite_toggle(clinician.id, is_favorited) }}{% endif %}
   {% if can_edit %}
     {{ actions(wrapper="toolbar",
@@ -57,6 +69,16 @@
     delete_url=entity_url('clinician', id=clinician.id),
     delete_confirm="Permanently delete this clinician? Credentials attached to them will be removed too. This cannot be undone.",
     ) }}
+  {% elif is_authenticated %}
+    <li>
+      {% if can_act_as_provider %}
+        <a href="{{ entity_url('user', id=clinician.owner_id) }}"
+           role="button"
+           class="outline">{{ icon_label('message-circle', 'Message') }}</a>
+      {% else %}
+        {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
+      {% endif %}
+    </li>
   {% endif %}
 {% endblock %}
 {# The detail page is a *dispatching picker* (#704 / #1330 pattern):
@@ -69,6 +91,45 @@
    land on the sub-resource list pages and see those pages' own
    redaction rules. #}
 {% block content %}
+  {# Consolidated read summary (mock §6). The page is still a
+     dispatching picker underneath, but a visitor lands on a profile —
+     so we lead with the key facts (Licenses, Affiliation, Location,
+     Insurance) drawn from the sub-resources rather than making the
+     reader click into each list page to learn them. This is a READ
+     surface only; full management still lives behind the picker cards
+     below, unchanged. Every row guards on its source so an unset field
+     suppresses cleanly.
+
+     Redaction: Location and Insurance are identifying practice facts,
+     so they follow the same `_redacted` gate as the H1 name — a
+     non-network visitor sees the locked name and no address, matching
+     the `_clinician_card.html` redaction contract. Licenses and the
+     practice/affiliation name are the clinician's public credentials
+     (the same facts the verification badge attests) and render for
+     every viewer, like the identity cluster below. #}
+  {%- set _license_lines = [] -%}
+  {%- for lic in view.licensures -%}
+    {%- set _lt = LICENSE_TYPES_LABELS.get(lic.license_type, lic.license_type) -%}
+    {%- set _ = _license_lines.append(_lt ~ " (" ~ lic.issuing_state ~ ")") -%}
+  {%- endfor -%}
+  {%- if _license_lines or view.practice_name or (not _redacted and (view.full_address or view.insurance_summary)) %}
+    {% call facts_block() %}
+      {%- if _license_lines %}
+        {{ fact('summary_licenses', 'Licenses', _license_lines | join(", ") , icon='award') }}
+      {%- endif %}
+      {%- if view.practice_name %}
+        {%- call fact('summary_affiliation', 'Affiliation', icon='stethoscope') -%}
+          {%- if view.practice_url -%}<a href="{{ view.practice_url }}">{{ view.practice_name }}</a>{%- else -%}{{ view.practice_name }}{%- endif -%}
+        {%- endcall %}
+      {%- endif %}
+      {%- if not _redacted and view.full_address %}
+        {{ fact('summary_location', 'Location', view.full_address, icon='map-pin') }}
+      {%- endif %}
+      {%- if not _redacted and view.insurance_summary %}
+        {{ fact('summary_insurance', 'Insurance', view.insurance_summary, icon='shield') }}
+      {%- endif %}
+    {% endcall %}
+  {%- endif %}
   {# Person-level identity cluster (#1358 PR-a/c/f). Affirming identities,
      languages, and clinical niches are *person* attributes — they move
      with the clinician across affiliations, the same way credentials
