@@ -835,11 +835,15 @@ async def test_create_form_gate_shown_when_no_clinician_profile(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """GET /posts/form?kind=<kind> shows the clinician-profile gate when the
-    requesting user has no clinician profiles, not the create form."""
+    """GET /posts/form?kind=<kind> shows the provider-entity gate when the
+    requesting user has no clinician profiles, not the create form. The gate
+    copy (`posts/_shared/_require_clinician_profile.html`) nudges toward a
+    clinician *or* org, matching the global #onboarding-banner."""
     response = await authenticated_client.get(f"/posts/form?kind={kind}")
     assert response.status_code == 200
-    assert "Create your clinician profile" in response.text
+    assert "Add a clinician or organization first." in response.text
+    assert "/clinicians/form" in response.text
+    assert "/organizations/form" in response.text
     # The post-create form fields should not be rendered.
     assert 'name="kind"' not in response.text
 
@@ -861,7 +865,7 @@ async def test_create_form_shown_when_clinician_profile_exists(
     response = await authenticated_client.get(f"/posts/form?kind={kind}")
     assert response.status_code == 200
     assert 'name="kind"' in response.text
-    assert "Create your clinician profile" not in response.text
+    assert "Add a clinician or organization first." not in response.text
 
 
 # Both clinician-authored kinds now expose a single practice picker named
