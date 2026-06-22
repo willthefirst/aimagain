@@ -1,16 +1,21 @@
 """Pins the verification status and chrome banner contract.
 
 The global chrome carries one chrome signal (`#onboarding-banner`, copy in
-`base.html`, gated on `onboarding_incomplete` from `base_context` →
-`onboarding_checklist`). The old `/profile` hub has been removed; the
-verification card on `/users/me` is the new home for claim setup links.
-These tests assert:
+`base.html`, gated on `needs_provider_entity` from `base_context`). It is a
+derived gate (`RESOURCE_GRAMMAR.md` §"Derived gates"): shown only when an
+authenticated account holds neither a clinician profile nor an org rep — so
+no post can be authored yet — and it dispatches into the two minimal create
+forms (`/clinicians/form`, `/organizations/form`). The old `/profile` hub has
+been removed; the verification card on `/users/me` is the new home for claim
+setup links. These tests assert:
 
 1. `/home` shows no per-page finish-setup card for a no-claim user — the
    post-action row is suppressed entirely and the only nudge is the chrome
    `#onboarding-banner`.
 2. Post CTAs on `/home` are gated on `can_act_as_provider` (clinician or org rep).
-3. The global `#onboarding-banner` is currently disabled (absent on all pages).
+3. The global `#onboarding-banner` is shown for an empty (no clinician/org)
+   account and links to both minimal create forms; it goes silent once the
+   account holds a provider entity (verified or not).
 """
 
 import pytest
@@ -37,8 +42,9 @@ async def test_new_user_sees_no_finish_setup_card_on_home(
     assert tree.css_first("#finish-setup-card") is None
     assert "Open Profile" not in response.text
     assert "+ Post a referral" not in response.text
-    # Banner temporarily disabled.
-    assert tree.css_first("#onboarding-banner") is None
+    # The chrome onboarding banner is the single finish-setup nudge for an
+    # account with no clinician/org.
+    assert tree.css_first("#onboarding-banner") is not None
 
 
 async def test_home_shows_network_section_with_empty_state_when_no_recent_posts(
@@ -162,39 +168,87 @@ async def test_home_shows_active_post_actions_for_claim_b_org_rep(
     ), "No disabled post buttons expected for a network-verified user"
 
 
-async def test_onboarding_banner_shown_off_profile_for_incomplete_user(
+async def test_onboarding_banner_shown_for_empty_account(
     authenticated_client: AsyncClient,
 ):
-    """Banner temporarily disabled — assert it is absent."""
+    """A fresh account (no clinician profile, no org rep) sees the global
+    `#onboarding-banner` nudging it to add a provider entity."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    assert HTMLParser(response.text).css_first("#onboarding-banner") is None
+    banner = HTMLParser(response.text).css_first("#onboarding-banner")
+    assert banner is not None
+    assert "start posting" in banner.text()
+
+
+async def test_onboarding_banner_links_to_both_minimal_create_forms(
+    authenticated_client: AsyncClient,
+):
+    """The banner is a derived gate, not a wizard: it dispatches into the two
+    existing minimal create forms (`/clinicians/form`, `/organizations/form`)."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    banner = HTMLParser(response.text).css_first("#onboarding-banner")
+    assert banner is not None
+    hrefs = {a.attributes.get("href") for a in banner.css("a")}
+    assert "/clinicians/form" in hrefs
+    assert "/organizations/form" in hrefs
 
 
 async def test_onboarding_banner_renders_inside_main(
     authenticated_client: AsyncClient,
 ):
-    """Banner temporarily disabled — assert it is absent."""
+    """The banner lives inside the page `<main>` band (not the header)."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    banner = tree.css_first("main #onboarding-banner")
+    assert banner is not None
+
+
+async def test_onboarding_banner_hidden_once_clinician_added(
+    authenticated_client: AsyncClient,
+    db_test_session_manager,
+    logged_in_user,
+):
+    """The banner keys on entity existence, not verification: once the account
+    holds a clinician profile (even an unverified one) the global banner is
+    silent — the residual verify-to-post step lives on `/users/me`."""
+    from tests.helpers import make_clinician_with_org
+
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     assert HTMLParser(response.text).css_first("#onboarding-banner") is None
 
 
-async def test_onboarding_banner_hidden_once_claim_verified(
+async def test_onboarding_banner_hidden_for_org_rep(
     authenticated_client: AsyncClient,
     db_test_session_manager,
     logged_in_user,
 ):
-    """A verified clinician has completed onboarding, so the global banner
-    is silent."""
-    from tests.helpers import make_clinician_with_org
+    """An account that holds an org representation (no clinician) also clears
+    the banner — "clinician OR org" satisfies the derived gate."""
+    from src.domain.models.org_representations.org_representation import (
+        OrgRepresentation,
+    )
+    from tests.helpers import make_organization_row
 
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
+    org = make_organization_row(owner_id=logged_in_user.id)
+    rep = OrgRepresentation(
+        user_id=logged_in_user.id,
+        org_id=org.id,
+        role="coordinator",
+        authority_method="admin_review",
+        authority_status="verified",
+    )
     async with db_test_session_manager() as session:
         async with session.begin():
-            session.add(clinician)
+            session.add(org)
+            session.add(rep)
 
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
