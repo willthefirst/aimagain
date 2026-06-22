@@ -507,6 +507,12 @@ async def test_get_users_id_renders_admin_view_of_other_user(
     assert (
         tree.css_first("#account-organizations") is None
     ), "no inline Organizations section on another user's profile"
+    # The global onboarding banner (#1525) is chrome — it links to the create
+    # forms for the *viewing* user's own incomplete setup and legitimately
+    # appears site-wide. Strip it before asserting the self-only account-hub
+    # Add CTAs (the inline sections above) don't leak onto another user's page.
+    for _banner in tree.css("#onboarding-banner"):
+        _banner.decompose()
     assert (
         tree.css_first("a[href='/clinicians/form']") is None
         and tree.css_first("a[href='/organizations/form']") is None
