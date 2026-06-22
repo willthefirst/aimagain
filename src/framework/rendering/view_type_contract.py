@@ -83,7 +83,7 @@ _EXTENDS_VIEW_TYPE_RE = re.compile(
 @lru_cache(maxsize=None)
 def view_type_for(template_name: str) -> str | None:
     """Return the `views/X.html` parent for `template_name`, or `None`
-    when the template doesn't extend a view-type (auth pages, `home.html`,
+    when the template doesn't extend a view-type (auth pages,
     `landing.html`, `dev/components.html`, etc.).
 
     Resolved by reading the template source and matching the

@@ -180,6 +180,11 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .filter-sidebar { flex: 0 0 220px; min-width: 0; }
 .browse-results { flex: 1 1 0; min-width: 0; }
 
+/* Binary intent toggle above the results column (posts/list.html). The
+   Referrals/Openings switch is a Pico `role="group"` button group; this
+   only spaces it off the feed below. */
+.intent-toggle { margin-bottom: 1rem; }
+
 /* Narrow: stack sidebar full-width above results; hide inline form */
 @media (max-width: 640px) {
   .browse-layout { flex-direction: column; }
@@ -298,8 +303,3 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 /* ── Capability requirements panel (users/access/capabilities/detail.html) ── */
 .cap-reqs { list-style: none; margin: 0; padding: 0; }
 .cap-reqs li { list-style: none; }
-
-/* ── Home page (home.html) ─────────────────────────────────────── */
-.home-section-header { display: flex; justify-content: space-between; align-items: baseline; }
-.home-empty-msg { color: var(--pico-muted-color); }
-.home-network-blurb { font-size: 0.875rem; color: var(--pico-muted-color); margin-bottom: 1rem; }
