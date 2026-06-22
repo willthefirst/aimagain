@@ -28,8 +28,12 @@ import logging
 from typing import Any
 from uuid import UUID
 
+from fastapi import Request
 from pydantic import BaseModel
 
+from src.domain.logic.clinician_affiliations.repository import (
+    ClinicianAffiliationRepository,
+)
 from src.domain.logic.org_representations.repository import (
     OrgRepresentationRepository,
 )
@@ -37,6 +41,15 @@ from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.verifications.repository import VerificationRepository
 from src.domain.models import Organization, User
 from src.framework.audit.repository import AuditRepository
+from src.framework.dispatch.pagination import (
+    DEFAULT_PAGE_SIZE,
+    Pager,
+    base_query,
+    offset_for,
+    paginate,
+    parse_page,
+)
+from src.framework.http.exceptions import NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +69,45 @@ async def organization_form_extras(
     future per-viewer context (e.g. an audit-scoped picker).
     """
     return {}
+
+
+async def handle_list_org_members(
+    request: Request,
+    organization_id: UUID,
+    repo: ClinicianAffiliationRepository,
+    organization_repo: OrganizationRepository,
+    requesting_user: User,
+) -> dict[str, Any]:
+    """`GET /organizations/{id}/members` — the org's affiliated clinicians.
+
+    The "Members" surface from the I6 redesign (#1524): the same
+    `(clinician × org)` `ClinicianAffiliation` join that's edited from the
+    clinician side, listed here by `org_id`. "One join, two doors" — this
+    page is the org's read door onto the members; add / edit / remove
+    route through `/clinicians/{id}/clinician_affiliations` because the
+    affiliation is FK-owned by the clinician. `mount_related_list` hands
+    this handler the *child's* repo (the affiliation repo) under `repo`;
+    `organization_repo` loads the parent org for the 404 / breadcrumb.
+    """
+    org = await organization_repo.get_by_model_id(Organization, organization_id)
+    if org is None:
+        raise NotFoundError(detail=f"Organization {organization_id} not found")
+    page_number = parse_page(request)
+    per_page = DEFAULT_PAGE_SIZE
+    rows_plus_one = await repo.list_org_members(
+        organization_id,
+        offset=offset_for(page_number, per_page),
+        limit=per_page + 1,
+    )
+    rows, page = paginate(rows_plus_one, page=page_number, per_page=per_page)
+    return {
+        "request": request,
+        "organization": org,
+        "rows": rows,
+        "is_self": org.owner_id == requesting_user.id,
+        "current_user": requesting_user,
+        "pager": Pager(page=page, base_query=base_query(request)),
+    }
 
 
 async def after_create_organization_owner_grant(

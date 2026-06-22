@@ -16,4 +16,21 @@
     delete_confirm="Delete this organization?",
     ) }}
   {% endcall %}
+  {# Members live on the (clinician × org) affiliation join, FK-owned by
+     the clinician — they are not editable inline on the org form. Link
+     out to the Members page (the org's read door); add / remove happen
+     from each clinician's own practices. "One join, two doors" (#1524). #}
+  <section>
+    <h2>Members</h2>
+    <p>
+      <a href="{{ entity_url('organization', id=organization.id) }}/members"
+         role="button"
+         class="secondary outline">View members</a>
+    </p>
+    <p>
+      Members are this organization's affiliated clinicians. To add or remove
+      one, edit the clinician's practices from their own profile — the same
+      affiliation, two doors.
+    </p>
+  </section>
 {% endblock %}
