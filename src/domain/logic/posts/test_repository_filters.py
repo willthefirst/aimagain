@@ -461,6 +461,93 @@ async def test_age_group_matches_intake_age_groups(db_test_session_manager):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# owner filter — `?owner=me` scopes to the viewer's own posts. The viewer
+# is `BaseRepository._requesting_user`, which `handle_list` stamps on the
+# repo before calling `list_posts`; the test stamps it the same way.
+# ---------------------------------------------------------------------------
+
+
+async def _list_as(db_test_session_manager, viewer, **kwargs) -> list[Post]:
+    """Run `list_posts` with `viewer` stamped as the requesting user, the
+    same field `handle_list` sets so viewer-relative filters resolve."""
+    async with db_test_session_manager() as session:
+        repo = PostRepository(session)
+        repo._requesting_user = viewer
+        return list(await repo.list_posts(**kwargs))
+
+
+async def test_owner_me_scopes_to_viewer_owned_posts(db_test_session_manager):
+    """``owner="me"`` returns only the viewer's own posts; another user's
+    post is excluded even though it would otherwise list."""
+    viewer = await _seed_user(db_test_session_manager)
+    stranger = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            viewer_clinician = make_clinician_with_org(owner_id=viewer.id)
+            stranger_clinician = make_clinician_with_org(owner_id=stranger.id)
+            session.add(viewer_clinician)
+            session.add(stranger_clinician)
+        viewer_cid = viewer_clinician.id
+        stranger_cid = stranger_clinician.id
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            mine = await _add_post(
+                session,
+                viewer.id,
+                make_referral_detail(referring_clinician_id=viewer_cid),
+                "referral_detail",
+            )
+            theirs = await _add_post(
+                session,
+                stranger.id,
+                make_referral_detail(referring_clinician_id=stranger_cid),
+                "referral_detail",
+            )
+
+    results = await _list_as(db_test_session_manager, viewer, owner="me")
+    ids = {p.id for p in results}
+    assert mine.id in ids
+    assert theirs.id not in ids
+
+
+async def test_owner_absent_returns_all_posts(db_test_session_manager):
+    """Without ``owner`` (or with any non-``me`` value) the scope is not
+    applied — both owners' posts list."""
+    viewer = await _seed_user(db_test_session_manager)
+    stranger = await _seed_user(db_test_session_manager)
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            viewer_clinician = make_clinician_with_org(owner_id=viewer.id)
+            stranger_clinician = make_clinician_with_org(owner_id=stranger.id)
+            session.add(viewer_clinician)
+            session.add(stranger_clinician)
+        viewer_cid = viewer_clinician.id
+        stranger_cid = stranger_clinician.id
+
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            mine = await _add_post(
+                session,
+                viewer.id,
+                make_referral_detail(referring_clinician_id=viewer_cid),
+                "referral_detail",
+            )
+            theirs = await _add_post(
+                session,
+                stranger.id,
+                make_referral_detail(referring_clinician_id=stranger_cid),
+                "referral_detail",
+            )
+
+    results = await _list_as(db_test_session_manager, viewer)
+    ids = {p.id for p in results}
+    assert {mine.id, theirs.id} <= ids
+
+
 async def test_language_matches_clinician_languages(db_test_session_manager):
     """Opening side: ``languages`` lives on ``Clinician`` (person-
     level), distinct from the other steady-state fields which live on
