@@ -364,6 +364,164 @@ async def test_get_clinician_hides_delete_button_for_non_owner(
     assert _delete_clinician_button(tree, clinician_id) is None
 
 
+# --- Consolidated read summary (I5 / #1523) -------------------------------
+
+
+async def test_get_clinician_detail_surfaces_consolidated_summary(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The detail page leads with a consolidated read summary (mock §6):
+    a non-redacted viewer sees the clinician's licenses and affiliation
+    surfaced inline (drawn from the sub-resources) so the page reads
+    like a profile, without having to click into each sub-resource list.
+    The summary is keyed by stable `data-fact` selectors per the
+    `sections.html::fact` contract."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager,
+        user_id=logged_in_user.id,
+        practice_name="Acme Therapy",
+    )
+    licensure = make_clinician_licensure(
+        clinician_id=clinician_id, license_type="lcsw", issuing_state="IL"
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    licenses = tree.css_first('[data-fact="summary_licenses"]')
+    assert licenses is not None, "consolidated summary must surface Licenses"
+    assert "Licensed Clinical Social Worker (LCSW)" in licenses.text()
+    assert "(IL)" in licenses.text()
+    affiliation = tree.css_first('[data-fact="summary_affiliation"]')
+    assert affiliation is not None, "consolidated summary must surface Affiliation"
+    assert "Acme Therapy" in affiliation.text()
+    # Additive: the management picker is still reachable below the summary.
+    assert len(tree.css("main article.picker-option")) == 4
+
+
+async def test_get_clinician_detail_summary_redacts_location_for_non_network_viewer(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """Redaction is preserved (mock §6): a non-owner viewer who isn't a
+    verified provider sees the locked name and no identifying Location /
+    Insurance rows in the summary, matching the `_clinician_card.html`
+    redaction contract. The non-identifying credential rows (Licenses)
+    still render."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=other.id, practice_name="Acme Therapy"
+    )
+    licensure = make_clinician_licensure(clinician_id=clinician_id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(licensure)
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}")
+
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # Identifying practice facts are withheld from a non-network visitor.
+    assert tree.css_first('[data-fact="summary_location"]') is None
+    assert tree.css_first('[data-fact="summary_insurance"]') is None
+    # Non-identifying credentials still surface.
+    assert tree.css_first('[data-fact="summary_licenses"]') is not None
+
+
+# --- Owner-vs-visitor toolbar action (I5 / #1523) -------------------------
+
+
+async def test_get_clinician_owner_sees_edit_not_message(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The owner's toolbar carries the management Edit action and no
+    visitor Message affordance — the owner manages, they don't message
+    themselves (mock §6)."""
+    clinician_id = await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id
+    )
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}")
+    tree = HTMLParser(response.text)
+    assert tree.css_first(f'a[href="/clinicians/{clinician_id}/form"]') is not None
+    toolbar = tree.css_first("menu.toolbar-right")
+    assert toolbar is not None
+    assert "Message" not in toolbar.text()
+
+
+async def test_get_clinician_non_owner_non_provider_sees_locked_message(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A non-owner viewer who isn't a verified provider sees the Message
+    affordance in its locked state — reusing the same `_locked` gating
+    the post detail footer applies. Clicking opens the verify-to-message
+    popover rather than messaging directly."""
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    clinician_id = await _seed_clinician_for(db_test_session_manager, user_id=other.id)
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}")
+    tree = HTMLParser(response.text)
+    toolbar = tree.css_first("menu.toolbar-right")
+    assert toolbar is not None
+    assert "Message" in toolbar.text()
+    locked = toolbar.css_first("[data-locked-cta]")
+    assert locked is not None, "non-provider Message must be the locked affordance"
+    assert locked.attributes.get("data-locked-cta") == "network_unverified"
+    # No Edit link for a non-owner.
+    assert tree.css_first(f'a[href="/clinicians/{clinician_id}/form"]') is None
+
+
+async def test_get_clinician_non_owner_provider_sees_live_message(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """A non-owner viewer who clears `can_act_as_provider` (a verified
+    clinician, but not an admin) sees a live Message action linking to
+    the target clinician's owner — where contact happens. No locked
+    state, no Edit link (they aren't the owner). We make the viewer a
+    verified provider by giving them their *own* verified clinician
+    (`make_clinician_with_org` defaults `clinician_verified=True`), which
+    flips `can_act_as_provider` without granting edit rights on the
+    clinician they're viewing — exactly the verified-visitor case."""
+    # Viewer's own verified clinician → `can_act_as_provider` True.
+    await _seed_clinician_for(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="My Practice"
+    )
+    other = create_test_user(username=f"other-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other)
+    clinician_id = await _seed_clinician_for(db_test_session_manager, user_id=other.id)
+
+    response = await authenticated_client.get(f"/clinicians/{clinician_id}")
+    tree = HTMLParser(response.text)
+    toolbar = tree.css_first("menu.toolbar-right")
+    assert toolbar is not None
+    message_link = toolbar.css_first(f'a[href="/users/{other.id}"]')
+    assert message_link is not None, "verified visitor must get a live Message link"
+    assert "Message" in message_link.text()
+    assert message_link.css_first("[data-locked-cta]") is None
+    assert tree.css_first(f'a[href="/clinicians/{clinician_id}/form"]') is None
+
+
 # --- Clinician listing -----------------------------------------------------
 
 
