@@ -532,28 +532,24 @@ dd { margin: 0; }
 @media (max-width: 640px) {
   .toolbar { grid-template-columns: 1fr; }
 }
-/* Page-header band — the single fixed top-chrome element
-   (`_shared/_page_header.html`): the nav row above the breadcrumb row,
-   with a `border-bottom` boundary. The band itself is full-width and
-   carries that boundary; its inner `.container` (max-width-capped,
-   centered) holds the two rows, which stack as normal block flow — no flex
-   needed. Splitting the band from its container means the `border-bottom`
-   spans the whole page while content stays within the container gutter
-   (matches `<main>` / `<footer>`, which also wrap content in an inner
-   `.container`). The page `<h1>` + actions toolbar lives in `<main>`, not
-   the band. */
-/* Header + breadcrumb band dividers are full-width, colored lines so the
-   chrome reads as distinct bands above the content: the nav uses the Pico
-   primary border, the breadcrumb the secondary border. */
-.page-header { border-bottom: 1px solid var(--pico-primary-border); color: inherit; }
+/* Page-header band — the top-chrome nav element
+   (`_shared/_page_header.html`): the primary nav, closed with a full-width
+   `border-bottom`. The band itself is full-width and carries the boundary;
+   its inner `.container` (max-width-capped, centered) holds the nav, so the
+   divider spans the whole page while content stays within the container
+   gutter (matches `<main>` / `<footer>`, which also wrap content in an inner
+   `.container`). The breadcrumb is its own band below; the page `<h1>` +
+   actions toolbar lives in `<main>`. Both band dividers use the standard
+   subtle `--pico-muted-border-color`. */
+.page-header { border-bottom: 1px solid var(--pico-muted-border-color); color: inherit; }
 /* Breadcrumb bar (`_shared/_breadcrumb.html`) — a body-level band below the
-   header. Its own `border-bottom` (full width) separates the breadcrumb from
+   header. Its own full-width `border-bottom` separates the breadcrumb from
    page content. `padding-block` mirrors the `var(--pico-block-spacing-vertical)`
    Pico gives `body > header/main/footer` so the breadcrumb band shares the
    same vertical rhythm (Pico's rule only targets those landmarks, not this
    `<nav>`). */
 .breadcrumb-bar {
-  border-bottom: 1px solid var(--pico-secondary-border);
+  border-bottom: 1px solid var(--pico-muted-border-color);
   padding-block: var(--pico-block-spacing-vertical);
 }
 /* `<menu>` is HTML's native "list of commands" element — used
