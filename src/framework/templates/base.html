@@ -50,11 +50,12 @@
 <link rel="stylesheet" href="/static/fw/fonts/lucide-icons.css{% if static_version %}?v={{ static_version }}{% endif %}" />
 {# Density overrides and component styles live in two static CSS files
        split by framework/domain boundary — see `src/framework/static/css/`
-       and `src/domain/static/css/`. The classful Pico build needs
-       `class="container"` for max-width centering; each layout band
-       (`<header>`, the breadcrumb `<nav>`, `<main>`, `<footer>`) wraps its
-       content in an inner `.container` so the band spans full width (its
-       divider edge-to-edge) while the content stays centered. #}
+       and `src/domain/static/css/`. The classful Pico build uses
+       `class="container-fluid"` for the full-width gutter layout; each layout
+       band (`<header>`, the breadcrumb `<nav>`, `<main>`, `<footer>`) wraps
+       its content in an inner `.container-fluid` so the band spans full width
+       (its divider edge-to-edge) and the content fills the viewport width
+       (minus Pico's horizontal gutter), rather than being max-width-capped. #}
 <link rel="stylesheet" href="/static/fw/css/framework.css{% if static_version %}?v={{ static_version }}{% endif %}" />
 <link rel="stylesheet" href="/static/domain/css/domain.css{% if static_version %}?v={{ static_version }}{% endif %}" />
 {# `defer` keeps the HTML parser unblocked while these scripts
@@ -204,7 +205,7 @@
        sibling of `<header>` / `<main>` / `<footer>` (NOT inside the
        page-header). The `breadcrumb()` macro emits the full Pico chain (a
        Home root + the page's segments) wrapped in `<nav>` + inner
-       `.container`. Always present on authenticated app pages: a page-
+       `.container-fluid`. Always present on authenticated app pages: a page-
        supplied chain (detail / form / search / subresource list) when set,
        otherwise just the Home crumb (`breadcrumb([])`). Absent for anonymous
        pages (landing / `/auth/*`). #}
@@ -213,11 +214,11 @@
 {%- else %}{{ breadcrumb([]) }}{%- endif %}
 {%- endif %}
 <main>
-{# `.container` wraps the content INSIDE `<main>` (not on `<main>` itself)
-         so any full-bleed chrome on `<main>` spans the page while the content
-         stays max-width-capped and centered. Mirrors `<header>` (the
-         page-header band) and `<footer>`. #}
-<div class="container">
+{# `.container-fluid` wraps the content INSIDE `<main>` (not on `<main>`
+         itself) so any full-bleed chrome on `<main>` spans the page while the
+         content fills the full viewport width minus Pico's horizontal gutter.
+         Mirrors `<header>` (the page-header band) and `<footer>`. #}
+<div class="container-fluid">
 {# Page toolbar — the page `<h1>` plus its action cluster (Edit, Delete,
          Favorite, Create, ...). Historically this lived inside the
          `.page-header` band; it now renders at the top of `<main>` so the
@@ -268,13 +269,13 @@ or
 {# Page footer slot — outside `<main>` so the footer is the
        document's `<footer>` (semantic site-level role) rather than a
        child of the main content. Content is wrapped in an inner
-       `.container` (not on `<footer>` itself) so the footer band can span
-       the full page while its text stays max-width-capped and centered —
-       same pattern as `<header>` and `<main>`. The default body is a
-       site-wide copyright / contact line shown on every page; pages can
-       override by redefining `{% raw %}{% block footer %}{% endraw %}`. #}
+       `.container-fluid` (not on `<footer>` itself) so the footer band can
+       span the full page and its text fills the viewport width minus Pico's
+       horizontal gutter — same pattern as `<header>` and `<main>`. The
+       default body is a site-wide copyright / contact line shown on every
+       page; pages can override by redefining `{% raw %}{% block footer %}{% endraw %}`. #}
 <footer>
-<div class="container">
+<div class="container-fluid">
 {% block footer %}
 <small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
 {% endblock %}

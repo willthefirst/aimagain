@@ -1,6 +1,7 @@
 {# Unified page-header band — the app's permanent top chrome.
 
-Renders one `<header class="container page-header">` whose rows, top to
+Renders one `<header class="page-header">` (with an inner `.container-fluid`)
+whose rows, top to
 bottom, are: primary nav → breadcrumb slot → page-title/toolbar slot.
 The band's `border-bottom` is the page's one horizontal boundary and
 sits at the same Y on every app page at a given screen size: the
@@ -39,13 +40,13 @@ See `templates/README.md` § "Page chrome contract" for the slot list
 and the constant-boundary rationale (one source of truth).
 #}
 <header class="page-header">
-  {# `.container` lives INSIDE the band (not on `<header>`) so the band's
-     `border-bottom` spans the full page width while the nav content stays
-     max-width-capped and centered. Same pattern on `<main>` and `<footer>`
-     in base.html. The breadcrumb is no longer part of this band — it is its
-     own `<nav class="breadcrumb-bar">` rendered as a body-level sibling in
-     base.html. #}
-  <div class="container">
+  {# `.container-fluid` lives INSIDE the band (not on `<header>`) so the band's
+     `border-bottom` spans the full page width while the nav content fills the
+     viewport width minus Pico's horizontal gutter. Same pattern on `<main>`
+     and `<footer>` in base.html. The breadcrumb is no longer part of this
+     band — it is its own `<nav class="breadcrumb-bar">` rendered as a
+     body-level sibling in base.html. #}
+  <div class="container-fluid">
     {# Canonical Pico nav: a brand `<ul>` (left) and an actions `<ul>`
      (right). `Post` is a visible link `<li>`; the profile menu is a Pico
      dropdown (https://picocss.com/docs/nav) — `<details class="dropdown">`
