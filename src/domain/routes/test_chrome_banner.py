@@ -128,10 +128,11 @@ async def test_onboarding_banner_hidden_for_org_rep(
 
 
 async def test_authenticated_primary_nav_redesign(authenticated_client: AsyncClient):
-    """End-to-end (through the real entity registry) the authenticated nav is:
-    brand → posts collection, a `+ Post` button → the post create form, and an
-    avatar `<details>` menu with My posts / Account / Sign out. "Saved" is
-    deferred and must not appear. Anonymous nav stays brand-only — pinned in
+    """End-to-end (through the real entity registry) the authenticated nav is
+    the canonical Pico shape: brand → posts collection, a plain `Post` link →
+    the post create form, and a Pico `<details class="dropdown">` profile menu
+    with My posts / Account / Sign out. "Saved" is deferred and must not appear.
+    Anonymous nav stays brand-only — pinned in
     `framework/templates/test_views.py`."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
@@ -143,14 +144,14 @@ async def test_authenticated_primary_nav_redesign(authenticated_client: AsyncCli
     assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
     assert brand.parent.attributes.get("href") == "/posts"
 
-    # `+ Post` button → post create form, outside the collapsible menu.
-    ctas = [a for a in nav.css("a[role='button']") if a.text(strip=True) == "+ Post"]
-    assert len(ctas) == 1
-    assert ctas[0].attributes.get("href") == "/posts/form"
-    assert ctas[0].parent.attributes.get("id") == "primary-nav"
+    # `Post` is a plain link (no `role=button`, no `+`) → the post create form.
+    posts = [a for a in nav.css("a") if a.text(strip=True) == "Post"]
+    assert len(posts) == 1
+    assert posts[0].attributes.get("href") == "/posts/form"
+    assert posts[0].attributes.get("role") is None
 
-    # Avatar menu items.
-    menu = nav.css_first("details#nav-menu")
+    # Profile dropdown items.
+    menu = nav.css_first("details.dropdown#nav-menu")
     assert menu is not None
     items = {a.text(strip=True): a for a in menu.css("ul li a")}
     assert set(items) == {"My posts", "Account", "Sign out"}

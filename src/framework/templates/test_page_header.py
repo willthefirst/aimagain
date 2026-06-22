@@ -1,24 +1,26 @@
-"""Tests for the unified page-header band (``_shared/_page_header.html``).
+"""Tests for the page top-chrome: the page-header band
+(``_shared/_page_header.html``), the breadcrumb bar (``_shared/_breadcrumb.html``),
+and the page toolbar (``_shared/_toolbar.html``).
 
-The band is the single fixed top-chrome element: primary nav + breadcrumb
-slot + toolbar slot, with a ``border-bottom`` boundary on ``.page-header``.
-These tests render the generic view-type templates (which compose the band
-via ``base.html``) and pin the band's structure — the toolbar ``<h1>`` and
-breadcrumb live *inside* ``header.page-header``, the breadcrumb row is
-reserved with a placeholder on list pages (so the boundary sits at a
-constant Y), and no ``<hr>`` lives in the band or in ``<main>``.
+The chrome is three full-width bands stacked above the content, each a
+body-level layout row:
 
-A second group pins the CSS rules the constant-boundary + no-wrap
-guarantees depend on, mirroring the regex-against-``framework.css`` style in
-``test_views.py``.
+  1. ``<header class="page-header">`` — the primary nav only. Its inner
+     ``.container`` caps + centers the nav; the band's ``border-bottom`` spans
+     the full page.
+  2. ``<nav class="breadcrumb-bar">`` — its OWN body-level band (a sibling of
+     ``<header>``/``<main>``/``<footer>``, NOT nested in the header). Always
+     shows a real, visible crumb on authenticated pages — a page-supplied
+     breadcrumb when set, else a default "Home" crumb. No hidden placeholder.
+  3. The page ``<h1>`` + actions toolbar, which lives at the top of
+     ``<main>`` (not in the band).
 
-A third group pins the **body-layout invariant**: ``base.html`` emits
-exactly ``<header>``, ``<main>``, ``<footer>`` as the top-level children of
-``<body>`` (the three rows of the body grid). This holds even with the
-incomplete-profile banner showing — the banner is the first child of
-``<main>``, never a fourth top-level ``<aside>`` band. Pinned across view
-types since they all compose ``base.html``; this is the structural
-enforcement that replaces a "keep it inside ``<main>``" comment.
+These tests render the generic view-type templates (which compose the chrome
+via ``base.html``) and pin that structure. A second group pins the CSS rules
+the toolbar's no-wrap/truncation guarantees depend on. A third group pins the
+**body-layout invariant**: ``base.html`` emits ``<header>``, the breadcrumb
+``<nav>``, ``<main>``, ``<footer>`` as the layout rows of the body flex column,
+followed only by locked-CTA popovers and an init script.
 """
 
 from __future__ import annotations
@@ -78,41 +80,57 @@ _LIST_STUB = """
 """
 
 
-def test_detail_toolbar_h1_and_breadcrumb_live_inside_the_band() -> None:
-    """A detail page's page title (`<h1>`) and breadcrumb both render
-    *inside* `header.page-header` — the band owns the whole top chrome, not
-    just the nav. The real breadcrumb means no reserved placeholder."""
+def test_detail_toolbar_in_main_and_breadcrumb_is_its_own_band() -> None:
+    """A detail page's toolbar `<h1>` lives in `<main>` (not the page-header
+    band), and its breadcrumb is its OWN body-level `<nav class="breadcrumb-bar">`
+    — not nested inside `header.page-header`."""
     env = _make_env()
     _add_child(env, "stub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "stub.html"))
 
-    assert tree.css_first("header.page-header div.toolbar h1") is not None
-    assert tree.css_first('header.page-header nav[aria-label="breadcrumb"]') is not None
-    # A real breadcrumb is present, so the reserved placeholder is absent.
-    assert tree.css_first(".page-header-crumb-placeholder") is None
+    # Toolbar H1 is in <main>, not the band.
+    assert tree.css_first("header.page-header div.toolbar h1") is None
+    assert tree.css_first("main div.toolbar h1") is not None
+
+    # Breadcrumb is a body-level band, not inside the header.
+    assert tree.css_first("header.page-header nav.breadcrumb-bar") is None
+    bar = tree.css_first("body > nav.breadcrumb-bar")
+    assert bar is not None
+    assert bar.attributes.get("aria-label") == "breadcrumb"
+    # The crumb is wrapped in a `.container` so it aligns with page content.
+    assert bar.css_first("div.container a.breadcrumb-back") is not None
 
 
-def test_list_reserves_breadcrumb_row_with_hidden_placeholder() -> None:
-    """List pages carry no real breadcrumb, but the band still reserves the
-    breadcrumb row with a hidden placeholder so the boundary rule sits at
-    the same Y as a detail page's. The toolbar `<h1>` still lives in the
-    band."""
+def test_list_page_shows_visible_home_breadcrumb_no_placeholder() -> None:
+    """Top-level list pages carry no page-specific breadcrumb, so the bar falls
+    back to a real, visible "Home" crumb — never the old hidden placeholder.
+    The toolbar `<h1>` still renders (in `<main>`)."""
     env = _make_env()
     _add_child(env, "stub.html", _LIST_STUB)
-    tree = HTMLParser(_render(env, "stub.html"))
+    tree = HTMLParser(_render(env, "stub.html", is_authenticated=True))
 
-    # No real breadcrumb on list pages...
-    assert tree.css_first('header.page-header nav[aria-label="breadcrumb"]') is None
-    # ...but the row is reserved with the placeholder.
-    assert (
-        tree.css_first("header.page-header .page-header-crumb-placeholder") is not None
-    )
-    assert tree.css_first("header.page-header div.toolbar h1") is not None
+    bar = tree.css_first("body > nav.breadcrumb-bar")
+    assert bar is not None
+    back = bar.css_first("a.breadcrumb-back")
+    assert back is not None and back.text(strip=True) == "Home"
+    # The hidden-placeholder mechanism is gone entirely.
+    assert tree.css_first(".page-header-crumb-placeholder") is None
+    assert tree.css_first("main div.toolbar h1") is not None
 
 
-def test_band_owns_the_single_boundary_and_no_hr_anywhere() -> None:
-    """No `<hr>` lives in the band or in `<main>` — the divider is the
-    `border-bottom` on `.page-header` itself (pinned via CSS regex below)."""
+def test_anonymous_pages_have_no_breadcrumb_band() -> None:
+    """Anonymous pages (no page-supplied crumb, not authenticated) render no
+    breadcrumb band at all — the Home fallback is authenticated-only."""
+    env = _make_env()
+    _add_child(env, "stub.html", _LIST_STUB)
+    tree = HTMLParser(_render(env, "stub.html", is_authenticated=False))
+    assert tree.css_first("nav.breadcrumb-bar") is None
+
+
+def test_band_owns_a_boundary_and_no_hr_anywhere() -> None:
+    """No `<hr>` lives in the band or in `<main>` — dividers are the
+    `border-bottom`s on `.page-header` / `.breadcrumb-bar` (pinned via CSS
+    regex below)."""
     env = _make_env()
     _add_child(env, "stub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "stub.html"))
@@ -127,107 +145,99 @@ def test_band_owns_the_single_boundary_and_no_hr_anywhere() -> None:
 
 
 def test_every_toolbar_reserves_the_action_row_height() -> None:
-    """Each toolbar renders a hidden, non-interactive reserve `<button>` so
-    the action-row height (and thus the band boundary's Y) is constant
-    whether or not a page has real actions. Pinned on an action-free list
-    stub and an action-bearing detail stub; the reserve is aria-hidden and
-    removed from the tab order so it's chrome-only."""
+    """Each toolbar renders a hidden, non-interactive reserve `<button>` so the
+    action-row height is constant whether or not a page has real actions. The
+    toolbar now lives in `<main>`; the reserve is aria-hidden and removed from
+    the tab order so it's chrome-only."""
     env = _make_env()
     _add_child(env, "liststub.html", _LIST_STUB)
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     for name in ("liststub.html", "detailstub.html"):
         tree = HTMLParser(_render(env, name))
-        reserve = tree.css_first(
-            "header.page-header div.toolbar button.toolbar-reserve"
-        )
+        reserve = tree.css_first("main div.toolbar button.toolbar-reserve")
         assert reserve is not None, f"{name}: toolbar must render the reserve button"
         assert reserve.attributes.get("aria-hidden") == "true"
         assert reserve.attributes.get("tabindex") == "-1"
 
 
-# Context for banner-related tests. The onboarding banner has been removed;
-# this context only sets `is_authenticated=True` to exercise the authenticated
-# chrome path. The banner assertions below verify it is absent.
-_BANNER_CTX: dict[str, object] = dict(
-    is_authenticated=True,
-)
+# Context for the authenticated-chrome tests. The onboarding banner has been
+# removed; this only sets `is_authenticated=True` to exercise the authed path.
+_AUTHED_CTX: dict[str, object] = dict(is_authenticated=True)
 
 
-def test_body_top_level_children_are_header_main_footer_only() -> None:
-    """The body scaffold emits `<header>`, `<main>`, `<footer>` as the three
-    layout rows (the body grid), followed by locked-CTA `<div popover>`
-    elements and an init `<script>` from `base.html`.  The banner must be a
-    child of `<main>`, never a fourth top-level band.  The locked-CTA popovers
-    and JS script are utility chrome intentionally placed after `<footer>`."""
+def test_body_layout_rows_are_header_breadcrumb_main_footer() -> None:
+    """`base.html` emits the four full-width layout rows of the body flex
+    column — `<header>`, the breadcrumb `<nav>`, `<main>`, `<footer>` — in
+    order, followed only by locked-CTA `<div popover>` elements and an init
+    `<script>`. The banner (when shown) is a child of `<main>`, never a
+    top-level band."""
     env = _make_env()
     _add_child(env, "liststub.html", _LIST_STUB)
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     for name in ("liststub.html", "detailstub.html"):
-        tree = HTMLParser(_render(env, name, **_BANNER_CTX))
-        # Banner temporarily disabled — assert absent and structure still holds.
+        tree = HTMLParser(_render(env, name, **_AUTHED_CTX))
         assert tree.css_first("#onboarding-banner") is None, name
         top_level = [n.tag for n in tree.css("body > *")]
-        # Layout rows must be the first three children and in order.
-        assert top_level[:3] == ["header", "main", "footer"], f"{name}: {top_level}"
+        assert top_level[:4] == [
+            "header",
+            "nav",
+            "main",
+            "footer",
+        ], f"{name}: {top_level}"
+        # The breadcrumb row is the body-level breadcrumb bar.
+        assert tree.css_first("body > nav.breadcrumb-bar") is not None, name
         # Remaining children are only locked-CTA popovers and the init script.
         assert all(
-            t in ("div", "script") for t in top_level[3:]
-        ), f"{name}: unexpected body tail elements: {top_level[3:]}"
+            t in ("div", "script") for t in top_level[4:]
+        ), f"{name}: unexpected body tail elements: {top_level[4:]}"
         for div in tree.css("body > div"):
             assert "popover" in div.attributes, f"{name}: non-popover div in body"
 
 
-def test_onboarding_banner_is_first_child_of_main() -> None:
-    """Banner temporarily disabled — assert it is absent."""
+def test_authenticated_nav_has_post_link_and_avatar_dropdown() -> None:
+    """The authenticated primary nav is the canonical Pico shape: a brand `<ul>`
+    (→ the posts collection) and an actions `<ul>` with a plain `Post` link (→
+    the create form, no `role=button`, no `+`) and a Pico `<details
+    class="dropdown">` profile menu. The nav has no `id` hook — it's the
+    `aria-label="Primary"` landmark."""
     env = _make_env()
     _add_child(env, "detailstub.html", _DETAIL_STUB)
-    tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
-    assert tree.css_first("#onboarding-banner") is None
-
-
-def test_authenticated_nav_has_post_cta_and_avatar_menu() -> None:
-    """The authenticated primary nav is: brand → `+ Post` button → avatar
-    `<details>` menu. The brand links to the posts collection (Browse is the
-    default landing surface); the `+ Post` button is an `<a role="button">`
-    pointing at the post create form and lives *outside* the collapsible
-    menu so it stays a one-tap action on every viewport."""
-    env = _make_env()
-    _add_child(env, "detailstub.html", _DETAIL_STUB)
-    tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
+    tree = HTMLParser(_render(env, "detailstub.html", **_AUTHED_CTX))
 
     nav = tree.css_first('nav[aria-label="Primary"]')
     assert nav is not None
+    # The id hook was removed in favor of the landmark.
+    assert nav.attributes.get("id") is None
 
-    # Brand → posts collection (Browse), not a hardcoded "/home" link target.
-    brand = nav.css_first("a strong")
+    # Brand → posts collection (Browse), inside the first <ul>.
+    brand = nav.css_first("ul li a strong")
     assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
     assert brand.parent.attributes.get("href") == "/posts"
 
-    # `+ Post` is a button-styled anchor to the post create form, and is a
-    # direct child of the nav (not nested inside the avatar `<details>`).
-    post_ctas = [
-        a for a in nav.css("a[role='button']") if a.text(strip=True) == "+ Post"
-    ]
-    assert len(post_ctas) == 1, "exactly one `+ Post` button expected"
-    cta = post_ctas[0]
-    assert cta.attributes.get("href") == "/posts/form"
-    assert cta.parent.attributes.get("id") == "primary-nav", (
-        "`+ Post` must sit outside the collapsible avatar menu so it stays "
-        "visible on mobile"
-    )
+    # `Post` is a plain link (not a button, no `+`) to the create form.
+    post_links = [a for a in nav.css("a") if a.text(strip=True) == "Post"]
+    assert len(post_links) == 1, "exactly one `Post` link expected"
+    post = post_links[0]
+    assert post.attributes.get("href") == "/posts/form"
+    assert post.attributes.get("role") is None, "`Post` must be a plain link"
+
+    # Profile menu is a Pico dropdown.
+    dropdown = nav.css_first("details.dropdown#nav-menu")
+    assert dropdown is not None, "profile menu must be a `<details class='dropdown'>`"
 
 
 def test_avatar_menu_items_are_my_posts_account_sign_out() -> None:
-    """The repurposed `<details id="nav-menu">` is the avatar menu. Its
-    items are exactly My posts (→ the viewer's own posts via `?owner=me`),
-    Account (→ the self user page), and Sign out (`hx-post`). "Saved" is
-    deferred and must not appear."""
+    """The profile dropdown's items are exactly My posts (→ the viewer's own
+    posts via `?owner=me`), Account (→ the self user page), and Sign out
+    (`hx-post`). "Saved" is deferred and must not appear."""
     env = _make_env()
     _add_child(env, "detailstub.html", _DETAIL_STUB)
-    tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
+    tree = HTMLParser(_render(env, "detailstub.html", **_AUTHED_CTX))
 
-    menu = tree.css_first("details#nav-menu")
-    assert menu is not None, "avatar `<details id='nav-menu'>` menu missing"
+    menu = tree.css_first("details.dropdown#nav-menu")
+    assert (
+        menu is not None
+    ), "profile `<details class='dropdown' id='nav-menu'>` missing"
     items = menu.css("ul li a")
     labels = [a.text(strip=True) for a in items]
     assert labels == ["My posts", "Account", "Sign out"]
@@ -240,33 +250,30 @@ def test_avatar_menu_items_are_my_posts_account_sign_out() -> None:
 
 
 def test_anonymous_nav_is_brand_only() -> None:
-    """Anonymous visitors get the brand link only — no `+ Post` button and
-    no avatar menu."""
+    """Anonymous visitors get the brand link only — no `Post` link and no
+    profile dropdown."""
     env = _make_env()
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "detailstub.html", is_authenticated=False))
 
     nav = tree.css_first('nav[aria-label="Primary"]')
     assert nav is not None
-    assert nav.css_first("details#nav-menu") is None
-    assert [
-        a for a in nav.css("a[role='button']") if a.text(strip=True) == "+ Post"
-    ] == []
+    assert nav.css_first("details.dropdown#nav-menu") is None
+    assert [a for a in nav.css("a") if a.text(strip=True) == "Post"] == []
     # The brand link is still present.
     assert nav.css_first("a strong").text(strip=True) == "Bedlam Connect"
 
 
-def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:
-    """Pin the CSS the band's guarantees rest on: the actions cells never
-    wrap (so they don't grow the band), the toolbar `<h1>` truncates rather
-    than wraps (constant one-line heading), and the breadcrumb placeholder
-    reserves its row via `visibility: hidden` (intrinsic height, no pinned
-    size unit)."""
+def test_css_pins_no_wrap_truncation_and_full_width_dividers() -> None:
+    """Pin the CSS the chrome's guarantees rest on: the toolbar actions cell
+    never wraps (so it doesn't grow), the toolbar `<h1>` truncates rather than
+    wraps, and both the header and breadcrumb bands own full-width
+    `border-bottom` dividers."""
     css = _CSS_PATH.read_text()
 
     assert re.search(
         r"\.toolbar-right\b[^{]*\{[^}]*flex-wrap:\s*nowrap", css, re.DOTALL
-    ), ".toolbar-right must declare `flex-wrap: nowrap` so actions don't grow the band"
+    ), ".toolbar-right must declare `flex-wrap: nowrap` so actions don't grow"
 
     h1_rule = re.search(r"\.toolbar\s+h1\s*\{([^}]*)\}", css, re.DOTALL)
     assert h1_rule is not None, ".toolbar h1 must have a rule"
@@ -277,17 +284,13 @@ def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:
         ), f".toolbar h1 must declare `{decl}` so the title truncates"
 
     assert re.search(
-        r"\.page-header-crumb-placeholder\s*\{[^}]*visibility:\s*hidden", css, re.DOTALL
-    ), ".page-header-crumb-placeholder must reserve its row via `visibility: hidden`"
-
-    assert re.search(
         r"\.page-header\s*\{[^}]*border-bottom:\s*1px\s+solid", css, re.DOTALL
-    ), ".page-header must own the single divider via `border-bottom`"
+    ), ".page-header must own a full-width `border-bottom` divider"
+    assert re.search(
+        r"\.breadcrumb-bar\s*\{[^}]*border-bottom:\s*1px\s+solid", css, re.DOTALL
+    ), ".breadcrumb-bar must own a full-width `border-bottom` divider"
 
     # The action-row reserve: a hidden button sharing the H1's grid cell.
-    # Both the H1 and the reserve must be pinned to row 1 / col 1 so the
-    # reserve overlaps the H1 (instead of being pushed to a second row) and
-    # the actions cell still auto-flows for the mobile stack.
     h1_grid = re.search(r"\.toolbar\s+h1\s*\{([^}]*)\}", css, re.DOTALL).group(1)
     assert "grid-row: 1" in h1_grid and "grid-column: 1" in h1_grid, (
         ".toolbar h1 must be explicitly placed at row 1 / col 1 so the reserve "
