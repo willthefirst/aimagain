@@ -46,11 +46,11 @@ The required-keys table that the render-time validator enforces lives in [`../re
 | `form_edit.html` | `← <current>`                          | none — form's Save/Cancel buttons are the actions | `resource_label`, `current_label`, `content`. Required context: `entity_name`, `resource_detail_url`, `edit_heading`. `current_label` is the **specific resource being edited** (e.g. `{{ organization.name }}`, `{{ view.headline }}`) — not a generic kind noun. |
 | `search.html` | `← Resource`                              | none — form's submit button is the action  | `resource_label`. Required context: `entity_name`, `list_action`, `filter_heading`, `declared_filters`, `filter_values`. H1 = `filter_heading`, sourced from `entity_filter_label(spec.name)` via the search handler. |
 
-The breadcrumb is always a single back affordance — a left chevron + the deepest clickable parent's label — at every viewport. The macro picks the back target by walking the chain backward to the last item with a non-`None` href.
+The breadcrumb is the full Pico chain (https://picocss.com/docs/nav) — a **Home** root followed by each ancestor segment and the current page, with Lucide-chevron dividers between them. Callers pass the ancestors + current leaf; the macro prepends Home. Each segment links when it has an href, renders the locked popover-trigger when it carries a lock reason, and is plain current-page text otherwise.
 
 **Automatic breadcrumbs on subresource list pages.** `mount_related_list` and `mount_edge_routes` inject `_breadcrumb_items` — a list of `(label, href|None, lock_reason|None)` tuples — into the template context when the parent entity's spec declares `display_label_fn`. `views/list.html` renders the breadcrumb block automatically when `_breadcrumb_items` is present. A top-level list page has no such injection, so it shows the default **Home** crumb that `base.html` falls back to (see "Page chrome contract") — the breadcrumb band is visible on every authenticated page. Child templates that need a custom chain (labels derived from multiple context variables) still override `{% block breadcrumb %}` directly.
 
-**Capability-aware back affordance.** Both the view-type templates' collection segment and the mount-injected `_breadcrumb_items` carry the third tuple element — a `REASON_*` lock code from `capabilities.py`, or `None`. When the back target's entity declares `ReadPolicy.lock_reason` and the viewer fails `read_policy.can_read`, the breadcrumb macro emits a `data-locked-cta` popover trigger instead of an `<a href>` — so clicking `< Users` from `/users/me` opens the "Get provider network access" CTA rather than landing on a 403.
+**Capability-aware segments.** Both the view-type templates' collection segment and the mount-injected `_breadcrumb_items` carry the third tuple element — a `REASON_*` lock code from `capabilities.py`, or `None`. When a segment's entity declares `ReadPolicy.lock_reason` and the viewer fails `read_policy.can_read`, the breadcrumb macro renders that crumb as a `data-locked-cta` popover trigger (no `href`) instead of an `<a href>` — so clicking `Users` in the chain from `/users/me` opens the "Get provider network access" CTA rather than landing on a 403. The lock is per-segment: each link respects its own read gate.
 
 The structural guarantee: every view-type template (`detail`, `form_new`, `form_edit`, `search`) builds its collection segment from `breadcrumb_entity_item(entity_name)` (a Jinja global, see [`../rendering/route_urls.py`](../rendering/route_urls.py)). The helper produces the full `(label, href, lock_reason)` tuple from one entity-name lookup — *there is no way to call it that omits the lock check*. Mount-side, [`subresource_breadcrumb_items`](../dispatch/mounts/_common.py) calls the same helper for its first segment, so subresource list pages (`/users/me/favorites`, `/clinicians/{id}/openings`) are covered too.
 
@@ -119,15 +119,17 @@ Active state is matched against `request.url.path` (the `_on_posts` / `_on_users
 
 **Almost no custom CSS.** The nav and dropdown ride Pico's element-level `nav` + `.dropdown` defaults. The only nav-specific rules are: right-aligning the dropdown menu so it doesn't overflow the viewport's right edge, and restoring a little item spacing inside the dropdown (the global `--pico-nav-element-spacing-vertical: 0` — which tightens the nav/breadcrumb bands — would otherwise pack the menu flush). See [`../static/css/framework.css`](../static/css/framework.css).
 
-**Breadcrumb band** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) is a single back affordance — a chevron + the deepest clickable parent's label. The macro emits its own `<nav class="breadcrumb-bar">` + inner `.container`; `base.html` renders it as a body-level band below the header. Every authenticated page shows one: a page-supplied crumb following the resource hierarchy `list > detail > edit/new`, or — when a page supplies none (top-level lists) — a default **Home** crumb pointing at the posts feed. There is **no** hidden placeholder; the band is genuinely visible on every authenticated page (anonymous pages render no band at all).
+**Breadcrumb band** (`{% block breadcrumb %}`, macro in `_shared/_breadcrumb.html`) is the full Pico chain. The macro prepends a **Home** root, emits its own `<nav class="breadcrumb-bar">` + inner `.container`, and `base.html` renders it as a body-level band below the header — but **only for authenticated viewers** (breadcrumbs are authenticated-app chrome; anonymous pages render no band at all). The dividers are Lucide chevrons, set via Pico's `--pico-nav-breadcrumb-divider`. Every authenticated page shows the chain — there is no hidden placeholder.
 
-| Page type        | URL example                    | Breadcrumb back affordance |
-| ---------------- | ------------------------------ | -------------------------- |
-| Top-level list   | `/posts`, `/clinicians`        | `← Home`                   |
-| Resource detail  | `/posts/{id}`                  | `← Posts`                  |
-| Resource new     | `/posts/form`                  | `← Posts`                  |
-| Resource edit    | `/posts/{id}/form`             | `← Post`                   |
-| Subresource list | `/users/{id}/clinicians`       | `← <username>`             |
+| Page type        | URL example                    | Breadcrumb chain                          |
+| ---------------- | ------------------------------ | ----------------------------------------- |
+| Top-level list   | `/posts`, `/clinicians`        | `Home › Clinicians`                       |
+| Resource detail  | `/clinicians/{id}`             | `Home › Clinicians › Maya Ellis`          |
+| Resource new     | `/clinicians/form`             | `Home › Clinicians › New`                 |
+| Resource edit    | `/clinicians/{id}/form`        | `Home › Clinicians › Maya Ellis › Edit`   |
+| Subresource list | `/users/{id}/clinicians`       | `Home › Users › <username> › Clinicians`  |
+
+The collection / parent segments link; the trailing segment is the current page (plain, `aria-current="page"`).
 
 Public auth-flow pages (`/auth/login`, `/auth/register`, …) opt out — they aren't in the resource hierarchy.
 

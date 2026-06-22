@@ -1,18 +1,20 @@
 {# Generic list-view chrome.
 
 A list view (`/posts`, `/clinicians`, `/users`) renders the page
-heading + actions in a single toolbar row above the list body. Top-level
-list pages carry no breadcrumb — a single-segment "Posts" trail duplicates
-what the active global-nav tab already communicates.
+heading + actions in a single toolbar row above the list body. Its
+breadcrumb is the full chain `Home › <collection>` — the collection is the
+current (unlinked) leaf; the `breadcrumb()` macro prepends Home (rendered
+for authenticated viewers only — see base.html).
 
 Subresource list pages (`/users/me/favorites`, `/users/{id}/clinicians`,
 `/clinicians/{id}/openings`, `/clinicians/{id}/clinician_affiliations`)
-get a breadcrumb automatically when the mount injects
+get a deeper chain automatically when the mount injects
 `_breadcrumb_items` into the context (set by `mount_list`,
 `mount_related_list`, and `mount_edge_routes` when the parent entity's
 spec declares `display_label_fn`). The breadcrumb block below renders
-it when present; templates that need a custom chain override the block
-as before.
+the injected chain when present and otherwise falls back to the
+`Home › <collection>` two-segment chain; templates that need a custom
+chain override the block as before.
 
 Toolbar row contents (left-to-right):
   - `<h1>` heading (resource_label)
@@ -59,8 +61,8 @@ Child contract:
     breadcrumb     — override the auto-injected breadcrumb. Use when
                      `_breadcrumb_items` can't express the chain (e.g.
                      a label computed from multiple context variables).
-                     Top-level list pages don't need this — they have
-                     no `_breadcrumb_items` and the block renders nothing.
+                     Top-level list pages don't need this — they fall back
+                     to the `Home › <collection>` chain automatically.
     after_content  — content rendered after the list body (outside the
                      browse-layout wrapper). Empty by default.
     content        — override the entire list body area, including the
@@ -90,49 +92,54 @@ Child contract:
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_filter_field.html" import filter_field -%}
 {% block breadcrumb %}
-  {%- if _breadcrumb_items is defined %}{{ breadcrumb(_breadcrumb_items) }}{%- endif %}
-  {% endblock %}
-  {% block toolbar %}
-    {%- set label %}
-      {% block resource_label %}{{ resource_label | default("") }}{% endblock %}
-    {% endset -%}
-    {%- set actions_body %}
-      {% block actions %}{% endblock %}
-    {% endset -%}
-    {% call page_toolbar(heading=label | trim) %}
-      {{ actions_body }}
-    {% endcall %}
-  {% endblock %}
-  {% block content %}
-    {%- set _has_filters = filters is defined and filters -%}
-    {%- if _has_filters %}
-      <div class="browse-layout">
-        <aside class="filter-sidebar">
-          {%- if search_url is defined and search_url %}
-            <hgroup>
-              <a href="{{ search_url }}">{{ filter_heading or "Filters" }}
-                {% if active_filter_count is defined and active_filter_count %}({{ active_filter_count }}){% endif %}
-              </a>
-            </hgroup>
-          {%- endif %}
-          <form method="get" action="{{ request.url.path }}" class="filter-form">
-            {%- for f in filters %}{{ filter_field(f, filter_values.get(f.name) ) }}{%- endfor %}
-              <menu>
-                <li>
-                  <button type="submit">Apply filters</button>
-                </li>
-                <li>
-                  <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear all</a>
-                </li>
-              </menu>
-            </form>
-          </aside>
-          <div class="browse-results">
-          {%- endif %}
-          {% block list_body %}{% endblock %}
-          {%- if _has_filters %}
-          </div>
+  {%- if _breadcrumb_items is defined %}{{ breadcrumb(_breadcrumb_items) }}
+  {%- else %}
+    {# Top-level list: no injected chain, so the collection itself is the
+       current (unlinked) leaf — the macro prepends Home → `Home › Clinicians`. #}
+    {{ breadcrumb([(self.resource_label() | trim or resource_label | default(""), none)]) }}
+  {%- endif %}
+{% endblock %}
+{% block toolbar %}
+  {%- set label %}
+    {% block resource_label %}{{ resource_label | default("") }}{% endblock %}
+  {% endset -%}
+  {%- set actions_body %}
+    {% block actions %}{% endblock %}
+  {% endset -%}
+  {% call page_toolbar(heading=label | trim) %}
+    {{ actions_body }}
+  {% endcall %}
+{% endblock %}
+{% block content %}
+  {%- set _has_filters = filters is defined and filters -%}
+  {%- if _has_filters %}
+    <div class="browse-layout">
+      <aside class="filter-sidebar">
+        {%- if search_url is defined and search_url %}
+          <hgroup>
+            <a href="{{ search_url }}">{{ filter_heading or "Filters" }}
+              {% if active_filter_count is defined and active_filter_count %}({{ active_filter_count }}){% endif %}
+            </a>
+          </hgroup>
+        {%- endif %}
+        <form method="get" action="{{ request.url.path }}" class="filter-form">
+          {%- for f in filters %}{{ filter_field(f, filter_values.get(f.name) ) }}{%- endfor %}
+            <menu>
+              <li>
+                <button type="submit">Apply filters</button>
+              </li>
+              <li>
+                <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear all</a>
+              </li>
+            </menu>
+          </form>
+        </aside>
+        <div class="browse-results">
+        {%- endif %}
+        {% block list_body %}{% endblock %}
+        {%- if _has_filters %}
         </div>
-      {%- endif %}
-    {% endblock %}
-    {% block after_content %}{% endblock %}
+      </div>
+    {%- endif %}
+  {% endblock %}
+  {% block after_content %}{% endblock %}

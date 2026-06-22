@@ -202,13 +202,15 @@
 {% include "_shared/_page_header.html" %}
 {# Breadcrumb bar — its own `<nav class="breadcrumb-bar">`, a body-level
        sibling of `<header>` / `<main>` / `<footer>` (NOT inside the
-       page-header). The `breadcrumb()` macro emits the full `<nav>` + inner
+       page-header). The `breadcrumb()` macro emits the full Pico chain (a
+       Home root + the page's segments) wrapped in `<nav>` + inner
        `.container`. Always present on authenticated app pages: a page-
-       supplied crumb (detail / form / search / subresource list) when set,
-       otherwise a default "Home" crumb pointing at the posts feed. Absent for
-       anonymous pages (landing / `/auth/*`). #}
+       supplied chain (detail / form / search / subresource list) when set,
+       otherwise just the Home crumb (`breadcrumb([])`). Absent for anonymous
+       pages (landing / `/auth/*`). #}
+{%- if is_authenticated %}
 {%- if _breadcrumb_html | trim %}{{ _breadcrumb_html }}
-{%- elif is_authenticated %}{{ breadcrumb([("Home", entity_url("post") )]) }}
+{%- else %}{{ breadcrumb([]) }}{%- endif %}
 {%- endif %}
 <main>
 {# `.container` wraps the content INSIDE `<main>` (not on `<main>` itself)

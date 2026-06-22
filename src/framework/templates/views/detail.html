@@ -62,12 +62,16 @@ Child contract:
     {% block resource_label %}{% endblock %}
   {% endset -%}
   {# `breadcrumb_entity_item(name)` produces the (label, href, lock_reason)
-     tuple — every view-type template's collection-back goes through it,
+     tuple — every view-type template's collection segment goes through it,
      so the lock-reason third element can't be forgotten. The `{% block
      resource_label %}` override (if a child template declared one) flows
-     in via `label=`; default is the spec's `url_collection.capitalize()`. #}
+     in via `label=`; default is the spec's `url_collection.capitalize()`.
+     The current resource (the H1, re-rendered via `self.current_label()`)
+     is appended as the unlinked leaf so the breadcrumb shows the full path
+     to it (Home › Collection › <this resource>). #}
   {{ breadcrumb([
     breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+  (self.current_label() | trim, none),
   ]) }}
 {% endblock %}
 {% block toolbar %}

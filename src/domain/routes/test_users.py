@@ -445,18 +445,17 @@ async def test_get_users_id_renders_admin_view_of_other_user(
     tree = HTMLParser(body)
 
     # --- Breadcrumb + heading (was test_admin_detail_renders_breadcrumb_and_heading)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None, "breadcrumb back-link missing"
-    label = back.css_first("span.breadcrumb-back-label")
+    crumbs = tree.css('nav[aria-label="breadcrumb"] ul li')
+    labels = [li.text(strip=True) for li in crumbs]
+    assert labels[:2] == ["Home", "Users"], "breadcrumb must start Home › Users"
     assert (
-        label is not None and label.text(strip=True) == "Users"
-    ), "breadcrumb label must say 'Users'"
-    assert (
-        back.attributes.get("href") == "/users"
-    ), "breadcrumb href must point at /users"
-    assert (
-        "data-locked-cta" not in back.attributes
-    ), "breadcrumb back-link must not be locked"
+        crumbs[1].css_first("a") is not None
+    ), "the Users segment must link to the collection"
+    assert labels[-1] == target_username, "current crumb is the viewed user"
+    # The Users collection segment links to /users and is not locked for an admin.
+    users_seg = crumbs[1].css_first("a")
+    assert users_seg.attributes.get("href") == "/users"
+    assert "data-locked-cta" not in users_seg.attributes
     h1 = tree.css_first("div.toolbar h1")
     assert h1 is not None and target_username in h1.text(
         strip=True
@@ -982,19 +981,23 @@ async def test_get_my_clinicians_renders_breadcrumb(
     superuser_client: AsyncClient,
     superuser_logged_in_user: User,
 ):
-    """`GET /users/me/clinicians` renders a breadcrumb back-affordance
-    pointing at the current user's profile — auto-injected by
+    """`GET /users/me/clinicians` renders a breadcrumb chain whose profile
+    segment links to the current user's page — auto-injected by
     `mount_related_list` via `USER_ENTITY.display_label_fn`."""
     response = await superuser_client.get("/users/me/clinicians")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
+    nav = tree.css_first('nav[aria-label="breadcrumb"]')
+    assert nav is not None, "user clinicians list must render a breadcrumb"
+    profile = next(
+        (
+            a
+            for a in nav.css("a")
+            if a.attributes.get("href") == f"/users/{superuser_logged_in_user.id}"
+        ),
+        None,
+    )
     assert (
-        back is not None
-    ), "user clinicians list must render a breadcrumb back-affordance"
-    assert back.attributes.get("href") == f"/users/{superuser_logged_in_user.id}"
-    label = back.css_first("span.breadcrumb-back-label")
-    assert (
-        label is not None
-        and label.text(strip=True) == superuser_logged_in_user.username
+        profile is not None
+        and profile.text(strip=True) == superuser_logged_in_user.username
     )
