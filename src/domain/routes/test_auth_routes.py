@@ -279,7 +279,7 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     test_client: AsyncClient, logged_in_user: User
 ):
     """HTMX-flagged POST + valid credentials → 204 + `Set-Cookie:
-    fastapiusersauth=...` + `HX-Redirect` (default `/posts?kind=referral`
+    fastapiusersauth=...` + `HX-Redirect` (default `/posts`
     per `UserManager.on_after_login`). The wrapper converts the
     underlying 302+Location into 204+HX-Redirect for HTMX so the
     browser doesn't auto-follow before HTMX honors the navigation."""
@@ -291,10 +291,10 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     assert response.status_code == 204
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
     # `Location` is popped (auto-follow guard for HTMX); HX-Redirect
-    # takes over. `on_after_login` defaults to `/posts?kind=referral`
-    # when no `?next=` is set.
+    # takes over. `on_after_login` defaults to `/posts` when no `?next=`
+    # is set.
     assert "Location" not in response.headers
-    assert response.headers.get("HX-Redirect") == "/posts?kind=referral"
+    assert response.headers.get("HX-Redirect") == "/posts"
 
 
 async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
@@ -309,7 +309,7 @@ async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
         data={"username": logged_in_user.email, "password": "password123"},
     )
     assert response.status_code == 302
-    assert response.headers.get("Location") == "/posts?kind=referral"
+    assert response.headers.get("Location") == "/posts"
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
 
 
@@ -791,7 +791,7 @@ async def test_post_verify_with_valid_token_verifies_and_auto_logs_in(
         follow_redirects=False,
     )
     # Non-HTMX POST → 302 + Location to the clinician-create form
-    # (NOT `on_after_login`'s default `/posts?kind=referral`).
+    # (NOT `on_after_login`'s default `/posts`).
     assert response.status_code == 302
     assert response.headers["location"] == "/clinicians/form"
     # Session cookie was minted.
@@ -1042,12 +1042,13 @@ async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
     assert "support@bedlamhealth.com" in response.text
 
 
-async def test_root_authenticated_redirects_to_posts_referrals(
+async def test_root_authenticated_redirects_to_browse(
     authenticated_client: AsyncClient,
 ):
-    """Authenticated GET / redirects to `/posts?kind=referral` — the
-    "find new clients" home (#692), preserved as a kind-filter on the
-    unified `/posts` feed."""
+    """Authenticated GET / redirects to the `/posts` browse feed — the
+    default landing surface (I3). The old `?kind=referral` bias was
+    dropped; the unfiltered feed lists every kind newest-first and the
+    Referrals/Openings intent toggle narrows on demand."""
     response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/posts?kind=referral"
+    assert response.headers["location"] == "/posts"

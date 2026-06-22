@@ -15,6 +15,29 @@
   {% endif %}
 {% endblock %}
 {% block list_body %}
+  {#- Binary intent toggle (mock §3). Browse is the default landing; the
+      toggle is pure presentation over the existing `?kind=` filter —
+      Referrals ("grow caseload") vs Openings ("place a client"). It is
+      NOT a third "All" state and `program_intake` is deliberately absent:
+      intake is browsed via org pages (`/organizations/:id/intakes`). The
+      structured `kind` checkbox in the sidebar rail still offers every
+      kind; this is the fast two-way switch above the results.
+
+      Active intent reads `filter_values.kind` (a list — the `kind` filter
+      is `multi=True`): a tab is current iff that selection is exactly its
+      one kind. The default unfiltered feed (every kind) leaves neither
+      tab current, so it never lies about a narrowing that isn't applied. -#}
+  {%- set _active_kinds = filter_values.get("kind") or [] -%}
+  <nav class="intent-toggle" aria-label="Post intent">
+    <div role="group">
+      <a href="{{ entity_url("post") }}?kind=referral"
+         role="button"
+         {% if _active_kinds == ["referral"] %}aria-current="page"{% else %}class="outline"{% endif %}>Referrals</a>
+      <a href="{{ entity_url("post") }}?kind=clinician_opening"
+         role="button"
+         {% if _active_kinds == ["clinician_opening"] %}aria-current="page"{% else %}class="outline"{% endif %}>Openings</a>
+    </div>
+  </nav>
   {#- Poster names / contact are anonymized server-side via
       `can_act_as_provider`. The chrome `#onboarding-banner` (base.html)
       is the single place explaining verification unlocks the full view —

@@ -60,11 +60,10 @@ def test_view_type_for_list_template():
 
 
 def test_view_type_for_base_extending_template_returns_none():
-    """Templates that extend `base.html` (auth flow, home, landing,
+    """Templates that extend `base.html` (auth flow, landing,
     dev/components) are outside the view-type contract — the
     validator must skip them."""
     assert view_type_for("auth/login.html") is None
-    assert view_type_for("home.html") is None
     assert view_type_for("landing.html") is None
 
 

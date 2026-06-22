@@ -11,166 +11,50 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
-from selectolax.parser import HTMLParser
 
-from src.domain.models import Post
 from src.main import lifespan
 
 pytestmark = pytest.mark.asyncio
 
 
-# --- GET /home -----------------------------------------------------------
+# --- Landing: `/` and `/home` resolve to browse --------------------------
+#
+# `/posts` is the authenticated landing surface (I3). The bespoke `/home`
+# dashboard template was retired: "My posts" folds into `/posts?owner=me`
+# (nav avatar menu) and "Recent in the network" *is* the default
+# newest-first browse feed. `/home` is kept only as an alias of `/` so the
+# anonymous brand link and stale bookmarks keep resolving — both routes
+# redirect an authenticated viewer to `/posts` and render the public
+# landing page for an anonymous one.
 
 
-async def test_home_page_requires_auth(test_client: AsyncClient):
-    """Unauthenticated browser requests to /home redirect to the login page.
-    The 401→302 rewrite fires only when Accept: text/html is present
-    (see `unauthorized_exception_handler` in main.py)."""
+@pytest.mark.parametrize("path", ["/", "/home"])
+async def test_authenticated_landing_redirects_to_browse(
+    path: str,
+    authenticated_client: AsyncClient,
+):
+    """An authenticated viewer hitting `/` or `/home` is redirected to the
+    `/posts` browse feed — the default landing surface. No `?kind=` bias is
+    applied; the unfiltered feed lists every kind newest-first."""
+    response = await authenticated_client.get(path, follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/posts"
+
+
+@pytest.mark.parametrize("path", ["/", "/home"])
+async def test_anonymous_landing_renders_public_page(
+    path: str,
+    test_client: AsyncClient,
+):
+    """An anonymous visitor hitting `/` or `/home` gets the public landing
+    page (not the login wall) — `/home` is a plain alias of `/`."""
     response = await test_client.get(
-        "/home",
+        path,
         headers={"Accept": "text/html"},
         follow_redirects=False,
     )
-    assert response.status_code == 302
-    assert "/auth/login" in response.headers["location"]
-
-
-async def test_home_page_shows_post_buttons_when_claim_a_verified(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """The home page renders kind-specific CTAs linking to the unified
-    `/posts/form` URL when the user is network-verified. CTAs are gated
-    on `can_act_as_provider` from `base_context()` — same
-    predicate the route's `write_authz` consults — so the visible button
-    and the server-side block can't disagree."""
-    from tests.helpers import make_clinician_with_org
-
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-
-    response = await authenticated_client.get("/home")
     assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first('a[href="/posts/form?kind=referral"]') is not None
-    assert tree.css_first('a[href="/posts/form?kind=clinician_opening"]') is not None
-
-
-async def test_home_page_no_post_actions_for_no_claim_user(
-    authenticated_client: AsyncClient,
-):
-    """A no-claim user gets the My posts section but no active toolbar CTAs.
-    The empty-state create button is disabled (locked_action) instead of a
-    live link. No finish-setup card is rendered — the chrome
-    `#onboarding-banner` is the single nudge."""
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert tree.css_first('a[href="/posts/form?kind=referral"]') is None
-    assert "+ Post a referral" not in response.text
-    assert tree.css_first("#finish-setup-card") is None
-    # My posts section always renders
-    assert "My posts" in response.text
-    # Empty-state CTA is a locked_action button (aria-disabled, not disabled),
-    # not a live link
-    assert "No posts yet." in response.text
-    assert tree.css_first('button[aria-disabled="true"]') is not None
-    # The page-body / toolbar create affordance is gated to a disabled button
-    # for a no-claim user. The global nav `+ Post` button is always present
-    # (pinned in the nav tests), so scope this to `<main>` to exclude it.
-    assert tree.css_first('main a[href="/posts/form"]') is None
-
-
-async def test_home_page_empty_my_posts_shows_locked_cta_when_unverified(
-    authenticated_client: AsyncClient,
-):
-    """An unverified user with no posts sees a locked_action Create a post button
-    (aria-disabled, clickable for popover) rather than a live link."""
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert "No posts yet." in response.text
-    btn = tree.css_first('button[aria-disabled="true"]')
-    assert btn is not None
-    assert "Create a post" in btn.text()
-
-
-async def test_home_page_empty_my_posts_shows_active_cta_when_verified(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """A verified user with no posts sees a live Create a post link."""
-    from tests.helpers import make_clinician_with_org
-
-    clinician = make_clinician_with_org(owner_id=logged_in_user.id, npi="1234567890")
-    clinician.npi_match_status = "matched"
-    clinician.clinician_verified = True
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(clinician)
-
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    assert "No posts yet." in response.text
-    assert tree.css_first('a[href="/posts/form"]') is not None
-    assert tree.css_first('button[aria-disabled="true"]') is None
-
-
-async def test_home_page_no_blur_element(authenticated_client: AsyncClient):
-    """The blur wrapper (`feed-teaser-blur`) is removed regardless of
-    verification state — anonymization is now server-side via `can_act_as_provider`,
-    not a CSS filter on the client."""
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
-    assert "feed-teaser-blur" not in response.text
-
-
-async def test_home_page_has_no_inline_feed_verify_notice(
-    authenticated_client: AsyncClient,
-    db_test_session_manager,
-    logged_in_user,
-):
-    """The home network feed carries no inline verify notice, even for an
-    unverified viewer with network posts. The single chrome
-    `#onboarding-banner` is the only place that explains verification
-    unlocks the full view — the old `feed-verify-notice` is gone."""
-    from tests.helpers import create_test_user, make_referral_detail
-
-    author = create_test_user(username="net-poster")
-    post = Post(kind="referral", owner_id=author.id)
-    post.referral_detail = make_referral_detail()
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(author)
-            session.add(post)
-
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
-    assert "feed-verify-notice" not in response.text
-    assert "Complete verification" not in response.text
-
-
-async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):
-    """The home page passes current_user so is_authenticated=True and the
-    redesigned primary nav renders: brand → posts, a `+ Post` button →
-    the create form, and the avatar menu (My posts / Account / Sign out)."""
-    response = await authenticated_client.get("/home")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    nav = tree.css_first('nav[aria-label="Primary"]')
-    assert nav is not None
-    links = {a.attributes.get("href") for a in nav.css("a")}
-    # Brand → posts collection; `+ Post` → create form; My posts → owner=me.
-    assert "/posts" in links
-    assert "/posts/form" in links
-    assert "/posts?owner=me" in links
+    assert "/auth/login" not in response.headers.get("location", "")
 
 
 # --- lifespan -----------------------------------------------------------

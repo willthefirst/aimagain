@@ -336,9 +336,6 @@ class PostRepository(BaseRepository):
     async def list_intakes(self, **kwargs) -> Sequence[Post]:
         return await self.list_posts(**kwargs)
 
-    async def list_recent_for_network(self, **kwargs) -> Sequence[Post]:
-        return await self.list_posts(**kwargs)
-
 
 def _json_array_contains_any_multi(
     values: Sequence[str], targets: Sequence[tuple[type, str]]

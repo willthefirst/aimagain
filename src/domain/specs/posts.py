@@ -9,6 +9,14 @@ and the framework's discriminated-union adapter handles dispatch on
 POST/PATCH bodies. List/search expose a `kind` filter for narrowing
 to one kind without leaving ``/posts``.
 
+``/posts`` is the authenticated landing surface (see
+``src/main.py:read_root``). The browse list (`posts/list.html`) adds a
+binary **intent toggle** — Referrals (``?kind=referral``) vs Openings
+(``?kind=clinician_opening``) — as pure presentation over this same
+`kind` filter; ``program_intake`` is deliberately absent from the toggle
+(intake is browsed via org pages) while the sidebar `kind` checkbox still
+offers every kind.
+
 See the `discriminator` / `discriminator_value` docstring in
 [`framework/dispatch/entity_spec.py`](../../framework/dispatch/entity_spec.py)
 for the full polymorphic-face contract.
