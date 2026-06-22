@@ -552,6 +552,18 @@ dd { margin: 0; }
   border-bottom: 1px solid var(--pico-muted-border-color);
   padding-block: var(--pico-block-spacing-vertical);
 }
+/* Breadcrumb divider — a Lucide chevron instead of Pico's default ">"
+   character. Configured the Pico-native way: set `--pico-nav-breadcrumb-divider`
+   (which Pico's `li::after { content: var(--pico-nav-breadcrumb-divider) }`
+   reads) to the lucide chevron-right codepoint. The `font-family` override on
+   the divider pseudo is what renders that codepoint as the glyph (it lives in
+   the lucide icon font); muted to read as chrome. Codepoint kept in sync with
+   `fonts/lucide-icons.css`. */
+.breadcrumb-bar { --pico-nav-breadcrumb-divider: "\e073"; }
+.breadcrumb-bar ul li:not(:last-child)::after {
+  font-family: "lucide";
+  color: var(--pico-muted-color);
+}
 /* `<menu>` is HTML's native "list of commands" element — used
    by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
    and any in-row action cluster (e.g. the users-table Actions
@@ -568,31 +580,6 @@ td > menu > li > [role="button"] {
   padding-block: 0.25rem;
   padding-inline: 0.5rem;
   font-size: 0.875rem;
-}
-/* Breadcrumb back affordance. The macro emits a single
-   `<a class="breadcrumb-back">` — a Lucide arrow-left glyph plus
-   the deepest clickable parent's label — at every viewport
-   width. The breadcrumb sits as a thin line above the toolbar
-   row that carries the `<h1>`, so the chrome between the
-   global nav and the content is one band instead of two.
-
-   Pico's default `<a>` underline ran across both the icon and
-   the label, and the icon's `vertical-align: -0.15em` made it
-   sit below the underline so the chevron read as visually
-   detached from the label. Strip the underline on the link as
-   a whole, scope the underline to the label `<span>` on hover/
-   focus, and use a flex `gap` for the chevron-to-label spacing
-   (overriding the icon's universal `margin-inline-end`). */
-.breadcrumb-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  text-decoration: none;
-}
-.breadcrumb-back > i { margin-inline-end: 0; }
-.breadcrumb-back:hover .breadcrumb-back-label,
-.breadcrumb-back:focus .breadcrumb-back-label {
-  text-decoration: underline;
 }
 /* Entity create/edit forms — cap form width on large screens so
    short fields don't stretch across the whole container, and
@@ -688,8 +675,8 @@ legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; co
    element-level `nav` + `.dropdown` styling owns ALL of it — layout
    (space-between), `<li>` chrome, the dropdown trigger/chevron, and the
    click-to-open menu on every viewport — so there is no custom rule here.
-   The breadcrumb `<nav aria-label="breadcrumb">` carries a single
-   `.breadcrumb-back` child, so Pico's space-between is a no-op there.
+   The breadcrumb `<nav aria-label="breadcrumb">` is styled separately as a
+   Pico breadcrumb chain (see `.breadcrumb-bar` above).
 
    One override: the profile dropdown sits at the nav's right edge, and
    Pico opens dropdown menus left-aligned to the summary — which overflows

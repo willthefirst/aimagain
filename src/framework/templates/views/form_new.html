@@ -53,12 +53,14 @@ as a second crumb between collection and the H1).
     {%- set _label_override %}
       {% block resource_label %}{% endblock %}
     {% endset -%}
-    {# Collection-back tuple flows through `breadcrumb_entity_item` so the
-       lock_reason third element is always populated — clicking `< Clinicians`
-       from `/clinicians/form` opens the network-unverified popover instead
-       of a 403. See `route_urls.breadcrumb_entity_item`. #}
+    {# Collection tuple flows through `breadcrumb_entity_item` so the
+       lock_reason third element is always populated — `Clinicians` in the
+       chain opens the network-unverified popover instead of a 403. See
+       `route_urls.breadcrumb_entity_item`. `New` is the current leaf →
+       `Home › Clinicians › New`. #}
     {{ breadcrumb([
         breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+    ("New", none),
     ]) }}
   {%- endif %}
 {% endblock %}

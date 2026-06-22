@@ -1,12 +1,14 @@
 """Tests for the ``_shared/_breadcrumb.html`` macro.
 
-The breadcrumb renders the deepest clickable parent as the "back"
-affordance. Each item is a ``(label, href, lock_reason)`` tuple — the
-third element is optional and, when set to a closed-vocab ``REASON_*``
-code, switches the back link to a locked popover-trigger instead of a
-plain ``<a>``. That branch is what keeps the visible link consistent
-with the destination page's ``read_policy.assert_can_read`` — without
-it, clicking the back link from ``/users/me`` lands on a 403.
+The breadcrumb renders a full Pico chain: a "Home" root (→ the posts feed)
+prepended to each passed ``(label, href, lock_reason?)`` segment, with Pico
+drawing the ``>`` dividers. Per segment:
+
+  - ``lock_reason`` set (a closed-vocab ``REASON_*`` code) → a
+    ``data-locked-cta`` popover trigger with NO ``href``, so the visible link
+    can't disagree with the destination page's ``read_policy.assert_can_read``.
+  - ``href`` set, no lock → a plain ``<a href>`` link.
+  - neither → plain current-page text (``aria-current="page"``).
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from __future__ import annotations
 import textwrap
 
 from jinja2 import Environment
-from selectolax.parser import HTMLParser
+from selectolax.parser import HTMLParser, Node
 
 from src.domain.logic import capabilities
 from src.framework.templates._test_env import make_test_env
@@ -33,77 +35,100 @@ def _render(items_literal: str) -> str:
     return _make_env().from_string(snippet).render()
 
 
-def test_breadcrumb_two_tuple_back_link_renders_anchor() -> None:
-    """Legacy 2-tuple shape (label, href) still renders a plain `<a>`."""
-    html = _render('[("Posts", "/posts")]')
-    a = HTMLParser(html).css_first("a.breadcrumb-back")
-    assert a is not None
+def _crumbs(html: str) -> list[Node]:
+    return HTMLParser(html).css("nav[aria-label='breadcrumb'] ul li")
+
+
+def test_home_root_is_always_prepended() -> None:
+    """Every chain starts with a Home link to the posts feed — an empty
+    `items` renders just that crumb."""
+    lis = _crumbs(_render("[]"))
+    assert len(lis) == 1
+    home = lis[0].css_first("a")
+    assert home.text(strip=True) == "Home"
+    assert home.attributes.get("href") == "/posts"
+
+
+def test_two_tuple_segment_renders_link_after_home() -> None:
+    """Legacy 2-tuple shape (label, href) renders a plain `<a>` link, after
+    the Home root."""
+    lis = _crumbs(_render('[("Posts", "/posts")]'))
+    assert [li.text(strip=True) for li in lis] == ["Home", "Posts"]
+    a = lis[1].css_first("a")
     assert a.attributes.get("href") == "/posts"
     assert "data-locked-cta" not in a.attributes
 
 
-def test_breadcrumb_three_tuple_no_reason_renders_anchor() -> None:
+def test_three_tuple_no_reason_renders_link() -> None:
     """3-tuple with `lock_reason=None` is identical to the 2-tuple case."""
-    html = _render('[("Posts", "/posts", none)]')
-    a = HTMLParser(html).css_first("a.breadcrumb-back")
-    assert a is not None
+    a = _crumbs(_render('[("Posts", "/posts", none)]'))[1].css_first("a")
     assert a.attributes.get("href") == "/posts"
     assert "data-locked-cta" not in a.attributes
 
 
-def test_breadcrumb_lock_reason_set_renders_locked_back() -> None:
-    """3-tuple with a `REASON_*` code emits the popover-trigger chrome:
+def test_hrefless_segment_is_the_current_page() -> None:
+    """A segment with `href=None` is the current page — plain text with
+    `aria-current="page"`, no link."""
+    current = _crumbs(_render('[("Clinicians", none)]'))[1]
+    assert current.css_first("a") is None
+    span = current.css_first("span")
+    assert span.text(strip=True) == "Clinicians"
+    assert span.attributes.get("aria-current") == "page"
+
+
+def test_lock_reason_renders_locked_trigger_with_no_href() -> None:
+    """A segment with a `REASON_*` code emits the popover-trigger chrome:
     aria-disabled, `data-locked-cta`, and crucially no `href` so a click
     can't navigate to the gated page."""
-    html = _render('[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER)]')
-    a = HTMLParser(html).css_first("a.breadcrumb-back")
-    assert a is not None
+    a = _crumbs(
+        _render('[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER)]')
+    )[1].css_first("a")
     assert a.attributes.get("aria-disabled") == "true"
     assert (
         a.attributes.get("data-locked-cta")
         == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
     assert "href" not in a.attributes
-    assert a.css_first("span.breadcrumb-back-label").text() == "Users"
+    assert a.text(strip=True) == "Users"
 
 
-def test_breadcrumb_lock_reason_preserves_chevron() -> None:
-    """The locked branch keeps the back-chevron icon — visual continuity
-    with the normal breadcrumb-back so the layout doesn't shift."""
-    html = _render('[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER)]')
-    a = HTMLParser(html).css_first("a.breadcrumb-back")
-    assert a is not None
-    assert a.css_first("i.icon-arrow-left") is not None
-
-
-def test_breadcrumb_multi_segment_uses_deepest_linkable_for_lock() -> None:
-    """For nested chains, the back target is the deepest item with an href
-    — when that item carries a lock_reason, the back link is locked."""
-    html = _render(
-        '[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER),'
-        ' ("Will", "/users/abc", none),'
-        ' ("Favorites", none, none)]'
+def test_full_chain_renders_every_segment_in_order() -> None:
+    """A multi-segment chain renders Home + each segment in order; ancestors
+    with an href link, the trailing href-less segment is the current page."""
+    lis = _crumbs(
+        _render(
+            '[("Clinicians", "/clinicians"),'
+            ' ("Maya Ellis", "/clinicians/abc"),'
+            ' ("Edit", none)]'
+        )
     )
-    a = HTMLParser(html).css_first("a.breadcrumb-back")
-    assert a is not None
-    # Back target is the parent row link (/users/abc), which has no lock
-    # — so the rendered link is a plain anchor.
-    assert a.attributes.get("href") == "/users/abc"
-    assert "data-locked-cta" not in a.attributes
+    assert [li.text(strip=True) for li in lis] == [
+        "Home",
+        "Clinicians",
+        "Maya Ellis",
+        "Edit",
+    ]
+    assert lis[1].css_first("a").attributes.get("href") == "/clinicians"
+    assert lis[2].css_first("a").attributes.get("href") == "/clinicians/abc"
+    assert lis[3].css_first("a") is None
+    assert lis[3].css_first("span").attributes.get("aria-current") == "page"
 
 
-def test_breadcrumb_two_segment_locks_when_collection_locked() -> None:
-    """On a subresource list (`/users/me/favorites`) where the parent row
-    is the current page, the back target IS the collection — locking
-    propagates to the visible link."""
-    html = _render(
-        '[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER),'
-        ' ("Favorites", none, none)]'
+def test_lock_is_per_segment() -> None:
+    """A lock on one ancestor locks only that crumb; the others render
+    normally — each link respects its own read gate."""
+    lis = _crumbs(
+        _render(
+            '[("Users", "/users", capabilities.REASON_NOT_A_VERIFIED_PROVIDER),'
+            ' ("Will", "/users/abc", none),'
+            ' ("Favorites", none, none)]'
+        )
     )
-    a = HTMLParser(html).css_first("a.breadcrumb-back")
-    assert a is not None
+    users = lis[1].css_first("a")
     assert (
-        a.attributes.get("data-locked-cta")
+        users.attributes.get("data-locked-cta")
         == capabilities.REASON_NOT_A_VERIFIED_PROVIDER
     )
-    assert "href" not in a.attributes
+    assert "href" not in users.attributes
+    assert lis[2].css_first("a").attributes.get("href") == "/users/abc"
+    assert lis[3].css_first("span").attributes.get("aria-current") == "page"

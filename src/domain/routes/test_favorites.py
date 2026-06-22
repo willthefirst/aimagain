@@ -213,17 +213,20 @@ async def test_list_my_favorites_renders_breadcrumb(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """`GET /users/me/favorites` now renders a breadcrumb back-affordance
-    pointing at the current user's profile page — auto-injected by
-    `mount_edge_routes` via `USER_ENTITY.display_label_fn`."""
+    """`GET /users/me/favorites` renders a breadcrumb chain whose profile
+    segment links to the current user's page — auto-injected by
+    `mount_edge_routes` via `USER_ENTITY.display_label_fn`. `Favorites` is the
+    current (unlinked) leaf."""
     response = await authenticated_client.get("/users/me/favorites")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    back = tree.css_first('nav[aria-label="breadcrumb"] a.breadcrumb-back')
-    assert back is not None, "favorites list must render a breadcrumb back-affordance"
-    assert back.attributes.get("href") == "/users/me"
-    label = back.css_first("span.breadcrumb-back-label")
-    assert label is not None and label.text(strip=True) == logged_in_user.username
+    nav = tree.css_first('nav[aria-label="breadcrumb"]')
+    assert nav is not None, "favorites list must render a breadcrumb"
+    profile = next(
+        (a for a in nav.css("a") if a.attributes.get("href") == "/users/me"), None
+    )
+    assert profile is not None and profile.text(strip=True) == logged_in_user.username
+    assert nav.css("ul li")[-1].text(strip=True) == "Favorites"
 
 
 async def test_empty_favorites_browse_clinicians_link_is_plain_anchor(

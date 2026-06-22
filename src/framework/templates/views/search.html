@@ -45,12 +45,14 @@ Required context (also enforced at render time by
   {%- set _label_override %}
     {% block resource_label %}{% endblock %}
   {% endset -%}
-  {# Collection-back tuple flows through `breadcrumb_entity_item` so the
-     lock_reason third element is always populated — the back link
-     auto-locks when the viewer fails the entity's `read_policy.can_read`.
-     See `route_urls.breadcrumb_entity_item`. #}
+  {# Collection segment flows through `breadcrumb_entity_item` so the
+     lock_reason third element is always populated — it auto-locks when the
+     viewer fails the entity's `read_policy.can_read`. `Search` is the
+     current leaf → `Home › Clinicians › Search`. See
+     `route_urls.breadcrumb_entity_item`. #}
   {{ breadcrumb([
     breadcrumb_entity_item(entity_name, label=_label_override | trim or none) ,
+  ("Search", none),
   ]) }}
 {% endblock %}
 {% block toolbar %}
