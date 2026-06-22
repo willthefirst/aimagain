@@ -785,10 +785,11 @@ def test_primary_nav_omits_login_link_for_anonymous_visitors() -> None:
         html = _render_base_for_path(path)
         tree = HTMLParser(html)
         assert (
-            tree.css_first('#primary-nav a[href="/auth/login"]') is None
+            tree.css_first('nav[aria-label="Primary"] a[href="/auth/login"]') is None
         ), f"expected no /auth/login link on {path}"
         assert (
-            tree.css_first('#primary-nav span[aria-current="page"]') is None
+            tree.css_first('nav[aria-label="Primary"] span[aria-current="page"]')
+            is None
         ), f"expected no Login indicator on {path}"
 
 

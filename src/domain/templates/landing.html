@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 {% block head %}
-  {# Landing-only layout. The sticky-footer body grid (auto 1fr auto)
-   lives in `base.html` and already grows the `<main>` row to fill the
-   viewport. This block adds the landing-specific extras: vertically
-   center the hero within `<main>` and switch the CTA cluster to a
-   natural-width inline row, both at tablet+. Mobile relies on Pico
-   defaults — `<a role="button">` is block-level full-width, which is
-   exactly what we want for stacked tappable bars. Scoped to
-   `body:has(.landing-hero)` and `.landing-hero` so the rules don't
+  {# Landing-only layout. The sticky-footer body (flex column) in
+   `base.html` grows `<main>` to fill the viewport. This block adds the
+   landing-specific extras: vertically center the hero within `<main>` and
+   switch the CTA cluster to a natural-width inline row, both at tablet+.
+   `<main>` makes itself a centering grid; its sole child is the
+   `.container` that holds the hero, so `align-content: center` centers the
+   hero block. Mobile relies on Pico defaults — `<a role="button">` is
+   block-level full-width, which is exactly what we want for stacked
+   tappable bars. Scoped to `body:has(.landing-hero)` so the rules don't
    leak to any other page. #}
   <style>
   @media (min-width: 768px) {
-    body:has(.landing-hero) main.container {
+    body:has(.landing-hero) main {
       display: grid;
+      align-content: center;
       padding-block: 2rem;
     }
-    .landing-hero { align-self: center; }
     .landing-hero .cta-cluster {
       display: flex;
       flex-wrap: wrap;

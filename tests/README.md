@@ -39,7 +39,7 @@ Tests that exercise the real login endpoint (`POST /auth/jwt/login`) still do so
 
 ## Template-test selectors
 
-Selectors MUST scope to a stable handle on the region under test (an `id`, `class`, or `data-testid`) — e.g. `#user-list > li`. Do not rely on a page having only one `<ul>` / `<form>` / `<table>`; that property is incidental and breaks the first time anything list-shaped lands in a shared template. When adding markup to `base.html` or a shared template, give the new element a stable handle too. Exclusion selectors (`ul:not(#primary-nav) > li`) are a smell — prefer inclusion.
+Selectors MUST scope to a stable handle on the region under test (an `id`, `class`, `data-testid`, or a semantic landmark like `nav[aria-label="Primary"]`) — e.g. `#user-list > li`. Do not rely on a page having only one `<ul>` / `<form>` / `<table>`; that property is incidental and breaks the first time anything list-shaped lands in a shared template. When adding markup to `base.html` or a shared template, give the new element a stable handle too. Exclusion selectors (`ul:not([aria-label="Primary"]) > li`) are a smell — prefer inclusion.
 
 ## Testing scripts under `scripts/dev/`
 

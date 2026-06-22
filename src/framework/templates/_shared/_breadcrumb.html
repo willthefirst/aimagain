@@ -2,9 +2,11 @@
 
 Renders the page's location as a single "back" affordance — a
 Lucide arrow-left chevron plus the deepest clickable parent's
-label. Sits in the `breadcrumb` block slot wired in
-[`../base.html`](../base.html). No band chrome (background, border,
-padding); just inline text with an icon.
+label — wrapped in its OWN `<nav class="breadcrumb-bar">` band. A
+view template fills the `breadcrumb` block; `base.html` captures it
+and renders the result as a body-level sibling of `<header>` /
+`<main>` / `<footer>` (not inside the page-header). The inner
+`.container` keeps the crumb aligned with page content.
 
 Each item is a `(label, href, lock_reason)` tuple — the third
 element is optional and defaults to `None`. The last item's
@@ -41,23 +43,29 @@ item's label as plain text so the markup stays valid.
     {%- set _linkable = items | selectattr(1) | list -%}
     {%- set _back = _linkable[-1] if _linkable else items[0] -%}
     {%- set _lock = _back[2] if _back|length > 2 else none -%}
-    <nav aria-label="breadcrumb">
-      {%- if _lock %}
-        {# Locked back affordance: same locked-cta popover wiring as
+    {# Self-contained breadcrumb bar: its own `<nav>` rendered at body
+       level (a sibling of `<header>`/`<main>`/`<footer>` — see base.html),
+       with an inner `.container` so the crumb aligns with page content
+       while the bar can span full width. #}
+    <nav aria-label="breadcrumb" class="breadcrumb-bar">
+      <div class="container">
+        {%- if _lock %}
+          {# Locked back affordance: same locked-cta popover wiring as
        `locked_link`, but keeps the `.breadcrumb-back` chrome (chevron
-       + label sizing) so the band layout is unchanged. #}
-        <a class="breadcrumb-back locked-link"
-           aria-disabled="true"
-           tabindex="0"
-           data-locked-cta="{{ _lock }}">
-          <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
-        </a>
-      {%- else %}
-        <a class="breadcrumb-back"
-           {% if _back[1] %}href="{{ _back[1] }}"{% endif %}>
-          <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
-        </a>
-      {%- endif %}
+       + label sizing) so the bar layout is unchanged. #}
+          <a class="breadcrumb-back locked-link"
+             aria-disabled="true"
+             tabindex="0"
+             data-locked-cta="{{ _lock }}">
+            <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
+          </a>
+        {%- else %}
+          <a class="breadcrumb-back"
+             {% if _back[1] %}href="{{ _back[1] }}"{% endif %}>
+            <i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">{{ _back[0] }}</span>
+          </a>
+        {%- endif %}
+      </div>
     </nav>
   {%- endif %}
 {%- endmacro %}

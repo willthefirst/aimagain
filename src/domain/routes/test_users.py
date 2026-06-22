@@ -73,9 +73,9 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
     brand = nav.css_first('a[href="/home"]')
     assert brand is not None
     # No profile link, no Login link, no Login indicator.
-    assert tree.css_first('#primary-nav a[href="/users/me"]') is None
-    assert tree.css_first('#primary-nav a[href="/auth/login"]') is None
-    assert tree.css_first('#primary-nav span[aria-current="page"]') is None
+    assert tree.css_first('nav[aria-label="Primary"] a[href="/users/me"]') is None
+    assert tree.css_first('nav[aria-label="Primary"] a[href="/auth/login"]') is None
+    assert tree.css_first('nav[aria-label="Primary"] span[aria-current="page"]') is None
 
 
 # --- Listing -------------------------------------------------------------
@@ -251,22 +251,24 @@ async def test_get_users_me_renders_authenticated_self_view(
     body = response.text
     tree = HTMLParser(body)
 
-    # --- Primary nav structure (was test_base_template_renders_primary_nav_when_authenticated) ---
+    # --- Primary nav structure (canonical Pico nav: brand <ul> + actions <ul>) ---
     # Create-clinician CTA was removed from nav in #697.
     assert (
-        tree.css("#primary-nav a[href='/clinicians/form']") == []
+        tree.css("nav[aria-label='Primary'] a[href='/clinicians/form']") == []
     ), "Create-clinician CTA must be removed from nav (#697)"
     # Brand → posts collection for an authenticated viewer (Browse is the
     # default landing surface); anonymous keeps brand → /home (test_users.py
     # anonymous nav test).
     assert (
-        tree.css_first('#primary-nav > a[href="/posts"] strong') is not None
+        tree.css_first('nav[aria-label="Primary"] a[href="/posts"] strong') is not None
     ), "brand link must point at /posts when authenticated"
-    # Prominent `+ Post` button (outside the avatar menu) → post create form.
-    assert (
-        tree.css_first('#primary-nav > a[role="button"][href="/posts/form"]')
-        is not None
-    ), "`+ Post` button missing in primary nav"
+    # `Post` link (a visible <li>, outside the profile dropdown) → create form.
+    posts = [
+        a
+        for a in tree.css('nav[aria-label="Primary"] a[href="/posts/form"]')
+        if a.text(strip=True) == "Post"
+    ]
+    assert len(posts) == 1, "`Post` link missing in primary nav"
     # The avatar `<details>` menu carries the non-Post destinations.
     nav_hrefs = [a.attributes.get("href") for a in tree.css("#nav-menu ul li a")]
     assert nav_hrefs == [
