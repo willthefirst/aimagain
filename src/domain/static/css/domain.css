@@ -180,35 +180,6 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .filter-sidebar { flex: 0 0 220px; min-width: 0; }
 .browse-results { flex: 1 1 0; min-width: 0; }
 
-/* Filter summary — the header that opens the results column (framework
-   views/list.html). Reads out the active filters defining the result set
-   (`.filter-tags`) and right-aligns the refine link to the full search page
-   (`.filter-summary-edit`). Replaced the old sidebar header link. */
-.filter-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: calc(var(--pico-spacing) * 0.5) var(--pico-spacing);
-  margin-bottom: 1rem;
-}
-.filter-summary-label { margin: 0; color: var(--pico-muted-color); }
-.filter-summary-edit { margin-left: auto; }
-.filter-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: calc(var(--pico-spacing) * 0.5);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.filter-tags li {
-  padding: 0.1rem 0.5rem;
-  border: 1px solid var(--pico-muted-border-color);
-  border-radius: var(--pico-border-radius);
-  font-size: 0.85em;
-  color: var(--pico-muted-color);
-}
-
 /* Narrow: stack sidebar full-width above results; hide inline form */
 @media (max-width: 640px) {
   .browse-layout { flex-direction: column; }
