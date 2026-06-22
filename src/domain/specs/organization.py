@@ -4,6 +4,9 @@ practices, health systems, and solo-practice shells.
 
 from typing import Final
 
+from src.domain.logic.clinician_affiliations.repository import (
+    get_clinician_affiliation_repository,
+)
 from src.domain.logic.org_representations.repository import (
     OrgRepresentationRepository,
 )
@@ -51,6 +54,22 @@ def _organization_create_redirect(**_: object) -> str:
 # `Post` rows, so the child spec points at the post repo.
 _org_intakes_child = ResourceSpec(
     collection="intakes", id_param="post_id", repo_dep=get_post_repository
+)
+
+# Owner-scoped read projection over the `(clinician × org)`
+# `ClinicianAffiliation` join (RESOURCE_GRAMMAR pattern #5 — "an
+# organization owns members"): the org's affiliated clinicians, listed
+# here by `org_id`. The same join is edited from the clinician side
+# (`/clinicians/{id}/clinician_affiliations`) — "one join, two doors"
+# (#1524). No new model, no org-side mutation routes: the affiliation is
+# FK-owned by the clinician, so the members list links each row to its
+# clinician-side edit page where add / remove already live. Child renders
+# `ClinicianAffiliation` rows, so the child spec points at the affiliation
+# repo.
+_org_members_child = ResourceSpec(
+    collection="members",
+    id_param="clinician_affiliation_id",
+    repo_dep=get_clinician_affiliation_repository,
 )
 
 
@@ -151,6 +170,13 @@ ORGANIZATION_ENTITY: Final[EntitySpec] = EntitySpec(
             child_spec=_org_intakes_child,
             template="organizations/intakes_list.html",
             handler_path="src.domain.logic.posts.handlers.handle_list_org_intakes",
+        ),
+        RelatedListSubresource(
+            child_spec=_org_members_child,
+            template="organizations/members_list.html",
+            handler_path=(
+                "src.domain.logic.organizations.handlers.handle_list_org_members"
+            ),
         ),
     ),
 )

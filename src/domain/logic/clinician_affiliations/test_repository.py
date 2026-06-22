@@ -105,3 +105,49 @@ async def test_repository_creates_and_fetches_affiliation(session):
     assert fetched is not None
     assert fetched.org_id == org_b_id
     assert fetched.sliding_scale is True
+
+
+@pytest.mark.asyncio
+async def test_list_org_members_scopes_by_org_id(session):
+    """`list_org_members(org_id)` returns only the affiliations whose
+    `org_id` matches — the org-side door onto the join (#1524). The
+    clinician is seeded with an affiliation at org_a; a second
+    affiliation is added at org_b. Each org's members list returns its
+    own row only, with the `clinician` relation eager-loaded."""
+    user_id = uuid.uuid4()
+    user = User(
+        id=user_id,
+        username="members-test",
+        email="members-test@example.com",
+        hashed_password="not-a-password",
+        is_active=True,
+        is_verified=True,
+    )
+    org_a_id = uuid.uuid4()
+    org_b_id = uuid.uuid4()
+    org_a = Organization(id=org_a_id, name="Acme", owner_id=user_id)
+    org_b = Organization(id=org_b_id, name="Beta", owner_id=user_id)
+    clinician = Clinician(
+        owner_id=user_id,
+        org_id=org_a_id,
+        first_name="Ada",
+        last_name="Lovelace",
+        location_city="Brooklyn",
+        location_state="NY",
+    )
+    session.add_all([user, org_a, org_b, clinician])
+    await session.flush()
+
+    repo = ClinicianAffiliationRepository(session)
+    await repo.create(ClinicianAffiliation(clinician_id=clinician.id, org_id=org_b_id))
+
+    members_a = await repo.list_org_members(org_a_id)
+    members_b = await repo.list_org_members(org_b_id)
+    assert [m.org_id for m in members_a] == [org_a_id]
+    assert [m.org_id for m in members_b] == [org_b_id]
+    # The relation the template reads is eager-loaded.
+    assert members_a[0].clinician.last_name == "Lovelace"
+
+    # An org with no affiliations returns an empty sequence (drives the
+    # Members empty state).
+    assert await repo.list_org_members(uuid.uuid4()) == []

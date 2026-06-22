@@ -2,6 +2,7 @@
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/sections.html" import fact, facts_block -%}
 {%- from "_shared/_locked.html" import locked_name, locked_field -%}
+{%- from "_shared/_picker.html" import picker -%}
 {# Redact identifying fields (name H1, NPI) when the viewer is neither
    the owner, a verified rep, nor a provider-network member. The viewer's
    own orgs (owned OR represented) always render un-redacted. #}
@@ -37,4 +38,15 @@ and organization.id not in viewer_rep_org_ids -%}
         {% endif %}
       {%- endif %}
     {%- endcall %}
+    {# Subresource navigation — Members is the org's read door onto the
+       (clinician × org) affiliation join; Intakes projects the org's
+       program-intake posts. See organizations/members_list.html. #}
+    {{ picker([
+        {"href": entity_url('organization', id=organization.id) ~ "/members",
+    "heading": "Members",
+    "description": "Clinicians affiliated with this organization. Add or remove a member from the clinician's own practices."},
+    {"href": entity_url('organization', id=organization.id) ~ "/intakes",
+    "heading": "Program intakes",
+    "description": "Open program-intake announcements posted under this organization's programs."},
+    ]) }}
   {% endblock %}
