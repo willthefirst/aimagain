@@ -18,6 +18,12 @@ inherits the caller's context, so `_on_home` / `_on_posts` /
 `_on_profile` / `is_authenticated` resolve normally. `_on_home` marks
 the brand logo with `aria-current="page"` when the viewer is on /home.
 
+When authenticated, the primary nav is: brand link (→ the posts
+collection, the default landing surface) → a prominent `+ Post` button
+(→ the post create form) → an avatar `<details>` menu (My posts → the
+viewer's own posts via `?owner=me`, Account → the self user page, Sign
+out via `hx-post`). Anonymous visitors get the brand link only.
+
 The band's lower rows (breadcrumb + toolbar) render only when there's
 app chrome to show — any breadcrumb or toolbar content, or an
 authenticated viewer. Anonymous public pages (landing, the `/auth/*`
@@ -34,21 +40,23 @@ and the constant-boundary rationale (one source of truth).
 #}
 <header class="container page-header">
   <nav aria-label="Primary" id="primary-nav">
-    <a href="/home" {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
+    <a href="{% if is_authenticated %}{{ entity_url("post") }}{% else %}/home{% endif %}"
+       {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
     {% if is_authenticated %}
+      <a href="{{ entity_form_url('post') }}" role="button">+ Post</a>
       <details id="nav-menu">
-        <summary class="nav-menu-toggle" aria-label="Menu">
-          <i class="icon-menu nav-menu-open-icon"></i>
-          <i class="icon-x nav-menu-close-icon"></i>
+        <summary class="nav-menu-toggle" aria-label="Account menu">
+          <i class="icon-user nav-menu-open-icon" aria-hidden="true"></i>
+          <i class="icon-x nav-menu-close-icon" aria-hidden="true"></i>
         </summary>
         <ul>
           <li>
-            <a href="{{ entity_url('post') }}"
-               {% if _on_posts %}aria-current="page"{% endif %}>Posts</a>
+            <a href="{{ entity_url("post") }}?owner=me"
+               {% if _on_posts %}aria-current="page"{% endif %}>My posts</a>
           </li>
           <li>
             <a href="{{ entity_url('user', id='me') }}"
-               {% if _on_users_me %}aria-current="page"{% endif %}>Profile</a>
+               {% if _on_users_me %}aria-current="page"{% endif %}>Account</a>
           </li>
           <li>
             <a href="#" hx-post="/auth/sign-out">Sign out</a>

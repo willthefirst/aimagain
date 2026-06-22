@@ -746,16 +746,17 @@ def test_login_link_color_is_consistent_across_auth_pages() -> None:
 
 
 def test_primary_nav_posts_active_on_posts_list() -> None:
-    """`/posts` is the canonical Posts URL — its tab is active."""
-    assert _active_tab_labels(_render_chrome("/posts")) == ["Posts"]
+    """`/posts` is the canonical Posts URL — the avatar menu's "My posts"
+    entry (the only Posts-family link) is active there."""
+    assert _active_tab_labels(_render_chrome("/posts")) == ["My posts"]
 
 
 def test_primary_nav_posts_active_on_posts_subpath() -> None:
-    """Subpaths under `/posts` (detail, edit, form) keep the Posts tab
-    lit — same path-prefix rule Directory uses."""
-    assert _active_tab_labels(_render_chrome("/posts/42")) == ["Posts"]
-    assert _active_tab_labels(_render_chrome("/posts/42/form")) == ["Posts"]
-    assert _active_tab_labels(_render_chrome("/posts/form")) == ["Posts"]
+    """Subpaths under `/posts` (detail, edit, form) keep the "My posts"
+    avatar-menu entry lit — same path-prefix rule Directory uses."""
+    assert _active_tab_labels(_render_chrome("/posts/42")) == ["My posts"]
+    assert _active_tab_labels(_render_chrome("/posts/42/form")) == ["My posts"]
+    assert _active_tab_labels(_render_chrome("/posts/form")) == ["My posts"]
 
 
 def test_primary_nav_no_tab_active_on_non_journey_paths() -> None:

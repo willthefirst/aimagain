@@ -80,7 +80,10 @@ async def test_home_page_no_post_actions_for_no_claim_user(
     # not a live link
     assert "No posts yet." in response.text
     assert tree.css_first('button[aria-disabled="true"]') is not None
-    assert tree.css_first('a[href="/posts/form"]') is None
+    # The page-body / toolbar create affordance is gated to a disabled button
+    # for a no-claim user. The global nav `+ Post` button is always present
+    # (pinned in the nav tests), so scope this to `<main>` to exclude it.
+    assert tree.css_first('main a[href="/posts/form"]') is None
 
 
 async def test_home_page_empty_my_posts_shows_locked_cta_when_unverified(
@@ -156,15 +159,18 @@ async def test_home_page_has_no_inline_feed_verify_notice(
 
 async def test_home_page_shows_primary_nav(authenticated_client: AsyncClient):
     """The home page passes current_user so is_authenticated=True and the
-    primary nav links (Home, Posts, Profile, Sign out) render."""
+    redesigned primary nav renders: brand → posts, a `+ Post` button →
+    the create form, and the avatar menu (My posts / Account / Sign out)."""
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     nav = tree.css_first('nav[aria-label="Primary"]')
     assert nav is not None
     links = {a.attributes.get("href") for a in nav.css("a")}
-    assert "/home" in links
+    # Brand → posts collection; `+ Post` → create form; My posts → owner=me.
     assert "/posts" in links
+    assert "/posts/form" in links
+    assert "/posts?owner=me" in links
 
 
 # --- lifespan -----------------------------------------------------------
