@@ -1208,12 +1208,16 @@ async def test_list_hides_create_cta_for_claimless_user(
 ):
     """The `/posts` toolbar 'Create' button is hidden for a user holding
     no posting-capable claim — clicking it would only land on a server
-    403 / degraded form. Matches the per-kind post gate's universe."""
+    403 / degraded form. Matches the per-kind post gate's universe. Scoped
+    to the toolbar action menu — the global nav `+ Post` button (also an
+    `a[href='/posts/form'][role='button']`) is intentionally always present
+    and is pinned separately in the page-header / nav tests."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert (
-        tree.css_first("a[href='/posts/form'][role='button']") is None
+        tree.css_first("menu.toolbar-right a[href='/posts/form'][role='button']")
+        is None
     ), "claimless user must not be offered the toolbar Create CTA"
 
 
@@ -1235,7 +1239,8 @@ async def test_list_shows_create_cta_for_claim_a_user(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert (
-        tree.css_first("a[href='/posts/form'][role='button']") is not None
+        tree.css_first("menu.toolbar-right a[href='/posts/form'][role='button']")
+        is not None
     ), "Claim-A user should be offered the toolbar Create CTA"
 
 
@@ -1263,7 +1268,8 @@ async def test_list_shows_create_cta_for_claim_b_org_rep(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     assert (
-        tree.css_first("a[href='/posts/form'][role='button']") is not None
+        tree.css_first("menu.toolbar-right a[href='/posts/form'][role='button']")
+        is not None
     ), "Claim-B org rep must be offered the toolbar Create CTA"
 
 

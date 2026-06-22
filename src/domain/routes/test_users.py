@@ -36,13 +36,15 @@ async def test_primary_nav_highlights_active_section(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
-    """The Posts tab lights on its own list page and subpaths."""
+    """The avatar menu's "My posts" entry lights on the posts list page and
+    its subpaths (it is the Posts-family link; the brand `a[href="/posts"]`
+    is not section-highlighted)."""
     posts = await authenticated_client.get("/posts")
     tree = HTMLParser(posts.text)
     assert (
-        tree.css_first('nav[aria-label="Primary"] a[href="/posts"]').attributes.get(
-            "aria-current"
-        )
+        tree.css_first(
+            'nav[aria-label="Primary"] a[href="/posts?owner=me"]'
+        ).attributes.get("aria-current")
         == "page"
     )
 
@@ -219,8 +221,9 @@ async def test_get_users_me_renders_authenticated_self_view(
     logged_in_user: User,
 ):
     """`GET /users/me` for the signed-in user renders the canonical
-    account-hub self-view (#1522): the primary nav with brand +
-    Posts/Profile/Sign-out destinations (Profile marked aria-current),
+    account-hub self-view (#1522): the primary nav with brand + the
+    `+ Post` button + the avatar menu's My posts/Account/Sign-out
+    destinations (Account marked aria-current on this path),
     the lucide font preload <link> for icon-flicker prevention, a
     Sign-out button in the toolbar action menu (htmx POST to
     /auth/jwt/logout with after-request redirect), a body-level
@@ -253,26 +256,32 @@ async def test_get_users_me_renders_authenticated_self_view(
     assert (
         tree.css("#primary-nav a[href='/clinicians/form']") == []
     ), "Create-clinician CTA must be removed from nav (#697)"
+    # Brand → posts collection for an authenticated viewer (Browse is the
+    # default landing surface); anonymous keeps brand → /home (test_users.py
+    # anonymous nav test).
     assert (
-        tree.css_first('#primary-nav > a[href="/home"]') is not None
-    ), "brand link missing in primary nav"
+        tree.css_first('#primary-nav > a[href="/posts"] strong') is not None
+    ), "brand link must point at /posts when authenticated"
+    # Prominent `+ Post` button (outside the avatar menu) → post create form.
     assert (
-        tree.css_first('#primary-nav a[href="/users/me"]') is not None
-    ), "Profile link missing in primary nav"
+        tree.css_first('#primary-nav > a[role="button"][href="/posts/form"]')
+        is not None
+    ), "`+ Post` button missing in primary nav"
+    # The avatar `<details>` menu carries the non-Post destinations.
     nav_hrefs = [a.attributes.get("href") for a in tree.css("#nav-menu ul li a")]
     assert nav_hrefs == [
-        "/posts",
+        "/posts?owner=me",
         "/users/me",
         "#",
     ], f"nav-menu hrefs unexpected: {nav_hrefs}"
 
-    # --- Profile link carries aria-current on this path
+    # --- Account link carries aria-current on this path
     # (was test_primary_nav_marks_profile_active_on_users_me)
-    profile_link = tree.css_first('#primary-nav a[href="/users/me"]')
+    account_link = tree.css_first('#nav-menu a[href="/users/me"]')
     assert (
-        profile_link is not None
-        and profile_link.attributes.get("aria-current") == "page"
-    ), "Profile link must carry aria-current=page on /users/me"
+        account_link is not None
+        and account_link.attributes.get("aria-current") == "page"
+    ), "Account link must carry aria-current=page on /users/me"
 
     # --- Every authenticated page exposes the header sign-out link
     # (was test_authenticated_page_has_sign_out_affordance in
