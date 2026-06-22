@@ -119,6 +119,9 @@ Child contract:
   {%- if _has_filters %}
     <div class="browse-layout">
       <aside class="filter-sidebar">
+        <header>
+          <h2>Filters</h2>
+        </header>
         <form method="get" action="{{ request.url.path }}" class="filter-form">
           {%- for f in filters %}{{ filter_field(f, filter_values.get(f.name) ) }}{%- endfor %}
             <menu>
@@ -149,7 +152,6 @@ Child contract:
                 <p class="filter-summary-label">Showing all results.</p>
               {%- endif %}
             </header>
-            <hr>
           {%- endif %}
         {%- endif %}
         {% block list_body %}{% endblock %}

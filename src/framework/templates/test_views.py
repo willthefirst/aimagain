@@ -206,6 +206,9 @@ def test_list_view_never_renders_filter_link_in_toolbar() -> None:
     sidebar = tree.css_first("aside.filter-sidebar")
     assert sidebar is not None
     assert sidebar.css_first("hgroup a") is None
+    # The sidebar carries a plain "Filters" heading in a <header> above the form.
+    heading = sidebar.css_first("header h2")
+    assert heading is not None and heading.text(strip=True) == "Filters"
     summary = tree.css_first(".browse-results .filter-summary")
     assert summary is not None
     # With one active filter, the count ("1 filter") is the link to search.
