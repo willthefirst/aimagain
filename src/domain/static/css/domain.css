@@ -180,13 +180,6 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .filter-sidebar { flex: 0 0 220px; min-width: 0; }
 .browse-results { flex: 1 1 0; min-width: 0; }
 
-/* Filter summary — the header that opens the results column (framework
-   views/list.html). One muted line stating whether the result set is filtered;
-   when it is, the filter count links to the full search page
-   (`.filter-summary-edit`). Replaced the old sidebar header link. */
-.filter-summary { margin-bottom: 1rem; }
-.filter-summary-label { margin: 0; color: var(--pico-muted-color); }
-
 /* Narrow: stack sidebar full-width above results; hide inline form */
 @media (max-width: 640px) {
   .browse-layout { flex-direction: column; }

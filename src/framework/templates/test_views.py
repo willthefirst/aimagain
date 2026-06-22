@@ -202,29 +202,26 @@ def test_list_view_never_renders_filter_link_in_toolbar() -> None:
     assert toolbar is not None
     assert toolbar.css_first("a.toolbar-filter-link") is None
     # The search link is not in the sidebar (it moved to the results
-    # column's `.filter-summary` header) and never in the toolbar.
+    # column's summary header) and never in the toolbar.
     sidebar = tree.css_first("aside.filter-sidebar")
     assert sidebar is not None
     assert sidebar.css_first("hgroup a") is None
     # The sidebar carries a plain "Filters" heading in a <header> above the form.
     heading = sidebar.css_first("header h2")
     assert heading is not None and heading.text(strip=True) == "Filters"
-    summary = tree.css_first(".browse-results .filter-summary")
+    summary = tree.css_first(".browse-results > header")
     assert summary is not None
     # With one active filter, the count ("1 filter") is the link to search.
-    summary_link = summary.css_first("a.filter-summary-edit")
+    summary_link = summary.css_first("a")
     assert summary_link is not None
     assert summary_link.attributes.get("href") == "/clinicians/search?kind=x"
     assert summary_link.text(strip=True) == "1 filter"
     assert "Showing results with" in summary.text()
-    # The per-value descriptor pills were dropped.
-    assert summary.css_first("ul.filter-tags") is None
 
 
 def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     """With a filtered entity but no active selection, the results-column
-    `.filter-summary` header reads "Showing all results." with no count link
-    and no descriptor pills."""
+    summary header reads "Showing all results." with no count link."""
     env = _make_env()
     _add_child(
         env,
@@ -249,13 +246,12 @@ def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     )
 
     tree = HTMLParser(html)
-    summary = tree.css_first(".browse-results .filter-summary")
+    summary = tree.css_first(".browse-results > header")
     assert summary is not None
-    assert summary.css_first("ul.filter-tags") is None
-    label = summary.css_first(".filter-summary-label")
+    label = summary.css_first("p")
     assert label is not None and label.text(strip=True) == "Showing all results."
     # No filters active → no count link to the search page.
-    assert summary.css_first("a.filter-summary-edit") is None
+    assert summary.css_first("a") is None
 
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:

@@ -28,7 +28,7 @@ Browse layout: when the entity spec declares `filters=(…)`, the
 context. `{% block content %}` detects this and wraps `{% block list_body %}`
 in a two-column `.browse-layout` (220px sidebar + flexible results). The
 sidebar embeds the filter form inline so viewers never leave the list to
-filter. The results column opens with a `.filter-summary` header that states
+filter. The results column opens with a plain `<header>` that states
 whether the result set is filtered: "Showing all results." when nothing is
 active, else "Showing results with <N filters>" where the count links to the
 dedicated `/<collection>/search` page (mounted automatically whenever
@@ -78,7 +78,7 @@ Child contract:
     resource_label, pager, filters, filter_values, active_filters,
     active_filter_count, filter_heading, search_url. The sidebar
     form consumes `filters` / `filter_values`; the results-column
-    `.filter-summary` header consumes `active_filter_count` /
+    summary `<header>` consumes `active_filter_count` /
     `search_url`; `pager` is read inside the `item_list` macro.
     (`active_filters` / `filter_heading` are injected for any
     template that wants them but are not used by this view.)
@@ -142,14 +142,14 @@ Child contract:
             Only `active_filter_count` is rendered (the per-value descriptor
             pills were dropped); `search_url` is set whenever filters exist. -#}
           {%- if search_url is defined and search_url %}
-            <header class="filter-summary">
+            <header>
               {%- if active_filter_count is defined and active_filter_count %}
-                <p class="filter-summary-label">
+                <p>
                   Showing results with
-                  <a href="{{ search_url }}" class="filter-summary-edit">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
+                  <a href="{{ search_url }}">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
                 </p>
               {%- else %}
-                <p class="filter-summary-label">Showing all results.</p>
+                <p>Showing all results.</p>
               {%- endif %}
             </header>
           {%- endif %}

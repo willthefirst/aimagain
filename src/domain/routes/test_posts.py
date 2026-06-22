@@ -324,17 +324,15 @@ async def test_list_filter_summary_reads_active_filter_count(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """The results column opens with a `.filter-summary` header. Filtering by
-    kind makes it read "Showing results with 1 filter", where the count links
-    to the dedicated search page carrying the live query string. No descriptor
-    pills are rendered."""
+    """The results column opens with a summary header. Filtering by kind makes
+    it read "Showing results with 1 filter", where the count links to the
+    dedicated search page carrying the live query string."""
     response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
-    summary = HTMLParser(response.text).css_first(".browse-results .filter-summary")
+    summary = HTMLParser(response.text).css_first(".browse-results > header")
     assert summary is not None
-    assert summary.css_first("ul.filter-tags") is None
     assert "Showing results with" in summary.text()
-    link = summary.css_first("a.filter-summary-edit")
+    link = summary.css_first("a")
     assert link is not None
     assert link.text(strip=True) == "1 filter"
     assert (link.attributes.get("href") or "").startswith("/posts/search")
