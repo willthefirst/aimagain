@@ -807,8 +807,8 @@ async def test_list_clinicians_renders_empty_state(
 ):
     """With no persisted clinicians, the page renders a friendly empty
     message instead of an empty `<table>`. The browse-layout sidebar
-    embeds the filter widgets inline on the list page; its header carries
-    the link to `/clinicians/search`."""
+    embeds the filter widgets inline on the list page; the results column's
+    `.filter-summary` header carries the link to `/clinicians/search`."""
     response = await superuser_client.get("/clinicians")
     assert response.status_code == 200
     assert "No clinicians found" in response.text
@@ -817,11 +817,16 @@ async def test_list_clinicians_renders_empty_state(
     # Browse layout: sidebar has the filter widgets inline.
     sidebar = tree.css_first(".filter-sidebar")
     assert sidebar is not None, "Expected .filter-sidebar on /clinicians"
-    # Sidebar links to the full search page. (The toolbar never renders
-    # a filter link — pinned structurally in
-    # framework/templates/test_views.py.)
-    sidebar_link = sidebar.css_first("a[href*='/clinicians/search']")
-    assert sidebar_link is not None, "Expected sidebar link to /clinicians/search"
+    # The full-search link lives in the results column's filter-summary
+    # header (not the sidebar, not the toolbar — pinned structurally in
+    # framework/templates/test_views.py), and is present even on the empty
+    # state.
+    summary_link = tree.css_first(
+        ".browse-results .filter-summary a[href*='/clinicians/search']"
+    )
+    assert (
+        summary_link is not None
+    ), "Expected filter-summary link to /clinicians/search"
     # Multi-choice ChoiceFilters render as search-checkbox-fieldset with
     # single-click checkboxes (#583). No checkbox is preselected when the
     # filter is inactive.
