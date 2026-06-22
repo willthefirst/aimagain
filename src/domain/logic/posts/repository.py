@@ -31,6 +31,10 @@ class PostRepository(BaseRepository):
     Filter axes declared on ``POST_ENTITY.filters``:
 
     * ``kind`` (Choice) — exact match on ``Post.kind``.
+    * ``owner`` (Choice, radio) — ``owner="me"`` scopes to the viewer's
+      own posts (``Post.owner_id == self._requesting_user.id``); any
+      other value is ignored. The viewer-id is the one ``handle_list``
+      stamps on the repo. Powers the "My posts" view.
     * ``q`` (Text) — ILIKE substring over both detail tables'
       ``description``.
     * ``posted_by`` (Text) — ILIKE substring over the owner's
@@ -73,6 +77,7 @@ class PostRepository(BaseRepository):
         *,
         kind: str | list[str] | None = None,
         q: str | None = None,
+        owner: str | None = None,
         posted_by: str | None = None,
         state: list[str] | None = None,
         city: str | None = None,
@@ -165,6 +170,17 @@ class PostRepository(BaseRepository):
                     OpeningDetail.description.ilike(needle),
                 )
             )
+        if owner == "me":
+            # `?owner=me` scopes to the viewer's own posts. The viewer is
+            # the id `BaseRepository._requesting_user` carries — stamped by
+            # `handle_list` on every list mount so viewer-relative filters
+            # resolve without re-resolving the auth dep. Any other `owner`
+            # value is silently ignored (the only supported sentinel today).
+            # Powers the "My posts" view; an unauthenticated read (no
+            # `_requesting_user`) yields no rows rather than every row.
+            viewer = self._requesting_user
+            viewer_id = getattr(viewer, "id", None) if viewer is not None else None
+            stmt = stmt.filter(Post.owner_id == viewer_id)
         if posted_by:
             stmt = stmt.filter(User.username.ilike(f"%{posted_by}%"))
         if state:

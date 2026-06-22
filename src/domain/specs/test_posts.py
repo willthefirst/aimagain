@@ -45,6 +45,18 @@ def test_post_entity_exposes_kind_filter_for_every_registered_kind():
     assert filter_values == set(POST_KINDS.names)
 
 
+def test_post_entity_exposes_owner_me_radio_filter():
+    """`?owner=me` is the viewer-relative scope filter powering the "My
+    posts" view — a single-toggle radio (`multi=False`, `radio=True`)
+    with exactly the `("me", …)` choice, mirroring the clinician/org
+    owner filter. The repo resolves `owner="me"` to the viewer's own
+    posts; the filter declaration is what makes the toggle render."""
+    owner_filter = next(f for f in POST_ENTITY.filters if f.name == "owner")
+    assert owner_filter.multi is False
+    assert owner_filter.radio is True
+    assert {value for value, _label in owner_filter.choices} == {"me"}
+
+
 def test_post_entity_audit_resource_type_is_post():
     """Audit rows record `resource_type="post"` regardless of kind —
     the supertype shape is what survives across the polymorphic split."""
