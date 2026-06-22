@@ -16,6 +16,12 @@ setup links. These tests assert:
 3. The global `#onboarding-banner` is shown for an empty (no clinician/org)
    account and links to both minimal create forms; it goes silent once the
    account holds a provider entity (verified or not).
+4. The authenticated primary nav renders the redesigned shape end-to-end
+   (through the real entity registry, not the template-test stubs): brand →
+   posts collection, a prominent `+ Post` button → the post create form, and
+   the avatar menu's My posts / Account / Sign out items. Structure is pinned
+   at the template level in `framework/templates/test_page_header.py`; this
+   route test pins that the live URL helpers resolve to the expected paths.
 """
 
 import pytest
@@ -253,3 +259,36 @@ async def test_onboarding_banner_hidden_for_org_rep(
     response = await authenticated_client.get("/home")
     assert response.status_code == 200
     assert HTMLParser(response.text).css_first("#onboarding-banner") is None
+
+
+async def test_authenticated_primary_nav_redesign(authenticated_client: AsyncClient):
+    """End-to-end (through the real entity registry) the authenticated nav is:
+    brand → posts collection, a `+ Post` button → the post create form, and an
+    avatar `<details>` menu with My posts / Account / Sign out. "Saved" is
+    deferred and must not appear. Anonymous nav stays brand-only — pinned in
+    `framework/templates/test_views.py`."""
+    response = await authenticated_client.get("/home")
+    assert response.status_code == 200
+    nav = HTMLParser(response.text).css_first('nav[aria-label="Primary"]')
+    assert nav is not None
+
+    # Brand → posts collection (Browse is the default landing surface).
+    brand = nav.css_first("a strong")
+    assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
+    assert brand.parent.attributes.get("href") == "/posts"
+
+    # `+ Post` button → post create form, outside the collapsible menu.
+    ctas = [a for a in nav.css("a[role='button']") if a.text(strip=True) == "+ Post"]
+    assert len(ctas) == 1
+    assert ctas[0].attributes.get("href") == "/posts/form"
+    assert ctas[0].parent.attributes.get("id") == "primary-nav"
+
+    # Avatar menu items.
+    menu = nav.css_first("details#nav-menu")
+    assert menu is not None
+    items = {a.text(strip=True): a for a in menu.css("ul li a")}
+    assert set(items) == {"My posts", "Account", "Sign out"}
+    assert "Saved" not in items
+    assert items["My posts"].attributes.get("href") == "/posts?owner=me"
+    assert items["Account"].attributes.get("href") == "/users/me"
+    assert items["Sign out"].attributes.get("hx-post") == "/auth/sign-out"

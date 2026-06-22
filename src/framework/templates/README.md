@@ -86,7 +86,7 @@ From top to bottom:
 ```
 ┌───────────────────────────────────────────────────────────┐
 │ <header class="page-header">                              │  ← `_shared/_page_header.html`
-│   primary nav        brand + auth-aware links             │
+│   primary nav        brand · [+ Post] · avatar menu ▾     │
 │   breadcrumb row     ← Resource   (hidden placeholder if none) │  ← captured `{% block breadcrumb %}`
 │   toolbar row        <h1> title              [actions ▶]  │  ← captured `{% block toolbar %}`
 ├───────────────────────────────────────────────────────────┤  ← `border-bottom` on `.page-header`
@@ -106,7 +106,12 @@ From top to bottom:
 
 **Site footer** (`{% block footer %}`) renders on every page from the default body in `base.html` — a centered `<small>` with the copyright line and a `mailto:` to support. Pages can override the block to swap or extend the line; today none do.
 
-**Primary nav** lives in `base.html` and renders on every screen (authed *and* anonymous) as a single `<ul id="primary-nav">`. The brand sits on the left; when authed, inline links push to the right via `margin-left: auto` on the first link: Posts (`/posts`), Profile (`/users/me`), and Sign out (an `<a hx-post="/auth/sign-out">` — the route returns `HX-Redirect`). Anonymous visitors see only the brand; the chrome carries no Login shortcut (visitors enter the auth flow from the landing page CTA). Active state is matched against `request.url.path`. Pages don't extend it.
+**Primary nav** lives in [`_shared/_page_header.html`](_shared/_page_header.html) (composed by `base.html`) and renders on every screen (authed *and* anonymous) as a single `<nav id="primary-nav" aria-label="Primary">`. The brand link sits on the left; for an authenticated viewer it points at the posts collection (`entity_url('post')`) — Browse is the default authenticated landing surface — while anonymous visitors keep the brand → `/home` (the landing page they can actually reach). Anonymous visitors see only the brand; the chrome carries no Login shortcut (visitors enter the auth flow from the landing page CTA). When authed the brand is followed by:
+
+- a prominent **`+ Post`** button — an `<a role="button">` to the post create form (`entity_form_url('post')`), always visible (it sits outside the collapsible menu, so it stays a one-tap action on mobile too);
+- an **avatar `<details>` menu** (`#nav-menu`, an `icon-user` summary on desktop / hamburger-style toggle on mobile) holding the non-Post destinations: **My posts** → `{{ entity_url('post') }}?owner=me` (the viewer's own posts), **Account** → `entity_url('user', id='me')`, and **Sign out** (an `<a hx-post="/auth/sign-out">` — the route returns `HX-Redirect`). "Saved" is intentionally not here (deferred).
+
+Active state is matched against `request.url.path` (the `_on_posts` / `_on_users_me` flags). Pages don't extend it.
 
 The active tab carries `aria-current="page"` plus `class="contrast"`, and `base.html` styles `nav[aria-label="Primary"] a[aria-current="page"]` with a bottom underline + font-weight bump so the section reads at a glance — Pico's default `aria-current` tint alone was too subtle (#589). The rule scopes to the primary nav so breadcrumb / pagination links that also set `aria-current` keep their lighter treatment. Subpaths under each URL family (e.g. `/posts/{id}`, `/posts/form?kind=clinician_opening`) light the parent section tab. `test_views.py` pins the URL → active-tab mapping, and `test_primary_nav_omits_login_link_for_anonymous_visitors` pins the no-Login contract across every anonymous-accessible URL family.
 

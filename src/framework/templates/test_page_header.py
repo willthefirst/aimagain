@@ -185,6 +185,77 @@ def test_onboarding_banner_is_first_child_of_main() -> None:
     assert tree.css_first("#onboarding-banner") is None
 
 
+def test_authenticated_nav_has_post_cta_and_avatar_menu() -> None:
+    """The authenticated primary nav is: brand → `+ Post` button → avatar
+    `<details>` menu. The brand links to the posts collection (Browse is the
+    default landing surface); the `+ Post` button is an `<a role="button">`
+    pointing at the post create form and lives *outside* the collapsible
+    menu so it stays a one-tap action on every viewport."""
+    env = _make_env()
+    _add_child(env, "detailstub.html", _DETAIL_STUB)
+    tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
+
+    nav = tree.css_first('nav[aria-label="Primary"]')
+    assert nav is not None
+
+    # Brand → posts collection (Browse), not a hardcoded "/home" link target.
+    brand = nav.css_first("a strong")
+    assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
+    assert brand.parent.attributes.get("href") == "/posts"
+
+    # `+ Post` is a button-styled anchor to the post create form, and is a
+    # direct child of the nav (not nested inside the avatar `<details>`).
+    post_ctas = [
+        a for a in nav.css("a[role='button']") if a.text(strip=True) == "+ Post"
+    ]
+    assert len(post_ctas) == 1, "exactly one `+ Post` button expected"
+    cta = post_ctas[0]
+    assert cta.attributes.get("href") == "/posts/form"
+    assert cta.parent.attributes.get("id") == "primary-nav", (
+        "`+ Post` must sit outside the collapsible avatar menu so it stays "
+        "visible on mobile"
+    )
+
+
+def test_avatar_menu_items_are_my_posts_account_sign_out() -> None:
+    """The repurposed `<details id="nav-menu">` is the avatar menu. Its
+    items are exactly My posts (→ the viewer's own posts via `?owner=me`),
+    Account (→ the self user page), and Sign out (`hx-post`). "Saved" is
+    deferred and must not appear."""
+    env = _make_env()
+    _add_child(env, "detailstub.html", _DETAIL_STUB)
+    tree = HTMLParser(_render(env, "detailstub.html", **_BANNER_CTX))
+
+    menu = tree.css_first("details#nav-menu")
+    assert menu is not None, "avatar `<details id='nav-menu'>` menu missing"
+    items = menu.css("ul li a")
+    labels = [a.text(strip=True) for a in items]
+    assert labels == ["My posts", "Account", "Sign out"]
+    assert "Saved" not in labels
+
+    by_label = {a.text(strip=True): a for a in items}
+    assert by_label["My posts"].attributes.get("href") == "/posts?owner=me"
+    assert by_label["Account"].attributes.get("href") == "/users/me"
+    assert by_label["Sign out"].attributes.get("hx-post") == "/auth/sign-out"
+
+
+def test_anonymous_nav_is_brand_only() -> None:
+    """Anonymous visitors get the brand link only — no `+ Post` button and
+    no avatar menu."""
+    env = _make_env()
+    _add_child(env, "detailstub.html", _DETAIL_STUB)
+    tree = HTMLParser(_render(env, "detailstub.html", is_authenticated=False))
+
+    nav = tree.css_first('nav[aria-label="Primary"]')
+    assert nav is not None
+    assert nav.css_first("details#nav-menu") is None
+    assert [
+        a for a in nav.css("a[role='button']") if a.text(strip=True) == "+ Post"
+    ] == []
+    # The brand link is still present.
+    assert nav.css_first("a strong").text(strip=True) == "Bedlam Connect"
+
+
 def test_css_pins_no_wrap_truncation_and_reserved_band() -> None:
     """Pin the CSS the band's guarantees rest on: the actions cells never
     wrap (so they don't grow the band), the toolbar `<h1>` truncates rather
