@@ -1,0 +1,47 @@
+{# `GET /organizations/{organization_id}/members` — the org's Members.
+
+   The I6 redesign's "Members" surface (#1524): the org's affiliated
+   clinicians, read off the same `(clinician × org)` `ClinicianAffiliation`
+   join that the clinician edit page lists by `clinician_id`. "One join,
+   two doors" — this is the org's *read* door; the *mutation* door (add /
+   edit / remove) stays clinician-side because the affiliation is FK-owned
+   by the clinician. Each row links to its clinician-side affiliation edit
+   page, where Delete lives in the actions cluster.
+
+   Breadcrumb auto-injected by `mount_related_list` via
+   `ORGANIZATION_ENTITY.display_label_fn`. Renders via the shared
+   `card` + `item_list` primitives like every other list page. The card
+   body reuses `affiliation_facts(...)` — the single home for how an
+   affiliation's steady-state profile renders as fact rows.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/_card.html" import card -%}
+{%- from "_shared/_item_list.html" import item_list -%}
+{%- from "_shared/sections.html" import facts_block -%}
+{%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
+{% block resource_label %}Members{% endblock %}
+{%- macro member_card(aff) %}
+  {%- set clinician = aff.clinician -%}
+  {%- set name = ((clinician.first_name or "") ~ " " ~ (clinician.last_name or "")) | trim or "Clinician" -%}
+  {%- set location_parts = [] -%}
+  {%- if aff.location_city -%}{%- set _ = location_parts.append(aff.location_city) -%}{%- endif -%}
+    {%- if aff.location_state -%}{%- set _ = location_parts.append(aff.location_state) -%}{%- endif -%}
+      {%- set location = location_parts | join(", ") -%}
+      {%- set subtitle %}
+        {%- if aff.currently_accepting_new_patients %}<span>Accepting new patients</span>{%- endif %}
+        {%- if location %}<span>{{ location }}</span>{%- endif %}
+      {%- endset %}
+      {%- call card(
+        id=aff.id,
+        headline_url=entity_url('clinician', id=clinician.id) ~ "/clinician_affiliations/" ~ aff.id|string ~ "/form",
+        headline=name,
+        subtitle=subtitle | trim) -%}
+        {%- call facts_block() %}
+          {{ affiliation_facts(aff) }}
+        {%- endcall %}
+      {%- endcall %}
+    {%- endmacro %}
+    {% block list_body %}
+      {{ item_list(rows, member_card, "org-members-list",
+            empty_msg="No members yet. Clinicians appear here once they add a practice at this organization.") }}
+    {% endblock %}

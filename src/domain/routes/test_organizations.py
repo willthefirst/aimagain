@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.domain.models import Organization, OrgRepresentation, User
 from src.framework.audit.repository import AuditRepository
-from tests.helpers import create_test_user, make_organization_row
+from tests.helpers import create_test_user, make_clinician, make_organization_row
 
 pytestmark = pytest.mark.asyncio
 
@@ -332,6 +332,112 @@ async def test_get_org_intakes_404_for_missing_org(
 ):
     response = await authenticated_client.get(f"/organizations/{uuid.uuid4()}/intakes")
     assert response.status_code == 404
+
+
+# --- Members subresource (org-side door onto the affiliation join, #1524) ---
+
+
+async def _seed_member(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    owner_id: uuid.UUID,
+    org_id: uuid.UUID,
+    first_name: str = "Jane",
+    last_name: str = "Smith",
+) -> uuid.UUID:
+    """Persist a Clinician at `org_id`. `make_clinician` builds the
+    backing `ClinicianAffiliation` (org_id set, via the per-role proxy) —
+    that affiliation row is exactly what the Members list scopes by.
+    Returns the clinician id (the row's headline link target)."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            clinician = make_clinician(
+                owner_id=owner_id,
+                org_id=org_id,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            session.add(clinician)
+        return clinician.id
+
+
+async def test_get_org_members_empty_state(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /organizations/{id}/members` renders the empty state when no
+    clinician is affiliated with the org."""
+    org_id = await _seed_org_for(db_test_session_manager, owner_id=logged_in_user.id)
+    response = await authenticated_client.get(f"/organizations/{org_id}/members")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first("#org-members-list") is None
+    assert "No members yet" in response.text
+
+
+async def test_get_org_members_lists_only_this_org(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The list scopes via `ClinicianAffiliation.org_id`: a member at
+    another org does not bleed into this org's list, and the member's
+    name + clinician-side edit link (the mutation door) render."""
+    mine = await _seed_org_for(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Mine"
+    )
+    other = await _seed_org_for(
+        db_test_session_manager, owner_id=logged_in_user.id, name="Other"
+    )
+    clinician_id = await _seed_member(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        org_id=mine,
+        first_name="Ada",
+        last_name="Lovelace",
+    )
+    await _seed_member(
+        db_test_session_manager,
+        owner_id=logged_in_user.id,
+        org_id=other,
+        first_name="Grace",
+        last_name="Hopper",
+    )
+
+    response = await authenticated_client.get(f"/organizations/{mine}/members")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    rows = tree.css("#org-members-list article")
+    assert len(rows) == 1, "members must scope to this org's affiliations"
+    assert "Ada Lovelace" in response.text
+    assert "Grace Hopper" not in response.text
+    # Each row links to the clinician-side affiliation edit page — the
+    # remove door. "One join, two doors."
+    assert (
+        f"/clinicians/{clinician_id}/clinician_affiliations/" in response.text
+    ), "member row must link to the clinician-side edit (remove) page"
+
+
+async def test_get_org_members_404_for_missing_org(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+):
+    response = await authenticated_client.get(f"/organizations/{uuid.uuid4()}/members")
+    assert response.status_code == 404
+
+
+async def test_org_detail_links_to_members(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The org detail page surfaces a Members navigation link (the I6
+    redesign's "members on the org page" intent)."""
+    org_id = await _seed_org_for(db_test_session_manager, owner_id=logged_in_user.id)
+    response = await authenticated_client.get(f"/organizations/{org_id}")
+    assert response.status_code == 200
+    assert f"/organizations/{org_id}/members" in response.text
 
 
 # --- Network-aware redaction -------------------------------------------------
