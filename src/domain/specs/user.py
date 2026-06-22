@@ -20,6 +20,7 @@ from typing import Final
 
 from src.auth_config import current_active_user
 from src.domain.logic.clinicians.repository import ClinicianRepository
+from src.domain.logic.organizations.repository import OrganizationRepository
 from src.domain.logic.users.repository import get_user_repository
 from src.domain.logic.users.schema import (
     UserActivationAuditSnapshot,
@@ -106,5 +107,8 @@ USER_ENTITY: Final[EntitySpec] = EntitySpec(
     # dotted-path trick the state-axis / subresource handlers use —
     # `specs/user.py` never statically imports `src.logic.users`.
     detail_extras_path="src.domain.logic.users.handlers.user_detail_extras",
-    detail_extras_repos=(("clinician_repo", ClinicianRepository),),
+    detail_extras_repos=(
+        ("clinician_repo", ClinicianRepository),
+        ("organization_repo", OrganizationRepository),
+    ),
 )
