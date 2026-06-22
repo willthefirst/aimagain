@@ -12,6 +12,11 @@ html { scrollbar-gutter: stable; font-size: 14px; }
   --pico-typography-spacing-vertical: 0.5rem;
   --pico-block-spacing-vertical: 0.75rem;
   --pico-block-spacing-horizontal: 1rem;
+  /* No extra vertical padding on nav items — the nav/breadcrumb bands
+     already supply their own `padding-block`, so the per-item spacing was
+     double padding. Zeroed globally; the profile dropdown menu restores a
+     small value locally (see `details.dropdown`) so its items stay legible. */
+  --pico-nav-element-spacing-vertical: 0;
 
 
   /* Flat geometry — no elevation, minimal radius */
@@ -528,17 +533,30 @@ dd { margin: 0; }
   .toolbar { grid-template-columns: 1fr; }
 }
 /* Page-header band — the single fixed top-chrome element
-   (`_shared/_page_header.html`). Stacks nav → breadcrumb row → toolbar
-   row, with a `border-bottom` boundary. The boundary is the page's one
-   horizontal divider and sits at a constant Y across pages at a given
-   screen size (see the partial's header for the reservation rationale). */
-.page-header { display: flex; flex-direction: column; border-bottom: 1px solid var(--pico-muted-border-color); color: inherit; }
-.page-header-crumb { margin-block-start: 0.25rem; }
-/* Reserve the breadcrumb row's intrinsic height on pages without a real
-   breadcrumb (list pages): the placeholder is a real back-affordance
-   shape, hidden — so the reserved height equals a rendered breadcrumb's
-   and the boundary lines up with detail pages. No size unit is pinned. */
-.page-header-crumb-placeholder { visibility: hidden; }/* `<menu>` is HTML's native "list of commands" element — used
+   (`_shared/_page_header.html`): the nav row above the breadcrumb row,
+   with a `border-bottom` boundary. The band itself is full-width and
+   carries that boundary; its inner `.container` (max-width-capped,
+   centered) holds the two rows, which stack as normal block flow — no flex
+   needed. Splitting the band from its container means the `border-bottom`
+   spans the whole page while content stays within the container gutter
+   (matches `<main>` / `<footer>`, which also wrap content in an inner
+   `.container`). The page `<h1>` + actions toolbar lives in `<main>`, not
+   the band. */
+/* Header + breadcrumb band dividers are full-width, colored lines so the
+   chrome reads as distinct bands above the content: the nav uses the Pico
+   primary border, the breadcrumb the secondary border. */
+.page-header { border-bottom: 1px solid var(--pico-primary-border); color: inherit; }
+/* Breadcrumb bar (`_shared/_breadcrumb.html`) — a body-level band below the
+   header. Its own `border-bottom` (full width) separates the breadcrumb from
+   page content. `padding-block` mirrors the `var(--pico-block-spacing-vertical)`
+   Pico gives `body > header/main/footer` so the breadcrumb band shares the
+   same vertical rhythm (Pico's rule only targets those landmarks, not this
+   `<nav>`). */
+.breadcrumb-bar {
+  border-bottom: 1px solid var(--pico-secondary-border);
+  padding-block: var(--pico-block-spacing-vertical);
+}
+/* `<menu>` is HTML's native "list of commands" element — used
    by the page toolbar (`menu.toolbar`, `menu.toolbar-right`)
    and any in-row action cluster (e.g. the users-table Actions
    cell). Strip its default `<ul>`-style bullets + padding so
@@ -660,73 +678,48 @@ td > menu > li > [role="button"] {
   max-width: 28rem;
   margin-inline: auto;
 }
-/* Page footer (`<footer class="container">` in base.html — sibling
-   of `<header>` and `<main>`). Centered chrome line, present on
-   every page via the default `{% block footer %}` body. */
-footer.container { text-align: center; }
+/* Page footer (`<footer>` in base.html — sibling of `<header>` and
+   `<main>`, content wrapped in an inner `.container`). Centered chrome
+   line, present on every page via the default `{% block footer %}` body.
+   `text-align` is set on `<footer>` itself (full width) so it cascades to
+   the centered inner container's text. */
+footer { text-align: center; }
 fieldset { border: none; padding: 0; margin: 0 0 1.25rem; }
 legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); font-weight: 500; padding: 0; }
-/* Primary nav — brand always visible; links in a <details> so mobile
-   can collapse them behind a hamburger toggle. */
-#primary-nav {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding-block: 0.5rem;
-  /* Positioning context for the mobile menu's absolutely-positioned
-     dropdown (`#nav-menu[open] > ul`, below). Scoped to the nav rather
-     than the whole `.page-header` band so the menu drops directly under
-     the nav row (`top: 100%`) instead of below the breadcrumb + toolbar
-     + rule that now share the band. */
-  position: relative;
+/* Primary nav — the canonical Pico shape: `<nav>` with a brand `<ul>`
+   (left) and an actions `<ul>` (right), plus a Pico `<details class=
+   "dropdown">` profile menu (https://picocss.com/docs/nav). Pico's
+   element-level `nav` + `.dropdown` styling owns ALL of it — layout
+   (space-between), `<li>` chrome, the dropdown trigger/chevron, and the
+   click-to-open menu on every viewport — so there is no custom rule here.
+   The breadcrumb `<nav aria-label="breadcrumb">` carries a single
+   `.breadcrumb-back` child, so Pico's space-between is a no-op there.
+
+   One override: the profile dropdown sits at the nav's right edge, and
+   Pico opens dropdown menus left-aligned to the summary — which overflows
+   the viewport there. Right-align just this menu so it opens leftward and
+   stays on-screen. This is the only nav custom rule; everything else is
+   Pico defaults. */
+nav[aria-label="Primary"] details.dropdown > ul {
+  left: auto;
+  right: 0;
+  /* Restore item spacing inside the menu — the global zero (above) would
+     otherwise pack the dropdown links flush together. */
+  --pico-nav-element-spacing-vertical: 0.5rem;
 }
-/* Primary nav hamburger — strip Pico's built-in chevron */
-.nav-menu-toggle { list-style: none; margin-bottom: 0; }
-#primary-nav > details { margin: 0; }
-#primary-nav > details[open] > summary { margin-bottom: 0; }
-.nav-menu-toggle::-webkit-details-marker { display: none; }
-.nav-menu-toggle::marker { display: none; }
-.nav-menu-toggle::after { display: none; }
-/* Desktop: summary hidden, links always visible inline.
-   #nav-menu is both a flex item (flex:1 fills remaining space) and
-   a flex container so margin-left:auto on the <ul> right-aligns it.
-   display:contents caused a Chrome bug where the <ul> got zero width. */
-@media (min-width: 641px) {
-  .nav-menu-toggle { display: none; }
-  #nav-menu { flex: 1; display: flex; }
-  #nav-menu > ul { list-style: none; padding: 0; margin: 0 0 0 auto; gap: 1rem; display: flex; }
-}
-/* Mobile: hamburger shows, open menu covers full screen below nav.
-   The positioning context lives on `#primary-nav` (above), not here. */
-@media (max-width: 640px) {
-  #nav-menu:not([open]) .nav-menu-close-icon { display: none; }
-  #nav-menu[open] .nav-menu-open-icon { display: none; }
-  #nav-menu[open] > ul {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    min-height: 100dvh;
-    z-index: 10;
-    background: var(--pico-background-color);
-    display: flex;
-    flex-direction: column;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-}
-/* Sticky-footer layout. The body is a three-row grid
-   (`<header>` / `<main>` / `<footer>`) sized to the viewport, so
-   short pages pin the footer at the bottom instead of leaving it
-   floating mid-screen. The landing page reuses this row scaffold
-   to vertically center its hero (see `landing.html`); regular
-   content pages just benefit from the pinned footer. */
+/* Sticky-footer layout. The body is a flex column of full-width bands —
+   `<header>`, an optional breadcrumb `<nav class="breadcrumb-bar">`,
+   `<main>`, `<footer>` — sized to the viewport. `main` takes the slack
+   (`flex: 1`) so short pages pin the footer at the bottom instead of
+   leaving it floating mid-screen. Flex (not a fixed-row grid) so the
+   layout holds whether or not the breadcrumb band is present. The landing
+   page makes its tall `<main>` center the hero (see `landing.html`). */
 body {
   min-height: 100dvh;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
 }
+body > main { flex: 1; }
 /* Locked affordances rendered by `_shared/_locked.html`.
    Four trigger shapes + one CTA popover card:
 

@@ -38,55 +38,54 @@ Required context (set by `base.html` before the include):
 See `templates/README.md` § "Page chrome contract" for the slot list
 and the constant-boundary rationale (one source of truth).
 #}
-<header class="container page-header">
-  <nav aria-label="Primary" id="primary-nav">
-    <a href="{% if is_authenticated %}{{ entity_url("post") }}{% else %}/home{% endif %}"
-       {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
-    {% if is_authenticated %}
-      <a href="{{ entity_form_url('post') }}" role="button">+ Post</a>
-      <details id="nav-menu">
-        <summary class="nav-menu-toggle" aria-label="Account menu">
-          <i class="icon-user nav-menu-open-icon" aria-hidden="true"></i>
-          <i class="icon-x nav-menu-close-icon" aria-hidden="true"></i>
-        </summary>
+<header class="page-header">
+  {# `.container` lives INSIDE the band (not on `<header>`) so the band's
+     `border-bottom` spans the full page width while the nav content stays
+     max-width-capped and centered. Same pattern on `<main>` and `<footer>`
+     in base.html. The breadcrumb is no longer part of this band — it is its
+     own `<nav class="breadcrumb-bar">` rendered as a body-level sibling in
+     base.html. #}
+  <div class="container">
+    {# Canonical Pico nav: a brand `<ul>` (left) and an actions `<ul>`
+     (right). `Post` is a visible link `<li>`; the profile menu is a Pico
+     dropdown (https://picocss.com/docs/nav) — `<details class="dropdown">`
+     with the avatar as its summary trigger. It opens on click on EVERY
+     viewport (no mobile-only hamburger); Pico renders the chevron and
+     positions the menu. Anonymous visitors get the brand list only. #}
+    <nav aria-label="Primary">
+      <ul>
+        <li>
+          <a href="{% if is_authenticated %}{{ entity_url("post") }}{% else %}/home{% endif %}"
+             {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
+        </li>
+      </ul>
+      {% if is_authenticated %}
         <ul>
           <li>
-            <a href="{{ entity_url("post") }}?owner=me"
-               {% if _on_posts %}aria-current="page"{% endif %}>My posts</a>
+            <a href="{{ entity_form_url('post') }}">Post</a>
           </li>
           <li>
-            <a href="{{ entity_url('user', id='me') }}"
-               {% if _on_users_me %}aria-current="page"{% endif %}>Account</a>
-          </li>
-          <li>
-            <a href="#" hx-post="/auth/sign-out">Sign out</a>
+            <details class="dropdown" id="nav-menu">
+              <summary aria-label="Account menu">
+                <i class="icon-user" aria-hidden="true"></i>
+              </summary>
+              <ul>
+                <li>
+                  <a href="{{ entity_url("post") }}?owner=me"
+                     {% if _on_posts %}aria-current="page"{% endif %}>My posts</a>
+                </li>
+                <li>
+                  <a href="{{ entity_url('user', id='me') }}"
+                     {% if _on_users_me %}aria-current="page"{% endif %}>Account</a>
+                </li>
+                <li>
+                  <a href="#" hx-post="/auth/sign-out">Sign out</a>
+                </li>
+              </ul>
+            </details>
           </li>
         </ul>
-      </details>
-      <script>
-        (function () {
-          var mq = window.matchMedia("(min-width: 641px)");
-          var menu = document.getElementById("nav-menu");
-          function sync() { menu.open = mq.matches; }
-          sync();
-          mq.addEventListener("change", sync);
-        })();
-      </script>
-    {% endif %}
-    {# Anonymous visitors get only the brand link. #}
-  </nav>
-  {%- if (_breadcrumb_html | trim) or (_toolbar_html | trim) or is_authenticated %}
-    {# Breadcrumb row. Reserves its height with an invisible
-       back-affordance placeholder when a page has no real breadcrumb,
-       so the rule below sits at a constant Y across pages. #}
-    <div class="page-header-crumb">
-      {%- if _breadcrumb_html | trim %}{{ _breadcrumb_html }}
-      {%- else %}
-        <nav aria-hidden="true" class="page-header-crumb-placeholder">
-          <a class="breadcrumb-back"><i class="icon-arrow-left" aria-hidden="true"></i><span class="breadcrumb-back-label">&nbsp;</span></a>
-        </nav>
-      {%- endif %}
-    </div>
-    {{ _toolbar_html }}
-  {%- endif %}
+      {% endif %}
+    </nav>
+  </div>
 </header>
