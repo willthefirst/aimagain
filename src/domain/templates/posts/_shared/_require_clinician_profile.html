@@ -1,7 +1,14 @@
-{# Shown when `current_user` has no clinician profiles, blocking post creation.
-   Include this partial inside the `{% if not current_user.clinicians %}` branch
-   of any create-form template that requires a clinician profile to proceed.
-   Relies on `entity_form_url` from the calling template's context. #}
+{# Shown when `current_user` has no provider entity (no clinician profile
+   and no org), blocking post creation. Include this partial inside the
+   "no provider entity" branch of any create-form template that requires a
+   clinician or org to proceed. Frames the gate as "clinician OR org" to
+   match the global #onboarding-banner (base.html) and the derived-gate
+   model (RESOURCE_GRAMMAR.md §"Derived gates"): it only dispatches into
+   the existing minimal create forms. Relies on `entity_form_url` from the
+   calling template's context. #}
 <p>
-  Set up your clinician profile first. <a href="{{ entity_form_url('clinician') }}">Create your clinician profile.</a>
+  Add a clinician or organization first.
+  <a href="{{ entity_form_url('clinician') }}">Add a clinician</a>
+  or
+  <a href="{{ entity_form_url('organization') }}">Add an organization</a>.
 </p>
