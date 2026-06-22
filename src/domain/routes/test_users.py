@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import User
 from src.framework.audit.log import AuditLog
 from src.framework.audit.repository import AuditRepository
-from tests.helpers import create_test_user, make_clinician_with_org, promote_to_admin
+from tests.helpers import (
+    create_test_user,
+    make_clinician_with_org,
+    make_organization_row,
+    promote_to_admin,
+)
 
 # Mark all tests in this module as async
 pytestmark = pytest.mark.asyncio
@@ -210,23 +215,34 @@ def _signout_button(tree: HTMLParser):
 
 async def test_get_users_me_renders_authenticated_self_view(
     authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """`GET /users/me` for the signed-in user renders the canonical
-    self-view: the primary nav with brand + Posts/Profile/Sign-out
-    destinations (Profile marked aria-current), the lucide font preload
-    <link> for icon-flicker prevention, a Sign-out button in the toolbar
-    action menu (htmx POST to /auth/jwt/logout with after-request
-    redirect), a body-level Favorites link (not in the toolbar), the
-    self-only Email/Access cards, and a picker dispatching to the global
-    Clinician/Organization directories pre-filtered with `?owner=me`.
-    The page hides top-level identity facts (Email/Active/Verified dt
-    entries live on the admin path or the Email card; #597).
+    account-hub self-view (#1522): the primary nav with brand +
+    Posts/Profile/Sign-out destinations (Profile marked aria-current),
+    the lucide font preload <link> for icon-flicker prevention, a
+    Sign-out button in the toolbar action menu (htmx POST to
+    /auth/jwt/logout with after-request redirect), a body-level
+    Favorites link (not in the toolbar), inline Clinicians +
+    Organizations lists (each with a `+ Add` CTA and a per-row Edit
+    link), and a secondary Account picker with the self-only
+    Email/Favorites/Access cards. The page hides top-level identity
+    facts (Email/Active/Verified dt entries live on the admin path or
+    the Email card; #597).
 
     Consolidates 10 previously-separate tests that all rendered this
     same response with the same fixtures (one in `test_auth_routes.py`,
     nine here). Distinct assertion messages preserve the per-bit signal
     on failure."""
+    # Seed one owned clinician + one owned organization so the inline
+    # account-hub lists render rows (not just their empty states).
+    clinician_id = await _seed_user_clinician(
+        db_test_session_manager, user_id=logged_in_user.id, practice_name="My Practice"
+    )
+    org_id = await _seed_user_organization(
+        db_test_session_manager, user_id=logged_in_user.id, name="My Org"
+    )
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     body = response.text
@@ -318,21 +334,59 @@ async def test_get_users_me_renders_authenticated_self_view(
         tree.css_first(f"main {favorites_selector}") is not None
     ), "Favorites link must appear in the page body for the self viewer"
 
-    # --- Picker cards: Clinicians + Organizations dispatched with ?owner=me
-    # (was test_detail_picker_includes_clinicians_and_organizations)
-    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
-    assert "Clinicians" in headings, "picker missing Clinicians card"
-    assert "Organizations" in headings, "picker missing Organizations card"
+    # --- Inline account-hub lists: Clinicians + Organizations (#1522).
+    # The pre-#1522 dispatching picker cards are replaced by inline
+    # lists rendered from the owner's own clinicians/organizations.
+    section_headings = [el.text(strip=True) for el in tree.css("main section > * h2")]
+    assert "Clinicians" in section_headings, "account hub missing Clinicians section"
     assert (
-        tree.css_first("article.picker-option a[href$='/clinicians?owner=me']")
-        is not None
-    ), "Clinicians picker card must dispatch with ?owner=me"
-    assert (
-        tree.css_first("article.picker-option a[href$='/organizations?owner=me']")
-        is not None
-    ), "Organizations picker card must dispatch with ?owner=me"
+        "Organizations" in section_headings
+    ), "account hub missing Organizations section"
 
-    # --- Access card (was test_users_me_access_card_links_to_access_page)
+    # Each list renders the owner's seeded row through the shared card
+    # (selected by data-row-id so it survives card-internal markup
+    # changes).
+    assert (
+        tree.css_first(
+            f"#account-clinicians-list article[data-row-id='{clinician_id}']"
+        )
+        is not None
+    ), "owned clinician must render as an inline card in the account hub"
+    assert (
+        tree.css_first(f"#account-organizations-list article[data-row-id='{org_id}']")
+        is not None
+    ), "owned organization must render as an inline card in the account hub"
+
+    # Add CTAs point at the global create forms.
+    assert (
+        tree.css_first("#account-clinicians a[role='button'][href='/clinicians/form']")
+        is not None
+    ), "Clinicians section missing the + Add clinician CTA -> /clinicians/form"
+    assert (
+        tree.css_first(
+            "#account-organizations a[role='button'][href='/organizations/form']"
+        )
+        is not None
+    ), "Organizations section missing the + Add organization CTA -> /organizations/form"
+
+    # Per-row Edit links point at the row's own edit form.
+    assert (
+        tree.css_first(
+            f"#account-clinicians-list a[href='/clinicians/{clinician_id}/form']"
+        )
+        is not None
+    ), "clinician row missing per-row Edit link -> /clinicians/:id/form"
+    assert (
+        tree.css_first(
+            f"#account-organizations-list a[href='/organizations/{org_id}/form']"
+        )
+        is not None
+    ), "organization row missing per-row Edit link -> /organizations/:id/form"
+
+    # --- Secondary Account picker retains Email / Favorites / Access ---
+    headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
+
+    # Access card (was test_users_me_access_card_links_to_access_page)
     assert "Access" in headings, "/users/me is missing the Access card"
     assert (
         tree.css_first("article.picker-option a[href$='/users/me/access']") is not None
@@ -341,7 +395,7 @@ async def test_get_users_me_renders_authenticated_self_view(
         "Network access" not in body
     ), "capability status must not be embedded on /users/me — lives on /users/me/access"
 
-    # --- Email card (was test_users_me_email_card_links_to_email_form)
+    # Email card (was test_users_me_email_card_links_to_email_form)
     assert "Email" in headings, "/users/me is missing the Email card"
     assert (
         tree.css_first("article.picker-option a[href$='/users/me/email/form']")
@@ -444,12 +498,19 @@ async def test_get_users_id_renders_admin_view_of_other_user(
         "Verification" not in headings
     ), "Verification card must not appear on another user's profile"
 
-    # Inline Clinicians section
-    # (was test_detail_no_inline_clinicians_section_for_other_user) —
-    # removed entirely from the user detail page.
+    # Inline account-hub sections (#1522) are self-only — an admin
+    # auditing another user sees neither the inline Clinicians nor the
+    # inline Organizations list, and no Add CTAs.
     assert (
-        "Clinicians" not in headings
+        tree.css_first("#account-clinicians") is None
     ), "no inline Clinicians section on another user's profile"
+    assert (
+        tree.css_first("#account-organizations") is None
+    ), "no inline Organizations section on another user's profile"
+    assert (
+        tree.css_first("a[href='/clinicians/form']") is None
+        and tree.css_first("a[href='/organizations/form']") is None
+    ), "self-only Add CTAs must not render on another user's profile"
 
 
 async def test_non_admin_forbidden_on_other_user_detail(
@@ -750,6 +811,20 @@ async def _seed_user_clinician(
             session.add(clinician)
         await session.refresh(clinician)
         return clinician.id
+
+
+async def _seed_user_organization(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    *,
+    user_id: uuid.UUID,
+    name: str,
+) -> uuid.UUID:
+    org = make_organization_row(owner_id=user_id, name=name)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(org)
+        await session.refresh(org)
+        return org.id
 
 
 async def test_get_my_clinicians_empty_state(

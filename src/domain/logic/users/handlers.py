@@ -13,19 +13,25 @@ from src.framework.http.exceptions import NotFoundError
 logger = logging.getLogger(__name__)
 
 
-# `USER_ENTITY.detail_extras_path` target — fetches the clinicians the
-# target user owns and injects them under `clinicians` for the detail
-# template. Viewer-derived flags (`is_self`, `can_admin_actions`,
-# `can_view_private`) and the `target_user` projection are framework-
-# injected by `handle_detail` from `USER_ENTITY.public_fields` /
-# `private_fields` / `private_field_predicate` — defense-in-depth (a
-# forgotten template guard can re-leak; a missing dict key can't) is
-# preserved.
+# `USER_ENTITY.detail_extras_path` target — fetches the clinicians and
+# organizations the target user owns and injects them under
+# `clinicians` / `organizations` for the account-hub detail template,
+# which renders both as inline lists (issue #1522). Viewer-derived flags
+# (`is_self`, `can_admin_actions`, `can_view_private`) and the
+# `target_user` projection are framework-injected by `handle_detail`
+# from `USER_ENTITY.public_fields` / `private_fields` /
+# `private_field_predicate` — defense-in-depth (a forgotten template
+# guard can re-leak; a missing dict key can't) is preserved.
 user_detail_extras = make_detail_extras_handler(
     (
         (
             "clinicians",
             "clinician_repo",
+            lambda repo, target, _user: repo.list_for_user(target.id),
+        ),
+        (
+            "organizations",
+            "organization_repo",
             lambda repo, target, _user: repo.list_for_user(target.id),
         ),
     )
