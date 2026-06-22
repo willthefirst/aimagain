@@ -160,12 +160,11 @@
 <body hx-ext="response-targets">
 {# Primary nav renders on every screen so the chrome stays
        consistent between authenticated app pages and the public auth
-       flow. Authed users get the four inline links (Home, Posts,
-       Profile, Sign out); anonymous visitors get only the brand. The
-       brand link goes to `/`, which redirects authed users to
-       `/posts?kind=referral` (the "find new clients" journey home —
-       see `src/main.py:read_root` for the bias rationale) and unauthed
-       users to the login page — safe on either side of the auth gate. #}
+       flow. Authed users get the redesigned nav (brand → posts, + Post,
+       avatar menu); anonymous visitors get only the brand. The anonymous
+       brand link goes to `/home`, an alias of `/` that renders the public
+       landing page for an unauthed visitor (and redirects an authed one to
+       the `/posts` browse feed) — see `src/main.py:read_root`. #}
 {# Self-profile page. The nav lights up for any path under
        the self-alias URL. #}
 {%- set _users_me_path = entity_url('user', id='me') -%}

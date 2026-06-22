@@ -302,6 +302,74 @@ async def test_list_kind_filter_narrows_to_one_kind(
     }, f"/posts?kind=referral returned: {kinds_filtered!r}"
 
 
+# --- Intent toggle: Referrals / Openings over `?kind=` -------------------
+
+
+async def test_list_renders_binary_intent_toggle(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """`/posts` browse renders the binary intent toggle (mock §3): a
+    `role="group"` of exactly two links — Referrals (`?kind=referral`) and
+    Openings (`?kind=clinician_opening`). `program_intake` is deliberately
+    absent (browsed via org pages), so the toggle is never a three-way."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    group = HTMLParser(response.text).css_first(
+        'nav[aria-label="Post intent"] [role="group"]'
+    )
+    assert group is not None, "/posts did not render the intent toggle group"
+    links = group.css("a")
+    hrefs = [a.attributes.get("href") for a in links]
+    labels = [a.text(strip=True) for a in links]
+    assert hrefs == ["/posts?kind=referral", "/posts?kind=clinician_opening"]
+    assert labels == ["Referrals", "Openings"]
+    # Intake is not a toggle option.
+    assert not any("kind=program_intake" in (h or "") for h in hrefs)
+
+
+@pytest.mark.parametrize(
+    "kind,active_label",
+    [("referral", "Referrals"), ("clinician_opening", "Openings")],
+)
+async def test_intent_toggle_marks_active_kind_current(
+    kind: str,
+    active_label: str,
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """Selecting a kind marks exactly that toggle tab `aria-current="page"`;
+    the other tab is the inactive (outline) variant. Active intent reads the
+    `kind` filter selection (`filter_values.kind == [kind]`)."""
+    response = await authenticated_client.get(f"/posts?kind={kind}")
+    assert response.status_code == 200
+    group = HTMLParser(response.text).css_first(
+        'nav[aria-label="Post intent"] [role="group"]'
+    )
+    assert group is not None
+    current = [
+        a.text(strip=True)
+        for a in group.css("a")
+        if a.attributes.get("aria-current") == "page"
+    ]
+    assert current == [active_label]
+
+
+async def test_intent_toggle_no_current_tab_on_unfiltered_feed(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """The default unfiltered feed (every kind) marks neither tab current —
+    the toggle never claims a narrowing that isn't applied."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    group = HTMLParser(response.text).css_first(
+        'nav[aria-label="Post intent"] [role="group"]'
+    )
+    assert group is not None
+    assert not group.css('a[aria-current="page"]')
+
+
 # --- List filter: ?owner=me scopes to the viewer's own posts -------------
 
 

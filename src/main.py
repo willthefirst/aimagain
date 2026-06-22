@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -8,16 +8,13 @@ from fastapi.staticfiles import StaticFiles
 
 from src.auth_config import (
     auth_backend,
-    current_active_user,
     current_optional_user,
     fastapi_users,
 )
 from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
-from src.domain.logic.posts.repository import get_post_repository
 from src.domain.logic.users.schema import UserRead
-from src.domain.models.posts.post import Post
 from src.domain.routes import (
     access,
     auth_pages,
@@ -131,68 +128,35 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
-@app.get("/home")
-async def read_home(
-    request: Request,
-    _user=Depends(current_active_user),
-    post_repo=Depends(get_post_repository),
-):
-    clinicians = getattr(_user, "clinicians", [])
-    p = clinicians[0] if clinicians else None
-    if p and (p.first_name or p.last_name):
-        display_name = " ".join(filter(None, [p.first_name, p.last_name]))
-    else:
-        display_name = _user.username
-    my_posts = await post_repo.list_owned_by(Post, _user.id, limit=5)
-
-    since = datetime.now(tz=timezone.utc) - timedelta(days=7)
-    network_posts = await post_repo.list_recent_for_network(
-        since=since,
-        exclude_owner_id=_user.id,
-        limit=5,
-    )
-
-    network_filter_chips = []
-    if p and p.primary_clinician_affiliation:
-        aff = p.primary_clinician_affiliation
-        if aff.location_city:
-            network_filter_chips.append(aff.location_city)
-        if aff.in_network_carriers:
-            from src.domain.models.enums import INSURANCE_CARRIER_LABELS
-
-            carrier_labels = [
-                INSURANCE_CARRIER_LABELS.get(c, c) for c in aff.in_network_carriers
-            ]
-            network_filter_chips.extend(carrier_labels)
-
-    return APIResponse.html_response(
-        template_name="home.html",
-        context={
-            "display_name": display_name,
-            "my_posts": my_posts,
-            "network_posts": network_posts,
-            "network_filter_chips": network_filter_chips,
-        },
-        request=request,
-        current_user=_user,
-    )
-
-
-@app.get("/")
-async def read_root(request: Request, user=Depends(current_optional_user)):
-    # Authenticated users land on `/posts?kind=referral` — the "find
-    # new clients" home (see `src/auth_config.py:on_after_login` for
-    # the same bias). The kind-filter pre-narrows the unified `/posts`
-    # feed to client referrals, preserving the journey bias from when
-    # `/referrals` was its own URL family. Anonymous visitors see the
+async def _root_response(request: Request, user) -> RedirectResponse | APIResponse:
+    # Authenticated users land on the unified `/posts` browse feed — the
+    # default landing surface (mock §3). Browse lists every kind newest-first
+    # and carries the Referrals/Openings intent toggle + filter rail, so the
+    # old `/home` dashboard (My posts + Recent in the network) is fully folded
+    # in: "My posts" is `/posts?owner=me` (nav avatar menu) and "Recent in the
+    # network" *is* the default newest-first feed. Anonymous visitors see the
     # public landing page instead of being redirected to the login wall.
     if user is not None:
-        return RedirectResponse(url="/posts?kind=referral", status_code=302)
+        return RedirectResponse(url="/posts", status_code=302)
     return APIResponse.html_response(
         template_name="landing.html",
         context={},
         request=request,
     )
+
+
+@app.get("/")
+async def read_root(request: Request, user=Depends(current_optional_user)):
+    return await _root_response(request, user)
+
+
+@app.get("/home")
+async def read_home(request: Request, user=Depends(current_optional_user)):
+    # `/home` is retained only as an alias of `/` so the anonymous brand
+    # link (`_page_header.html`) and any stale bookmark keep resolving:
+    # authenticated → `/posts` browse, anonymous → landing. The bespoke
+    # dashboard template (`home.html`) was retired in favor of browse.
+    return await _root_response(request, user)
 
 
 app.include_router(
