@@ -201,13 +201,57 @@ def test_list_view_never_renders_filter_link_in_toolbar() -> None:
     toolbar = tree.css_first("div.toolbar")
     assert toolbar is not None
     assert toolbar.css_first("a.toolbar-filter-link") is None
-    # The sidebar header still carries the search link — that's
-    # where filters live now.
+    # The search link is not in the sidebar (it moved to the results
+    # column's `.filter-summary` header) and never in the toolbar.
     sidebar = tree.css_first("aside.filter-sidebar")
     assert sidebar is not None
-    sidebar_link = sidebar.css_first("hgroup a")
-    assert sidebar_link is not None
-    assert sidebar_link.attributes.get("href") == "/clinicians/search?kind=x"
+    assert sidebar.css_first("hgroup a") is None
+    summary = tree.css_first(".browse-results .filter-summary")
+    assert summary is not None
+    summary_link = summary.css_first("a.filter-summary-edit")
+    assert summary_link is not None
+    assert summary_link.attributes.get("href") == "/clinicians/search?kind=x"
+    # The active filters are read out as tags in the same header.
+    tags = [li.text(strip=True) for li in summary.css("ul.filter-tags li")]
+    assert tags == ["Type: X"]
+
+
+def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
+    """With a filtered entity but no active selection, the results-column
+    `.filter-summary` header states it's the unfiltered directory and still
+    offers the refine-filters link — no active-filter tags are rendered."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Clinicians{% endblock %}
+        {% block list_body %}body{% endblock %}
+        """,
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        filters=({"name": "kind", "label": "Type"},),
+        filter_values={},
+        active_filters=[],
+        active_filter_count=0,
+        search_url="/clinicians/search",
+        filter_heading="Filter clinicians",
+    )
+
+    tree = HTMLParser(html)
+    summary = tree.css_first(".browse-results .filter-summary")
+    assert summary is not None
+    assert summary.css_first("ul.filter-tags") is None
+    label = summary.css_first(".filter-summary-label")
+    assert label is not None and label.text(strip=True) == "Showing all results."
+    link = summary.css_first("a.filter-summary-edit")
+    assert link is not None
+    assert link.attributes.get("href") == "/clinicians/search"
 
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:
