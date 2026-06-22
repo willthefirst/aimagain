@@ -320,22 +320,23 @@ async def test_list_omits_toolbar_and_intent_toggle(
     assert tree.css_first('nav[aria-label="Post intent"]') is None
 
 
-async def test_list_filter_summary_reads_active_kind(
+async def test_list_filter_summary_reads_active_filter_count(
     authenticated_client: AsyncClient,
     logged_in_user,
 ):
-    """The results column opens with a `.filter-summary` header that names
-    the active filters and links to the dedicated search page. Filtering by
-    kind surfaces a `Type: …` tag and points the refine link at the search
-    URL carrying the live query string."""
+    """The results column opens with a `.filter-summary` header. Filtering by
+    kind makes it read "Showing results with 1 filter", where the count links
+    to the dedicated search page carrying the live query string. No descriptor
+    pills are rendered."""
     response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
     summary = HTMLParser(response.text).css_first(".browse-results .filter-summary")
     assert summary is not None
-    tags = [li.text(strip=True) for li in summary.css("ul.filter-tags li")]
-    assert any(t.startswith("Type:") for t in tags), tags
+    assert summary.css_first("ul.filter-tags") is None
+    assert "Showing results with" in summary.text()
     link = summary.css_first("a.filter-summary-edit")
     assert link is not None
+    assert link.text(strip=True) == "1 filter"
     assert (link.attributes.get("href") or "").startswith("/posts/search")
 
 

@@ -208,18 +208,20 @@ def test_list_view_never_renders_filter_link_in_toolbar() -> None:
     assert sidebar.css_first("hgroup a") is None
     summary = tree.css_first(".browse-results .filter-summary")
     assert summary is not None
+    # With one active filter, the count ("1 filter") is the link to search.
     summary_link = summary.css_first("a.filter-summary-edit")
     assert summary_link is not None
     assert summary_link.attributes.get("href") == "/clinicians/search?kind=x"
-    # The active filters are read out as tags in the same header.
-    tags = [li.text(strip=True) for li in summary.css("ul.filter-tags li")]
-    assert tags == ["Type: X"]
+    assert summary_link.text(strip=True) == "1 filter"
+    assert "Showing results with" in summary.text()
+    # The per-value descriptor pills were dropped.
+    assert summary.css_first("ul.filter-tags") is None
 
 
 def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     """With a filtered entity but no active selection, the results-column
-    `.filter-summary` header states it's the unfiltered directory and still
-    offers the refine-filters link — no active-filter tags are rendered."""
+    `.filter-summary` header reads "Showing all results." with no count link
+    and no descriptor pills."""
     env = _make_env()
     _add_child(
         env,
@@ -249,9 +251,8 @@ def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     assert summary.css_first("ul.filter-tags") is None
     label = summary.css_first(".filter-summary-label")
     assert label is not None and label.text(strip=True) == "Showing all results."
-    link = summary.css_first("a.filter-summary-edit")
-    assert link is not None
-    assert link.attributes.get("href") == "/clinicians/search"
+    # No filters active → no count link to the search page.
+    assert summary.css_first("a.filter-summary-edit") is None
 
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:
