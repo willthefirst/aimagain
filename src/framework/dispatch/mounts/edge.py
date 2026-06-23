@@ -19,15 +19,19 @@ def mount_edge_routes(
     router: Any,
     entity: Any,  # `EntitySpec` for an M:N edge with `relation` set
     *,
-    list_handler: Callable[..., Awaitable[dict]],
+    list_handler: Callable[..., Awaitable[dict]] | None = None,
     add_handler: Callable[..., Awaitable[Any]],
     remove_handler: Callable[..., Awaitable[None]],
 ) -> None:
-    """Mount the three self-only routes for an M:N edge entity.
+    """Mount the self-only routes for an M:N edge entity.
 
     Routes:
       - ``GET ""`` → renders ``entity.templates.list`` with the
-        context returned by ``list_handler``.
+        context returned by ``list_handler``. **Optional** — omit
+        ``list_handler`` to mount only the add/remove toggle with no
+        list page (then ``entity.templates.list`` may be unset). This
+        is how favorites is exposed as a `/clinicians?favorited=me`
+        filter rather than a standalone page.
       - ``POST /{<to_attr>}`` → calls ``add_handler`` and returns
         ``201 Created`` (new edge: `Location` + `HX-Redirect` to the
         target's detail page) or ``200 OK`` (idempotent re-add:
@@ -58,10 +62,10 @@ def mount_edge_routes(
             f"mount_edge_routes({entity.name!r}): entity has no `relation`; "
             "edge mounts require an M2NRelation declaration on the spec."
         )
-    if entity.templates.list is None:
+    if list_handler is not None and entity.templates.list is None:
         raise ValueError(
             f"mount_edge_routes({entity.name!r}): entity.templates.list is "
-            "required for the list endpoint."
+            "required when a list_handler is given."
         )
     to_attr = entity.relation.to_attr
     to_entity = entity.relation.to_entity
@@ -69,7 +73,6 @@ def mount_edge_routes(
     # Handler kwarg name for the opposite-end repo follows the spec
     # name convention: `clinician_repo` for the clinician entity, etc.
     to_repo_kwarg = f"{to_entity.name}_repo"
-    list_template = entity.templates.list
     user_dep = entity.read_user_dep
     repo_dep = entity.repo_dep
     to_repo_dep = to_entity.repo_dep
@@ -80,40 +83,46 @@ def mount_edge_routes(
     # cluster mate `entity_spec`).
     from src.framework.persistence.dependencies import get_audit_repository
 
-    # Resolve breadcrumb metadata once at mount time. Edge routes are
-    # self-only (the "parent" is always the requesting user), so the
-    # ancestry chain is: from_entity collection → user row → edge collection.
-    _from_entity = entity.relation.from_entity
-    _from_label_fn = _from_entity.display_label_fn
+    # The list page is optional — an edge can expose only the add/remove
+    # toggle (favorites is reached via `/clinicians?favorited=me` instead).
+    if list_handler is not None:
+        list_template = entity.templates.list
+        # Resolve breadcrumb metadata once at mount time. Edge routes are
+        # self-only (the "parent" is always the requesting user), so the
+        # ancestry chain is: from_entity collection → user row → edge collection.
+        _from_entity = entity.relation.from_entity
+        _from_label_fn = _from_entity.display_label_fn
 
-    @router.get("", name=f"{entity.name}:list")
-    async def _list_route(  # noqa: F811 — closure, not re-exported
-        request: Request,
-        user: Any = Depends(user_dep),
-        repo: Any = Depends(repo_dep),
-    ):
-        context = await list_handler(request=request, repo=repo, requesting_user=user)
-        if _from_label_fn is not None:
-            collection = _from_entity.url_collection
-            # Use the singleton alias path (e.g. /users/me) when available
-            # so the back link reads the canonical self-path, not a bare UUID.
-            alias = _from_entity.singleton_alias
-            parent_path = (
-                f"/{collection}/{alias[0]}" if alias else f"/{collection}/{user.id}"
+        @router.get("", name=f"{entity.name}:list")
+        async def _list_route(  # noqa: F811 — closure, not re-exported
+            request: Request,
+            user: Any = Depends(user_dep),
+            repo: Any = Depends(repo_dep),
+        ):
+            context = await list_handler(
+                request=request, repo=repo, requesting_user=user
             )
-            context["_breadcrumb_items"] = subresource_breadcrumb_items(
-                parent_spec=_from_entity,
-                parent_row=user,
-                parent_path=parent_path,
-                child_label=entity.url_collection.capitalize(),
-                viewer=user,
+            if _from_label_fn is not None:
+                collection = _from_entity.url_collection
+                # Use the singleton alias path (e.g. /users/me) when available
+                # so the back link reads the canonical self-path, not a bare UUID.
+                alias = _from_entity.singleton_alias
+                parent_path = (
+                    f"/{collection}/{alias[0]}" if alias else f"/{collection}/{user.id}"
+                )
+                context["_breadcrumb_items"] = subresource_breadcrumb_items(
+                    parent_spec=_from_entity,
+                    parent_row=user,
+                    parent_path=parent_path,
+                    child_label=entity.url_collection.capitalize(),
+                    viewer=user,
+                )
+            return APIResponse.html_response(
+                template_name=list_template,
+                context=context,
+                request=request,
+                current_user=user,
             )
-        return APIResponse.html_response(
-            template_name=list_template,
-            context=context,
-            request=request,
-            current_user=user,
-        )
 
     add_route_path = f"/{{{to_attr}}}"
 

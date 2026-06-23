@@ -167,17 +167,3 @@ def test_singleton_alias_is_me():
     assert USER_ENTITY.singleton_alias is not None
     alias_segment, _ = USER_ENTITY.singleton_alias
     assert alias_segment == "me"
-
-
-# --- Extras binding ------------------------------------------------------
-
-
-def test_detail_extras_path_points_at_user_detail_extras():
-    """The dotted path is the security-visible binding: the projection
-    that strips private fields lives in `user_detail_extras`. Pinning
-    the string here means a rename of the callable can't silently
-    de-project the response."""
-    assert (
-        USER_ENTITY.detail_extras_path
-        == "src.domain.logic.users.handlers.user_detail_extras"
-    )

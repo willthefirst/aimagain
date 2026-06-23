@@ -57,10 +57,9 @@ def test_relation_is_M2NRelation():
 # --- Edge entity templates ----------------------------------------------
 
 
-def test_list_template_is_set_for_handrolled_route():
-    """The route file is hand-rolled (`routes.list` stays False); the
-    list template is read directly from the spec by `mount_edge_routes`.
-    The conformance suite generalizes "templates.list set without
-    routes.list True implies an M2NRelation"; this test pins the
-    favorites-specific template name."""
-    assert FAVORITE_ENTITY.templates.list == "favorites/list.html"
+def test_no_list_template_for_toggle_only_edge():
+    """Favorites mounts only the add/remove toggle (no `list_handler`),
+    so there is no favorites list page and the spec declares no list
+    template — favorited clinicians are browsed via
+    `/clinicians?favorited=me`."""
+    assert FAVORITE_ENTITY.templates.list is None

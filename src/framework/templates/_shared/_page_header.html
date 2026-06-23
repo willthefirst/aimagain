@@ -19,11 +19,12 @@ inherits the caller's context, so `_on_home` / `_on_posts` /
 `_on_profile` / `is_authenticated` resolve normally. `_on_home` marks
 the brand logo with `aria-current="page"` when the viewer is on /home.
 
-When authenticated, the primary nav is: brand link (→ the posts
-collection, the default landing surface) → a `Post` link (fronted by a
-`plus` glyph → the post create form) → an avatar `<details>` menu (My posts → the
-viewer's own posts via `?owner=me`, Account → the self user page, Sign
-out via `hx-post`). Anonymous visitors get the brand link only.
+When authenticated, the primary nav is: brand link (→ `/home`, the
+signed-in hub) → a `Post` link (fronted by a `plus` glyph → the post
+create form) → an avatar `<details>` menu (My posts → the viewer's own
+posts via `?owner=me`, Account → the self user page, Sign out via
+`hx-post`). Anonymous visitors get the brand link only (also → `/home`,
+which falls through to the public landing page for them).
 
 The band's lower rows (breadcrumb + toolbar) render only when there's
 app chrome to show — any breadcrumb or toolbar content, or an
@@ -57,8 +58,7 @@ and the constant-boundary rationale (one source of truth).
     <nav aria-label="Primary">
       <ul>
         <li>
-          <a href="{% if is_authenticated %}{{ entity_url("post") }}{% else %}/home{% endif %}"
-             {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
+          <a href="/home" {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
         </li>
       </ul>
       {% if is_authenticated %}

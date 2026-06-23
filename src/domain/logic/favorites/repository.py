@@ -1,9 +1,8 @@
-from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
 
-from src.domain.models import Clinician, UserFavorite
+from src.domain.models import UserFavorite
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
 
@@ -26,22 +25,6 @@ class UserFavoriteRepository(BaseRepository):
 
     async def delete_favorite(self, favorite: UserFavorite) -> None:
         await self._delete(favorite)
-
-    async def list_favorited_clinicians(
-        self,
-        user_id: UUID,
-        *,
-        offset: int = 0,
-        limit: int | None = None,
-    ) -> Sequence[Clinician]:
-        """Return the clinicians a user has favorited, newest-favoriting first."""
-        stmt = (
-            select(Clinician)
-            .join(UserFavorite, UserFavorite.clinician_id == Clinician.id)
-            .filter(UserFavorite.user_id == user_id)
-            .order_by(UserFavorite.created_at.desc())
-        )
-        return await self._list(stmt, offset=offset, limit=limit)
 
     async def is_favorited(self, *, user_id: UUID, clinician_id: UUID) -> bool:
         return (
