@@ -5,10 +5,17 @@
    automatically as filter declarations change.
 
    Args:
-     f     — a Filter instance (ChoiceFilter, TextFilter, FlagFilter)
-     value — the currently-active value for this filter (string, list, or None)
+     f       — a Filter instance (ChoiceFilter, TextFilter, FlagFilter)
+     value   — the currently-active value for this filter (string, list, or None)
+     heading — render the field's own section heading (text label / fieldset
+               legend). True for full-page search, where each field stands on
+               its own. False for the browse sidebar, where each field lives in
+               an accordion whose `<summary>` already supplies the heading, so
+               repeating it inline would duplicate the title. The flag
+               checkbox's inline label is the control itself (not a section
+               heading) and is always rendered.
 #}
-{% macro filter_field(f, value) -%}
+{% macro filter_field(f, value, heading=true) -%}
   {%- if f.kind == "flag" -%}
     <label>
       <input type="checkbox"
@@ -19,7 +26,7 @@
     </label>
   {%- elif f.kind == "text" -%}
     <label>
-      {{ f.display_label }}
+      {%- if heading %}{{ f.display_label }}{% endif %}
       <input type="search"
              name="{{ f.name }}"
              value="{{ value or '' }}"
@@ -29,7 +36,7 @@
     {%- if f.multi -%}
       {%- set selected = value or [] -%}
       <fieldset class="search-checkbox-fieldset">
-        <legend>{{ f.display_label }}</legend>
+        {%- if heading %}<legend>{{ f.display_label }}</legend>{% endif %}
         <div class="checkbox-list">
           {%- for v, l in f.choices %}
             <label>
@@ -44,7 +51,7 @@
       </fieldset>
     {%- elif f.radio -%}
       <fieldset class="toggle-radio">
-        <legend>{{ f.display_label }}</legend>
+        {%- if heading %}<legend>{{ f.display_label }}</legend>{% endif %}
         <div role="group">
           <label>
             <input type="radio"
@@ -66,7 +73,7 @@
       </fieldset>
     {%- else -%}
       <label>
-        {{ f.display_label }}
+        {%- if heading %}{{ f.display_label }}{% endif %}
         <select name="{{ f.name }}">
           <option value=""{% if not value %} selected{% endif %}>Any</option>
           {%- for v, l in f.choices %}

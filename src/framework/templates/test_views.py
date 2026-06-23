@@ -14,6 +14,8 @@ up here even if no domain template has been wired into it yet.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from jinja2 import Environment
 from selectolax.parser import HTMLParser
 
@@ -251,6 +253,125 @@ def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     assert label is not None and label.text(strip=True) == "Showing all results."
     # No filters active → no count link to the search page.
     assert summary.css_first("a") is None
+
+
+def test_list_view_wraps_each_sidebar_filter_in_a_folded_accordion() -> None:
+    """Each declared filter in the browse sidebar is wrapped in a Pico
+    accordion (`<details class="filter-accordion">`) that starts folded
+    (no `open` attribute) with the filter's `display_label` as its
+    `<summary>`. The macro is called with `heading=false` so the inner
+    fieldset doesn't repeat the title as a `<legend>`."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Clinicians{% endblock %}
+        {% block list_body %}body{% endblock %}
+        """,
+    )
+
+    filters = (
+        SimpleNamespace(
+            kind="choice",
+            name="license_type",
+            display_label="License type",
+            multi=True,
+            radio=False,
+            choices=(("psyd", "PsyD"),),
+        ),
+        SimpleNamespace(
+            kind="text",
+            name="keyword",
+            display_label="Keyword",
+            placeholder=None,
+        ),
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        filters=filters,
+        filter_values={},
+    )
+
+    tree = HTMLParser(html)
+    sidebar = tree.css_first("aside.filter-sidebar")
+    assert sidebar is not None
+    accordions = sidebar.css("details.filter-accordion")
+    assert len(accordions) == len(filters), "one accordion per declared filter"
+    # Folded by default — none carry the `open` attribute.
+    assert all("open" not in a.attributes for a in accordions)
+    summaries = [a.css_first("summary").text(strip=True) for a in accordions]
+    assert summaries == ["License type", "Keyword"]
+    # An <hr /> divides adjacent accordions — one fewer than the filter count,
+    # so the last accordion has no trailing rule.
+    assert len(sidebar.css("hr")) == len(filters) - 1
+    # Heading suppressed inside the accordion: the multi-choice fieldset
+    # renders without a `<legend>` (the summary already names the section).
+    fieldset = sidebar.css_first("fieldset.search-checkbox-fieldset")
+    assert fieldset is not None
+    assert fieldset.css_first("legend") is None
+
+
+def test_list_view_opens_accordion_for_active_filters_only() -> None:
+    """An accordion renders `open` when its filter is in a dirty (active)
+    state — `filter_values` holds a non-empty value for it — so applied
+    filters stay visible on reload. Filters with no value (absent, empty
+    string, or empty list) stay folded."""
+    env = _make_env()
+    _add_child(
+        env,
+        "stub.html",
+        """
+        {% extends "views/list.html" %}
+        {% block resource_label %}Clinicians{% endblock %}
+        {% block list_body %}body{% endblock %}
+        """,
+    )
+
+    filters = (
+        SimpleNamespace(
+            kind="choice",
+            name="license_type",
+            display_label="License type",
+            multi=True,
+            radio=False,
+            choices=(("psyd", "PsyD"),),
+        ),
+        SimpleNamespace(
+            kind="text",
+            name="keyword",
+            display_label="Keyword",
+            placeholder=None,
+        ),
+        SimpleNamespace(
+            kind="text",
+            name="city",
+            display_label="City",
+            placeholder=None,
+        ),
+    )
+
+    html = env.get_template("stub.html").render(
+        request=_request_stub(),
+        is_authenticated=False,
+        is_development=False,
+        filters=filters,
+        # license_type active (non-empty list), keyword active (non-empty
+        # string), city inactive (empty string treated as no value).
+        filter_values={"license_type": ["psyd"], "keyword": "ptsd", "city": ""},
+    )
+
+    tree = HTMLParser(html)
+    accordions = tree.css("aside.filter-sidebar details.filter-accordion")
+    open_state = {
+        a.css_first("summary").text(strip=True): ("open" in a.attributes)
+        for a in accordions
+    }
+    assert open_state == {"License type": True, "Keyword": True, "City": False}
 
 
 def test_list_view_renders_actions_block_in_toolbar_right() -> None:

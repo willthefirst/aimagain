@@ -241,19 +241,35 @@ async def test_list_has_browse_layout_with_filter_sidebar(
 ):
     """`/posts` list renders a `.browse-layout` with a `.filter-sidebar` that
     embeds the framework filter form inline. The sidebar uses the same
-    `filter_field` macro as `/posts/search` so both surfaces stay in sync."""
+    `filter_field` macro as `/posts/search` so both surfaces stay in sync.
+
+    Unlike the full-page `/posts/search`, each sidebar filter is wrapped in
+    a Pico accordion (`<details class="filter-accordion">`) that starts
+    folded; the section heading lives in the `<summary>`, so the macro
+    suppresses its own `<legend>` to avoid duplicating the title."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
     sidebar = tree.css_first(".filter-sidebar")
     assert sidebar, "/posts did not render a .filter-sidebar element"
-    # Framework filter_field macro renders multi-choice filters as
-    # search-checkbox-fieldset fieldsets with plain text legends.
-    sections = sidebar.css("fieldset.search-checkbox-fieldset")
-    assert sections, "/posts sidebar did not render any filter fieldsets"
-    legends = [s.css_first("legend").text(strip=True) for s in sections]
-    assert "Type" in legends, f"Expected 'Type' legend in sidebar: {legends}"
-    assert "Insurance" in legends, f"Expected 'Insurance' legend in sidebar: {legends}"
+    # Each filter is its own folded accordion; the heading is the <summary>.
+    accordions = sidebar.css("details.filter-accordion")
+    assert accordions, "/posts sidebar did not render any filter accordions"
+    assert all(
+        "open" not in a.attributes for a in accordions
+    ), "Sidebar accordions must start folded (no `open` attribute)"
+    summaries = [a.css_first("summary").text(strip=True) for a in accordions]
+    assert "Type" in summaries, f"Expected 'Type' accordion in sidebar: {summaries}"
+    assert (
+        "Insurance" in summaries
+    ), f"Expected 'Insurance' accordion in sidebar: {summaries}"
+    # The heading moved to <summary>; the inner fieldset no longer repeats it
+    # as a <legend>.
+    multi_fieldsets = sidebar.css("fieldset.search-checkbox-fieldset")
+    assert multi_fieldsets, "/posts sidebar did not render any filter fieldsets"
+    assert all(
+        fs.css_first("legend") is None for fs in multi_fieldsets
+    ), "Sidebar fieldsets should not duplicate the accordion summary as a <legend>"
 
 
 # --- List filter: ?kind= narrows the feed --------------------------------
