@@ -1,6 +1,6 @@
 """Page navigation for list views.
 
-`handle_list` (and bespoke list handlers like `handle_list_my_favorites`,
+`handle_list` (and bespoke list handlers like
 `handle_list_user_clinicians`) parse `?page=N` from the request, ask
 the logic layer for `per_page + 1` rows, and slice the trailing probe
 row off to compute `has_next` without a separate `COUNT(*)` query.

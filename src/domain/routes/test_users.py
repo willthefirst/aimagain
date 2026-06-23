@@ -37,7 +37,7 @@ async def test_primary_nav_highlights_active_section(
     logged_in_user: User,
 ):
     """The avatar menu's "My posts" entry lights on the posts list page and
-    its subpaths (it is the Posts-family link; the brand `a[href="/posts"]`
+    its subpaths (it is the Posts-family link; the brand `a[href="/home"]`
     is not section-highlighted)."""
     posts = await authenticated_client.get("/posts")
     tree = HTMLParser(posts.text)
@@ -217,35 +217,25 @@ def _signout_button(tree: HTMLParser):
 
 async def test_get_users_me_renders_authenticated_self_view(
     authenticated_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
     """`GET /users/me` for the signed-in user renders the canonical
-    account-hub self-view (#1522): the primary nav with brand + the
+    account-hub self-view: the primary nav with brand + the
     `+ Post` button + the avatar menu's My posts/Account/Sign-out
     destinations (Account marked aria-current on this path),
-    the lucide font preload <link> for icon-flicker prevention, a
-    Sign-out button in the toolbar action menu (htmx POST to
-    /auth/jwt/logout with after-request redirect), a body-level
-    Favorites link (not in the toolbar), inline Clinicians +
-    Organizations lists (each with a `+ Add` CTA and a per-row Edit
-    link), and a secondary Account picker with the self-only
-    Email/Favorites/Access cards. The page hides top-level identity
-    facts (Email/Active/Verified dt entries live on the admin path or
-    the Email card; #597).
+    the lucide font preload <link> for icon-flicker prevention, NO
+    Sign-out button in the toolbar action menu (sign-out lives only in
+    the global header chrome now), NO Favorites link (the favorites page
+    was removed; favorited clinicians are browsed via
+    `/clinicians?favorited=me`), and a single "Account" picker with the
+    self-only Email/Access cards (no Clinicians/Organizations sections).
+    The page hides top-level identity facts (Email/Active/Verified dt
+    entries live on the admin path or the Email card; #597).
 
-    Consolidates 10 previously-separate tests that all rendered this
+    Consolidates several previously-separate tests that all rendered this
     same response with the same fixtures (one in `test_auth_routes.py`,
-    nine here). Distinct assertion messages preserve the per-bit signal
-    on failure."""
-    # Seed one owned clinician + one owned organization so the inline
-    # account-hub lists render rows (not just their empty states).
-    clinician_id = await _seed_user_clinician(
-        db_test_session_manager, user_id=logged_in_user.id, practice_name="My Practice"
-    )
-    org_id = await _seed_user_organization(
-        db_test_session_manager, user_id=logged_in_user.id, name="My Org"
-    )
+    the rest here). Distinct assertion messages preserve the per-bit
+    signal on failure."""
     response = await authenticated_client.get("/users/me")
     assert response.status_code == 200
     body = response.text
@@ -256,12 +246,12 @@ async def test_get_users_me_renders_authenticated_self_view(
     assert (
         tree.css("nav[aria-label='Primary'] a[href='/clinicians/form']") == []
     ), "Create-clinician CTA must be removed from nav (#697)"
-    # Brand → posts collection for an authenticated viewer (Browse is the
-    # default landing surface); anonymous keeps brand → /home (test_users.py
+    # Brand → /home (the quicklinks hub) for every viewer; anonymous
+    # /home falls through to the public landing page (test_users.py
     # anonymous nav test).
     assert (
-        tree.css_first('nav[aria-label="Primary"] a[href="/posts"] strong') is not None
-    ), "brand link must point at /posts when authenticated"
+        tree.css_first('nav[aria-label="Primary"] a[href="/home"] strong') is not None
+    ), "brand link must point at /home"
     # `Post` link (a visible <li>, outside the profile dropdown) → create form.
     posts = [
         a
@@ -324,78 +314,50 @@ async def test_get_users_me_renders_authenticated_self_view(
     assert "<dt>Active</dt>" not in body, "self-view must not surface Active dt"
     assert "<dt>Verified</dt>" not in body, "self-view must not surface Verified dt"
 
-    # --- Sign-out button in toolbar (was test_detail_shows_signout_for_self)
-    # The htmx POST target + after-request redirect must stay in lockstep —
-    # fastapi-users' logout returns 204 with no body, so the htmx swap
-    # alone leaves the browser on /users/me.
-    button = _signout_button(tree)
-    assert button is not None, "self profile is missing the Sign out button"
-    on_after = button.attributes.get("hx-on::after-request") or ""
+    # --- Self-view heading is a Pico hgroup ("Your account" + a muted
+    # subheading), NOT the `.toolbar` command bar. The owner has no
+    # toolbar actions, so the toolbar chrome is dropped entirely; the H1
+    # lives inside the <hgroup> here.
+    hgroup = tree.css_first("main hgroup")
+    assert hgroup is not None, "self-view must render an <hgroup> heading"
+    hgroup_h1 = hgroup.css_first("h1")
     assert (
-        "window.location" in on_after
-    ), "Sign out button must redirect after the 204 logout response"
+        hgroup_h1 is not None and hgroup_h1.text(strip=True) == "Your account"
+    ), 'self-view H1 must read "Your account"'
+    assert (
+        hgroup.css_first("p") is not None
+    ), "self-view hgroup must carry a subheading paragraph"
+    assert (
+        tree.css_first("main .toolbar") is None
+    ), "self-view must not render the .toolbar command bar"
 
-    # --- Favorites link in body, not toolbar
-    # (was test_self_detail_renders_favorites_link_in_body_not_toolbar)
-    favorites_selector = "a[href='/users/me/favorites']"
+    # --- No Sign-out button in the toolbar on the self-view. The
+    # toolbar `<button hx-post="/auth/jwt/logout">` was removed; sign-out
+    # remains reachable only via the global header chrome
+    # (`hx-post="/auth/sign-out"`, asserted above).
     assert (
-        tree.css_first(f".toolbar {favorites_selector}") is None
-    ), "Favorites link must not appear in the toolbar — toolbar is for Actions only"
-    assert (
-        tree.css_first(f"main {favorites_selector}") is not None
-    ), "Favorites link must appear in the page body for the self viewer"
+        _signout_button(tree) is None
+    ), "self-view toolbar must NOT render a Sign out button"
 
-    # --- Inline account-hub lists: Clinicians + Organizations (#1522).
-    # The pre-#1522 dispatching picker cards are replaced by inline
-    # lists rendered from the owner's own clinicians/organizations.
-    section_headings = [el.text(strip=True) for el in tree.css("main section > * h2")]
-    assert "Clinicians" in section_headings, "account hub missing Clinicians section"
+    # --- No Favorites link anywhere: the favorites page was removed;
+    # favorited clinicians are browsed via `/clinicians?favorited=me`.
     assert (
-        "Organizations" in section_headings
-    ), "account hub missing Organizations section"
+        tree.css_first("a[href='/users/me/favorites']") is None
+    ), "the favorites page was removed — no /users/me/favorites link should render"
 
-    # Each list renders the owner's seeded row through the shared card
-    # (selected by data-row-id so it survives card-internal markup
-    # changes).
+    # --- No Clinicians / Organizations sections on the self-view: those
+    # were removed from the account hub entirely.
     assert (
-        tree.css_first(
-            f"#account-clinicians-list article[data-row-id='{clinician_id}']"
-        )
-        is not None
-    ), "owned clinician must render as an inline card in the account hub"
-    assert (
-        tree.css_first(f"#account-organizations-list article[data-row-id='{org_id}']")
-        is not None
-    ), "owned organization must render as an inline card in the account hub"
+        tree.css_first("#account-clinicians") is None
+        and tree.css_first("#account-organizations") is None
+    ), "Clinicians/Organizations sections must not render on /users/me"
 
-    # Add CTAs point at the global create forms.
-    assert (
-        tree.css_first("#account-clinicians a[role='button'][href='/clinicians/form']")
-        is not None
-    ), "Clinicians section missing the + Add clinician CTA -> /clinicians/form"
-    assert (
-        tree.css_first(
-            "#account-organizations a[role='button'][href='/organizations/form']"
-        )
-        is not None
-    ), "Organizations section missing the + Add organization CTA -> /organizations/form"
-
-    # Per-row Edit links point at the row's own edit form.
-    assert (
-        tree.css_first(
-            f"#account-clinicians-list a[href='/clinicians/{clinician_id}/form']"
-        )
-        is not None
-    ), "clinician row missing per-row Edit link -> /clinicians/:id/form"
-    assert (
-        tree.css_first(
-            f"#account-organizations-list a[href='/organizations/{org_id}/form']"
-        )
-        is not None
-    ), "organization row missing per-row Edit link -> /organizations/:id/form"
-
-    # --- Secondary Account picker retains Email / Favorites / Access ---
+    # --- The account hub is a single "Account" picker of self-management
+    # cards: Email + Access only (no Favorites card).
     headings = [el.text(strip=True) for el in tree.css(".picker-option h2")]
+    assert (
+        "Favorites" not in headings
+    ), "Favorites card must be gone from the account picker"
 
     # Access card (was test_users_me_access_card_links_to_access_page)
     assert "Access" in headings, "/users/me is missing the Access card"
@@ -424,8 +386,7 @@ async def test_get_users_id_renders_admin_view_of_other_user(
     (Email dt + the email value itself), admin activation actions
     inside the toolbar (single instance, not duplicated), and the
     self-only affordances suppressed: no Sign-out button, no Email
-    card (which links to /users/me — self-only), no Verification card,
-    no inline Clinicians section (removed entirely from user detail).
+    card (which links to /users/me — self-only), no Verification card.
 
     Consolidates 9 previously-separate tests that hit this same endpoint
     with two admin-acquisition shapes (some used `superuser_client`
@@ -508,25 +469,11 @@ async def test_get_users_id_renders_admin_view_of_other_user(
         "Verification" not in headings
     ), "Verification card must not appear on another user's profile"
 
-    # Inline account-hub sections (#1522) are self-only — an admin
-    # auditing another user sees neither the inline Clinicians nor the
-    # inline Organizations list, and no Add CTAs.
+    # The self-only Account picker doesn't render on another user's
+    # profile (admin view is identity facts + admin actions only).
     assert (
-        tree.css_first("#account-clinicians") is None
-    ), "no inline Clinicians section on another user's profile"
-    assert (
-        tree.css_first("#account-organizations") is None
-    ), "no inline Organizations section on another user's profile"
-    # The global onboarding banner (#1525) is chrome — it links to the create
-    # forms for the *viewing* user's own incomplete setup and legitimately
-    # appears site-wide. Strip it before asserting the self-only account-hub
-    # Add CTAs (the inline sections above) don't leak onto another user's page.
-    for _banner in tree.css("#onboarding-banner"):
-        _banner.decompose()
-    assert (
-        tree.css_first("a[href='/clinicians/form']") is None
-        and tree.css_first("a[href='/organizations/form']") is None
-    ), "self-only Add CTAs must not render on another user's profile"
+        tree.css_first("#account-secondary") is None
+    ), "self-only Account picker must not render on another user's profile"
 
 
 async def test_non_admin_forbidden_on_other_user_detail(
@@ -558,10 +505,12 @@ async def test_self_detail_still_works(
     logged_in_user: User,
 ):
     """Non-admins must keep access to their own `/users/{own-id}` page
-    — the `detail_authz` gate permits self even without admin."""
+    — the `detail_authz` gate permits self even without admin. The
+    self-view is the account hub headed "Your account" (the H1 no longer
+    echoes the raw username; see the consolidated self-view test)."""
     response = await authenticated_client.get(f"/users/{logged_in_user.id}")
     assert response.status_code == 200
-    assert logged_in_user.username in response.text
+    assert "Your account" in response.text
 
 
 async def test_admin_detail_admin_actions_not_on_self_view(

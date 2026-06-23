@@ -18,12 +18,10 @@ import uuid
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from starlette.requests import Request
 
 from src.domain.logic.clinicians.repository import ClinicianRepository
 from src.domain.logic.favorites.handlers import (
     handle_add_favorite,
-    handle_list_my_favorites,
     handle_remove_favorite,
 )
 from src.domain.logic.favorites.repository import UserFavoriteRepository
@@ -35,21 +33,6 @@ from src.framework.http.exceptions import NotFoundError
 from tests.helpers import create_test_user, make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
-
-
-def _fake_request(query_string: bytes = b"") -> Request:
-    """Minimal Starlette Request used as a placeholder. `query_string`
-    is consumed by `parse_page` / `base_query` when the handler
-    paginates; callers that don't care leave the default empty."""
-    return Request(
-        {
-            "type": "http",
-            "headers": [],
-            "method": "GET",
-            "path": "/",
-            "query_string": query_string,
-        }
-    )
 
 
 async def _seed_user(
@@ -262,40 +245,3 @@ async def test_remove_favorite_idempotent_no_audit_on_noop(
             .all()
         )
         assert audit_rows == []
-
-
-async def test_list_my_favorites_returns_only_self_edges(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """Self-scoping: another user's favorites are not visible."""
-    me = await _seed_user(db_test_session_manager)
-    other = await _seed_user(db_test_session_manager)
-    mine = await _seed_clinician(db_test_session_manager, practice_name="Mine")
-    theirs = await _seed_clinician(db_test_session_manager, practice_name="Theirs")
-
-    async with db_test_session_manager() as session:
-        await handle_add_favorite(
-            clinician_id=mine.id,
-            repo=UserFavoriteRepository(session),
-            clinician_repo=ClinicianRepository(session),
-            audit_repo=AuditRepository(session),
-            requesting_user=me,
-        )
-        await handle_add_favorite(
-            clinician_id=theirs.id,
-            repo=UserFavoriteRepository(session),
-            clinician_repo=ClinicianRepository(session),
-            audit_repo=AuditRepository(session),
-            requesting_user=other,
-        )
-
-    async with db_test_session_manager() as session:
-        context = await handle_list_my_favorites(
-            request=_fake_request(),
-            repo=UserFavoriteRepository(session),
-            requesting_user=me,
-        )
-
-    names = [p.org.name for p in context["clinicians"]]
-    assert names == ["Mine"]
-    assert context["current_user"] == me

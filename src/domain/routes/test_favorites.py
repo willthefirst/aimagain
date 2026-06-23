@@ -1,16 +1,16 @@
 """Route-level tests for `/users/me/favorites/...`.
 
-These exercise the wire shape: status codes for create/re-create/delete/
-re-delete, the rendered favorites page for self vs. anon, and that no
-parametric `/users/{user_id}/favorites/...` path exists (the route file
-intentionally mounts only the self-scoped path).
+These exercise the add/remove toggle's wire shape: status codes for
+create / re-create / delete / re-delete, and that the favorites list
+page is gone (`GET /users/me/favorites` 404s — favorited clinicians are
+browsed via `/clinicians?favorited=me`). Only the self-scoped path is
+mounted; no parametric `/users/{user_id}/favorites/...` path exists.
 """
 
 import uuid
 
 import pytest
 from httpx import AsyncClient
-from selectolax.parser import HTMLParser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -156,48 +156,15 @@ async def test_remove_favorite_idempotent_when_not_favorited(
         assert audit_rows == []
 
 
-async def test_list_my_favorites_renders_html(
-    superuser_client: AsyncClient,
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """Uses `superuser_client` so the viewer clears `can_act_as_provider`
-    via the superuser bypass and the favorited clinician's practice name
-    renders un-redacted. The redaction branch (where a non-network
-    viewer sees their favorite's identifying fields as locked
-    placeholders) is exercised separately by the clinician-card
-    template tests."""
-    first_id = await _seed_clinician(
-        db_test_session_manager, practice_name="First Favorite"
-    )
-    await superuser_client.post(f"/users/me/favorites/{first_id}")
-
-    response = await superuser_client.get("/users/me/favorites")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    parser = HTMLParser(response.text)
-    body = parser.body.text() if parser.body else ""
-    assert "First Favorite" in body
-
-
-async def test_list_my_favorites_empty_state(
+async def test_get_my_favorites_list_returns_404(
     authenticated_client: AsyncClient,
     logged_in_user: User,
 ):
+    """The favorites list page was removed — favorited clinicians are
+    browsed via `/clinicians?favorited=me`. Only the add/remove toggle
+    is mounted, so `GET /users/me/favorites` has no route and 404s."""
     response = await authenticated_client.get("/users/me/favorites")
-    assert response.status_code == 200
-    assert "No favorites" in response.text
-
-
-async def test_anonymous_get_my_favorites_redirects_to_login(
-    test_client: AsyncClient,
-):
-    """No `/users/{user_id}/favorites/...` parametric path exists.
-    `/users/me/favorites` requires auth; unauthenticated requests
-    redirect to login per `unauthorized_exception_handler`."""
-    response = await test_client.get(
-        "/users/me/favorites", headers={"accept": "text/html"}
-    )
-    assert response.status_code in (302, 401)
+    assert response.status_code == 404
 
 
 async def test_add_favorite_requires_auth(
@@ -207,47 +174,3 @@ async def test_add_favorite_requires_auth(
     clinician_id = await _seed_clinician(db_test_session_manager)
     response = await test_client.post(f"/users/me/favorites/{clinician_id}")
     assert response.status_code in (302, 401)
-
-
-async def test_list_my_favorites_renders_breadcrumb(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """`GET /users/me/favorites` renders a breadcrumb chain whose profile
-    segment links to the current user's page — auto-injected by
-    `mount_edge_routes` via `USER_ENTITY.display_label_fn`. `Favorites` is the
-    current (unlinked) leaf."""
-    response = await authenticated_client.get("/users/me/favorites")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    nav = tree.css_first('nav[aria-label="breadcrumb"]')
-    assert nav is not None, "favorites list must render a breadcrumb"
-    profile = next(
-        (a for a in nav.css("a") if a.attributes.get("href") == "/users/me"), None
-    )
-    assert profile is not None and profile.text(strip=True) == logged_in_user.username
-    assert nav.css("ul li")[-1].text(strip=True) == "Favorites"
-
-
-async def test_empty_favorites_browse_clinicians_link_is_plain_anchor(
-    authenticated_client: AsyncClient,
-    logged_in_user: User,
-):
-    """Empty-state copy on `/users/me/favorites` reads "Browse clinicians
-    to add some" and points at `/clinicians`. The clinician spec no
-    longer carries a `read_policy` — `/clinicians` is reachable for
-    every authenticated viewer (identifying rows redact per-row at
-    render time), so the link is a plain `<a href="/clinicians">`
-    regardless of the viewer's network-access state. `entity_link`'s
-    locked-popover branch only fires when the target spec declares a
-    `read_policy` with `lock_reason`; no live spec does today."""
-    response = await authenticated_client.get("/users/me/favorites")
-    assert response.status_code == 200
-    tree = HTMLParser(response.text)
-    empty = tree.css_first("#favorites-empty")
-    assert empty is not None, "expected empty-state to render for fresh user"
-    plain = empty.css_first("a:not(.locked-link)")
-    assert plain is not None, "Browse clinicians must render as a plain <a>"
-    assert plain.attributes.get("href") == "/clinicians"
-    assert "Browse clinicians" in plain.text()
-    assert empty.css_first("a.locked-link") is None

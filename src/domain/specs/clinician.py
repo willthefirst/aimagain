@@ -174,6 +174,18 @@ CLINICIAN_ENTITY: Final[EntitySpec] = EntitySpec(
             multi=False,
             radio=True,
         ),
+        # `?favorited=me` scopes the list to clinicians the viewer has
+        # favorited — the replacement for the removed `/users/me/favorites`
+        # page. Same single-toggle radio shape as `owner`; the viewer-id
+        # resolution and the `user_favorites` join live in
+        # `ClinicianRepository.list_clinicians`.
+        ChoiceFilter(
+            name="favorited",
+            label="Favorited",
+            choices=(("me", "Favorited"),),
+            multi=False,
+            radio=True,
+        ),
         ChoiceFilter(
             name="license_type",
             label="License type",

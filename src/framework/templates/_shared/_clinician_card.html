@@ -1,12 +1,10 @@
 {# Shared clinician card — used by every list of clinician directory entries.
 
-   Lives in `src/framework/templates/_shared/` because four templates
-   across three clusters render the same card:
+   Lives in `src/framework/templates/_shared/` because templates across
+   two clusters (clinicians + users) render the same card:
 
-     - `/clinicians`                  (clinicians/list.html)
-     - `/users/me/favorites`          (favorites/list.html)
-     - `/users/{id}/clinicians`       (users/clinicians_list.html)
-     - `/users/{id}` embedded preview (users/detail.html)
+     - `/clinicians`            (clinicians/list.html)
+     - `/users/{id}/clinicians` (users/clinicians_list.html)
 
    Cross-cluster template imports aren't permitted (see
    ../README.md "Layering rule"), so the shared shape goes here.

@@ -26,6 +26,7 @@ from src.domain.models import (
     ClinicianEducation,
     ClinicianLicensure,
     User,
+    UserFavorite,
 )
 from tests.helpers import (
     create_test_user,
@@ -446,6 +447,70 @@ async def test_list_clinicians_includes_viewers_own_never_verified_row(
     assert (
         stranger.id not in owner_ids
     ), "stranger's unverified row must stay hidden on /clinicians"
+
+
+async def test_list_clinicians_favorited_me_scopes_to_viewer_favorites(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """``?favorited=me`` returns exactly the clinicians the viewer has
+    favorited (a `user_favorites` row for `(viewer, clinician)`), and
+    nothing else — the replacement for the removed `/users/me/favorites`
+    page."""
+    viewer = await _seed_user(db_test_session_manager)
+    owner = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            favorited = _verified(
+                make_clinician_with_org(owner_id=owner.id, practice_name="Saved Clinic")
+            )
+            other = _verified(
+                make_clinician_with_org(owner_id=owner.id, practice_name="Other Clinic")
+            )
+            session.add_all([favorited, other])
+        favorited_id = favorited.id
+        other_id = other.id
+        async with session.begin():
+            session.add(UserFavorite(user_id=viewer.id, clinician_id=favorited_id))
+
+    async with db_test_session_manager() as session:
+        repo = ClinicianRepository(session)
+        repo._requesting_user = viewer
+        clinicians = await repo.list_clinicians(favorited="me")
+
+    ids = {c.id for c in clinicians}
+    assert favorited_id in ids, "favorited clinician must appear under ?favorited=me"
+    assert other_id not in ids, "un-favorited clinician must not appear"
+
+
+async def test_list_clinicians_favorited_me_bypasses_verified_gate(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """A favorited clinician stays reachable through ``?favorited=me``
+    even if it is not currently verified — the filter is keyed on the
+    favorite edge, not the directory's verified-only gate."""
+    viewer = await _seed_user(db_test_session_manager)
+    owner = await _seed_user(db_test_session_manager)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            unverified = make_clinician_with_org(
+                owner_id=owner.id,
+                practice_name="Lapsed Clinic",
+                clinician_verified=False,
+                npi_match_status="none",
+            )
+            session.add(unverified)
+        unverified_id = unverified.id
+        async with session.begin():
+            session.add(UserFavorite(user_id=viewer.id, clinician_id=unverified_id))
+
+    async with db_test_session_manager() as session:
+        repo = ClinicianRepository(session)
+        repo._requesting_user = viewer
+        clinicians = await repo.list_clinicians(favorited="me")
+
+    assert unverified_id in {
+        c.id for c in clinicians
+    }, "favorited-but-unverified clinician must surface under ?favorited=me"
 
 
 async def test_list_clinicians_includes_once_verified_clinicians(

@@ -4,7 +4,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy import select
 
-from src.domain.models import Clinician, ClinicianLicensure
+from src.domain.models import Clinician, ClinicianLicensure, UserFavorite
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
 
@@ -30,6 +30,7 @@ class ClinicianRepository(BaseRepository):
         license_type: list[str] | None = None,
         issuing_state: list[str] | None = None,
         owner: str | None = None,
+        favorited: str | None = None,
         offset: int = 0,
         limit: int | None = None,
     ) -> Sequence[Clinician]:
@@ -68,6 +69,16 @@ class ClinicianRepository(BaseRepository):
         ``handle_list`` so every list mount can resolve viewer-relative
         filters. Any other ``owner`` value is silently ignored (the
         only supported sentinel today).
+
+        ``favorited="me"`` scopes results to the clinicians the viewer
+        has favorited (``Clinician.id IN (SELECT clinician_id FROM
+        user_favorites WHERE user_id = viewer)``) and likewise bypasses
+        the verified-only gate — a favorited clinician stays reachable
+        through this filter even if their verification later lapses.
+        This replaces the standalone `/users/me/favorites` page: favorites
+        are now a viewer-relative quality of the clinician directory.
+        Mutually exclusive with ``owner`` in practice (separate single
+        toggles); if both are "me", ``owner`` wins.
         """
         viewer_id = (
             self._requesting_user.id
@@ -76,8 +87,14 @@ class ClinicianRepository(BaseRepository):
             else None
         )
         owner_self = owner == "me" and viewer_id is not None
+        favorited_self = favorited == "me" and viewer_id is not None
         if owner_self:
             stmt = select(Clinician).filter(Clinician.owner_id == viewer_id)
+        elif favorited_self:
+            favorited_ids = select(UserFavorite.clinician_id).filter(
+                UserFavorite.user_id == viewer_id
+            )
+            stmt = select(Clinician).filter(Clinician.id.in_(favorited_ids))
         else:
             # Default directory: verified-only. The viewer's own rows
             # bypass the gate so brand-new in-flight clinicians stay

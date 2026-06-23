@@ -8,7 +8,6 @@ truth table.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
@@ -132,48 +131,6 @@ async def test_delete_favorite_removes_edge(
             .first()
         )
         assert row is None
-
-
-async def test_list_favorited_clinicians_newest_first(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    """Ordering is by `UserFavorite.created_at DESC`. SQLite's
-    server-default `CURRENT_TIMESTAMP` is second-precision, so two
-    inserts in the same second tie on ordering. The test bypasses
-    `add_favorite` (which doesn't accept `created_at`) and inserts
-    `UserFavorite` rows directly with explicit timestamps to force a
-    deterministic ordering without `asyncio.sleep`. The repo
-    listing's `created_at DESC` is what's under test, not the writer."""
-    user = await _seed_user(db_test_session_manager)
-    first = await _seed_clinician(db_test_session_manager, practice_name="First")
-    second = await _seed_clinician(db_test_session_manager, practice_name="Second")
-    earlier = datetime.now(timezone.utc)
-    later = earlier + timedelta(seconds=1)
-
-    async with db_test_session_manager() as session:
-        async with session.begin():
-            session.add(
-                UserFavorite(user_id=user.id, clinician_id=first.id, created_at=earlier)
-            )
-            session.add(
-                UserFavorite(user_id=user.id, clinician_id=second.id, created_at=later)
-            )
-
-    async with db_test_session_manager() as session:
-        repo = UserFavoriteRepository(session)
-        clinicians = await repo.list_favorited_clinicians(user.id)
-        names = [c.org.name for c in clinicians]
-        assert names == ["Second", "First"]
-
-
-async def test_list_favorited_clinicians_empty(
-    db_test_session_manager: async_sessionmaker[AsyncSession],
-):
-    user = await _seed_user(db_test_session_manager)
-    async with db_test_session_manager() as session:
-        repo = UserFavoriteRepository(session)
-        clinicians = await repo.list_favorited_clinicians(user.id)
-        assert list(clinicians) == []
 
 
 async def test_is_favorited_truth_table(

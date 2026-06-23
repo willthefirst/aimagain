@@ -9,9 +9,9 @@ forms (`/clinicians/form`, `/organizations/form`). The old `/profile` hub has
 been removed; the verification card on `/users/me` is the new home for claim
 setup links.
 
-Browse (`/posts`) is the authenticated landing surface (I3) — the bespoke
-`/home` dashboard was retired — so these tests exercise the chrome on
-`/posts`. They assert:
+Browse (`/posts`) is the canonical onboarding-banner surface — `/` now
+redirects to the signed-in `/home` hub, so these tests exercise the
+chrome on `/posts` (a representative authenticated app page). They assert:
 
 1. The global `#onboarding-banner` is shown for an empty (no clinician/org)
    account and links to both minimal create forms; it goes silent once the
@@ -129,7 +129,7 @@ async def test_onboarding_banner_hidden_for_org_rep(
 
 async def test_authenticated_primary_nav_redesign(authenticated_client: AsyncClient):
     """End-to-end (through the real entity registry) the authenticated nav is
-    the canonical Pico shape: brand → posts collection, a plain `Post` link →
+    the canonical Pico shape: brand → `/home`, a plain `Post` link →
     the post create form, and a Pico `<details class="dropdown">` profile menu
     with My posts / Account / Sign out. "Saved" is deferred and must not appear.
     Anonymous nav stays brand-only — pinned in
@@ -139,10 +139,10 @@ async def test_authenticated_primary_nav_redesign(authenticated_client: AsyncCli
     nav = HTMLParser(response.text).css_first('nav[aria-label="Primary"]')
     assert nav is not None
 
-    # Brand → posts collection (Browse is the default landing surface).
+    # Brand → /home (the quicklinks hub).
     brand = nav.css_first("a strong")
     assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
-    assert brand.parent.attributes.get("href") == "/posts"
+    assert brand.parent.attributes.get("href") == "/home"
 
     # `Post` is a plain link (no `role=button`, no `+`) → the post create form.
     posts = [a for a in nav.css("a") if a.text(strip=True) == "Post"]

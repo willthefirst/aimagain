@@ -56,7 +56,7 @@ def test_view_type_for_search_template():
 
 def test_view_type_for_list_template():
     assert view_type_for("posts/list.html") == "views/list.html"
-    assert view_type_for("favorites/list.html") == "views/list.html"
+    assert view_type_for("clinicians/list.html") == "views/list.html"
 
 
 def test_view_type_for_base_extending_template_returns_none():

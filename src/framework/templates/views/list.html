@@ -6,7 +6,7 @@ breadcrumb is the full chain `Home › <collection>` — the collection is the
 current (unlinked) leaf; the `breadcrumb()` macro prepends Home (rendered
 for authenticated viewers only — see base.html).
 
-Subresource list pages (`/users/me/favorites`, `/users/{id}/clinicians`,
+Subresource list pages (`/users/{id}/clinicians`,
 `/clinicians/{id}/openings`, `/clinicians/{id}/clinician_affiliations`)
 get a deeper chain automatically when the mount injects
 `_breadcrumb_items` into the context (set by `mount_list`,

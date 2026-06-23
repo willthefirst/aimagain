@@ -1,10 +1,7 @@
 {% extends "views/detail.html" %}
 {%- from "_shared/sections.html" import fact, facts_block -%}
 {%- from "_shared/_picker.html" import picker -%}
-{%- from "_shared/_locked.html" import locked_name, locked_field -%}
-{%- from "_shared/_card.html" import card -%}
-{%- from "_shared/_item_list.html" import item_list -%}
-{%- from "_shared/_clinician_card.html" import clinician_card with context -%}
+{%- from "_shared/_locked.html" import locked_name -%}
 {% block resource_label %}Users{% endblock %}
 {# Redact the username H1 when the viewer lacks provider-network access
    and isn't this user themselves. `is_self` is computed by
@@ -12,87 +9,50 @@
    the viewer can self-manage even before clearing network verification. #}
 {%- set _redacted = not can_act_as_provider and not is_self -%}
 {% block current_label %}
-  {% if _redacted %}
+  {% if is_self %}
+    Your account
+  {% elif _redacted %}
     {{ locked_name("J. Doe") }}
   {% else %}
     {{ target_user.username }}
   {% endif %}
 {% endblock %}
-{% block actions %}
-  {# Toolbar is reserved for Actions (Sign out, admin Deactivate/Delete).
-   Favorites is navigation and lives in the body content below. #}
+{# Self-view heading: a Pico hgroup pairs the "Your account" H1 with a
+   muted subheading (Pico auto-styles `hgroup > p`, no custom CSS). The
+   owner has no toolbar actions, so the `.toolbar` command bar is dropped
+   entirely on the self-view; the admin/other-user view keeps the parent
+   toolbar (H1 + Deactivate/Delete) via `super()`. #}
+{% block toolbar %}
   {% if is_self %}
-    {# Sign out — self-only. fastapi-users' POST /auth/jwt/logout returns
-   204 (cookie deleted, no body); the `hx-on::after-request` shim
-   redirects the browser to `/` on success since the library doesn't
-   ship a `?next=` for logout the way login does. Don't move this
-   above the admin block — Sign out reads as the last action in the
-   self view, and the admin actions only render for admins viewing
-   someone else. #}
-    <li>
-      <button type="button"
-              class="secondary outline"
-              hx-post="/auth/jwt/logout"
-              hx-on::after-request="if(event.detail.successful){window.location='/'}">Sign out</button>
-    </li>
+    <hgroup>
+      <h1>{{ self.current_label() | trim }}</h1>
+      <p>Manage your email and account settings.</p>
+    </hgroup>
+  {% else %}
+    {{ super() }}
   {% endif %}
+{% endblock %}
+{% block actions %}
+  {# Toolbar is reserved for Actions (admin Deactivate/Delete). The
+   self-view Sign out button was removed; sign-out remains reachable via
+   the global header chrome (`POST /auth/sign-out`) on every
+   authenticated page. #}
   {% include "users/_admin_actions.html" %}
 {% endblock %}
-{# Account hub ("Your practice"). The self-view is an account hub
- (issue #1522): the owner's clinicians and organizations render as
- INLINE lists — one account · many clinicians · many orgs · clinicians
- ↔ orgs is many-to-many — each with a `+ Add` CTA and a per-row Edit
- link. The lists are sourced exactly like `/clinicians?owner=me` and
- `/organizations?owner=me` (via `repo.list_for_user(target.id)` in
- `user_detail_extras`). Email, Favorites, and Access fold into a
- secondary "Account" picker below — kept, not removed; the mock omits
- them but they remain reachable here.
+{# Account hub. The self-view is a single "Account" picker of the
+ self-management surfaces — Email and Access. Clinicians, Organizations,
+ and the old Favorites page were removed: clinicians/orgs are managed on
+ their own directory pages, and favorites are now a `/clinicians?favorited=me`
+ directory filter rather than a card here.
+
+ Because nothing here reads the owner's clinician/org rows anymore, the
+ spec no longer wires `detail_extras` (the old `user_detail_extras`
+ fetch was removed) — see `src/domain/specs/user.py`.
 
  Other-user views (admin auditing someone else) render only the
- identity facts + admin actions: no inline lists, no self-only Account
- picker. The inline-list row macros below reuse the shared
- `_clinician_card` / `_card` cards so a clinician/organization renders
- identically here and on its directory page; the Edit footer is the
- only per-row addition. #}
-{# Per-row Edit link — secondary-outline treatment per the actions.html
-   vocabulary (Edit = `class="outline"`). Owner-only: these lists only
-   render on the self-view, so every row is the viewer's own. #}
-{%- macro _edit_footer(name, id) -%}
-  <footer>
-    <a href="{{ entity_form_url(name, id=id) }}"
-       role="button"
-       class="outline">Edit</a>
-  </footer>
-{%- endmacro -%}
-{# Clinician row: shared card + Edit footer. #}
-{%- macro clinician_row(clinician) -%}
-  {{ clinician_card(clinician) }}
-  {{ _edit_footer('clinician', clinician.id) }}
-{%- endmacro -%}
-{# Organization row: mirrors `organizations/list.html`'s `org_card`
-   (same `_redacted` rule, same NPI fact) plus the Edit footer. #}
-{%- macro organization_row(org) -%}
-  {%- set _org_redacted = not can_act_as_provider
-    and org.owner_id != current_user_id
-    and org.id not in viewer_rep_org_ids -%}
-  {%- call card(
-    id=org.id,
-    headline_url=None if _org_redacted else entity_url('organization', id=org.id),
-    headline=locked_name("Doe Health Group") if _org_redacted else org.name) -%}{# title-case-ignore: placeholder org name #}
-    {%- if org.npi %}
-      {%- call facts_block() %}
-        {% if _org_redacted %}
-          {%- call fact('npi', 'NPI') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}{%- endcall %}
-          {% else %}
-            {{ fact('npi', 'NPI', org.npi) }}
-          {% endif %}
-        {%- endcall %}
-      {%- endif %}
-      {{ _edit_footer('organization', org.id) }}
-    {%- endcall %}
-  {%- endmacro -%}
-  {% block content %}
-    {# Private rows (email, active) are gated by `can_view_private`,
+ identity facts + admin actions: no Account picker. #}
+{% block content %}
+  {# Private rows (email, active) are gated by `can_view_private`,
    computed in handle_get_user_detail as `is_self OR is_admin(viewer)`.
    The handler also omits these fields from the `target_user`
    projection for non-authorized viewers, so a forgotten guard here
@@ -110,55 +70,28 @@
    every account is permanently False; showing it was misleading.
    Verification status and the resend action live at
    /users/me/email/form (linked in the Email card below). #}
-    {% if can_view_private and not is_self %}
-      <article>
-        {%- call facts_block() %}
-          {{ fact('email', 'Email', target_user.email) }}
-          {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
-        {%- endcall %}
-      </article>
-    {% endif %}
-    {# Self-view account hub: inline Clinicians + Organizations, then a
-   secondary Account picker (Email, Favorites, Access). #}
-    {% if is_self %}
-      <section id="account-clinicians">
-        <header>
-          <h2>Clinicians</h2>
-          <a href="{{ entity_form_url('clinician') }}" role="button">+ Add clinician</a>
-        </header>
-        {%- set _clinicians_empty %}
-          <p id="account-clinicians-empty">You have not added any clinicians yet.</p>
-        {%- endset %}
-        {{ item_list(clinicians, clinician_row, "account-clinicians-list",
-                empty=_clinicians_empty) }}
-      </section>
-      <section id="account-organizations">
-        <header>
-          <h2>Organizations</h2>
-          <a href="{{ entity_form_url('organization') }}" role="button">+ Add organization</a>
-        </header>
-        {%- set _organizations_empty %}
-          <p id="account-organizations-empty">You have not added any organizations yet.</p>
-        {%- endset %}
-        {{ item_list(organizations, organization_row, "account-organizations-list",
-                empty=_organizations_empty) }}
-      </section>
-      {# Secondary section: Email, Favorites, and Access — kept from the
-     pre-#1522 picker, folded below the practice lists. Each dispatches
-     to the sub-page where the user manages that surface. #}
-      <section id="account-secondary">
-        <h2>Account</h2>
-        {{ picker([
-                {"href": entity_url('user', id='me') + "/email/form",
-        "heading": "Email",
-        "description": "Manage your email address and verification."},
-        {"href": entity_url('user_favorite'),
-        "heading": "Favorites",
-        "description": "Posts you've saved to revisit."},
-        {"href": entity_url('user', id='me') + "/access",
-        "heading": "Access",
-        "description": "Review your account's capabilities and what's gated."},
-        ]) }}
-      </section>
-    {% endif %}
-  {% endblock %}
+  {% if can_view_private and not is_self %}
+    <article>
+      {%- call facts_block() %}
+        {{ fact('email', 'Email', target_user.email) }}
+        {{ fact('active', 'Active', "Yes" if target_user.is_active else "No") }}
+      {%- endcall %}
+    </article>
+  {% endif %}
+  {# Self-view account hub: a single picker of self-management surfaces.
+   Each card dispatches to the sub-page where the user manages that
+   surface. No section <h2> — the "Your account" page heading above
+   already names the surface. #}
+  {% if is_self %}
+    <section id="account-secondary">
+      {{ picker([
+            {"href": entity_url('user', id='me') + "/email/form",
+      "heading": "Email",
+      "description": "Manage your email address and verification."},
+      {"href": entity_url('user', id='me') + "/access",
+      "heading": "Access",
+      "description": "Review your account's capabilities and what's gated."},
+      ]) }}
+    </section>
+  {% endif %}
+{% endblock %}

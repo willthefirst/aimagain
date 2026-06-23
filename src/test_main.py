@@ -11,45 +11,112 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
+from selectolax.parser import HTMLParser
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.domain.models import User
 from src.main import lifespan
+from tests.helpers import make_clinician_with_org
 
 pytestmark = pytest.mark.asyncio
 
 
-# --- Landing: `/` and `/home` resolve to browse --------------------------
+# --- Landing: `/` redirects to `/home`, the auth-aware hub --------------
 #
-# `/posts` is the authenticated landing surface (I3). The bespoke `/home`
-# dashboard template was retired: "My posts" folds into `/posts?owner=me`
-# (nav avatar menu) and "Recent in the network" *is* the default
-# newest-first browse feed. `/home` is kept only as an alias of `/` so the
-# anonymous brand link and stale bookmarks keep resolving — both routes
-# redirect an authenticated viewer to `/posts` and render the public
-# landing page for an anonymous one.
+# `/home` is the canonical home URL. `/` is a bare redirect to it for both
+# auth states, so the brand link, bookmarks, and the bare domain all land
+# in one place. `/home` then splits: a signed-in viewer gets the
+# goal-oriented hub (`home.html`); an anonymous one gets the public
+# landing page (`landing.html`), never the login wall.
 
 
-@pytest.mark.parametrize("path", ["/", "/home"])
-async def test_authenticated_landing_redirects_to_browse(
-    path: str,
+@pytest.mark.parametrize("authed", [True, False])
+async def test_root_redirects_to_home(
+    authed: bool,
     authenticated_client: AsyncClient,
-):
-    """An authenticated viewer hitting `/` or `/home` is redirected to the
-    `/posts` browse feed — the default landing surface. No `?kind=` bias is
-    applied; the unfiltered feed lists every kind newest-first."""
-    response = await authenticated_client.get(path, follow_redirects=False)
-    assert response.status_code == 302
-    assert response.headers["location"] == "/posts"
-
-
-@pytest.mark.parametrize("path", ["/", "/home"])
-async def test_anonymous_landing_renders_public_page(
-    path: str,
     test_client: AsyncClient,
 ):
-    """An anonymous visitor hitting `/` or `/home` gets the public landing
-    page (not the login wall) — `/home` is a plain alias of `/`."""
+    """`/` redirects to `/home` for both signed-in and anonymous visitors
+    — `/home` is the single canonical home URL."""
+    client = authenticated_client if authed else test_client
+    response = await client.get("/", follow_redirects=False)
+    assert response.status_code == 302
+    assert response.headers["location"] == "/home"
+
+
+async def test_authenticated_home_renders_quicklinks(
+    authenticated_client: AsyncClient,
+):
+    """An authenticated viewer hitting `/home` gets the goal hub — NOT a
+    redirect. It renders the opinionated intent CTAs in three columns,
+    and (because a fresh account can't post yet) surfaces the dynamic
+    `#home-setup` task at the top."""
+    response = await authenticated_client.get("/home", follow_redirects=False)
+    assert response.status_code == 200
+    body = response.text
+    for href in (
+        # Refer a patient
+        "/clinicians",
+        "/posts/form?kind=referral",
+        # Find your next client
+        "/posts/form?kind=clinician_opening",
+        "/posts?kind=referral",
+        # Manage your presence
+        "/posts?owner=me",
+        "/clinicians?owner=me",
+        "/users/me",
+    ):
+        assert f'href="{href}"' in body, f"home goal hub missing a link to {href}"
+    # A fresh account isn't post-ready, so the setup task is surfaced.
+    assert 'id="home-setup"' in body, "setup task must show when the viewer can't post"
+    # No network access yet → the greeting is "Welcome.", not "Welcome back."
+    assert (
+        HTMLParser(body).css_first("h1").text(strip=True) == "Welcome."
+    ), "teased viewer must be greeted with Welcome."
+
+
+async def test_authenticated_home_greets_returning_provider(
+    superuser_client: AsyncClient,
+):
+    """A viewer with network access (`can_act_as_provider`, here via the
+    superuser grant) is greeted with the returning-provider header."""
+    response = await superuser_client.get("/home", follow_redirects=False)
+    assert response.status_code == 200
+    assert HTMLParser(response.text).css_first("h1").text(strip=True) == "Welcome back."
+
+
+async def test_authenticated_home_hides_setup_task_when_post_ready(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """The dynamic `#home-setup` task disappears once the viewer can post —
+    here, a verified email plus a verified clinician profile (Claim A)."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.is_verified = True
+            session.add(
+                make_clinician_with_org(
+                    owner_id=logged_in_user.id, clinician_verified=True
+                )
+            )
+
+    response = await authenticated_client.get("/home", follow_redirects=False)
+    assert response.status_code == 200
+    assert (
+        'id="home-setup"' not in response.text
+    ), "setup task must be hidden once the viewer can post"
+
+
+async def test_anonymous_home_renders_public_landing(
+    test_client: AsyncClient,
+):
+    """An anonymous visitor hitting `/home` gets the public landing page
+    (not the login wall) — the goal hub is signed-in only, so anonymous
+    falls through to `landing.html`."""
     response = await test_client.get(
-        path,
+        "/home",
         headers={"Accept": "text/html"},
         follow_redirects=False,
     )

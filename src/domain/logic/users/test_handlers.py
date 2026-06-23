@@ -16,9 +16,6 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
-from src.domain.logic.clinicians.repository import ClinicianRepository
-from src.domain.logic.organizations.repository import OrganizationRepository
-from src.domain.logic.users.handlers import user_detail_extras
 from src.domain.logic.users.repository import UserRepository
 from src.domain.models import User
 from src.domain.specs.user import USER_ENTITY
@@ -66,11 +63,6 @@ async def test_get_user_detail_forbids_stranger(
                 target_id=target.id,
                 repo=UserRepository(session),
                 requesting_user=stranger,
-                extras=user_detail_extras,
-                extra_kwargs={
-                    "clinician_repo": ClinicianRepository(session),
-                    "organization_repo": OrganizationRepository(session),
-                },
             )
 
 
@@ -87,11 +79,6 @@ async def test_get_user_detail_includes_private_fields_for_self(
             target_id=target.id,
             repo=UserRepository(session),
             requesting_user=target,
-            extras=user_detail_extras,
-            extra_kwargs={
-                "clinician_repo": ClinicianRepository(session),
-                "organization_repo": OrganizationRepository(session),
-            },
         )
 
     target_view = context["target_user"]
@@ -115,11 +102,6 @@ async def test_get_user_detail_includes_private_fields_for_admin(
             target_id=target.id,
             repo=UserRepository(session),
             requesting_user=admin,
-            extras=user_detail_extras,
-            extra_kwargs={
-                "clinician_repo": ClinicianRepository(session),
-                "organization_repo": OrganizationRepository(session),
-            },
         )
 
     target_view = context["target_user"]
