@@ -15,6 +15,7 @@ from src.db import check_database_health
 from src.domain import routes  # noqa: F401  # populates entity_registry
 from src.domain import template_globals  # noqa: F401  # populates Jinja env globals
 from src.domain.logic.users.schema import UserRead
+from src.domain.logic.users.view import onboarding_readiness
 from src.domain.routes import (
     access,
     auth_pages,
@@ -128,35 +129,36 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
-async def _root_response(request: Request, user) -> RedirectResponse | APIResponse:
-    # Authenticated users land on the unified `/posts` browse feed — the
-    # default landing surface (mock §3). Browse lists every kind newest-first
-    # and carries the Referrals/Openings intent toggle + filter rail, so the
-    # old `/home` dashboard (My posts + Recent in the network) is fully folded
-    # in: "My posts" is `/posts?owner=me` (nav avatar menu) and "Recent in the
-    # network" *is* the default newest-first feed. Anonymous visitors see the
-    # public landing page instead of being redirected to the login wall.
+@app.get("/")
+async def read_root() -> RedirectResponse:
+    # `/home` is the canonical home URL; `/` just redirects there so the
+    # brand link, bookmarks, and the bare-domain entry all resolve to one
+    # place. The auth-aware split (signed-in hub vs public landing) lives
+    # in `read_home`.
+    return RedirectResponse(url="/home", status_code=302)
+
+
+@app.get("/home")
+async def read_home(request: Request, user=Depends(current_optional_user)):
+    # `/home` is the signed-in launchpad — a goal-oriented hub linking to
+    # the app's main surfaces, rendered from `home.html`. Anonymous
+    # visitors get the public landing page instead (not the login wall);
+    # the anonymous brand link (`_page_header.html`) points here too.
     if user is not None:
-        return RedirectResponse(url="/posts", status_code=302)
+        # `readiness` drives the dynamic "finish setting up" task at the
+        # top of the hub: when the account can't post yet, the next
+        # verification step is surfaced as the highest-priority action.
+        return APIResponse.html_response(
+            template_name="home.html",
+            context={"readiness": onboarding_readiness(user)},
+            request=request,
+            current_user=user,
+        )
     return APIResponse.html_response(
         template_name="landing.html",
         context={},
         request=request,
     )
-
-
-@app.get("/")
-async def read_root(request: Request, user=Depends(current_optional_user)):
-    return await _root_response(request, user)
-
-
-@app.get("/home")
-async def read_home(request: Request, user=Depends(current_optional_user)):
-    # `/home` is retained only as an alias of `/` so the anonymous brand
-    # link (`_page_header.html`) and any stale bookmark keep resolving:
-    # authenticated → `/posts` browse, anonymous → landing. The bespoke
-    # dashboard template (`home.html`) was retired in favor of browse.
-    return await _root_response(request, user)
 
 
 app.include_router(

@@ -29,13 +29,14 @@ def test_auth_policy_is_owner_or_admin():
 # --- List filters --------------------------------------------------------
 
 
-def test_filters_are_owner_license_type_and_issuing_state():
-    """`owner` is the viewer-relative scope filter (`?owner=me` → viewer's
-    own clinicians; bypasses the verified-only directory gate so
-    in-flight rows still surface to their creator). The license filters
-    are multi-select directory facets."""
+def test_filters_are_owner_favorited_license_type_and_issuing_state():
+    """`owner` and `favorited` are viewer-relative scope filters
+    (`?owner=me` → viewer's own clinicians; `?favorited=me` → clinicians
+    the viewer favorited — the replacement for the removed
+    `/users/me/favorites` page). Both bypass the verified-only directory
+    gate. The license filters are multi-select directory facets."""
     names = {f.name for f in CLINICIAN_ENTITY.filters}
-    assert names == {"owner", "license_type", "issuing_state"}
+    assert names == {"owner", "favorited", "license_type", "issuing_state"}
 
 
 # --- Redirects -----------------------------------------------------------

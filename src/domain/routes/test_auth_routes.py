@@ -240,7 +240,9 @@ async def test_login_success(test_client: AsyncClient, logged_in_user: User):
     auth_header = {"Cookie": f"fastapiusersauth={access_token}"}
     me_response = await test_client.get("/users/me", headers=auth_header)
     assert me_response.status_code == 200
-    assert logged_in_user.username in me_response.text
+    # The self-view is the account hub headed "Your account" — a proxy
+    # that the authenticated page rendered for the logged-in cookie.
+    assert "Your account" in me_response.text
 
 
 async def test_login_failure_wrong_password(
@@ -583,11 +585,12 @@ async def test_get_register_page(test_client: AsyncClient):
     # tablet/desktop (#584). No card chrome: deliberately not styled as
     # a card. The `.auth-page` rule lives in `base.html`.
     assert '<section class="auth-page">' in response.text
-    # Subtitle must use plain language a first-time visitor can parse —
-    # no bare model-jargon list ("openings, referrals, and intakes")
-    # before any value framing (#694).
+    # Subtitle mirrors the Login page's "Sign in to your Bedlam Connect
+    # account." — plain, brand-anchored copy a first-time visitor can
+    # parse, with no bare model-jargon list ("openings, referrals, and
+    # intakes") before any value framing (#694).
     assert "openings, referrals, and intakes" not in response.text
-    assert "clinician profile" in response.text
+    assert "Create a new Bedlam Connect account." in response.text
     # Signup form collects email + password only — username is filled
     # server-side from email in `handle_registration`. Pin the absence
     # so the field doesn't sneak back in.
@@ -1005,14 +1008,15 @@ async def test_failed_register_writes_no_audit_row(
         assert rows == []
 
 
-async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
-    """Anonymous GET / returns the marketing landing page (200 HTML),
-    not a redirect to the login wall (#692). The H1 + tagline +
-    description copy are taken verbatim from the parent marketing
-    site at https://www.bedlamconnect.com/ — pinning them so a
+async def test_home_anonymous_returns_landing_page(test_client: AsyncClient):
+    """Anonymous GET /home returns the marketing landing page (200 HTML),
+    not a redirect to the login wall (#692). (`/` redirects to `/home`;
+    the anonymous branch of `/home` renders the public landing.) The H1 +
+    tagline + description copy are taken verbatim from the parent
+    marketing site at https://www.bedlamconnect.com/ — pinning them so a
     well-meaning copy edit doesn't quietly drift the public-facing
     page out of sync with the brand."""
-    response = await test_client.get("/", follow_redirects=False)
+    response = await test_client.get("/home", follow_redirects=False)
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     # Verbatim copy from bedlamconnect.com.
@@ -1042,13 +1046,11 @@ async def test_root_anonymous_returns_landing_page(test_client: AsyncClient):
     assert "support@bedlamhealth.com" in response.text
 
 
-async def test_root_authenticated_redirects_to_browse(
+async def test_root_authenticated_redirects_to_home(
     authenticated_client: AsyncClient,
 ):
-    """Authenticated GET / redirects to the `/posts` browse feed — the
-    default landing surface (I3). The old `?kind=referral` bias was
-    dropped; the unfiltered feed lists every kind newest-first and the
-    Referrals/Openings intent toggle narrows on demand."""
+    """Authenticated GET / redirects to `/home` — the canonical home URL.
+    `/home` then renders the signed-in goal hub (`home.html`)."""
     response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/posts"
+    assert response.headers["location"] == "/home"

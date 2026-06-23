@@ -507,8 +507,11 @@ def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
         nav_links = {
             a.attributes.get("href") for a in tree.css('nav[aria-label="Primary"] a')
         }
-        # Posts tab is present.
-        assert "/posts" in nav_links
+        # Brand → /home (the quicklinks hub); the posts feed family is
+        # promoted via the `Post` link and the avatar's "My posts".
+        assert "/home" in nav_links
+        assert "/posts/form" in nav_links
+        assert "/posts?owner=me" in nav_links
         # Non-journey families are NOT in the primary nav (regardless of
         # admin flag).
         for absent in (

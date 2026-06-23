@@ -16,10 +16,11 @@ Phase 1 makes both declarations load-bearing: handlers in
 verb→action map from `FAVORITE_ENTITY.edge_audit` instead of bespoke
 module-level constants.
 
-The route file (`src/domain/routes/favorites.py`) stays hand-rolled —
-the codebase has no `mount_edge_*` helper today and `RouteSet`'s
-flags don't fit edge-shaped routes. Phase 2 may introduce edge
-mount helpers later; A4 doesn't.
+The route file (`src/domain/routes/favorites.py`) mounts the edge via
+`mount_edge_routes`, passing only `add_handler`/`remove_handler` (no
+`list_handler`) — so only the POST/DELETE toggle exists. There is no
+favorites list page; favorited clinicians are browsed through the
+`/clinicians?favorited=me` directory filter.
 """
 
 from typing import Final
@@ -36,7 +37,6 @@ from src.framework.dispatch.entity_spec import (
     EntitySpec,
     M2NRelation,
     RouteSet,
-    Templates,
 )
 
 FAVORITE_EDGE_AUDIT: Final[EdgeAudit] = EdgeAudit(
@@ -68,11 +68,12 @@ FAVORITE_ENTITY: Final[EntitySpec] = EntitySpec(
         from_attr="user_id",
         to_attr="clinician_id",
     ),
-    # Favorites doesn't use any `mount_*` helper — the route file is
-    # hand-rolled. All `RouteSet` flags stay False; phase 2 may
-    # introduce edge-specific flags + mount helpers.
+    # Favorites mounts only the add/remove toggle via `mount_edge_routes`
+    # (no `list_handler`), so there is no list page and no list template.
+    # All `RouteSet` flags stay False — the edge routes are mounted
+    # explicitly in `routes/favorites.py`. Favorited clinicians are
+    # browsed via the `/clinicians?favorited=me` directory filter.
     routes=RouteSet(),
-    templates=Templates(list="favorites/list.html"),
     # Favorites' URLs nest under the requesting user: the edge is
     # self-only and routes live at `/users/me/favorites/...` rather than
     # `/<url_collection>/...`. Every other entity leaves `prefix_override`

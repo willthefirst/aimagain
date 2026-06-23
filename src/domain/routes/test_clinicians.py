@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from src.domain.models import (
     Clinician,
     User,
+    UserFavorite,
     Verification,
 )
 from src.framework.audit.repository import AuditRepository
@@ -138,6 +139,48 @@ async def test_create_clinician_happy_path(
     assert len(rows) == 1
     assert rows[0].action == "create_clinician"
     assert rows[0].actor_id == logged_in_user.id
+
+
+async def test_clinicians_favorited_me_filter_lists_only_favorites(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user: User,
+):
+    """`GET /clinicians?favorited=me` renders only the clinicians the
+    viewer has favorited — the directory filter that replaced the
+    standalone `/users/me/favorites` page. Pins the spec-filter →
+    `list_clinicians(favorited=...)` wiring end-to-end."""
+    owner = create_test_user(username=f"owner-{uuid.uuid4()}")
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(owner)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            # `make_clinician_with_org` defaults to verified, so both land
+            # in the directory; only the favorited one should pass the filter.
+            favorited = make_clinician_with_org(
+                owner_id=owner.id, practice_name="Saved Clinic"
+            )
+            other = make_clinician_with_org(
+                owner_id=owner.id, practice_name="Other Clinic"
+            )
+            session.add_all([favorited, other])
+        favorited_id = favorited.id
+        other_id = other.id
+        async with session.begin():
+            session.add(
+                UserFavorite(user_id=logged_in_user.id, clinician_id=favorited_id)
+            )
+
+    response = await authenticated_client.get("/clinicians?favorited=me")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert (
+        tree.css_first(f"article[data-row-id='{favorited_id}']") is not None
+    ), "favorited clinician must render under ?favorited=me"
+    assert (
+        tree.css_first(f"article[data-row-id='{other_id}']") is None
+    ), "un-favorited clinician must not render under ?favorited=me"
 
 
 async def test_create_clinician_requires_npi(
