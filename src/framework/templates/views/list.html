@@ -28,7 +28,15 @@ Browse layout: when the entity spec declares `filters=(…)`, the
 context. `{% block content %}` detects this and wraps `{% block list_body %}`
 in a two-column `.browse-layout` (220px sidebar + flexible results). The
 sidebar embeds the filter form inline so viewers never leave the list to
-filter. The results column opens with a plain `<header>` that states
+filter. Each declared filter sits in its own Pico accordion
+(`<details class="filter-accordion">`) that starts folded, so the sidebar
+reads as a compact list of filter names that expand one at a time; the
+accordion `<summary>` carries the section heading, so `filter_field` is
+called with `heading=false` to suppress its now-redundant inline
+label/legend (the full-page `/<collection>/search` form keeps the inline
+headings). An accordion renders `open` when its filter is in a dirty
+(active) state — i.e. `filter_values` holds a non-empty value for it — so
+applied filters stay visible on reload. The results column opens with a plain `<header>` that states
 whether the result set is filtered: "Showing all results." when nothing is
 active, else "Showing results with <N filters>" where the count links to the
 dedicated `/<collection>/search` page (mounted automatically whenever
@@ -120,41 +128,59 @@ Child contract:
     <div class="browse-layout">
       <aside class="filter-sidebar">
         <form method="get" action="{{ request.url.path }}" class="filter-form">
-          {%- for f in filters %}{{ filter_field(f, filter_values.get(f.name) ) }}{%- endfor %}
-            <menu>
-              <li>
-                <button type="submit">Apply filters</button>
-              </li>
-              <li>
-                <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear all</a>
-              </li>
-            </menu>
-          </form>
-        </aside>
-        <div class="browse-results">
-          {#- Filter summary — states what the results column is showing. With
+          {#- Each filter is its own Pico accordion (`<details>`): folded by
+              default so the sidebar reads as a compact list of filter names,
+              expandable one at a time. The `<summary>` carries the section
+              heading, so `filter_field` is called with `heading=false` to
+              suppress its now-redundant inline label/legend. An accordion
+              opens by default when its filter is in a dirty (active) state —
+              a non-empty value (a chosen radio/select/text value or any
+              checked multi-choice box) — so applied filters stay visible on
+              reload instead of hiding behind a folded summary. An `<hr />`
+              divides adjacent accordions (rendered after every one but the
+              last) so the folded list reads as discrete rows. -#}
+          {%- for f in filters %}
+            {%- set _value = filter_values.get(f.name) %}
+            <details class="filter-accordion"{% if _value %} open{% endif %}>
+              <summary>{{ f.display_label }}</summary>
+              {{ filter_field(f, _value, heading=false) }}
+            </details>
+            {%- if not loop.last %}<hr />{% endif %}
+          {%- endfor %}
+          <menu>
+            <li>
+              <button type="submit">Apply filters</button>
+            </li>
+            <li>
+              <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear all</a>
+            </li>
+          </menu>
+        </form>
+      </aside>
+      <div class="browse-results">
+        {#- Filter summary — states what the results column is showing. With
             no active filter it reads "Showing all results."; with one or more,
             it reads "Showing results with <N filters>", where the count is the
             link to the dedicated `/<collection>/search` page for refining them.
             Only `active_filter_count` is rendered (the per-value descriptor
             pills were dropped); `search_url` is set whenever filters exist. -#}
-          {%- if search_url is defined and search_url %}
-            <header>
-              {%- if active_filter_count is defined and active_filter_count %}
-                <p>
-                  Showing results with
-                  <a href="{{ search_url }}">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
-                </p>
-              {%- else %}
-                <p>Showing all results.</p>
-              {%- endif %}
-            </header>
-          {%- endif %}
+        {%- if search_url is defined and search_url %}
+          <header>
+            {%- if active_filter_count is defined and active_filter_count %}
+              <p>
+                Showing results with
+                <a href="{{ search_url }}">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
+              </p>
+            {%- else %}
+              <p>Showing all results.</p>
+            {%- endif %}
+          </header>
         {%- endif %}
-        {% block list_body %}{% endblock %}
-        {%- if _has_filters %}
-        </div>
+      {%- endif %}
+      {% block list_body %}{% endblock %}
+      {%- if _has_filters %}
       </div>
-    {%- endif %}
-  {% endblock %}
-  {% block after_content %}{% endblock %}
+    </div>
+  {%- endif %}
+{% endblock %}
+{% block after_content %}{% endblock %}

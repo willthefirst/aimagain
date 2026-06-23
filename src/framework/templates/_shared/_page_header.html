@@ -20,8 +20,8 @@ inherits the caller's context, so `_on_home` / `_on_posts` /
 the brand logo with `aria-current="page"` when the viewer is on /home.
 
 When authenticated, the primary nav is: brand link (→ the posts
-collection, the default landing surface) → a prominent `+ Post` button
-(→ the post create form) → an avatar `<details>` menu (My posts → the
+collection, the default landing surface) → a `Post` link (fronted by a
+`plus` glyph → the post create form) → an avatar `<details>` menu (My posts → the
 viewer's own posts via `?owner=me`, Account → the self user page, Sign
 out via `hx-post`). Anonymous visitors get the brand link only.
 
@@ -39,6 +39,7 @@ Required context (set by `base.html` before the include):
 See `templates/README.md` § "Page chrome contract" for the slot list
 and the constant-boundary rationale (one source of truth).
 #}
+{%- from "_shared/icon_label.html" import icon_label -%}
 <header class="page-header">
   {# `.container-fluid` lives INSIDE the band (not on `<header>`) so the band's
      `border-bottom` spans the full page width while the nav content fills the
@@ -48,7 +49,7 @@ and the constant-boundary rationale (one source of truth).
      body-level sibling in base.html. #}
   <div class="container-fluid">
     {# Canonical Pico nav: a brand `<ul>` (left) and an actions `<ul>`
-     (right). `Post` is a visible link `<li>`; the profile menu is a Pico
+     (right). `Post` is a visible link `<li>` (`plus` glyph + label via `icon_label`); the profile menu is a Pico
      dropdown (https://picocss.com/docs/nav) — `<details class="dropdown">`
      with the avatar as its summary trigger. It opens on click on EVERY
      viewport (no mobile-only hamburger); Pico renders the chevron and
@@ -63,7 +64,7 @@ and the constant-boundary rationale (one source of truth).
       {% if is_authenticated %}
         <ul>
           <li>
-            <a href="{{ entity_form_url('post') }}">Post</a>
+            <a href="{{ entity_form_url('post') }}">{{ icon_label('plus', 'Post') }}</a>
           </li>
           <li>
             <details class="dropdown" id="nav-menu">

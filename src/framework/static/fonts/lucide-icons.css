@@ -55,6 +55,7 @@
 .icon-menu:before            { content: "\e118"; }
 .icon-message-circle:before  { content: "\e119"; }
 .icon-monitor:before         { content: "\e120"; }
+.icon-plus:before            { content: "\e140"; }
 .icon-shield:before          { content: "\e15b"; }
 .icon-shield-alert:before    { content: "\e1fd"; }
 .icon-shield-check:before    { content: "\e1fe"; }

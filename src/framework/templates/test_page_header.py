@@ -200,10 +200,10 @@ def test_body_layout_rows_are_header_breadcrumb_main_footer() -> None:
 
 def test_authenticated_nav_has_post_link_and_avatar_dropdown() -> None:
     """The authenticated primary nav is the canonical Pico shape: a brand `<ul>`
-    (→ the posts collection) and an actions `<ul>` with a plain `Post` link (→
-    the create form, no `role=button`, no `+`) and a Pico `<details
-    class="dropdown">` profile menu. The nav has no `id` hook — it's the
-    `aria-label="Primary"` landmark."""
+    (→ the posts collection) and an actions `<ul>` with a `Post` link (→ the
+    create form, a plain link fronted by a leading `plus` glyph) and a Pico
+    `<details class="dropdown">` profile menu. The nav has no `id` hook — it's
+    the `aria-label="Primary"` landmark."""
     env = _make_env()
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "detailstub.html", **_AUTHED_CTX))
@@ -218,12 +218,16 @@ def test_authenticated_nav_has_post_link_and_avatar_dropdown() -> None:
     assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
     assert brand.parent.attributes.get("href") == "/posts"
 
-    # `Post` is a plain link (not a button, no `+`) to the create form.
+    # `Post` is a plain link to the create form, fronted by a `plus` glyph
+    # (aria-hidden, so the label text is still just "Post").
     post_links = [a for a in nav.css("a") if a.text(strip=True) == "Post"]
     assert len(post_links) == 1, "exactly one `Post` link expected"
     post = post_links[0]
     assert post.attributes.get("href") == "/posts/form"
     assert post.attributes.get("role") is None, "`Post` must be a plain link"
+    icon = post.css_first("i.icon-plus")
+    assert icon is not None, "`Post` button must lead with a plus icon"
+    assert icon.attributes.get("aria-hidden") == "true"
 
     # Profile menu is a Pico dropdown.
     dropdown = nav.css_first("details.dropdown#nav-menu")
