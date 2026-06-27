@@ -75,9 +75,12 @@
      {% endcall %}
 
    A single ungrouped `facts_block()` doesn't need this — it's only for
-   splitting one aligned grid into titled sections. #}
-{% macro facts_grid() -%}
-  <section class="entity-facts facts-grid">
+   splitting one aligned grid into titled sections.
+
+   `id` is optional: pass it when a caller needs a stable selector for the
+   whole panel (e.g. a detail-page section other templates/tests scope to). #}
+{% macro facts_grid(id=None) -%}
+  <section class="entity-facts facts-grid"{% if id %} id="{{ id }}"{% endif %}>
     {{ caller() }}
   </section>
 {%- endmacro %}

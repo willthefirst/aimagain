@@ -1,13 +1,17 @@
 {% extends "base.html" %}
-{%- from "_shared/_picker.html" import picker -%}
-{# Signed-in home: an opinionated launchpad organized by goal. When the
+{# Signed-in home: a consolidated launchpad organized by goal. When the
    account can't post yet, the next setup step is surfaced as the
    top-priority action (`readiness.next_*`, from `onboarding_readiness`
-   in `read_home`). Below it, the key intents are grouped into three Pico
-   `.grid` columns; each column renders its CTAs through the shared
-   `picker()` cards. Reached at `/home` for authenticated viewers only;
-   anonymous visitors get the public `landing.html` instead (see
-   `read_home` in `src/main.py`). #}
+   in `read_home`).
+
+   Below it, three Pico `.grid` columns map to the goals a signed-in
+   user comes here for ("Refer a patient" / "Find your next client" /
+   "Manage"). Each column is a plain `<ul>` of links — no cards, no
+   descriptions — so the whole hub stays scannable at a glance.
+
+   Reached at `/home` for authenticated viewers only; anonymous visitors
+   get the public `landing.html` instead (see `read_home` in
+   `src/main.py`). #}
 {% block content %}
   {# Greeting + setup nudge as a Pico hgroup (header + muted subheading,
      styled by pico.css — no custom CSS). The greeting keys off network
@@ -34,39 +38,39 @@
   <div class="grid">
     <section>
       <h2>Refer a patient</h2>
-      {{ picker([
-            {"href": entity_form_url('post') ~ "?kind=referral",
-      "heading": "Post a referral",
-      "description": "Describe the patient you're trying to place."},
-      {"href": entity_url('clinician'),
-      "heading": "Find a clinician to refer to",
-      "description": "Search and filter the clinician directory."},
-      ]) }}
+      <ul>
+        <li>
+          <a href="{{ entity_form_url('post') ~ '?kind=referral' }}">Post a referral</a>
+        </li>
+        <li>
+          <a href="{{ entity_url('post') ~ '?kind=clinician_opening' }}">Browse recent openings</a>
+        </li>
+      </ul>
     </section>
     <section>
       <h2>Find your next client</h2>
-      {{ picker([
-            {"href": entity_form_url('post') ~ "?kind=clinician_opening",
-      "heading": "Post an opening",
-      "description": "Tell the network you're accepting clients."},
-      {"href": entity_url('post') ~ "?kind=referral",
-      "heading": "Find patients looking for care",
-      "description": "Browse open referrals from other clinicians."},
-      ]) }}
+      <ul>
+        <li>
+          <a href="{{ entity_form_url('post') ~ '?kind=clinician_opening' }}">Post an opening</a>
+        </li>
+        <li>
+          <a href="{{ entity_url('post') ~ '?kind=referral' }}">Browse recent referrals</a>
+        </li>
+      </ul>
     </section>
     <section>
-      <h2>Manage your presence</h2>
-      {{ picker([
-            {"href": entity_url('post') ~ "?owner=me",
-      "heading": "Manage your posts",
-      "description": "Edit the referrals and openings you've shared."},
-      {"href": entity_url('clinician') ~ "?owner=me",
-      "heading": "Manage your profile",
-      "description": "Update the clinician profile you've created."},
-      {"href": entity_url('user', id='me'),
-      "heading": "Manage your account",
-      "description": "Update your email, access, and settings."},
-      ]) }}
+      <h2>Manage</h2>
+      <ul>
+        <li>
+          <a href="{{ entity_url('post') ~ '?owner=me' }}">Your posts</a>
+        </li>
+        <li>
+          <a href="{{ entity_url('clinician') ~ '?owner=me' }}">Your profile</a>
+        </li>
+        <li>
+          <a href="{{ entity_url('user', id='me') }}">Your account</a>
+        </li>
+      </ul>
     </section>
   </div>
 {% endblock %}

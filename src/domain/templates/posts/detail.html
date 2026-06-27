@@ -2,8 +2,7 @@
 {%- from "posts/_shared/_modality_chips.html" import modality_chips -%}
 {%- from "posts/_shared/_referral_facts.html" import referral_facts -%}
 {%- from "posts/_shared/_provider_post_facts.html" import provider_post_facts -%}
-{%- from "_shared/_card.html" import card -%}
-{%- from "_shared/sections.html" import fact, fact_list, facts_block as entity_facts -%}
+{%- from "_shared/sections.html" import fact, fact_list, facts_grid, fact_group, fact_rows -%}
 {%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
 {%- from "_shared/_program_facts.html" import program_facts -%}
 {%- from "_shared/_provider_ref.html" import provider_ref -%}
@@ -25,11 +24,13 @@
 {% block actions %}
   {% include "posts/_shared/_owner_actions.html" %}
 {% endblock %}
-{# Owner-context card — the steady-state profile of the provider behind
+{# Owner-context section — the steady-state profile of the provider behind
    the post (the clinician + practice for an opening, the program for an
-   intake), rendered as a visually separate read-only card below the
-   post's own facts. Referrals don't use this card: their referring
-   clinician is a linked `provider_ref` reference in the meta line.
+   intake), rendered as an "About this provider" heading + fact rows below
+   the post's own facts (a sibling `facts_grid` section, same shape as the
+   post's own grouped facts — not a card). Referrals don't use this
+   section: their referring clinician is a linked `provider_ref` reference
+   in the meta line.
 
    The identity row is the shared `provider_ref` denotation — the
    canonical hyperlinked "<name> · <org>" the feed byline and form
@@ -51,8 +52,9 @@
     {%- set ctx.prog = post.intake_detail.program -%}
   {%- endif -%}
   {%- if view.kind in ("clinician_opening", "program_intake") and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
-    {%- call card(id="provider-profile", headline_url=None, headline="About this provider") %}
-      {%- call entity_facts() %}
+    {%- call facts_grid(id="provider-profile") %}
+      {{ fact_group("About this provider") }}
+      {%- call fact_rows() %}
         {%- call fact('provider', 'Provider') %}{{ provider_ref(view.provider_ref, redacted=redacted) }}
         {% endcall %}
         {%- if view.owner_address %}
@@ -83,9 +85,9 @@
    Coverage), openings + intakes via `_provider_post_facts` (Service type /
    Clients served / About / Availability). For provider posts the
    steady-state provider context (insurance, address, languages,
-   how-to-refer) then renders in the owner-context card; the referral's
-   referring clinician is the linked `provider_ref` in the meta line, not
-   an owner card. Per-kind logic lives in `post_card_view` (one place);
+   how-to-refer) then renders in the "About this provider" section; the
+   referral's referring clinician is the linked `provider_ref` in the meta
+   line, not an owner section. Per-kind logic lives in `post_card_view` (one place);
    every visual element reads from `view` (plus the linked
    affiliation/program model rows the owner-context macro renders
    directly). #}
@@ -113,13 +115,14 @@
           {%- if view.kind == "referral" %}
             {# Referral leads with its Narrative section (inside
                  `referral_facts`); the referring clinician is the linked
-                 reference in the `.post-meta` line above, not an owner card. #}
+                 reference in the `.post-meta` line above, not an owner section. #}
             {{ referral_facts(view, redacted=not can_act_as_provider) }}
           {%- else %}
             {# The provider post's own self-describing profile (services /
                  cohort / narrative / cost), grouped to mirror its form —
                  then the steady-state provider context (insurance, address,
-                 languages, how-to-refer) in the owner-context card below. #}
+                 languages, how-to-refer) in the "About this provider"
+                 section below. #}
             {{ provider_post_facts(view) }}
             {{ owner_context(view, post, redacted=not can_act_as_provider) }}
           {%- endif %}

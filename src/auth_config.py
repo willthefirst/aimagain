@@ -112,10 +112,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         response: Optional[Response] = None,
     ):
         print(f"User {user.id} has logged in.")
-        # Post-login lands on the `/posts` browse feed (the default landing
-        # surface) — kept in lockstep with `src/main.py:read_root`'s
-        # redirect target.
-        redirect_url = "/posts"
+        # Post-login lands on `/home`, the signed-in goal hub — kept in
+        # lockstep with `src/main.py:read_root`'s redirect target (`/` →
+        # `/home`). A `?next=` param (set when an auth wall bounced the
+        # user) overrides this default below.
+        redirect_url = "/home"
         next_url = request.query_params.get("next")
         if next_url:
             # Security check: only allow relative URLs that start with "/"

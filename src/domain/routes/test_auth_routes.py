@@ -281,7 +281,7 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     test_client: AsyncClient, logged_in_user: User
 ):
     """HTMX-flagged POST + valid credentials → 204 + `Set-Cookie:
-    fastapiusersauth=...` + `HX-Redirect` (default `/posts`
+    fastapiusersauth=...` + `HX-Redirect` (default `/home`
     per `UserManager.on_after_login`). The wrapper converts the
     underlying 302+Location into 204+HX-Redirect for HTMX so the
     browser doesn't auto-follow before HTMX honors the navigation."""
@@ -293,10 +293,10 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     assert response.status_code == 204
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
     # `Location` is popped (auto-follow guard for HTMX); HX-Redirect
-    # takes over. `on_after_login` defaults to `/posts` when no `?next=`
+    # takes over. `on_after_login` defaults to `/home` when no `?next=`
     # is set.
     assert "Location" not in response.headers
-    assert response.headers.get("HX-Redirect") == "/posts"
+    assert response.headers.get("HX-Redirect") == "/home"
 
 
 async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
@@ -311,7 +311,7 @@ async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
         data={"username": logged_in_user.email, "password": "password123"},
     )
     assert response.status_code == 302
-    assert response.headers.get("Location") == "/posts"
+    assert response.headers.get("Location") == "/home"
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
 
 
@@ -581,7 +581,7 @@ async def test_get_register_page(test_client: AsyncClient):
     assert "Create an account" in response.text
     assert "Create account" in response.text
     # Form wrapper — `.auth-page` caps the form at 28rem and centers it
-    # so it doesn't stretch to the `<main>` `.container-fluid` width on
+    # so it doesn't stretch to the `<main>` `.container` width on
     # tablet/desktop (#584). No card chrome: deliberately not styled as
     # a card. The `.auth-page` rule lives in `base.html`.
     assert '<section class="auth-page">' in response.text
@@ -794,7 +794,7 @@ async def test_post_verify_with_valid_token_verifies_and_auto_logs_in(
         follow_redirects=False,
     )
     # Non-HTMX POST → 302 + Location to the clinician-create form
-    # (NOT `on_after_login`'s default `/posts`).
+    # (NOT `on_after_login`'s default `/home`).
     assert response.status_code == 302
     assert response.headers["location"] == "/clinicians/form"
     # Session cookie was minted.
