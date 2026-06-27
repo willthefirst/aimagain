@@ -48,20 +48,21 @@ async def test_authenticated_home_renders_quicklinks(
     authenticated_client: AsyncClient,
 ):
     """An authenticated viewer hitting `/home` gets the goal hub — NOT a
-    redirect. It renders the opinionated intent CTAs in three columns,
-    and (because a fresh account can't post yet) surfaces the dynamic
-    `#home-setup` task at the top."""
+    redirect. It renders the intent CTAs as three columns of plain links
+    (Refer a patient / Find your next client / Manage), and (because a
+    fresh account can't post yet) surfaces the dynamic `#home-setup` task
+    at the top."""
     response = await authenticated_client.get("/home", follow_redirects=False)
     assert response.status_code == 200
     body = response.text
     for href in (
         # Refer a patient
-        "/clinicians",
         "/posts/form?kind=referral",
+        "/posts?kind=clinician_opening",
         # Find your next client
         "/posts/form?kind=clinician_opening",
         "/posts?kind=referral",
-        # Manage your presence
+        # Manage
         "/posts?owner=me",
         "/clinicians?owner=me",
         "/users/me",

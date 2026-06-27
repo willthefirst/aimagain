@@ -180,10 +180,11 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .filter-sidebar { flex: 0 0 220px; min-width: 0; }
 .browse-results { flex: 1 1 0; min-width: 0; }
 
-/* Narrow: stack sidebar full-width above results; hide inline form */
+/* Narrow: hide the filter sidebar entirely (filters are reached via the
+   in-results filter link), and drop the inline form. */
 @media (max-width: 640px) {
   .browse-layout { flex-direction: column; }
-  .filter-sidebar { flex: unset; width: 100%; }
+  .filter-sidebar { display: none; }
   .filter-form { display: none; }
 }
 
