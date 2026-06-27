@@ -22,10 +22,10 @@ The opening is **self-describing** (like a referral): it carries its own
 service lines, delivery format, the cohort it serves, and cost. Only
 steady-state context — location, insurance, how-to-refer — lives on the
 linked ClinicianAffiliation (and `languages` on the Clinician), managed
-through their own edit pages; the picker shows a read-only preview of it.
+through their own edit pages.
 
 Field order (referral-aligned):
-  1. Which practice — establishes context (with a read-only preview)
+  1. Which practice — establishes context
   2. Service type — services multi-select + "Other" free-text
   3. Delivery — session format
   4. Clients served — age groups + genders
@@ -43,9 +43,6 @@ Field order (referral-aligned):
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
-{%- from "_shared/_card.html" import card -%}
-{%- from "_shared/sections.html" import facts_block as profile_facts_block -%}
-{%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
 {%- macro opening_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.opening_detail if post else None -%}
   {# `form_with_errors` lights up the response-targets attrs that swap a
@@ -74,79 +71,31 @@ Field order (referral-aligned):
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Which practice?", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {# Read-only preview of the steady-state practice profile that renders
-     alongside this opening on its detail page — the same
-     `affiliation_facts` rows the practice page and the post detail show.
-     One card per affiliation is pre-rendered; the script below reveals
-     the one matching the picker so the preview tracks the selection
-     without a server round-trip. The profile is edited on the practice
-     page, never on this announcement form (#1358 PR-f). #}
-    {# The first card renders visible (the picker defaults to the first
-       affiliation via `default_first`); the rest start `hidden` and the
-       script toggles on change. So no-JS authors still see the default
-       practice's profile. #}
-    {%- set _pv = namespace(first=true) -%}
-    <div class="profile-preview"
-         data-profile-preview="clinician_affiliation_id">
-      {%- for c in current_user.clinicians -%}
-        {%- for aff in c.clinician_affiliations -%}
-          {%- set _name = (c.first_name ~ " " ~ c.last_name)|trim -%}
-          <div data-preview-for="{{ aff.id }}"
-               {% if not _pv.first %}hidden{% endif %}>
-            {%- call card(id="opening-preview-" ~ aff.id|string,
-              headline_url=None,
-              headline="Shown with this opening",
-              subtitle="From " ~ ((_name ~ " · " ~ aff.org.name) if aff.org else _name) ~ "’s profile") %}
-              {%- call profile_facts_block() %}{{ affiliation_facts(aff) }}{%- endcall %}
-              {%- endcall %}
-            </div>
-            {%- set _pv.first = false -%}
-          {%- endfor -%}
-        {%- endfor -%}
-      </div>
-      {# The opening describes itself. `services` uses the same
+    {# The opening describes itself. `services` uses the same
        `ReferralService` vocab as the request side; `other` reveals the
        free-text via the shared `services:other` conditional rule. #}
-      {% call form_section("Service type") %}
-        {{ multi_select_field("services", "Services offered", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None, required=false) }}
-        {% call conditional_field("services:other") %}
-          {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
-        {% endcall %}
+    {% call form_section("Service type") %}
+      {{ multi_select_field("services", "Services offered", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None, required=false) }}
+      {% call conditional_field("services:other") %}
+        {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
       {% endcall %}
-      {% call form_section("Delivery") %}
-        {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
-      {% endcall %}
-      {# Clients served — the cohort this opening is for (multi-valued,
+    {% endcall %}
+    {% call form_section("Delivery") %}
+      {{ multi_select_field("session_format", "Session format", SESSION_FORMATS, labels=SESSION_FORMAT_LABELS, current=d.session_format if d else None, required=false) }}
+    {% endcall %}
+    {# Clients served — the cohort this opening is for (multi-valued,
        unlike a referral's single client). #}
-      {% call form_section("Clients served") %}
-        {{ multi_select_field("age_groups", "Age groups", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_groups if d else None, required=false) }}
-        {{ multi_select_field("genders", "Genders", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None, required=false) }}
-      {% endcall %}
-      {% call form_section("About") %}
-        {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
-      {% endcall %}
-      {% call form_section("Availability") %}
-        {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
-        {{ text_field("cost", "Cost", current=d.cost if d else None, required=false, help="Per-session fee or fee range for this opening.") }}
-      {% endcall %}
-      {{ actions(submit_label, cancel_url=cancel_url) }}
-    {%- endcall -%}
-    {# Reveal the preview card matching the selected practice; re-sync on
-     every picker change so the author always sees the profile that will
-     accompany the opening they're posting. #}
-    <script>
-  (function () {
-    var wrap = document.querySelector('[data-profile-preview="clinician_affiliation_id"]');
-    var select = document.querySelector('select[name="clinician_affiliation_id"]');
-    if (!wrap || !select) return;
-    function sync() {
-      var id = select.value;
-      wrap.querySelectorAll('[data-preview-for]').forEach(function (el) {
-        el.toggleAttribute('hidden', el.getAttribute('data-preview-for') !== id);
-      });
-    }
-    select.addEventListener('change', sync);
-    sync();
-  })();
-    </script>
-  {%- endmacro -%}
+    {% call form_section("Clients served") %}
+      {{ multi_select_field("age_groups", "Age groups", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_groups if d else None, required=false) }}
+      {{ multi_select_field("genders", "Genders", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None, required=false) }}
+    {% endcall %}
+    {% call form_section("About") %}
+      {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
+    {% endcall %}
+    {% call form_section("Availability") %}
+      {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
+      {{ text_field("cost", "Cost", current=d.cost if d else None, required=false, help="Per-session fee or fee range for this opening.") }}
+    {% endcall %}
+    {{ actions(submit_label, cancel_url=cancel_url) }}
+  {%- endcall -%}
+{%- endmacro -%}

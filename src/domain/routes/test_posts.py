@@ -723,8 +723,9 @@ async def test_referral_detail_links_referring_clinician_in_meta_not_a_card(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    # No owner-context card on a referral detail page.
-    assert tree.css_first('article[data-row-id="provider-profile"]') is None
+    # No owner-context section on a referral detail page.
+    assert tree.css_first("section#provider-profile") is None
+    assert "About this provider" not in tree.body.text()
     # The referring clinician is a linked reference in the .post-meta line.
     meta = tree.css_first(".post-meta")
     assert meta is not None, ".post-meta identity line should render"
@@ -1118,26 +1119,20 @@ async def test_referral_form_age_group_options_are_singular(
     assert option_texts == set(CLIENT_AGE_GROUP_LABELS_SINGULAR.values())
 
 
-async def test_opening_create_form_renders_practice_profile_preview(
+async def test_opening_create_form_omits_practice_profile_preview(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """The opening create form shows a read-only preview of the selected
-    practice's steady-state *context* (the `affiliation_facts` rows — now
-    insurance posture + how-to-refer only), so the author sees the
-    practice context without navigating away. The self-describing
-    announcement profile (services / age groups / etc.) is entered in the
-    form's own sections, not previewed here. The default (first)
-    affiliation's card renders visible; the picker's value drives which
-    card the inline script reveals."""
+    """The opening create form no longer renders the read-only practice-
+    profile preview (removed). The picker still selects the practice, and
+    the announcement's own self-describing sections (services / delivery /
+    clients-served / cost) remain the form body."""
     clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, practice_name="Acme Health"
     )
     clinician.id = clinician.id or uuid.uuid4()
     aff = clinician.primary_clinician_affiliation
-    aff.sliding_scale = True
-    aff.website = "https://acme.example.com"
     async with db_test_session_manager() as session:
         async with session.begin():
             session.add(clinician)
@@ -1146,18 +1141,13 @@ async def test_opening_create_form_renders_practice_profile_preview(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    wrap = tree.css_first('[data-profile-preview="clinician_affiliation_id"]')
-    assert wrap is not None, "no practice-profile preview container on the opening form"
-    card = tree.css_first(f'div[data-preview-for="{aff.id}"]')
-    assert card is not None, "no preview card for the affiliation"
-    # The default (first) affiliation's card is visible without JS.
-    assert "hidden" not in card.attributes, "first preview card should be visible"
-    # Context rows come from the shared affiliation_facts macro (insurance
-    # posture + website); the opening's own services are NOT previewed here.
-    assert "Sliding scale" in card.text()
-    assert "https://acme.example.com" in card.text()
+    # Preview is gone: no container, no per-affiliation preview cards.
+    assert (
+        tree.css_first('[data-profile-preview="clinician_affiliation_id"]') is None
+    ), "practice-profile preview should be removed from the opening form"
+    assert tree.css_first(f'div[data-preview-for="{aff.id}"]') is None
 
-    # The opening is self-describing now: the form carries its own
+    # The opening is self-describing: the form carries its own
     # service-type / delivery / clients-served / cost sections, on the
     # same vocabularies the referral request side uses.
     page_text = tree.body.text()
@@ -1169,18 +1159,16 @@ async def test_opening_create_form_renders_practice_profile_preview(
         ), f"opening form must render a {field_name!r} input"
 
 
-async def test_intake_create_form_renders_program_profile_preview(
+async def test_intake_create_form_omits_program_profile_preview(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """The intake create form shows a read-only preview of the selected
-    program's steady-state *context* (the `program_facts` rows — now
-    website + referral_instructions only), so the author sees the program
-    context without navigating away. The self-describing announcement
-    profile (services / age groups / etc.) is entered in the form's own
-    sections, not previewed here. Requires a verified org rep who owns a
-    program (the `check_program_intake` gate)."""
+    """The intake create form no longer renders the read-only program-
+    profile preview (removed). The picker still selects the program, and
+    the announcement's own self-describing sections (services /
+    clients-served / cost) remain the form body. Requires a verified org
+    rep who owns a program (the `check_program_intake` gate)."""
     org = make_organization_row(owner_id=logged_in_user.id, name="Acme Health")
     rep = OrgRepresentation(
         user_id=logged_in_user.id,
@@ -1205,14 +1193,11 @@ async def test_intake_create_form_renders_program_profile_preview(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    wrap = tree.css_first('[data-profile-preview="program_id"]')
-    assert wrap is not None, "no program-profile preview container on the intake form"
-    card = tree.css_first(f'div[data-preview-for="{program.id}"]')
-    assert card is not None, "no preview card for the program"
-    assert "hidden" not in card.attributes, "first preview card should be visible"
-    # Context rows come from the shared program_facts macro (website +
-    # referral instructions); the intake's own services are NOT previewed.
-    assert "https://riseiop.example.com" in card.text()
+    # Preview is gone: no container, no per-program preview cards.
+    assert (
+        tree.css_first('[data-profile-preview="program_id"]') is None
+    ), "program-profile preview should be removed from the intake form"
+    assert tree.css_first(f'div[data-preview-for="{program.id}"]') is None
 
     # The intake is self-describing now: the form carries its own
     # service-type / clients-served / cost sections, on the same
@@ -1393,7 +1378,7 @@ async def test_detail_shows_identity_rows_for_verified_viewer(
     assert tree.css_first("button.locked-ghost-btn") is None
 
 
-async def test_opening_detail_splits_post_facts_from_practice_profile_card(
+async def test_opening_detail_splits_post_facts_from_practice_profile_section(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
@@ -1401,7 +1386,7 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     """Opening detail renders the post's own self-describing profile
     (services / cohort / cost / schedule) in the grouped facts up top, and
     the steady-state practice *context* (insurance posture + how-to-refer
-    website) inside the `provider-profile` owner-context card —
+    website) inside the `provider-profile` "About this provider" section —
     structurally separate from the announcement profile."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
@@ -1430,11 +1415,12 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    card = tree.css_first('article[data-row-id="provider-profile"]')
-    assert card is not None, "owner-context card should render"
+    section = tree.css_first("section#provider-profile")
+    assert section is not None, "owner-context section should render"
+    assert "About this provider" in section.text()
     # The provider identity row carries the clinician (linked) followed
     # by the org (linked) — the shared `provider_ref` denotation.
-    provider_dd = card.css_first('div[data-fact="provider"] dd')
+    provider_dd = section.css_first('div[data-fact="provider"] dd')
     assert provider_dd is not None, "provider identity row should render"
     assert (
         provider_dd.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
@@ -1443,38 +1429,38 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_card(
         provider_dd.css_first(f"a[href='/organizations/{clinician.org.id}']")
         is not None
     ), "org name should link to the organization detail page"
-    # Steady-state context rows live inside the card (insurance posture +
+    # Steady-state context rows live inside the section (insurance posture +
     # how-to-refer website). The opening's self-describing profile
     # (services / age groups / etc.) is no longer on the affiliation, so
-    # it isn't rendered through this card.
+    # it isn't rendered through this section.
     for fact_key in ("insurance", "website"):
         assert (
-            card.css_first(f'div[data-fact="{fact_key}"]') is not None
-        ), f"{fact_key} should render inside the provider-profile card"
-    assert "Sliding scale" in card.text()
+            section.css_first(f'div[data-fact="{fact_key}"]') is not None
+        ), f"{fact_key} should render inside the provider-profile section"
+    assert "Sliding scale" in section.text()
     # The opening's own self-describing profile renders in the grouped
-    # facts up top — NOT through the owner-context card.
+    # facts up top — NOT through the owner-context section.
     for fact_key in ("services", "ages", "cost", "schedule_notes"):
         row = tree.css_first(f'div[data-fact="{fact_key}"]')
         assert row is not None, f"{fact_key} should render on the detail page"
         assert (
-            card.css_first(f'div[data-fact="{fact_key}"]') is None
+            section.css_first(f'div[data-fact="{fact_key}"]') is None
         ), f"{fact_key} is the post's own profile, not steady-state context"
     assert "Therapy — Individual" in tree.text()
 
 
-async def test_intake_detail_renders_program_profile_card(
+async def test_intake_detail_renders_program_profile_section(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
     """Intake detail renders the program's steady-state *context* inside
-    the `provider-profile` owner-context card via `program_facts` — the
-    Program now models only how-to-refer (website / referral_instructions),
-    so those rows live in the card. The provider identity row links the
-    program and its org. The intake's self-describing profile (services /
-    age groups / etc.) is no longer on the Program, so it isn't rendered
-    through this card."""
+    the `provider-profile` "About this provider" section via `program_facts`
+    — the Program now models only how-to-refer (website /
+    referral_instructions), so those rows live in the section. The provider
+    identity row links the program and its org. The intake's self-describing
+    profile (services / age groups / etc.) is no longer on the Program, so
+    it isn't rendered through this section."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
@@ -1500,9 +1486,10 @@ async def test_intake_detail_renders_program_profile_card(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    card = tree.css_first('article[data-row-id="provider-profile"]')
-    assert card is not None, "program owner-context card should render"
-    provider_dd = card.css_first('div[data-fact="provider"] dd')
+    section = tree.css_first("section#provider-profile")
+    assert section is not None, "program owner-context section should render"
+    assert "About this provider" in section.text()
+    provider_dd = section.css_first('div[data-fact="provider"] dd')
     assert provider_dd is not None, "provider identity row should render"
     assert (
         provider_dd.css_first(f"a[href='/programs/{program.id}']") is not None
@@ -1510,19 +1497,19 @@ async def test_intake_detail_renders_program_profile_card(
     assert (
         provider_dd.css_first(f"a[href='/organizations/{org.id}']") is not None
     ), "org name should link to the organization detail page"
-    # Steady-state context row lives inside the card (how-to-refer website).
+    # Steady-state context row lives inside the section (how-to-refer website).
     assert (
-        card.css_first('div[data-fact="website"]') is not None
-    ), "website should render inside the provider-profile card"
-    assert "https://riseiop.example.com" in card.text()
+        section.css_first('div[data-fact="website"]') is not None
+    ), "website should render inside the provider-profile section"
+    assert "https://riseiop.example.com" in section.text()
     # The intake's own self-describing profile (services / cohort) renders
-    # in the grouped facts up top — NOT through the owner-context card.
+    # in the grouped facts up top — NOT through the owner-context section.
     # `_intake_post` seeds services=["therapy_group"], age_groups=[adolescents].
     for fact_key in ("services", "ages"):
         row = tree.css_first(f'div[data-fact="{fact_key}"]')
         assert row is not None, f"{fact_key} should render on the intake detail page"
         assert (
-            card.css_first(f'div[data-fact="{fact_key}"]') is None
+            section.css_first(f'div[data-fact="{fact_key}"]') is None
         ), f"{fact_key} is the post's own profile, not Program context"
     assert "Therapy — Group" in tree.text()
 

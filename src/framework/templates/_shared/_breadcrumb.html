@@ -6,7 +6,7 @@ segment, with Pico drawing the `>` dividers between items — wrapped in its
 OWN `<nav class="breadcrumb-bar">` band. A view template fills the
 `breadcrumb` block; `base.html` captures it and renders the result as a
 body-level sibling of `<header>` / `<main>` / `<footer>` (not inside the
-page-header). The inner `.container-fluid` keeps the chain aligned with page
+page-header). The inner `.container` keeps the chain aligned with page
 content; on narrow viewports the chain scrolls horizontally rather than
 wrapping (see `.breadcrumb-bar` in framework.css).
 
@@ -34,7 +34,7 @@ chain, so callers pass only the ancestors + current segment. An empty
 {% macro breadcrumb(items) -%}
   {%- set _chain = [("Home", "/home", none)] + (items | list if items else []) -%}
   <nav aria-label="breadcrumb" class="breadcrumb-bar">
-    <div class="container-fluid">
+    <div class="container">
       <ul>
         {%- for _item in _chain %}
           {%- set _label = _item[0] -%}

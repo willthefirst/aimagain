@@ -40,6 +40,20 @@ html { scrollbar-gutter: stable; font-size: 14px; }
   --color-warning: #b45309;
   --color-success: #166534;
 }
+/* Container width — one flat cap instead of Pico's five per-breakpoint
+   max-widths (510 / 700 / 950 / 1200 / 1450px). Below the cap the
+   container is full-bleed (Pico's `width: 100%`) with a small gutter;
+   at/above it, it centers (Pico's `margin: auto`) and caps at this one
+   width. A single non-media rule is enough: it loads after Pico (see
+   base.html), so on equal specificity it overrides every Pico
+   `@media (min-width: …) .container` cap — and re-asserts the gutter
+   that Pico zeroes at ≥576px. Tune the layout by changing this one
+   number. */
+.container {
+  max-width: 1280px;
+  padding-right: var(--pico-spacing);
+  padding-left: var(--pico-spacing);
+}
 /* Heading scale — tight, not shouting. Set Pico's per-heading custom
    properties rather than raw `font-size`/`font-weight` on the element:
    Pico v2 drives headings from `--pico-font-size` / `--pico-font-weight`
@@ -535,10 +549,10 @@ dd { margin: 0; }
 /* Page-header band — the top-chrome nav element
    (`_shared/_page_header.html`): the primary nav, closed with a full-width
    `border-bottom`. The band itself is full-width and carries the boundary;
-   its inner `.container-fluid` (full-width, gutter-padded) holds the nav, so
-   the divider spans the whole page while content fills the viewport width
-   minus the gutter (matches `<main>` / `<footer>`, which also wrap content in
-   an inner `.container-fluid`). The breadcrumb is its own band below; the page `<h1>` +
+   its inner `.container` (centered, max-width-capped) holds the nav, so
+   the divider spans the whole page while the content is centered and capped
+   at Pico's container max-width (matches `<main>` / `<footer>`, which also
+   wrap content in an inner `.container`). The breadcrumb is its own band below; the page `<h1>` +
    actions toolbar lives in `<main>`. Both band dividers use the standard
    subtle `--pico-muted-border-color`. */
 .page-header { border-bottom: 1px solid var(--pico-muted-border-color); color: inherit; }
@@ -662,7 +676,7 @@ td > menu > li > [role="button"] {
   margin-inline: auto;
 }
 /* Page footer (`<footer>` in base.html — sibling of `<header>` and
-   `<main>`, content wrapped in an inner `.container-fluid`). Centered chrome
+   `<main>`, content wrapped in an inner `.container`). Centered chrome
    line, present on every page via the default `{% block footer %}` body.
    `text-align` is set on `<footer>` itself (full width) so it cascades to
    the inner container's text. */

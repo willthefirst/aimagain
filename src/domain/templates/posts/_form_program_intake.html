@@ -25,10 +25,10 @@ The intake is **self-describing** (like the opening): it carries its own
 service lines, the cohort it serves, and cost. It has no session-format
 section — a Program is a single group offering with no in-person/virtual
 axis. Only steady-state context — state served, languages, how-to-refer —
-lives on the linked Program; the picker shows a read-only preview of it.
+lives on the linked Program.
 
 Field order (opening-aligned):
-  1. Which program — establishes context (with a read-only preview)
+  1. Which program — establishes context
   2. Service type — services multi-select + "Other" free-text
   3. Clients served — age groups + genders
   4. About — description (free-text announcement copy)
@@ -44,9 +44,6 @@ Field order (opening-aligned):
 {%- from "_shared/form_meta.html" import form_with_errors with context -%}
 {%- from "_shared/form_copy.html" import schedule_notes_help -%}
 {%- from "_shared/actions.html" import actions -%}
-{%- from "_shared/_card.html" import card -%}
-{%- from "_shared/sections.html" import facts_block as profile_facts_block -%}
-{%- from "_shared/_program_facts.html" import program_facts -%}
 {%- macro intake_form(hx_method, action, submit_label=none, post=None, schema=None, current_user=None, cancel_url=None) -%}
   {%- set d = post.intake_detail if post else None -%}
   {# `form_with_errors` lights up the response-targets attrs that swap a
@@ -65,68 +62,27 @@ Field order (opening-aligned):
       {%- set _programs.opts = _programs.opts + [(p.id, p.name ~ ' · ' ~ p.organization.name)] -%}
     {%- endfor -%}
     {{ composite_select_field("program_id", "Which program?", _programs.opts, current=d.program_id if d else None) }}
-    {# Read-only preview of the steady-state program profile that renders
-     alongside this intake on its detail page — the same `program_facts`
-     rows the program detail page and the post detail show. One card per
-     program is pre-rendered; the script below reveals the one matching
-     the picker so the preview tracks the selection without a server
-     round-trip. The profile is edited on the program page, never on this
-     announcement form (#1358 PR-f). #}
-    {# The first card renders visible (the picker defaults to the first
-       program); the rest start `hidden` and the script toggles on
-       change, so no-JS authors still see the default program's profile. #}
-    <div class="profile-preview" data-profile-preview="program_id">
-      {%- for p in current_user.programs -%}
-        <div data-preview-for="{{ p.id }}"
-             {% if not loop.first %}hidden{% endif %}>
-          {%- call card(id="intake-preview-" ~ p.id|string,
-            headline_url=None,
-            headline="Shown with this intake",
-            subtitle="From " ~ p.name ~ " · " ~ p.organization.name ~ "’s profile") %}
-            {%- call profile_facts_block() %}{{ program_facts(p) }}{%- endcall %}
-            {%- endcall %}
-          </div>
-        {%- endfor -%}
-      </div>
-      {# The intake describes itself. `services` uses the same
+    {# The intake describes itself. `services` uses the same
        `ReferralService` vocab as the referral + opening sides; `other`
        reveals the free-text via the shared `services:other` rule. #}
-      {% call form_section("Service type") %}
-        {{ multi_select_field("services", "Services offered", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None, required=false) }}
-        {% call conditional_field("services:other") %}
-          {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
-        {% endcall %}
+    {% call form_section("Service type") %}
+      {{ multi_select_field("services", "Services offered", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None, required=false) }}
+      {% call conditional_field("services:other") %}
+        {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
       {% endcall %}
-      {# Clients served — the cohort this intake is for (multi-valued). #}
-      {% call form_section("Clients served") %}
-        {{ multi_select_field("age_groups", "Age groups", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_groups if d else None, required=false) }}
-        {{ multi_select_field("genders", "Genders", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None, required=false) }}
-      {% endcall %}
-      {% call form_section("About") %}
-        {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
-      {% endcall %}
-      {% call form_section("Availability") %}
-        {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
-        {{ text_field("cost", "Cost", current=d.cost if d else None, required=false, help="Per-session fee or fee range for this intake.") }}
-      {% endcall %}
-      {{ actions(submit_label, cancel_url=cancel_url) }}
-    {%- endcall -%}
-    {# Reveal the preview card matching the selected program; re-sync on
-     every picker change so the author always sees the profile that will
-     accompany the intake they're posting. #}
-    <script>
-  (function () {
-    var wrap = document.querySelector('[data-profile-preview="program_id"]');
-    var select = document.querySelector('select[name="program_id"]');
-    if (!wrap || !select) return;
-    function sync() {
-      var id = select.value;
-      wrap.querySelectorAll('[data-preview-for]').forEach(function (el) {
-        el.toggleAttribute('hidden', el.getAttribute('data-preview-for') !== id);
-      });
-    }
-    select.addEventListener('change', sync);
-    sync();
-  })();
-    </script>
-  {%- endmacro -%}
+    {% endcall %}
+    {# Clients served — the cohort this intake is for (multi-valued). #}
+    {% call form_section("Clients served") %}
+      {{ multi_select_field("age_groups", "Age groups", CLIENT_AGE_GROUPS, labels=CLIENT_AGE_GROUP_LABELS, current=d.age_groups if d else None, required=false) }}
+      {{ multi_select_field("genders", "Genders", GENDERS, labels=GENDER_LABELS, current=d.genders if d else None, required=false) }}
+    {% endcall %}
+    {% call form_section("About") %}
+      {{ field_for(schema, "description", "Description", current=d.description if d else None) }}
+    {% endcall %}
+    {% call form_section("Availability") %}
+      {{ field_for(schema, "schedule_text", "Schedule notes", current=d.schedule_text if d else None, help=schedule_notes_help() ) }}
+      {{ text_field("cost", "Cost", current=d.cost if d else None, required=false, help="Per-session fee or fee range for this intake.") }}
+    {% endcall %}
+    {{ actions(submit_label, cancel_url=cancel_url) }}
+  {%- endcall -%}
+{%- endmacro -%}
