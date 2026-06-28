@@ -1,0 +1,37 @@
+{# "Connect with the provider" panel — the right rail of the post detail
+   grid (`posts/detail.html`). One `<article>` that pairs the provider's
+   identity with the message form, so reaching the person behind a post is
+   a single self-contained unit on every kind.
+
+   Identity-only on EVERY kind: just the `provider` row + the message form.
+   The provider's practice context (location, insurance, languages,
+   how-to-refer) lives in the post body (`_provider_post_facts` for
+   openings/intakes, `_referral_facts` for referrals), so the seeking
+   (referral) and providing (opening/intake) detail pages stay symmetric —
+   the panel is purely the connection point.
+
+   Hand-rolls `<article>` + `<h2>` (allowlisted in
+   `template_component_check`) rather than composing `card()`: the `card`
+   macro's header is an `<h3>` list-item heading, and this detail-page
+   panel wants an `<h2>` section heading that sits level with the post's
+   own fact-group headings on the left.
+
+   Reads `view` / `post` / `can_act_as_provider` / `capabilities` from the
+   including context (detail.html). #}
+{%- from "_shared/sections.html" import fact, facts_block -%}
+{%- from "_shared/_provider_ref.html" import provider_ref -%}
+{%- from "_shared/_locked.html" import locked_action -%}
+<article data-row-id="connect-panel" data-kind="{{ post.kind }}">
+  <h2>Connect with the provider</h2>
+  {%- if view.provider_ref and (view.provider_ref.name or view.provider_ref.id) %}
+    {%- call facts_block() %}
+      {%- call fact('provider', 'Provider') %}{{ provider_ref(view.provider_ref, redacted=not can_act_as_provider) }}
+      {% endcall %}
+    {%- endcall %}
+  {%- endif %}
+  {% if can_act_as_provider %}
+    {% include "posts/_shared/_message_form.html" %}
+  {% else %}
+    {{ locked_action(capabilities.REASON_NOT_A_VERIFIED_PROVIDER, "Message", extra_class="secondary") }}
+  {% endif %}
+</article>

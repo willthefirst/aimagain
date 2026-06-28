@@ -224,6 +224,7 @@ def test_allowlist_only_contains_known_carveouts() -> None:
         "users/detail.html",
         "users/email_form.html",
         "posts/_shared/_message_form.html",
+        "posts/_shared/_connect_panel.html",
         "users/access/capabilities/index.html",
     }
     assert ALLOWLIST == expected

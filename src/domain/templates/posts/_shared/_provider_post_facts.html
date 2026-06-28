@@ -1,38 +1,69 @@
 {# Provider-post (clinician_opening + program_intake) DETAIL-page fact
-   display — grouped to mirror the create/edit form
-   (`_form_clinician_opening.html` / `_form_program_intake.html`).
+   display — the PROVIDING side of the network, structured to mirror the
+   SEEKING side (`_referral_facts.html`) so the two read as two halves of
+   one connection:
 
-   The post's own **self-describing** profile renders here; the
-   steady-state provider *context* (location, insurance, how-to-refer)
-   renders in the owner-context card in `posts/detail.html`. The read view
-   and the write view tell the same story in the same order — the form's
-   sections, in the form's order:
+     1. Logistics      — provider location + modality (the same
+                         `location_summary` row referrals use)
+     2. Service type   — services offered (+ "other" free text)
+     3. Clients served — the cohort (ages, genders) + languages spoken
+     4. About          — the announcement narrative
+     5. Coverage       — (opening) the affiliation's insurance posture
+        / How to refer    (intake) the program's website + how-to-refer
+     6. Availability   — schedule notes + cost (providing-only; no
+                         referral twin)
 
-     1. Service type    — services offered (+ "other" free text)
-     2. Clients served  — the cohort (ages, genders)
-     3. About           — the announcement narrative
-     4. Availability    — schedule notes + cost
+   The provider IDENTITY is not here — it lives in the "Connect with the
+   provider" panel (`_connect_panel.html`). Everything that describes the
+   practice itself (location, insurance, languages, how-to-refer) lives in
+   this body, leaving the panel as a pure connection point, symmetric with
+   the referral.
 
-   Delivery (in-person/virtual) is NOT a section here: it's shown in the
-   `.post-meta` modality chips above (and `location_summary` carries it on
-   the list card), so repeating it would be noise.
+   Steady-state practice context reads off the linked affiliation
+   (opening) or program (intake) via `post`; the announcement profile
+   (services / cohort / narrative / availability) reads off `view`.
+   `redacted` locks the location row for non-network viewers, same as the
+   referral's Logistics row.
 
    The sections live inside ONE `facts_grid()` so their key/value columns
-   align across every section (the read-side mirror of the form's single
-   aligned grid). Each section is a `fact_group("Title")` heading plus a
-   `fact_rows()` `<dl>`; a section with no values suppresses itself
-   (heading included) via the `{% if %}` guards.
-
-   No per-row icons: the section headings carry the organization.
-   Multi-value rows (services, ages, genders) stack one item per line via
-   `fact_list`. Reads from `view` (the `post_card_view` dict);
-   `CLIENT_AGE_GROUP_LABELS` / `GENDER_LABELS` are Jinja globals, and the
-   services row reuses `services_fact` so its priority-sort matches the
-   list card exactly. #}
+   align. Each is a `fact_group("Title")` heading + a `fact_rows()` `<dl>`;
+   a section with no values suppresses itself (heading included) via the
+   `{% if %}` guards. Multi-value rows (services, ages, genders, languages)
+   stack one item per line via `fact_list`. Display-label dicts
+   (`CLIENT_AGE_GROUP_LABELS`, `GENDER_LABELS`, `LANGUAGE_LABELS`) and
+   `location_summary` are Jinja globals; the services row reuses
+   `services_fact` so its priority-sort matches the list card exactly. #}
 {%- from "_shared/sections.html" import fact, fact_list, facts_grid, fact_group, fact_rows -%}
+{%- from "_shared/_affiliation_facts.html" import affiliation_facts -%}
+{%- from "_shared/_program_facts.html" import program_facts -%}
+{%- from "_shared/_locked.html" import locked_field -%}
 {%- from "posts/_shared/_facts_block.html" import services_fact -%}
-{% macro provider_post_facts(view) -%}
+{% macro provider_post_facts(view, post, redacted=False) -%}
+  {%- set ctx = namespace(aff=None, prog=None) -%}
+  {%- if view.kind == "clinician_opening" -%}
+    {%- set ctx.aff = post.opening_detail.clinician_affiliation -%}
+  {%- elif view.kind == "program_intake" -%}
+    {%- set ctx.prog = post.intake_detail.program -%}
+  {%- endif -%}
   {%- call facts_grid() %}
+    {%- set _location = location_summary(view) -%}
+    {%- if view.full_address or _location %}
+      {{ fact_group("Logistics") }}
+      {%- call fact_rows() %}
+        {#- One consolidated location row via the shared `location_summary`
+          global (state, then "In-person in <city>" and/or "Telehealth") —
+          the providing-side mirror of the referral's Logistics row, and
+          why the meta line no longer repeats the modality chips. Locked
+          for non-network viewers (the row still renders so they know a
+          location exists); `data-fact` stays `address`. -#}
+        {% if redacted %}
+          {%- call fact('address', 'Location') %}{{ locked_field(capabilities.REASON_NOT_A_VERIFIED_PROVIDER) }}
+          {% endcall %}
+        {% elif _location %}
+          {{ fact('address', 'Location', _location, icon='map-pin') }}
+        {% endif %}
+      {%- endcall %}
+    {%- endif %}
     {%- if view.services or view.services_other_text %}
       {{ fact_group("Service type") }}
       {%- call fact_rows() %}
@@ -42,7 +73,7 @@
         {%- endif %}
       {%- endcall %}
     {%- endif %}
-    {%- if view.ages or view.genders %}
+    {%- if view.ages or view.genders or view.languages or view.languages_other_text %}
       {{ fact_group("Clients served") }}
       {%- call fact_rows() %}
         {%- if view.ages %}
@@ -55,20 +86,46 @@
             {%- for g in view.genders -%}{%- set _ = _gs.append(GENDER_LABELS[g]) -%}{%- endfor -%}
               {{ fact_list('genders', 'Genders', _gs) }}
             {%- endif %}
-          {%- endcall %}
-        {%- endif %}
-        {%- if view.description %}
-          {{ fact_group("About") }}
-          {%- call fact_rows() %}
-            {{ fact('narrative', 'Narrative', view.description) }}
-          {%- endcall %}
-        {%- endif %}
-        {%- if view.schedule_text or view.cost %}
-          {{ fact_group("Availability") }}
-          {%- call fact_rows() %}
-            {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
-              {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
-              {%- endcall %}
-            {%- endif %}
-          {%- endcall %}
-        {%- endmacro %}
+            {%- if view.languages %}
+              {%- set _langs = [] -%}
+              {%- for l in view.languages -%}{%- set _ = _langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
+                {{ fact_list('languages', 'Languages', _langs) }}
+              {%- endif %}
+              {%- if view.languages_other_text %}
+                {{ fact('languages_other_text', 'Other language', view.languages_other_text) }}
+              {%- endif %}
+            {%- endcall %}
+          {%- endif %}
+          {%- if view.description %}
+            {{ fact_group("About") }}
+            {%- call fact_rows() %}
+              {{ fact('narrative', 'Narrative', view.description) }}
+            {%- endcall %}
+          {%- endif %}
+          {#- Steady-state practice context. Opening → the affiliation's insurance
+      posture under "Coverage" (mirrors the referral's Coverage), plus its
+      how-to-refer note. Intake → the program's website + how-to-refer (a
+      Program has no insurance) under "How to refer". -#}
+          {%- if ctx.aff and (ctx.aff.in_network_carriers or ctx.aff.accepts_out_of_network or ctx.aff.sliding_scale or ctx.aff.website or ctx.aff.referral_instructions) %}
+            {{ fact_group("Coverage") }}
+            {%- call fact_rows() %}
+              {{ affiliation_facts(ctx.aff) }}
+              {%- if ctx.aff.referral_instructions %}
+                {{ fact('referral_instructions', 'Referral instructions', ctx.aff.referral_instructions) }}
+              {%- endif %}
+            {%- endcall %}
+          {%- elif ctx.prog and (ctx.prog.website or ctx.prog.referral_instructions) %}
+            {{ fact_group("How to refer") }}
+            {%- call fact_rows() %}
+              {{ program_facts(ctx.prog) }}
+            {%- endcall %}
+          {%- endif %}
+          {%- if view.schedule_text or view.cost %}
+            {{ fact_group("Availability") }}
+            {%- call fact_rows() %}
+              {%- if view.schedule_text %}{{ fact('schedule_notes', 'Schedule notes', view.schedule_text) }}{%- endif %}
+                {%- if view.cost %}{{ fact('cost', 'Cost', view.cost) }}{%- endif %}
+                {%- endcall %}
+              {%- endif %}
+            {%- endcall %}
+          {%- endmacro %}

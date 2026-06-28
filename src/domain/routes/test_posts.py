@@ -568,9 +568,10 @@ async def test_referral_detail_meta_omits_modality_chips(
 ):
     """The referral detail's Logistics group carries the modality in its
     consolidated location row ("· Telehealth"), so the `.post-meta` identity
-    line no longer repeats it as chips — only the type pill, date, and
-    referring clinician live there. (Opening/intake keep the chips; that's
-    covered by their own kinds, not pinned here.)"""
+    line no longer repeats it as chips — only the type pill and date live
+    there (the referring provider moved to the about-provider section).
+    (Opening/intake keep the chips; that's covered by their own kinds, not
+    pinned here.)"""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(owner_id=author.id, session_format=["in_person", "virtual"])
@@ -692,14 +693,15 @@ async def test_referral_detail_narrative_is_row_of_about_the_client(
     assert "Teen seeking DBT" in narrative.text()
 
 
-async def test_referral_detail_links_referring_clinician_in_meta_not_a_card(
+async def test_referral_detail_shows_referring_provider_in_connect_card(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """A referral surfaces its referring clinician as a linked reference
-    in the meta line ("Referred by <name>"), NOT as an owner-context
-    card — that card is for openings/intakes only."""
+    """A referral surfaces its referring clinician in the shared
+    "Connect with the provider" card (the `connect-panel` right rail every
+    kind uses) — identity only, alongside the message form — and NOT in
+    the meta line."""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     referring = make_clinician_with_org(
@@ -723,16 +725,26 @@ async def test_referral_detail_links_referring_clinician_in_meta_not_a_card(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    # No owner-context section on a referral detail page.
-    assert tree.css_first("section#provider-profile") is None
-    assert "About this provider" not in tree.body.text()
-    # The referring clinician is a linked reference in the .post-meta line.
+    # The referring provider moved OUT of the meta line.
     meta = tree.css_first(".post-meta")
     assert meta is not None, ".post-meta identity line should render"
-    assert "Referred by" in meta.text(), meta.text()
+    assert "Referred by" not in meta.text(), meta.text()
+
+    # ...and INTO the "Connect with the provider" card, where the provider
+    # row links the referring clinician.
+    panel = tree.css_first('article[data-row-id="connect-panel"]')
+    assert panel is not None, "referral should render the connect-with-provider card"
+    assert "Connect with the provider" in panel.text()
+    provider_dd = panel.css_first('div[data-fact="provider"] dd')
+    assert provider_dd is not None, "provider identity row should render"
     assert (
-        meta.css_first(f'a[href="/clinicians/{referring.id}"]') is not None
+        provider_dd.css_first(f'a[href="/clinicians/{referring.id}"]') is not None
     ), "referring clinician name should link to the clinician detail page"
+    # Identity only: a referral suppresses the practice-marketing rows.
+    assert panel.css_first('div[data-fact="address"]') is None
+    assert panel.css_first('div[data-fact="insurance"]') is None
+    # The card also holds the message form (viewer is a verified provider).
+    assert panel.css_first("#post-message") is not None
 
 
 # --- Owner authz invariants ----------------------------------------------
@@ -1352,7 +1364,8 @@ async def test_detail_shows_identity_rows_for_verified_viewer(
     logged_in_user,
 ):
     """A verified viewer (can read the full feed) sees the real practice /
-    organization links and the full address — no locked placeholders."""
+    organization links (in the Connect panel) and the un-redacted location
+    (in the body's Logistics row) — no locked placeholders."""
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
     )
@@ -1374,20 +1387,25 @@ async def test_detail_shows_identity_rows_for_verified_viewer(
     tree = HTMLParser(response.text)
 
     assert tree.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
-    assert "Springfield, IL" in response.text
+    # Location renders un-redacted in the body's Logistics row (a
+    # `location_summary` — state always present, city only when in-person).
+    address_dd = tree.css_first('[data-fact="address"] dd')
+    assert address_dd is not None, "Logistics location row should render"
+    assert "IL" in address_dd.text(), address_dd.text()
     assert tree.css_first("button.locked-ghost-btn") is None
 
 
-async def test_opening_detail_splits_post_facts_from_practice_profile_section(
+async def test_opening_detail_renders_practice_context_in_body_not_panel(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
     """Opening detail renders the post's own self-describing profile
-    (services / cohort / cost / schedule) in the grouped facts up top, and
-    the steady-state practice *context* (insurance posture + how-to-refer
-    website) inside the `provider-profile` "About this provider" section —
-    structurally separate from the announcement profile."""
+    (services / cohort / cost / schedule) AND the steady-state practice
+    *context* (insurance posture + how-to-refer website) in the body — the
+    providing-side mirror of the referral. The `connect-panel` is
+    identity-only: the provider links + the message form, no practice
+    context."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
@@ -1415,12 +1433,12 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_section(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    section = tree.css_first("section#provider-profile")
-    assert section is not None, "owner-context section should render"
-    assert "About this provider" in section.text()
+    panel = tree.css_first('article[data-row-id="connect-panel"]')
+    assert panel is not None, "connect-with-provider card should render"
+    assert "Connect with the provider" in panel.text()
     # The provider identity row carries the clinician (linked) followed
     # by the org (linked) — the shared `provider_ref` denotation.
-    provider_dd = section.css_first('div[data-fact="provider"] dd')
+    provider_dd = panel.css_first('div[data-fact="provider"] dd')
     assert provider_dd is not None, "provider identity row should render"
     assert (
         provider_dd.css_first(f"a[href='/clinicians/{clinician.id}']") is not None
@@ -1429,38 +1447,37 @@ async def test_opening_detail_splits_post_facts_from_practice_profile_section(
         provider_dd.css_first(f"a[href='/organizations/{clinician.org.id}']")
         is not None
     ), "org name should link to the organization detail page"
-    # Steady-state context rows live inside the section (insurance posture +
-    # how-to-refer website). The opening's self-describing profile
-    # (services / age groups / etc.) is no longer on the affiliation, so
-    # it isn't rendered through this section.
+    # The panel is identity-only — the practice context is NOT in it.
+    assert panel.css_first('div[data-fact="insurance"]') is None
+    assert panel.css_first('div[data-fact="website"]') is None
+    # Insurance posture + how-to-refer website render in the body's Coverage
+    # section (the providing-side mirror of the referral's Coverage).
+    main = tree.css_first("div.post-detail-main")
+    assert main is not None
+    assert "Coverage" in main.text()
     for fact_key in ("insurance", "website"):
         assert (
-            section.css_first(f'div[data-fact="{fact_key}"]') is not None
-        ), f"{fact_key} should render inside the provider-profile section"
-    assert "Sliding scale" in section.text()
-    # The opening's own self-describing profile renders in the grouped
-    # facts up top — NOT through the owner-context section.
+            main.css_first(f'div[data-fact="{fact_key}"]') is not None
+        ), f"{fact_key} should render in the opening body"
+    assert "Sliding scale" in main.text()
+    # The opening's own self-describing profile renders in the body too.
     for fact_key in ("services", "ages", "cost", "schedule_notes"):
-        row = tree.css_first(f'div[data-fact="{fact_key}"]')
-        assert row is not None, f"{fact_key} should render on the detail page"
         assert (
-            section.css_first(f'div[data-fact="{fact_key}"]') is None
-        ), f"{fact_key} is the post's own profile, not steady-state context"
+            main.css_first(f'div[data-fact="{fact_key}"]') is not None
+        ), f"{fact_key} should render in the opening body"
     assert "Therapy — Individual" in tree.text()
 
 
-async def test_intake_detail_renders_program_profile_section(
+async def test_intake_detail_renders_program_context_in_body_not_panel(
     authenticated_client: AsyncClient,
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user,
 ):
-    """Intake detail renders the program's steady-state *context* inside
-    the `provider-profile` "About this provider" section via `program_facts`
-    — the Program now models only how-to-refer (website /
-    referral_instructions), so those rows live in the section. The provider
-    identity row links the program and its org. The intake's self-describing
-    profile (services / age groups / etc.) is no longer on the Program, so
-    it isn't rendered through this section."""
+    """Intake detail renders the program's how-to-refer context (website /
+    referral_instructions) in the body's "How to refer" section via
+    `program_facts`. The `connect-panel` is identity-only: the provider
+    links + the message form. The intake's self-describing profile
+    (services / age groups) renders in the body too."""
     # A verified viewer so the provider identity links render un-redacted.
     viewer_clinician = make_clinician_with_org(
         owner_id=logged_in_user.id, npi="1234567890"
@@ -1486,10 +1503,10 @@ async def test_intake_detail_renders_program_profile_section(
     assert response.status_code == 200
     tree = HTMLParser(response.text)
 
-    section = tree.css_first("section#provider-profile")
-    assert section is not None, "program owner-context section should render"
-    assert "About this provider" in section.text()
-    provider_dd = section.css_first('div[data-fact="provider"] dd')
+    panel = tree.css_first('article[data-row-id="connect-panel"]')
+    assert panel is not None, "program connect-with-provider card should render"
+    assert "Connect with the provider" in panel.text()
+    provider_dd = panel.css_first('div[data-fact="provider"] dd')
     assert provider_dd is not None, "provider identity row should render"
     assert (
         provider_dd.css_first(f"a[href='/programs/{program.id}']") is not None
@@ -1497,20 +1514,23 @@ async def test_intake_detail_renders_program_profile_section(
     assert (
         provider_dd.css_first(f"a[href='/organizations/{org.id}']") is not None
     ), "org name should link to the organization detail page"
-    # Steady-state context row lives inside the section (how-to-refer website).
+    # The panel is identity-only — the how-to-refer context is NOT in it.
+    assert panel.css_first('div[data-fact="website"]') is None
+    # Website renders in the body's "How to refer" section.
+    main = tree.css_first("div.post-detail-main")
+    assert main is not None
+    assert "How to refer" in main.text()
     assert (
-        section.css_first('div[data-fact="website"]') is not None
-    ), "website should render inside the provider-profile section"
-    assert "https://riseiop.example.com" in section.text()
+        main.css_first('div[data-fact="website"]') is not None
+    ), "website should render in the intake body"
+    assert "https://riseiop.example.com" in main.text()
     # The intake's own self-describing profile (services / cohort) renders
-    # in the grouped facts up top — NOT through the owner-context section.
-    # `_intake_post` seeds services=["therapy_group"], age_groups=[adolescents].
+    # in the body too. `_intake_post` seeds services=["therapy_group"],
+    # age_groups=[adolescents].
     for fact_key in ("services", "ages"):
-        row = tree.css_first(f'div[data-fact="{fact_key}"]')
-        assert row is not None, f"{fact_key} should render on the intake detail page"
         assert (
-            section.css_first(f'div[data-fact="{fact_key}"]') is None
-        ), f"{fact_key} is the post's own profile, not Program context"
+            main.css_first(f'div[data-fact="{fact_key}"]') is not None
+        ), f"{fact_key} should render in the intake body"
     assert "Therapy — Group" in tree.text()
 
 
