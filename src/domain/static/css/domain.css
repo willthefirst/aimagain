@@ -188,6 +188,21 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   .filter-form { display: none; }
 }
 
+/* ---- Post detail two-column layout --------------------------------------
+   The post's own facts fill the left 2/3; a "Connect with the provider"
+   card (provider meta + the message form) sits in the right 1/3 rail. On
+   narrow screens the rail stacks below the facts. */
+.post-detail-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+.post-detail-main { min-width: 0; }
+@media (max-width: 768px) {
+  .post-detail-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Profile step cards ───────────────────────────────────────
    Verification step cards used on profile-adjacent surfaces.
    Status badges surface completion state; border-left accents mark
