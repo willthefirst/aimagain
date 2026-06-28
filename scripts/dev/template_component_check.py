@@ -59,6 +59,10 @@ ALLOWLIST: frozenset[str] = frozenset(
         # Message-the-poster micro-form swaps itself in place on send;
         # the swap-self contract doesn't match `inline_add_form`.
         "posts/_shared/_message_form.html",
+        # "Connect with the provider" detail-page panel: a bespoke
+        # `<article>` + `<h2>` rail (the `card` macro's header is an `<h3>`
+        # list-item heading; this panel wants an `<h2>` section heading).
+        "posts/_shared/_connect_panel.html",
         # Capability-tree cards have a status badge inside the heading
         # band that the `picker` macro doesn't model.
         "users/access/capabilities/index.html",

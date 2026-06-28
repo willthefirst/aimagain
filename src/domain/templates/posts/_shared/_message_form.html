@@ -14,20 +14,27 @@
 
    Gating: rendered only when the viewer clears `can_act_as_provider`
    (the post detail template applies the gate); the route handler
-   enforces the same predicate server-side. #}
+   enforces the same predicate server-side.
+
+   Lives inside the "Connect with the provider" card on the post detail
+   page (the card header carries the title), so this fragment is just the
+   message field + submit. #}
 <form id="post-message"
       hx-post="{{ entity_url(entity_name, id=post.id, subresource='message') }}"
       hx-target="this"
       hx-swap="outerHTML"
       hx-target-4xx="this"
       hx-ext="json-enc">
+  {# Empty `<label>` wrapper — no visible text (the card's "Connect with
+     the provider" heading is the field's context), but it keeps Pico's
+     label-wrapped field spacing. `aria-label` names it for screen readers. #}
   <label>
-    Message to the poster
     <textarea name="body"
               rows="5"
               maxlength="2000"
               required
-              placeholder="Introduce yourself and ask whatever you'd like — the poster will get your message by email and can reply to you directly."></textarea>
+              aria-label="Your message"
+              placeholder="Say hi and what you're hoping to connect about — a sentence or two is plenty. They'll receive it as an email and can reply straight to your inbox."></textarea>
   </label>
-  <button type="submit">Send message</button>
+  <button type="submit">Connect</button>
 </form>
