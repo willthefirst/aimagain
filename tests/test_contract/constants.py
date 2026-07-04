@@ -2,6 +2,15 @@
 
 import uuid
 
+from src.framework.http.antibot import HONEYPOT_FIELD
+
+# The public auth forms (register, forgot-password) render a hidden
+# honeypot input (`_shared/antibot.html`); json-enc serializes it into
+# the request body as an empty string. The consumer contracts include it
+# so the pinned wire shape matches what the browser actually sends.
+# Sourced from the app so a rename can't drift the contract silently.
+HONEYPOT_FIELD_NAME = HONEYPOT_FIELD
+
 # Test user data
 TEST_EMAIL = "test.user@example.com"
 TEST_PASSWORD = "securepassword123"
