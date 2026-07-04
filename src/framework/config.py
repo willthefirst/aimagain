@@ -55,6 +55,18 @@ class Settings(BaseSettings):
     # future swap doesn't churn the deploy pipeline. Empty → no tag.
     APP_RELEASE: str = ""
 
+    # Anti-bot defense for the public auth forms (register, forgot-
+    # password) — see `src/framework/http/antibot.py`. The honeypot half
+    # runs unconditionally (no key, no network); the Cloudflare Turnstile
+    # challenge is gated on `CAPTCHA_ENABLED` so tests, local dev, and
+    # programmatic contract clients pass without a real key. Set all three
+    # in the prod `.env` to turn the challenge on. `TURNSTILE_SITE_KEY` is
+    # public (embedded in the rendered HTML widget); `TURNSTILE_SECRET_KEY`
+    # is server-side only (sent to Cloudflare's siteverify endpoint).
+    CAPTCHA_ENABLED: bool = False
+    TURNSTILE_SITE_KEY: str = ""
+    TURNSTILE_SECRET_KEY: str = ""
+
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @classmethod

@@ -12,6 +12,7 @@ from src.domain.models import User
 from src.domain.routes.dev_auth import DEV_SEED_USERS
 from src.framework import APIResponse, BaseRouter
 from src.framework.config import settings
+from src.framework.http.antibot import BotChallengeFailed, enforce_antibot
 from src.framework.http.form_error_handler import form_error_handler
 from src.framework.http.form_error_registry import register_form_error
 
@@ -247,6 +248,9 @@ def _render_validation_errors(exc: _MalformedForgotPasswordBody) -> "FormError":
     # the decorated function so the decorator catches it.
     template="auth/_forgot_password_form.html",
     handlers={_MalformedForgotPasswordBody: _render_validation_errors},
+    # Honeypot tripped / Turnstile token invalid → banner rerender.
+    # Registered in `src/framework/http/antibot.py`.
+    catches=(BotChallengeFailed,),
     require_htmx=False,
 )
 async def post_forgot_password(
@@ -277,6 +281,9 @@ async def post_forgot_password(
     Parsing inside the body lets the decorator render the inline
     error on the email field.
     """
+    # Reject bots before sending any reset email. Honeypot is always
+    # checked; the Turnstile challenge only when `CAPTCHA_ENABLED`.
+    await enforce_antibot(request)
     try:
         raw = await request.json()
     except Exception:

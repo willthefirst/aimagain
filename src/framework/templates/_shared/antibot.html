@@ -1,0 +1,35 @@
+{# `antibot_fields` — the hidden honeypot input plus the Cloudflare
+   Turnstile widget, dropped inside a public form's `{% call
+   form_with_errors(...) %}` block. Server-side enforcement lives in
+   `src/framework/http/antibot.py` (`enforce_antibot`); this macro only
+   renders the client half.
+
+   Honeypot: rendered offscreen + `aria-hidden` so no human (sighted or
+   screen-reader) encounters it, but a naive form-filling bot populates
+   `contact_url` and gets rejected. `position:absolute;left:-9999px`
+   rather than `display:none` because some bots skip display:none inputs.
+   `tabindex="-1"` + `autocomplete="off"` keep keyboard users and browser
+   autofill away from it. The field name MUST match `HONEYPOT_FIELD` in
+   `antibot.py`.
+
+   Turnstile: rendered only when `turnstile_site_key()` is non-empty
+   (i.e. `CAPTCHA_ENABLED` + a configured key — see the template global
+   in `rendering/templating.py`). The widget injects a hidden
+   `cf-turnstile-response` input which `hx-ext="json-enc"` serializes
+   into the JSON body alongside the real fields; `enforce_antibot` reads
+   it back. Loading the script per-form is fine — it's `async defer` and
+   these forms are single-widget pages. #}
+{% macro antibot_fields() -%}
+  <div aria-hidden="true" style="position:absolute;left:-9999px">
+    <label>
+      Leave this field empty
+      <input type="text" name="contact_url" tabindex="-1" autocomplete="off" />
+    </label>
+  </div>
+  {% if turnstile_site_key() %}
+    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key() }}"></div>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+            async
+            defer></script>
+  {% endif %}
+{%- endmacro %}

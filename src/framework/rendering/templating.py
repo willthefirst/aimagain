@@ -152,6 +152,22 @@ def viewer_is_admin() -> bool:
 _env.globals["viewer_is_admin"] = viewer_is_admin
 
 
+def turnstile_site_key() -> str:
+    """Return the Cloudflare Turnstile site key to embed in the anti-bot
+    widget, or "" when the challenge is disabled.
+
+    Registered as the ``turnstile_site_key`` template global so the
+    ``_shared/antibot.html`` macro can render the widget without the key
+    being threaded through every form's render context. Empty string
+    (challenge off) makes the macro skip the widget + script entirely —
+    the honeypot half still renders. See `src/framework/http/antibot.py`.
+    """
+    return settings.TURNSTILE_SITE_KEY if settings.CAPTCHA_ENABLED else ""
+
+
+_env.globals["turnstile_site_key"] = turnstile_site_key
+
+
 def register_template_globals(**kwargs: Any) -> None:
     """Add Jinja globals to the framework's environment.
 

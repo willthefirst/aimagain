@@ -5,6 +5,7 @@ from playwright.async_api import Page
 from tests.test_contract.constants import (
     CONSUMER_NAME_FORGOT_PASSWORD,
     FORGOT_PASSWORD_API_PATH,
+    HONEYPOT_FIELD_NAME,
     NETWORK_TIMEOUT_MS,
     PROVIDER_NAME_AUTH,
     PROVIDER_STATE_USER_CAN_REQUEST_PASSWORD_RESET,
@@ -34,7 +35,12 @@ async def test_consumer_forgot_password_form_interaction(
     full_mock_url = f"{mock_server_uri}{FORGOT_PASSWORD_API_PATH}"
 
     expected_request_headers = {"Content-Type": "application/json"}
-    expected_request_body = {"email": Like(TEST_EMAIL)}
+    # The hidden anti-bot honeypot rides along as an empty string (see
+    # `_shared/antibot.html` / `enforce_antibot`).
+    expected_request_body = {
+        "email": Like(TEST_EMAIL),
+        HONEYPOT_FIELD_NAME: Like(""),
+    }
 
     (
         pact.given(PROVIDER_STATE_USER_CAN_REQUEST_PASSWORD_RESET)

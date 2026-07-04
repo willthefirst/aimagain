@@ -225,6 +225,90 @@ async def test_register_htmx_duplicate_email_rerenders_form_with_field_error(
     assert "<h1>Create an account</h1>" not in body
 
 
+# --- Anti-bot: honeypot on the public forms ------------------------------
+#
+# The honeypot half of `enforce_antibot` runs unconditionally (no key, no
+# network — the Turnstile half is gated on CAPTCHA_ENABLED, which stays
+# False under `.env.test`). A submission with the hidden `contact_url`
+# field filled is a bot; it's rejected before any side effect. See
+# `src/framework/http/antibot.py` and its colocated `test_antibot.py` for
+# the verification-layer coverage.
+
+
+async def test_register_rejects_filled_honeypot(
+    test_client: AsyncClient, db_test_session_manager: async_sessionmaker[AsyncSession]
+):
+    """A non-HTMX register with the honeypot filled → clean 400 (not a
+    500), and no user row is created."""
+    response = await test_client.post(
+        "/auth/register",
+        json={
+            "email": "bot@example.com",
+            "password": "password123",
+            "contact_url": "http://spam.example",
+        },
+    )
+    assert response.status_code == 400
+    async with db_test_session_manager() as session:
+        user_db = SQLAlchemyUserDatabase(session, User)
+        assert await user_db.get_by_email("bot@example.com") is None
+
+
+async def test_register_htmx_filled_honeypot_rerenders_banner(
+    test_client: AsyncClient,
+):
+    """HTMX register + filled honeypot → 400 + form fragment carrying the
+    "couldn't verify you're human" banner (same rerender plumbing as the
+    duplicate-email path)."""
+    response = await test_client.post(
+        "/auth/register",
+        json={
+            "email": "bot2@example.com",
+            "password": "password123",
+            "contact_url": "spam",
+        },
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    assert 'class="form-banner"' in body
+    # Apostrophes are HTML-escaped in the rendered banner
+    # ("couldn&#39;t"), so match on an apostrophe-free slice of the copy.
+    assert "verify that you" in body.lower()
+    assert "human" in body.lower()
+    # Fragment-only — no page chrome.
+    assert "<!DOCTYPE" not in body
+    assert "<html" not in body
+
+
+async def test_register_happy_path_unaffected_by_honeypot(
+    test_client: AsyncClient,
+):
+    """A normal submission (honeypot omitted) still succeeds — the guard
+    must not break the happy path."""
+    response = await test_client.post(
+        "/auth/register",
+        json={"email": "real-person@example.com", "password": "password123"},
+    )
+    assert response.status_code == 201
+
+
+async def test_forgot_password_rejects_filled_honeypot(
+    test_client: AsyncClient, logged_in_user: User
+):
+    """Filled honeypot on forgot-password → 400 banner, and no reset
+    email path is taken (`enforce_antibot` runs before the lookup)."""
+    response = await test_client.post(
+        "/auth/forgot-password",
+        json={"email": logged_in_user.email, "contact_url": "spam"},
+        headers={"HX-Request": "true", "Content-Type": "application/json"},
+    )
+    assert response.status_code == 400
+    # Apostrophes are HTML-escaped in the banner; match an apostrophe-free slice.
+    assert "verify that you" in response.text.lower()
+
+
 async def test_login_success(test_client: AsyncClient, logged_in_user: User):
     login_data = {
         "username": logged_in_user.email,
@@ -595,6 +679,13 @@ async def test_get_register_page(test_client: AsyncClient):
     # server-side from email in `handle_registration`. Pin the absence
     # so the field doesn't sneak back in.
     assert 'name="username"' not in response.text
+    # Anti-bot honeypot is always rendered (offscreen); the Turnstile
+    # widget/script is NOT, because CAPTCHA_ENABLED is False under
+    # `.env.test` (`turnstile_site_key()` returns ""). See
+    # `src/framework/http/antibot.py`.
+    assert 'name="contact_url"' in response.text
+    assert "cf-turnstile" not in response.text
+    assert "challenges.cloudflare.com" not in response.text
 
 
 async def test_get_login_page(test_client: AsyncClient):
@@ -654,6 +745,9 @@ async def test_get_forgot_password_page(test_client: AsyncClient):
     # rewrite can't silently regress to form-encoding.
     assert 'hx-post="/auth/forgot-password"' in response.text
     assert 'hx-ext="json-enc"' in response.text
+    # Honeypot present; Turnstile widget absent (captcha off in tests).
+    assert 'name="contact_url"' in response.text
+    assert "cf-turnstile" not in response.text
 
 
 async def test_get_reset_password_page(test_client: AsyncClient):
