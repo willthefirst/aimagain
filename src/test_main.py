@@ -144,6 +144,58 @@ async def test_lifespan_skips_scheduler_entirely_when_disabled(monkeypatch):
         reg.assert_not_called()
 
 
+# --- 401 handling: one login URL, three client shapes ------------------
+#
+# `unauthorized_exception_handler` turns a 401 (typically an expired
+# session hitting an auth-gated route's `current_active_user` dependency)
+# into a login redirect for browsers while leaving JSON APIs untouched.
+# `POST /posts` is auth-gated; the 401 fires at the dependency *before*
+# the body is parsed, so an empty unauthenticated POST exercises the
+# handler for every client shape below.
+
+
+async def test_expired_session_htmx_submit_redirects_via_hx_header(
+    test_client: AsyncClient,
+):
+    """An HTMX form submit with no session gets `204` + `HX-Redirect` — NOT
+    the raw `{"detail": ...}` JSON, which `hx-target-4xx` would otherwise
+    swap into the form. htmx sends `Accept: */*`, so the redirect has to
+    key off the `HX-Request` header, not the Accept sniff."""
+    response = await test_client.post(
+        "/posts",
+        headers={"HX-Request": "true"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 204
+    assert response.headers["HX-Redirect"] == "/auth/login?next=/posts"
+    # No body — nothing for the response-targets extension to render.
+    assert response.text == ""
+
+
+async def test_expired_session_browser_nav_gets_302(test_client: AsyncClient):
+    """A full-page browser navigation (`Accept: text/html`, no `HX-Request`)
+    still gets the classic `302` to the login wall."""
+    response = await test_client.post(
+        "/posts",
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert response.headers["location"] == "/auth/login?next=/posts"
+
+
+async def test_expired_session_api_client_gets_json_401(test_client: AsyncClient):
+    """A JSON API client (no `HX-Request`, no `text/html`) keeps the
+    machine-readable `401` body — the redirect arms are browser-only."""
+    response = await test_client.post(
+        "/posts",
+        headers={"Accept": "application/json"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Unauthorized"}
+
+
 @pytest.mark.asyncio
 async def test_lifespan_starts_scheduler_when_enabled(monkeypatch):
     monkeypatch.delenv("DISABLE_SCHEDULER", raising=False)

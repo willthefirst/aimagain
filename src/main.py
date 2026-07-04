@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -117,14 +117,30 @@ else:
 
 @app.exception_handler(HTTPException)
 async def unauthorized_exception_handler(request: Request, exc: HTTPException):
-    """Redirect HTML 401s to /auth/login; pass JSON 401s through."""
+    """Send 401s to /auth/login for browsers; pass JSON 401s through to APIs.
+
+    Three client shapes, three responses — all landing on the same login
+    URL so the fix is uniform across every auth-gated surface:
+
+    - HTMX form submit (expired session mid-submit): htmx sends
+      `Accept: */*`, so the `text/html` sniff below misses it. Without
+      this branch it fell through to the JSON arm and the raw
+      `{"detail": ...}` body got swapped into the form by `hx-target-4xx`.
+      We detect the `HX-Request` header and answer `204` + `HX-Redirect`
+      instead — htmx honors that header regardless of status and does a
+      full-page navigation to login (no body to swap; matches the
+      `deleted_response` idiom in `framework/http/responses.py`).
+    - Full-page browser navigation (`Accept: text/html`): a plain `302`.
+    - API client (JSON): the original `{"detail": ...}` body, unchanged.
+
+    `next=<path>` round-trips the caller back after they re-auth.
+    """
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
-        accept_header = request.headers.get("accept", "")
-        if "text/html" in accept_header:
-            original_url = request.url.path
-            return RedirectResponse(
-                url=f"/auth/login?next={original_url}", status_code=302
-            )
+        login_url = f"/auth/login?next={request.url.path}"
+        if request.headers.get("HX-Request") == "true":
+            return Response(status_code=204, headers={"HX-Redirect": login_url})
+        if "text/html" in request.headers.get("accept", ""):
+            return RedirectResponse(url=login_url, status_code=302)
 
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
