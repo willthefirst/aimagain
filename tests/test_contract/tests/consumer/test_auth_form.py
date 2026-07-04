@@ -4,6 +4,7 @@ from playwright.async_api import Page
 
 from tests.test_contract.constants import (
     CONSUMER_NAME_REGISTRATION,
+    HONEYPOT_FIELD_NAME,
     NETWORK_TIMEOUT_MS,
     PROVIDER_NAME_AUTH,
     PROVIDER_STATE_USER_DOES_NOT_EXIST,
@@ -33,10 +34,13 @@ async def test_consumer_registration_form_interaction(
 
     expected_request_headers = {"Content-Type": "application/json"}
     # Signup form collects email + password only; the provider fills
-    # `username` from `email` server-side in `handle_registration`.
+    # `username` from `email` server-side in `handle_registration`. The
+    # hidden anti-bot honeypot rides along as an empty string (see
+    # `_shared/antibot.html` / `enforce_antibot`).
     expected_request_body = {
         "email": Like(TEST_EMAIL),
         "password": Like(TEST_PASSWORD),
+        HONEYPOT_FIELD_NAME: Like(""),
     }
 
     (

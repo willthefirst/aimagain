@@ -11,6 +11,7 @@ from src.domain.logic.auth.handlers import handle_registration
 from src.domain.logic.users.schema import UserCreate, UserRead
 from src.framework import BaseRouter
 from src.framework.audit.repository import AuditRepository
+from src.framework.http.antibot import BotChallengeFailed, enforce_antibot
 from src.framework.http.form_error_handler import form_error_handler
 from src.framework.persistence.dependencies import get_audit_repository
 
@@ -89,6 +90,10 @@ register_responses = {
     catches=(
         fa_users_exceptions.UserAlreadyExists,
         fa_users_exceptions.InvalidPasswordException,
+        # Honeypot tripped / Turnstile token invalid → banner rerender
+        # (HTMX) or a 400 for programmatic clients. Registered in
+        # `src/framework/http/antibot.py`.
+        BotChallengeFailed,
     ),
 )
 async def register_request_handler(
@@ -97,6 +102,9 @@ async def register_request_handler(
     user_manager: BaseUserManager[models.UP, models.ID] = Depends(get_user_manager),
     audit_repo: AuditRepository = Depends(get_audit_repository),
 ):
+    # Reject bots before creating any account. Honeypot is always
+    # checked; the Turnstile challenge only when `CAPTCHA_ENABLED`.
+    await enforce_antibot(request)
     logger.debug(f"Handling registration for email: {request_data.email}")
     created_user = await handle_registration(
         request_data=request_data,
