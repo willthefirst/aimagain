@@ -46,7 +46,7 @@
   {%- call facts_grid() %}
     {%- set _location = location_summary(view) -%}
     {%- if view.full_address or _location %}
-      {{ fact_group("Logistics") }}
+      {{ fact_group(REFERRAL_SECTIONS.logistics) }}
       {%- call fact_rows() %}
         {#- One consolidated location row via the shared `location_summary`
           global (state always, then "In-person in <city>" and/or
@@ -68,7 +68,7 @@
       {%- endcall %}
     {%- endif %}
     {%- if view.services or view.settings or view.services_other_text or view.languages or view.languages_other_text %}
-      {{ fact_group("Service type") }}
+      {{ fact_group(REFERRAL_SECTIONS.service_type) }}
       {%- call fact_rows() %}
         {{ services_fact(view, multiline=True) }}
         {%- if view.services_other_text %}
@@ -89,7 +89,7 @@
         {%- endcall %}
       {%- endif %}
       {%- if view.ages or view.pronouns or view.pronouns_other_text or view.description %}
-        {{ fact_group("About the client") }}
+        {{ fact_group(REFERRAL_SECTIONS.about_client) }}
         {%- call fact_rows() %}
           {%- if view.ages %}
             {#- Singular `Age` — a referral describes one client. -#}
@@ -112,7 +112,7 @@
               {%- endcall %}
             {%- endif %}
             {%- if view.insurance_carriers or view.insurance_carriers_other_text or view.accepts_private_pay or view.sliding_scale %}
-              {{ fact_group("Payment options") }}
+              {{ fact_group(REFERRAL_SECTIONS.payment) }}
               {%- call fact_rows() %}
                 {#- Private pay / sliding scale lead the group (mirroring the
           form's Payment options order), then the carriers. A non-empty

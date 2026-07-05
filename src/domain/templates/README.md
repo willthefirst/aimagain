@@ -60,10 +60,10 @@ Every label, legend, help string, button, and intro paragraph in `src/domain/tem
 
 ### Required vs. optional fields
 
-Requiredness is owned entirely by the `required=` argument to any form-field macro — never markup it yourself. It emits the control's own HTML `required` attribute (which enforces the field client-side and conveys the semantics to assistive tech). There is **no visual label decoration** — required and optional fields' labels look identical; the browser surfaces the requirement on submit.
+Pass `required=` to any form-field macro — never mark up requiredness yourself. The *mechanism* (it emits the control's HTML `required` attribute, and there is **no visual label decoration**) lives in the [`form_fields.html`](../../framework/templates/_shared/form_fields.html) docstring. The copy consequence is what belongs here: since required and optional fields look identical, **never announce optionality in prose** — no `(optional)`, no `help="Optional."`, no fieldset-level "everything below is optional" lines.
 
 ```jinja
-{# Required (the default for most macros) — emits the `required` attribute #}
+{# Required (the default for most macros) #}
 {{ text_field("last_name", "Last name", help="As it appears on your license.") }}
 
 {# Optional — pass required=False; no "Optional." prose #}
@@ -72,8 +72,6 @@ Requiredness is owned entirely by the `required=` argument to any form-field mac
 {# Bad — don't announce optionality in prose #}
 {{ text_field("npi", "NPI", required=False, help="Optional. Adding your NPI lets us cross-check your identity against NPPES.") }}
 ```
-
-Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — labels are bare and requiredness lives on the control.
 
 ### Buttons
 

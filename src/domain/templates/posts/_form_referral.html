@@ -55,7 +55,7 @@ override it.
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Referring as", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {% call form_section("Logistics", description="Where and how the client can meet.") %}
+    {% call form_section(REFERRAL_SECTIONS.logistics, description="Where and how the client can meet.") %}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
       {# Session-format is a multi-checkbox — any subset of
          {in_person, virtual}. Empty = "unspecified". #}
@@ -64,7 +64,7 @@ override it.
         {{ text_field("location_city", "City", current=d.location_city if d else None, required=false, help="City or area for in-person sessions.") }}
       {% endcall %}
     {% endcall %}
-    {% call form_section("Service type", description="What the client needs a provider to offer.") %}
+    {% call form_section(REFERRAL_SECTIONS.service_type, description="What the client needs a provider to offer.") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {% call conditional_field("services:other") %}
         {{ textarea_field("services_other_text", "Other services (specify)", current=d.services_other_text if d else None, required=false) }}
@@ -79,7 +79,7 @@ override it.
         {{ text_field("languages_other_text", "Other language (specify)", current=d.languages_other_text if d else None, required=false) }}
       {% endcall %}
     {% endcall %}
-    {% call form_section("About the client", description="Who the client is.") %}
+    {% call form_section(REFERRAL_SECTIONS.about_client, description="Who the client is.") %}
       {# A referral describes one client, so age is a single value — the
          options use the singular noun ("Child", not "Children"). The wire
          shape stays `age_groups: list[str]`; the form renders a single
@@ -95,7 +95,7 @@ override it.
      and sliding scale are independent opt-ins and lead the section; the
      carrier list is the in-network statement (a non-empty list = in-network;
      there's no separate "has insurance" checkbox). #}
-    {% call form_section("Payment options", description="Payment paths the provider must accept.") %}
+    {% call form_section(REFERRAL_SECTIONS.payment, description="Payment paths the provider must accept.") %}
       {{ checkbox_field("accepts_private_pay", "Private pay", current=(d.accepts_private_pay if d else False) ) }}
       {{ checkbox_field("sliding_scale", "Sliding scale", current=(d.sliding_scale if d else False) ) }}
       {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="The client's insurance carrier(s) — leave empty if none apply.") }}

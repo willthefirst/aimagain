@@ -27,6 +27,10 @@ from httpx import AsyncClient
 from selectolax.parser import HTMLParser
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from src.domain.logic.posts.sections import (
+    REFERRAL_SECTION_ORDER,
+    REFERRAL_SECTIONS,
+)
 from src.domain.models import Clinician, Organization, Post, Program
 from src.domain.models.enums import CLIENT_AGE_GROUP_LABELS_SINGULAR
 from src.domain.models.org_representations.org_representation import OrgRepresentation
@@ -495,12 +499,7 @@ async def test_referral_detail_groups_facts_like_the_form(
     tree = HTMLParser(response.text)
 
     headings = [h.text(strip=True) for h in tree.css(".facts-grid > h2.fact-group")]
-    assert headings == [
-        "Logistics",
-        "Service type",
-        "About the client",
-        "Payment options",
-    ], headings
+    assert headings == list(REFERRAL_SECTION_ORDER), headings
 
     facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
     assert {
@@ -624,7 +623,7 @@ async def test_referral_detail_suppresses_empty_coverage_group(
     tree = HTMLParser(response.text)
 
     headings = [h.text(strip=True) for h in tree.css(".facts-grid > h2.fact-group")]
-    assert "Payment options" not in headings, headings
+    assert REFERRAL_SECTIONS.payment not in headings, headings
 
 
 async def test_referral_detail_locks_client_address_for_non_provider(
@@ -1092,16 +1091,41 @@ async def test_referral_form_uses_client_oriented_section_labels(
     # clinician's mental flow: Logistics / Service type / About the
     # client / Payment options. The original "Client's coverage" /
     # "Provider sought" framing collapsed into these four sections.
-    assert "Logistics" in page_text
-    assert "Service type" in page_text
-    assert "About the client" in page_text
-    assert "Payment options" in page_text
+    for title in REFERRAL_SECTION_ORDER:
+        assert title in page_text, title
     # Payment options carries the insurance-carrier multi-select (the
     # in-network statement — there's no separate "has insurance" checkbox);
     # the payment-path checkboxes lead the section, then the carriers.
     assert (
         tree.css_first('input[name="insurance_carriers"]') is not None
     ), "the Payment options section must carry the insurance_carriers field"
+
+
+async def test_referral_form_section_titles_come_from_the_shared_source(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The write view's section headings are exactly `REFERRAL_SECTION_ORDER`,
+    in order. Paired with `test_referral_detail_groups_facts_like_the_form`
+    (which asserts the *read* view's headings against the same tuple), this
+    pins that both render from `domain.logic.posts.sections` — a section
+    rename is one edit there and can't drift between form and detail."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    titles = [
+        h.text(strip=True)
+        for h in tree.css(
+            "section.form-section > h2, section.form-section > hgroup > h2"
+        )
+    ]
+    assert titles == list(REFERRAL_SECTION_ORDER), titles
 
 
 async def test_referral_form_languages_is_provider_oriented_under_service_type(
@@ -1133,11 +1157,12 @@ async def test_referral_form_languages_is_provider_oriented_under_service_type(
         for s in tree.css("section.form-section")
         if s.css_first("h2")
     }
-    assert "Service type" in sections
+    assert REFERRAL_SECTIONS.service_type in sections
     assert (
-        sections["Service type"].css_first('[name="languages"]') is not None
+        sections[REFERRAL_SECTIONS.service_type].css_first('[name="languages"]')
+        is not None
     ), "languages must render inside the Service type section"
-    about = sections.get("About the client")
+    about = sections.get(REFERRAL_SECTIONS.about_client)
     assert (
         about is None or about.css_first('[name="languages"]') is None
     ), "languages must no longer live under About the client"
@@ -1177,7 +1202,7 @@ async def test_referral_detail_languages_row_is_under_service_type(
         elif node.css_first('[data-fact="languages"]') is not None:
             owner = current
             break
-    assert owner == "Service type", owner
+    assert owner == REFERRAL_SECTIONS.service_type, owner
 
 
 async def test_referral_form_fields_carry_help_descriptions(
