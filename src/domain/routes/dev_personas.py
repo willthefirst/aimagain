@@ -9,6 +9,10 @@ consumers need:
   - ``scripts/dev/seed/overrides/clinicians.py`` — to optionally
     anchor a Clinician owned by this persona with the right
     ``clinician_verified`` state.
+  - ``scripts/dev/seed/overrides/posts.py`` — to exclude personas from
+    the generic post-owner round-robin (post ownership has to reflect
+    each kind's capability gate) and to anchor authored posts for the
+    persona that holds the publishing capability.
   - ``src/domain/routes/dev_auth.py`` — to surface the persona in the
     quick-sign-in dropdown with a human-readable label.
 
