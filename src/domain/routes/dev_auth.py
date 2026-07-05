@@ -75,8 +75,8 @@ async def _login_response(
 
     # `auth_backend.login(strategy, user)` builds a Response with the
     # cookie set by CookieTransport. Swap status + Location so the browser
-    # lands on `/` carrying the freshly-set cookie; `/` redirects to
-    # `/home`, the signed-in hub (see `src/main.py:read_root`).
+    # lands on `/` carrying the freshly-set cookie; `/` then redirects an
+    # authed viewer to the referral board (see `src/main.py:read_root`).
     response = await auth_backend.login(get_strategy(), user)
     response.status_code = 302
     response.headers["Location"] = "/"

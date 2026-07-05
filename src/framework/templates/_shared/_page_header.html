@@ -15,16 +15,16 @@ identical across pages at one size.
 `{% include %}` can't see the including template's `{% block %}`s, so
 `base.html` captures the breadcrumb / toolbar block output into context
 vars and this partial renders them as pre-rendered HTML. The partial
-inherits the caller's context, so `_on_home` / `_on_posts` /
-`_on_profile` / `is_authenticated` resolve normally. `_on_home` marks
-the brand logo with `aria-current="page"` when the viewer is on /home.
+inherits the caller's context, so `_on_posts` / `_on_users_me` /
+`is_authenticated` resolve normally.
 
-When authenticated, the primary nav is: brand link (→ `/home`, the
-signed-in hub) → a `Post` link (fronted by a `plus` glyph → the post
-create form) → an avatar `<details>` menu (My posts → the viewer's own
-posts via `?owner=me`, Account → the self user page, Sign out via
-`hx-post`). Anonymous visitors get the brand link only (also → `/home`,
-which falls through to the public landing page for them).
+When authenticated, the primary nav is: brand link (→ the referral
+board, `entity_url('post') ~ '?kind=referral'` — the signed-in "home")
+→ a `Post` link (fronted by a `plus` glyph → the post create form) → an
+avatar `<details>` menu (My posts → the viewer's own posts via
+`?owner=me`, Account → the self user page, Sign out via `hx-post`).
+Anonymous visitors get the brand link only, pointing at `/` (the public
+landing page for them).
 
 The band's lower rows (breadcrumb + toolbar) render only when there's
 app chrome to show — any breadcrumb or toolbar content, or an
@@ -35,7 +35,7 @@ page gets the full constant-boundary band.
 Required context (set by `base.html` before the include):
   _breadcrumb_html — rendered `{% block breadcrumb %}` output (may be empty)
   _toolbar_html    — rendered `{% block toolbar %}` output (may be empty)
-  is_authenticated, _on_home, _on_posts, _on_users_me — nav state
+  is_authenticated, _on_posts, _on_users_me — nav state
 
 See `templates/README.md` § "Page chrome contract" for the slot list
 and the constant-boundary rationale (one source of truth).
@@ -58,7 +58,7 @@ and the constant-boundary rationale (one source of truth).
     <nav aria-label="Primary">
       <ul>
         <li>
-          <a href="/home" {% if _on_home %}aria-current="page"{% endif %}><strong>Bedlam Connect</strong></a>
+          <a href="{% if is_authenticated %}{{ entity_url("post") }}?kind=referral{% else %}/{% endif %}"><strong>Bedlam Connect</strong></a>
         </li>
       </ul>
       {% if is_authenticated %}
