@@ -116,7 +116,7 @@ def test_cr_enum_defaults_render_via_label_dict():
     assert d.location_state == "NY"
     # `accepts_private_pay` defaults to False; JSON `insurance_carriers`
     # defaults to [] (a non-empty list is the in-network signal — there's
-    # no boolean). The detail renders no Coverage rows in this state.
+    # no boolean). The detail renders no Payment options rows in this state.
     assert d.accepts_private_pay is False
     assert d.insurance_carriers == []
 

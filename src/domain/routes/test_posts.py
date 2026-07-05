@@ -469,8 +469,8 @@ async def test_referral_detail_groups_facts_like_the_form(
 ):
     """A fully-populated referral detail surfaces the same four section
     headings as the create/edit form — Logistics / Service type / About
-    the client / Coverage — as `fact_group` headings inside one aligned
-    `facts_grid`, with the relevant `data-fact` rows under them."""
+    the client / Payment options — as `fact_group` headings inside one
+    aligned `facts_grid`, with the relevant `data-fact` rows under them."""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(
@@ -499,7 +499,7 @@ async def test_referral_detail_groups_facts_like_the_form(
         "Logistics",
         "Service type",
         "About the client",
-        "Coverage",
+        "Payment options",
     ], headings
 
     facts = {n.attributes.get("data-fact") for n in tree.css(".facts-grid [data-fact]")}
@@ -603,7 +603,7 @@ async def test_referral_detail_suppresses_empty_coverage_group(
 ):
     """A group with nothing to show renders no heading. A referral that
     accepts no payment paths and names no carriers drops the whole
-    Coverage section — no bare heading over an empty group."""
+    Payment options section — no bare heading over an empty group."""
     viewer = _verified_provider_clinician(logged_in_user.id)
     author = create_test_user(username=f"author-{uuid.uuid4()}")
     post = _referral_post(
@@ -624,7 +624,7 @@ async def test_referral_detail_suppresses_empty_coverage_group(
     tree = HTMLParser(response.text)
 
     headings = [h.text(strip=True) for h in tree.css(".facts-grid > h2.fact-group")]
-    assert "Coverage" not in headings, headings
+    assert "Payment options" not in headings, headings
 
 
 async def test_referral_detail_locks_client_address_for_non_provider(
@@ -1075,9 +1075,9 @@ async def test_referral_form_uses_client_oriented_section_labels(
     person being placed), not the referrer — so the section legends and
     labels say so. Pins the client-oriented copy introduced when the
     referral/opening data-home split was surfaced in the UI: the payment
-    section is the client's coverage, the provider-attribute fields are
-    grouped under "Provider sought", and the languages label names the
-    client."""
+    section names the client's payment options. (Languages is the one
+    provider-oriented axis — the language the provider should speak — and
+    lives under "Service type", pinned separately below.)"""
     clinician = make_clinician_with_org(owner_id=logged_in_user.id)
     async with db_test_session_manager() as session:
         async with session.begin():
@@ -1090,17 +1090,150 @@ async def test_referral_form_uses_client_oriented_section_labels(
     page_text = tree.body.text()
     # The reworked referral form groups fields around the referring
     # clinician's mental flow: Logistics / Service type / About the
-    # client / Coverage. The original "Client's coverage" / "Provider
-    # sought" framing collapsed into these four sections.
+    # client / Payment options. The original "Client's coverage" /
+    # "Provider sought" framing collapsed into these four sections.
     assert "Logistics" in page_text
     assert "Service type" in page_text
     assert "About the client" in page_text
-    assert "Coverage" in page_text
-    # Coverage leads with the insurance-carrier multi-select (the in-network
-    # statement — there's no separate "has insurance" checkbox).
+    assert "Payment options" in page_text
+    # Payment options carries the insurance-carrier multi-select (the
+    # in-network statement — there's no separate "has insurance" checkbox);
+    # the payment-path checkboxes lead the section, then the carriers.
     assert (
         tree.css_first('input[name="insurance_carriers"]') is not None
-    ), "the Coverage section must carry the insurance_carriers field"
+    ), "the Payment options section must carry the insurance_carriers field"
+
+
+async def test_referral_form_languages_is_provider_oriented_under_service_type(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Languages on a referral is a service-fit axis — the language the
+    provider must speak (a client seeks a provider who speaks X) — not a
+    client demographic. So it lives under the "Service type" section (with
+    Services), not "About the client". The label stays terse ("Languages",
+    matching the detail page) and the help carries the provider-orientation
+    so it isn't read as a client attribute."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    page_text = tree.body.text()
+    lang_help = tree.css_first("small#languages-helper")
+    assert lang_help is not None, "languages must carry a provider-orientation help"
+    assert lang_help.text().strip() == "The language(s) the provider should speak."
+    assert "Languages the client speaks" not in page_text
+    sections = {
+        s.css_first("h2").text(strip=True): s
+        for s in tree.css("section.form-section")
+        if s.css_first("h2")
+    }
+    assert "Service type" in sections
+    assert (
+        sections["Service type"].css_first('[name="languages"]') is not None
+    ), "languages must render inside the Service type section"
+    about = sections.get("About the client")
+    assert (
+        about is None or about.css_first('[name="languages"]') is None
+    ), "languages must no longer live under About the client"
+
+
+async def test_referral_detail_languages_row_is_under_service_type(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The detail mirrors the form: the languages row renders inside the
+    "Service type" fact-group, not "About the client"."""
+    viewer = _verified_provider_clinician(logged_in_user.id)
+    author = create_test_user(username=f"author-{uuid.uuid4()}")
+    post = _referral_post(
+        owner_id=author.id,
+        services=["therapy_individual"],
+        languages=["es"],
+    )
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(viewer)
+            session.add(author)
+            session.add(post)
+
+    response = await authenticated_client.get(f"/posts/{post.id}")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # Walk the grid in document order, tracking the current fact-group, to
+    # find which group owns the languages row.
+    current = None
+    owner = None
+    for node in tree.css(".facts-grid > *"):
+        classes = node.attributes.get("class") or ""
+        if node.tag == "h2" and "fact-group" in classes:
+            current = node.text(strip=True)
+        elif node.css_first('[data-fact="languages"]') is not None:
+            owner = current
+            break
+    assert owner == "Service type", owner
+
+
+async def test_referral_form_fields_carry_help_descriptions(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Structured referral fields carry an optional description (the
+    `help=` slot on the field macro) so the form guides the referrer on
+    what a field is for. Pins the Narrative guidance end-to-end: the
+    `<small id="description-helper">` renders inside the field and the
+    control is wired to it via `aria-describedby` (Pico's canonical helper
+    pattern — the same wiring `_shared/form_fields.html` emits for every
+    `help=`)."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    helper = tree.css_first("small#description-helper")
+    assert helper is not None, "Narrative field must render a help description"
+    assert helper.text().strip().startswith("Briefly describe the patient")
+    textarea = tree.css_first('textarea[name="description"]')
+    assert textarea is not None
+    assert (
+        textarea.attributes.get("aria-describedby") == "description-helper"
+    ), "the Narrative field must link its help text via aria-describedby"
+
+
+async def test_referral_form_sections_state_their_perspective(
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """Each section carries a one-line perspective intro
+    (`form_section(description=…)`) so the form makes explicit which
+    fields describe the client vs. the provider the client is seeking.
+    Pins that the intros render as the muted `<p>` of each section's
+    Pico `<hgroup>`."""
+    clinician = make_clinician_with_org(owner_id=logged_in_user.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(clinician)
+
+    response = await authenticated_client.get("/posts/form?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    descs = {d.text(strip=True) for d in tree.css("section.form-section > hgroup > p")}
+    assert {
+        "What the client needs a provider to offer.",
+        "Payment paths the provider must accept.",
+        "Who the client is.",
+    } <= descs, descs
 
 
 async def test_referral_form_age_group_options_are_singular(

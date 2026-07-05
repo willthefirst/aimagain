@@ -103,7 +103,8 @@
             {%- endcall %}
           {%- endif %}
           {#- Steady-state practice context. Opening → the affiliation's insurance
-      posture under "Coverage" (mirrors the referral's Coverage), plus its
+      posture under "Coverage" (the providing-side counterpart of the
+      referral's "Payment options"), plus its
       how-to-refer note. Intake → the program's website + how-to-refer (a
       Program has no insurance) under "How to refer". -#}
           {%- if ctx.aff and (ctx.aff.in_network_carriers or ctx.aff.accepts_out_of_network or ctx.aff.sliding_scale or ctx.aff.website or ctx.aff.referral_instructions) %}
