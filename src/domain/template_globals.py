@@ -22,6 +22,7 @@ from src.domain.logic.posts.schema import (
     ProgramIntakeCreate,
     ReferralCreate,
 )
+from src.domain.logic.posts.sections import REFERRAL_SECTIONS
 from src.domain.logic.posts.view import (
     insurance_posture_for_post,
     location_summary,
@@ -118,6 +119,12 @@ register_template_globals(
     # read POST_KINDS[k].noun via the labels helpers. See
     # `src/domain/models/posts/post_kinds.py`.
     POST_KINDS=POST_KINDS,
+    # `REFERRAL_SECTIONS` is the single source for the referral form's
+    # section titles, shared by the write view (`_form_referral.html`
+    # `form_section(...)`) and the read view (`_referral_facts.html`
+    # `fact_group(...)`) so the mirrored headings can't drift. See
+    # `src.domain.logic.posts.sections`.
+    REFERRAL_SECTIONS=REFERRAL_SECTIONS,
     # Post-specific view helpers.
     insurance_posture=insurance_posture_for_post,
     referral_headline=referral_headline,
