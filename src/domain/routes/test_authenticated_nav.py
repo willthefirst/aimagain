@@ -33,10 +33,10 @@ async def test_authenticated_primary_nav_redesign(authenticated_client: AsyncCli
     nav = HTMLParser(response.text).css_first('nav[aria-label="Primary"]')
     assert nav is not None
 
-    # Brand → /home (the quicklinks hub).
+    # Brand → the referral board (the signed-in "home" surface).
     brand = nav.css_first("a strong")
     assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
-    assert brand.parent.attributes.get("href") == "/home"
+    assert brand.parent.attributes.get("href") == "/posts?kind=referral"
 
     # `Post` is a plain link (no `role=button`, no `+`) → the post create form.
     posts = [a for a in nav.css("a") if a.text(strip=True) == "Post"]
