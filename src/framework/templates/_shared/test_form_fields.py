@@ -1,16 +1,19 @@
 """Tests for the form-field render macros in ``_shared/form_fields.html``.
 
-Each macro renders a labelled control with Pico-canonical structure:
+Each macro renders a labelled control whose label + optional helper are
+grouped in a column-1 `.form-field-prompt`, with the control in column 2:
 
   <label>
-    <text>
+    <span class="form-field-prompt">
+      <span class="form-field-label">…</span>
+      <small id="<name>-helper">        ← optional, present when help= passed
+    </span>
     <input | select | textarea>
-    <small id="<name>-helper">          ← optional, present when help= passed
   </label>
 
 These tests pin that contract so future edits don't silently regress the
-shape (helper text drifting outside the label is exactly the bug class
-that motivated the rewrite).
+shape (helper text drifting outside the label, or back under the control,
+is exactly the bug class that motivated grouping it with the label).
 """
 
 from __future__ import annotations
@@ -72,12 +75,12 @@ def test_text_field_renders_label_wrapping_input_no_helper() -> None:
 
 
 def test_text_field_with_help_emits_small_inside_label_linked_via_aria() -> None:
-    """`help=` renders a `<small id="<name>-helper">` *inside* the
-    `<label>` after the input, and the input carries
-    `aria-describedby` pointing at it."""
+    """`help=` renders a `<small id="<name>-helper">` grouped with the
+    label in the column-1 `.form-field-prompt` (so it sits under the
+    label), and the input carries `aria-describedby` pointing at it."""
     html = _render(
         _make_env(),
-        '{{ text_field("npi", "NPI", help="10-digit National Provider Identifier. Optional.") }}',
+        '{{ text_field("npi", "NPI", help="10-digit National Provider Identifier.") }}',
     )
     tree = HTMLParser(html)
     label = tree.css_first('label[for="npi"]')
@@ -87,8 +90,12 @@ def test_text_field_with_help_emits_small_inside_label_linked_via_aria() -> None
     small = label.css_first("small#npi-helper")
     assert small is not None
     assert "10-digit National Provider Identifier" in small.text()
-    # Small is a child of the label, not a sibling.
-    assert tree.css_first('label[for="npi"] > small#npi-helper') is not None
+    # The small lives inside the label's `.form-field-prompt` wrapper
+    # (grouped with the label), not as a bare sibling of the label.
+    assert (
+        tree.css_first('label[for="npi"] > .form-field-prompt > small#npi-helper')
+        is not None
+    )
 
 
 def test_text_field_help_is_emitted_as_safe_so_inline_links_render() -> None:
@@ -227,6 +234,36 @@ def test_multi_select_field_with_help_links_group_via_aria() -> None:
     assert group is not None
     assert group.attributes.get("aria-describedby") == "tags-helper"
     assert tree.css_first("small#tags-helper") is not None
+
+
+def test_help_small_is_grouped_with_label_before_the_control() -> None:
+    """The helper `<small>` is grouped with the label inside the column-1
+    `.form-field-prompt`, which precedes the control in the DOM — so the
+    helper renders directly under the label rather than under the field.
+    Holds for a single-line input and for a tall control (the multi_select
+    checkbox list), which is the whole reason the prompt wrapper exists."""
+    env = _make_env()
+
+    # Single-line input: label + helper in the prompt, prompt before input.
+    text_html = _render(env, '{{ text_field("npi", "NPI", help="Ten digits.") }}')
+    prompt = HTMLParser(text_html).css_first(".form-field-prompt")
+    assert prompt is not None
+    assert prompt.css_first("span.form-field-label") is not None
+    assert prompt.css_first("small#npi-helper") is not None
+    assert text_html.index("form-field-prompt") < text_html.index(
+        'name="npi"'
+    ), "the prompt (label + helper) must come before the control"
+
+    # Tall control: the helper still sits in the prompt, ahead of the list.
+    ms_html = _render(
+        env, '{{ multi_select_field("tags", "Tags", ("a", "b"), help="Pick any.") }}'
+    )
+    ms_prompt = HTMLParser(ms_html).css_first(".form-field-prompt")
+    assert ms_prompt is not None
+    assert ms_prompt.css_first("small#tags-helper") is not None
+    assert ms_html.index("form-field-prompt") < ms_html.index(
+        "checkbox-list"
+    ), "the prompt must precede the checkbox list so the helper hugs the label"
 
 
 def test_multi_select_field_marks_current_values_checked() -> None:
@@ -403,52 +440,29 @@ def test_composite_select_field_current_wins_over_default_first() -> None:
     assert selected[0].attributes.get("value") == "b"
 
 
-# --- required indicator ---------------------------------------------------
+# --- no required/optional indicator ---------------------------------------
 
 
-def test_required_marker_has_no_literal_space_before_marker() -> None:
-    """Spacing between the label text and the required `*` marker is
-    owned by `.form-field-required { margin-inline-start }` in
-    `framework.css` — the macro must not emit a literal space character
-    before `<span class="form-field-required">`. Whitespace-as-spacing
-    in markup is the anti-pattern this test pins against regression.
-    """
-    html = _render(_make_env(), '{{ text_field("name", "Name", required=true) }}')
-    # The label text and the `<span>` must be flush in the rendered
-    # source — no run of one-or-more whitespace chars between them.
-    assert "Name<span" in html, (
-        "Expected label text flush against `<span>` (CSS owns the "
-        f"gap). Rendered HTML: {html!r}"
-    )
-
-
-def test_required_marker_renders_inside_form_field_label_span() -> None:
-    """When `required=true`, the `<span class="form-field-required">`
-    lives inside the `<span class="form-field-label">` next to the label
-    text. This is what lets the CSS rule key off `.form-field-required`
-    without any additional selector specificity. The marker is
-    `aria-hidden` decoration (the control's `required` attribute carries
-    the semantics for assistive tech)."""
-    html = _render(_make_env(), '{{ text_field("name", "Name", required=true) }}')
-    tree = HTMLParser(html)
-    span = tree.css_first("span.form-field-label")
-    assert span is not None
-    marker = span.css_first("span.form-field-required")
-    assert marker is not None
-    assert marker.text().strip() == "*"
-    assert marker.attributes.get("aria-hidden") == "true"
-
-
-def test_optional_field_has_no_required_marker() -> None:
-    """The flip side of the contract: when `required=false`, no marker
-    is rendered at all — optional fields are signaled by the *absence*
-    of the `*`, not by any `(optional)` text."""
-    html = _render(_make_env(), '{{ text_field("zip", "ZIP", required=false) }}')
-    tree = HTMLParser(html)
-    span = tree.css_first("span.form-field-label")
-    assert span is not None
-    assert span.css_first("span.form-field-required") is None
-    assert "(optional)" not in html
+def test_no_required_marker_is_rendered_for_required_or_optional_fields() -> None:
+    """Forms carry no visual required/optional indicator: the `*` marker
+    and its `.form-field-required` span were removed. The label renders
+    the bare label text whether the field is required or optional — the
+    only carrier of requiredness is the control's own `required`
+    attribute (semantics + client-side validation), not any label
+    decoration or `(optional)` prose."""
+    for markup in (
+        '{{ text_field("name", "Name", required=true) }}',
+        '{{ text_field("zip", "ZIP", required=false) }}',
+    ):
+        html = _render(_make_env(), markup)
+        assert "form-field-required" not in html
+        label_text = HTMLParser(html).css_first("span.form-field-label").text()
+        assert "*" not in label_text
+        assert "(optional)" not in html
+    # The required control still emits the HTML `required` attribute — the
+    # semantics live there, not on the label.
+    req = _render(_make_env(), '{{ text_field("name", "Name", required=true) }}')
+    assert "required" in HTMLParser(req).css_first("input").attributes
 
 
 # --- checkbox_field -------------------------------------------------------
@@ -554,16 +568,15 @@ def test_checkbox_field_with_help_emits_small_linked_via_aria() -> None:
     assert "Useful note." in small.text()
 
 
-def test_checkbox_field_required_false_by_default_shows_no_marker() -> None:
+def test_checkbox_field_required_false_by_default() -> None:
     """Checkbox fields default to `required=False` because the
     overwhelming use case is feature flags (where "unchecked" is a
-    meaningful answer). Being optional, the label carries no required
-    `*` marker."""
+    meaningful answer), so the checkbox emits no HTML `required`
+    attribute by default."""
     html = _render(_make_env(), '{{ checkbox_field("x", "X") }}')
-    tree = HTMLParser(html)
-    span = tree.css_first("span.form-field-label")
-    assert span is not None
-    assert span.css_first("span.form-field-required") is None
+    checkbox = HTMLParser(html).css_first('input[type="checkbox"]')
+    assert checkbox is not None
+    assert "required" not in checkbox.attributes
 
 
 # --- conditional_field ----------------------------------------------------
@@ -621,6 +634,28 @@ def test_form_section_wraps_caller_in_section_with_heading() -> None:
     assert heading.text().strip() == "Coverage"
     # The called body renders inside the same section, after the heading.
     assert section.css_first('input[name="plan_name"]') is not None
+    # No description passed → bare <h2>, no <hgroup>.
+    assert section.css_first("hgroup") is None
+
+
+def test_form_section_description_uses_pico_hgroup() -> None:
+    """`form_section(title, description=…)` pairs the heading with a
+    subheading using Pico's native `<hgroup>` (the `<h2>` + a muted
+    `<p>`), rendered before the called body — the section's perspective
+    line (e.g. "who the fields are about"). No custom class."""
+    html = _render(
+        _make_env(),
+        '{% call form_section("Coverage", description="Payment the provider accepts.") %}'
+        '{{ text_field("plan_name", "Plan name") }}'
+        "{% endcall %}",
+    )
+    tree = HTMLParser(html)
+    hgroup = tree.css_first("section.form-section > hgroup")
+    assert hgroup is not None
+    assert hgroup.css_first("h2").text().strip() == "Coverage"
+    assert hgroup.css_first("p").text().strip() == "Payment the provider accepts."
+    # Order: the hgroup (heading + subheading) precedes the called body.
+    assert html.index("<hgroup") < html.index("plan_name")
 
 
 # --- error-state contract (pattern, parametrized over every macro) -------
@@ -760,10 +795,8 @@ def test_input_macro_no_error_no_help_omits_describedby_and_small(
     assert (
         "aria-describedby" not in control.attributes
     ), f"{macro_name}: aria-describedby must be absent without help/error"
-    # `<small id="x-helper">` is the helper/error slot; the macros also
-    # emit a sibling `<span class="form-field-required">*</span>` inside
-    # the label when `required` (so required fields carry the marker).
-    # Only the helper slot must be absent.
+    # `<small id="x-helper">` is the helper/error slot; it must be absent
+    # when neither help nor error is set.
     assert (
         tree.css_first("small#x-helper") is None
     ), f"{macro_name}: <small id='x-helper'> must be absent without help/error"

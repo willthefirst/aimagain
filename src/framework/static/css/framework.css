@@ -246,16 +246,24 @@ dd { margin: 0; }
    Markup contract (emitted by `_shared/form_fields.html` macros):
 
      <label class="form-field" for="x">
-       <span class="form-field-label">Label</span>
-       <input id="x" ... />
-       <small id="x-helper">helper</small>     {# optional #}
+       <span class="form-field-prompt">          {# col 1 #}
+         <span class="form-field-label">Label</span>
+         <small id="x-helper">helper</small>     {# optional #}
+       </span>
+       <input id="x" ... />                       {# col 2 #}
      </label>
+
+   The label and its helper `<small>` are grouped in a `.form-field-prompt`
+   wrapper that occupies column 1, so the helper text sits directly under
+   the label — even when the control (a textarea, a scrolling
+   `.checkbox-list`) is tall. (Previously the `<small>` was the label's
+   last child, after the control, and dropped to column 2 under the field.)
 
    Every macro funnels through this shape — including `checkbox_field`,
    which emits a sibling `<input type="hidden">` immediately before
    the checkbox itself. The hidden input has `display: none` from the
    browser default so it doesn't take a grid slot; layout still falls
-   to the label-span (col 1) and the visible checkbox (col 2).
+   to the prompt (col 1) and the visible checkbox (col 2).
 
    Mobile (≤640px): the parent's grid collapses to a single
    column; subgrids inherit that automatically and the labels
@@ -290,10 +298,13 @@ dd { margin: 0; }
   grid-column: 1 / -1;
   row-gap: var(--pico-spacing);
 }
-/* Section heading — a plain Pico `<h2>` (default size/weight/spacing).
-   The only custom rule spans it across both columns; its default margin
-   carries the separation between groups. */
-.entity-form-page form > .form-section > h2 {
+/* Section heading — a plain Pico `<h2>`, or an `<hgroup>` (heading +
+   muted subheading `<p>`) when `form_section` is given a `description=`.
+   Both span both columns; the `<h2>`/`<hgroup>` default margin carries
+   the separation between groups. Pico styles the `<hgroup> > p` as the
+   muted subheading, so no custom perspective-line rule is needed. */
+.entity-form-page form > .form-section > h2,
+.entity-form-page form > .form-section > hgroup {
   grid-column: 1 / -1;
 }
 /* Every child of the form/section that ISN'T a `.form-field` spans both
@@ -304,31 +315,21 @@ dd { margin: 0; }
 .entity-form-page form > .form-section > :not(.form-field) {
   grid-column: 1 / -1;
 }
-/* Form-field row: subgrid so label sits in col 1, control col 2. */
+/* Form-field row: subgrid so label sits in col 1, control col 2. Items
+   are NOT baseline-aligned: the column-1 prompt (label + helper) top-aligns
+   with the control, so the label/helper block hugs the top of the row next
+   to a tall control (textarea, scrolling `.checkbox-list`) instead of
+   floating to the control's baseline. */
 .entity-form-page form .form-field {
   display: grid;
   grid-template-columns: subgrid;
   grid-column: 1 / -1;
-  align-items: baseline;
   row-gap: 0.25rem;
   margin: 0;
   padding: 0;
   border: 0;
 }
 .form-field-label { font-weight: 500; }
-/* Required `*` marker rendered by every form-field macro when
-   `required` (the default for most macros). Reads as an accent-colored
-   asterisk next to the label so required fields stand out while optional
-   ones carry no marker at all — the single source of truth lives in
-   `_field_label` (see `_shared/form_fields.html`). The marker is
-   `aria-hidden` decoration; the control's own `required` attribute
-   conveys requiredness to assistive tech. The label-to-`*` gap is owned
-   here — `_field_label` emits no literal whitespace between the two. */
-.form-field-required {
-  font-weight: 400;
-  color: var(--pico-color-red-600);
-  margin-inline-start: 0.2em;
-}
 .entity-form-page form .form-field > input,
 .entity-form-page form .form-field > select,
 .entity-form-page form .form-field > textarea { margin: 0; min-width: 0; }
@@ -403,20 +404,33 @@ dd { margin: 0; }
 .form-field[aria-invalid="true"] > .checkbox-list {
   border-color: var(--pico-form-element-invalid-border-color);
 }
-.entity-form-page form .form-field > small {
-  grid-column: 2;
+/* The prompt (label + helper) is column 1; it stacks the label above the
+   helper `<small>` so the helper reads directly under the label. Baseline
+   alignment on the `.form-field` row aligns the label with the control on
+   the right, and the helper flows below the label regardless of control
+   height. */
+.entity-form-page form .form-field > .form-field-prompt {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  row-gap: 0.25rem;
+  min-width: 0;
+}
+.entity-form-page form .form-field-prompt > small {
   margin: 0;
   color: var(--pico-muted-color);
 }
-/* Error state: when an input/select/textarea inside a `.form-field`
-   row carries `aria-invalid="true"` (set by the macros' `error=`
-   param), the sibling `<small id="<name>-helper">` carries the
+/* Error state: when the control carries `aria-invalid="true"` (set by the
+   macros' `error=` param), the `<small id="<name>-helper">` carries the
    error text instead of the helper text (Pico's canonical
-   one-small-per-field pattern). The selector mirrors the muted
-   rule above's specificity and adds an attribute selector so it
-   wins; Pico's own `~ small` rule for invalid forms is overridden
-   by the rule above, so we restate it here at matching depth. */
-.entity-form-page form .form-field > [aria-invalid="true"] ~ small {
+   one-small-per-field pattern). Now that the `<small>` lives in the
+   column-1 prompt rather than as a following sibling of the control, the
+   `~` combinator no longer reaches it — a `:has()` on the row matches the
+   control's invalid state (a direct child for input/select/textarea) or
+   the group's own invalid state (`multi_select_field` sets `aria-invalid`
+   on the `.form-field[role="group"]` wrapper itself). */
+.entity-form-page form .form-field:has(> [aria-invalid="true"]) .form-field-prompt > small,
+.entity-form-page form .form-field[aria-invalid="true"] .form-field-prompt > small {
   color: var(--pico-del-color);
 }
 /* Form-level error banner rendered above the fields by the
@@ -443,17 +457,12 @@ dd { margin: 0; }
   grid-template-columns: max-content 1fr;
   grid-column: auto;
 }
-.entity-form-page form .grid > .form-field > small { grid-column: 2; }
 @media (max-width: 640px) {
   .entity-form-page form {
     grid-template-columns: 1fr;
   }
-  .entity-form-page form .form-field > small,
-  .entity-form-page form .grid > .form-field,
-  .entity-form-page form .grid > .form-field > small {
-    grid-column: 1;
-  }
   .entity-form-page form .grid > .form-field {
+    grid-column: 1;
     grid-template-columns: 1fr;
   }
 }

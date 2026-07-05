@@ -8,9 +8,9 @@
      1. Logistics       — one redaction-aware `location_summary` row
                           (state always, then "In-person in <city>" and/or
                           "Telehealth"; locked for non-verified viewers)
-     2. Service type    — services sought (+ "other" free text)
-     3. About the client — age, pronouns, languages, narrative
-     4. Coverage        — accepted payment paths + insurance carriers
+     2. Service type    — services + languages sought (+ "other" free text)
+     3. About the client — age, pronouns, narrative
+     4. Payment options — accepted payment paths + insurance carriers
 
    The narrative is the LAST row of "About the client" — same section,
    same position as the form's "Narrative" field — not a special block;
@@ -67,41 +67,43 @@
         {% endif %}
       {%- endcall %}
     {%- endif %}
-    {%- if view.services or view.settings or view.services_other_text %}
+    {%- if view.services or view.settings or view.services_other_text or view.languages or view.languages_other_text %}
       {{ fact_group("Service type") }}
       {%- call fact_rows() %}
         {{ services_fact(view, multiline=True) }}
         {%- if view.services_other_text %}
           {{ fact('services_other_text', 'Other services', view.services_other_text) }}
         {%- endif %}
-      {%- endcall %}
-    {%- endif %}
-    {%- if view.ages or view.pronouns or view.pronouns_other_text or view.languages or view.languages_other_text or view.description %}
-      {{ fact_group("About the client") }}
-      {%- call fact_rows() %}
-        {%- if view.ages %}
-          {#- Singular `Age` — a referral describes one client. -#}
-          {%- set ages = [] -%}
-          {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
-            {{ fact_list('age', 'Age', ages) }}
+        {#- Languages the provider should speak — a service-fit axis, not a
+          client demographic (mirrors the form, where languages sits under
+          Service type after services). Detail always lists languages (no
+          English-only suppression — that's a card-only density concern). -#}
+        {%- if view.languages %}
+          {%- set langs = [] -%}
+          {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
+            {{ fact_list('languages', 'Languages', langs) }}
           {%- endif %}
-          {%- if view.pronouns %}
-            {%- set _pron_labels = [] -%}
-            {%- for p in view.pronouns -%}{%- set _ = _pron_labels.append(PRONOUNS_LABELS[p]) -%}{%- endfor -%}
-              {{ fact_list('pronouns', 'Pronouns', _pron_labels) }}
+          {%- if view.languages_other_text %}
+            {{ fact('languages_other_text', 'Other language', view.languages_other_text) }}
+          {%- endif %}
+        {%- endcall %}
+      {%- endif %}
+      {%- if view.ages or view.pronouns or view.pronouns_other_text or view.description %}
+        {{ fact_group("About the client") }}
+        {%- call fact_rows() %}
+          {%- if view.ages %}
+            {#- Singular `Age` — a referral describes one client. -#}
+            {%- set ages = [] -%}
+            {%- for g in view.ages -%}{%- set _ = ages.append(CLIENT_AGE_GROUP_LABELS[g]) -%}{%- endfor -%}
+              {{ fact_list('age', 'Age', ages) }}
             {%- endif %}
-            {%- if view.pronouns_other_text %}
-              {{ fact('pronouns_other_text', 'Other pronouns', view.pronouns_other_text) }}
-            {%- endif %}
-            {%- if view.languages %}
-              {#- Detail always lists languages (no English-only suppression —
-            that's a list-density concern for the card only). -#}
-              {%- set langs = [] -%}
-              {%- for l in view.languages -%}{%- set _ = langs.append(LANGUAGE_LABELS[l]) -%}{%- endfor -%}
-                {{ fact_list('languages', 'Languages', langs) }}
+            {%- if view.pronouns %}
+              {%- set _pron_labels = [] -%}
+              {%- for p in view.pronouns -%}{%- set _ = _pron_labels.append(PRONOUNS_LABELS[p]) -%}{%- endfor -%}
+                {{ fact_list('pronouns', 'Pronouns', _pron_labels) }}
               {%- endif %}
-              {%- if view.languages_other_text %}
-                {{ fact('languages_other_text', 'Other language', view.languages_other_text) }}
+              {%- if view.pronouns_other_text %}
+                {{ fact('pronouns_other_text', 'Other pronouns', view.pronouns_other_text) }}
               {%- endif %}
               {#- Narrative is the last field of "About the client" in the form
           (`_form_referral.html`); the detail mirrors that — same section,
@@ -110,21 +112,22 @@
               {%- endcall %}
             {%- endif %}
             {%- if view.insurance_carriers or view.insurance_carriers_other_text or view.accepts_private_pay or view.sliding_scale %}
-              {{ fact_group("Coverage") }}
+              {{ fact_group("Payment options") }}
               {%- call fact_rows() %}
-                {#- A non-empty carrier list is the in-network statement —
-          there's no separate "In-network: Yes" row. Private pay / sliding
-          scale render as their own rows when set. -#}
-                {%- if view.insurance_carriers %}
-                  {%- set _carrier_labels = [] -%}
-                  {%- for c in view.insurance_carriers -%}{%- set _ = _carrier_labels.append(INSURANCE_CARRIER_LABELS[c]) -%}{%- endfor -%}
-                    {{ fact_list('insurance_carriers', 'Insurance carriers', _carrier_labels) }}
-                  {%- endif %}
-                  {%- if view.insurance_carriers_other_text %}
-                    {{ fact('insurance_carriers_other_text', 'Other carrier', view.insurance_carriers_other_text) }}
-                  {%- endif %}
-                  {%- if view.accepts_private_pay %}{{ fact('accepts_private_pay', 'Private pay', 'Yes') }}{%- endif %}
-                    {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
+                {#- Private pay / sliding scale lead the group (mirroring the
+          form's Payment options order), then the carriers. A non-empty
+          carrier list is the in-network statement — there's no separate
+          "In-network: Yes" row. -#}
+                {%- if view.accepts_private_pay %}{{ fact('accepts_private_pay', 'Private pay', 'Yes') }}{%- endif %}
+                  {%- if view.sliding_scale %}{{ fact('sliding_scale', 'Sliding scale', 'Yes') }}{%- endif %}
+                    {%- if view.insurance_carriers %}
+                      {%- set _carrier_labels = [] -%}
+                      {%- for c in view.insurance_carriers -%}{%- set _ = _carrier_labels.append(INSURANCE_CARRIER_LABELS[c]) -%}{%- endfor -%}
+                        {{ fact_list('insurance_carriers', 'Insurance carriers', _carrier_labels) }}
+                      {%- endif %}
+                      {%- if view.insurance_carriers_other_text %}
+                        {{ fact('insurance_carriers_other_text', 'Other carrier', view.insurance_carriers_other_text) }}
+                      {%- endif %}
                     {%- endcall %}
                   {%- endif %}
                 {%- endcall %}

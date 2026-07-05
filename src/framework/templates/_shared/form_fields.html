@@ -8,19 +8,22 @@ boilerplate.
 ## Helper text (`help=...`)
 
 Every input macro accepts `help=None`. When set, it renders a `<small>`
-**inside the wrapping `<label>`** as a sibling of the input (Pico's
-canonical pattern — https://picocss.com/docs/forms/input). The input
-also receives `aria-describedby="<name>-helper"` so screen readers
-associate the helper text with the input.
+grouped with the label inside a `.form-field-prompt` wrapper (column 1),
+so the helper text sits **directly under the label**, above/left of the
+control — even when the control is tall (a textarea, a scrolling
+`.checkbox-list`). The control receives `aria-describedby="<name>-helper"`
+so screen readers associate the helper text with the input.
 
-  {{ text_field("npi", "NPI", help="10-digit National Provider Identifier. Optional.") }}
+  {{ text_field("npi", "NPI", help="10-digit National Provider Identifier.") }}
 
 Produces:
 
   <label for="npi">
-    NPI
+    <span class="form-field-prompt">
+      <span class="form-field-label">NPI</span>
+      <small id="npi-helper">10-digit National Provider Identifier.</small>
+    </span>
     <input type="text" id="npi" name="npi" aria-describedby="npi-helper" />
-    <small id="npi-helper">10-digit National Provider Identifier. Optional.</small>
   </label>
 
 If a field needs HTML inside the help text (e.g. an inline link), pass
@@ -45,14 +48,16 @@ this implicitly via the `error=` parameter below.
 `error` is a string. When set, the macro follows Pico's canonical
 invalid-form pattern (https://picocss.com/docs/forms/input):
 
-  - the `<small id="<name>-helper">` slot carries the error text
-    instead of the helper text (one small per field, single id),
+  - the `<small id="<name>-helper">` slot (in the column-1 prompt)
+    carries the error text instead of the helper text (one small per
+    field, single id),
   - the input keeps `aria-describedby="<name>-helper"` so screen
     readers announce the error,
-  - the input auto-sets `aria-invalid="true"` — Pico colors both the
-    input and the sibling `<small>` red via its
-    `[aria-invalid="true"] ~ small` rule (callers don't pass
-    `invalid=` redundantly alongside `error=`).
+  - the input auto-sets `aria-invalid="true"` — Pico colors the input
+    red, and `framework.css` colors the `<small>` red via a `:has()`
+    rule on the row (the `<small>` is no longer a following sibling of
+    the control, so Pico's own `~ small` rule can't reach it). Callers
+    don't pass `invalid=` redundantly alongside `error=`.
 
 If both `help=` and `error=` are set, the error wins — the helper text
 is suppressed for that render so the visible message is the actionable
@@ -163,25 +168,29 @@ emitted attribute string. #}
   {%- if error %}<small id="{{ name }}-helper">{{ error }}</small>
   {%- elif help %}<small id="{{ name }}-helper">{{ help|safe }}</small>{%- endif %}
 {%- endmacro %}
-{# Field label + required indicator. Every macro funnels its label through
-   here so the required `*` marker is the *only* way requiredness is
-   communicated visually — required fields get the marker, optional fields
-   get nothing (no `help="Optional."`, no `(optional)` text). Callers never
-   render the marker themselves; passing `required=` to any field macro is
-   the whole contract.
+{# Column-1 "prompt" block: the label and its helper/error `<small>`
+   stacked together above/left of the control. Grouping them in one
+   wrapper (rather than emitting the `<small>` as the label's last child
+   after the control) is what keeps the helper text tucked directly under
+   the label even when the control is tall (a textarea, a scrolling
+   `.checkbox-list`) — the grid places this whole block in column 1 and
+   the control in column 2. `label_id` is set only where the control
+   points at the label via `aria-labelledby` (the `multi_select_field`
+   group, which isn't a `<label for>`). The error/muted coloring of the
+   `<small>` is owned by `framework.css` (`.form-field-prompt small`) —
+   the control's `aria-invalid` no longer sits as a preceding sibling of
+   the `<small>`, so the CSS uses `:has()` instead of `~`.
 
-   The marker is `aria-hidden` decoration: requiredness is conveyed to
-   assistive tech by the control's own `required` attribute (every text-like
-   macro emits it when `required`), so the `*` is purely visual. The gap
-   between the label and the `*` is owned by
-   `.form-field-required { margin-inline-start }` in `framework.css` — do
-   not introduce literal whitespace here (spacing belongs in CSS, not
-   markup). Pinned by ``test_form_fields.py`` (marker presence + no
-   literal-space markup) and ``src/domain/templates/test_copy_conventions.py``
-   (no prose duplicating the marker).
-#}
-{% macro _field_label(label, required) -%}
-  {{ label }}{%- if required -%}<span class="form-field-required" aria-hidden="true">*</span>{%- endif -%}
+   No visual required/optional indicator: requiredness is conveyed to
+   assistive tech (and enforced client-side) by the control's own
+   `required` attribute — every text-like macro emits it when `required`
+   — but nothing decorates the label. #}
+{% macro _field_prompt(name, label, help, error, label_id=None) -%}
+  <span class="form-field-prompt">
+    <span class="form-field-label"
+          {% if label_id %}id="{{ label_id }}"{% endif %}>{{ label }}</span>
+    {{- _help_small(name, help, error) }}
+  </span>
 {%- endmacro %}
 {# ---- text-like inputs --------------------------------------------- #}
 {% macro text_field(name, label, current=None, required=True, pattern=None, maxlength=None, help=None, invalid=None, error=None, type="text", autocomplete=None) -%}
@@ -191,7 +200,7 @@ emitted attribute string. #}
   {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
+    {{ _field_prompt(name, label, help, error) }}
     <input type="{{ type }}"
            id="{{ name }}"
            name="{{ name }}"
@@ -202,7 +211,6 @@ emitted attribute string. #}
            {% if required %}required{% endif %}
            {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
            {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %} />
-    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {% macro textarea_field(name, label, current=None, required=True, help=None, invalid=None, error=None) -%}
@@ -212,13 +220,12 @@ emitted attribute string. #}
   {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
+    {{ _field_prompt(name, label, help, error) }}
     <textarea id="{{ name }}"
               name="{{ name }}"
               {% if required %}required{% endif %}
               {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
               {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>{{ current or "" }}</textarea>
-    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# `url_field` is `text_field(type="url")` with a more readable callsite.
@@ -235,7 +242,7 @@ emitted attribute string. #}
   {%- set current = _form_values[name] if name in _form_values else current -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}"{% if hidden %} hidden{% endif %}>
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
+    {{ _field_prompt(name, label, help, error) }}
     <select id="{{ name }}"
             name="{{ name }}"
             {% if required %}required{% endif %}
@@ -246,7 +253,6 @@ emitted attribute string. #}
         <option value="{{ v }}"{% if current == v %} selected{% endif %}>{{ labels[v] if labels else v }}</option>
       {%- endfor %}
     </select>
-    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# Multi-selection rendered as a scrollable list of checkboxes. One
@@ -268,10 +274,10 @@ emitted attribute string. #}
 
    Required: `required=False` by default ("any subset, including the
    empty set" is the canonical semantic — no in-network carriers, no
-   featured services), so no `*` marker is shown. Callers can pass
-   `required=True` to surface the `*` marker, but HTML can't natively
-   require "at least one of these checkboxes" — server-side validation
-   owns that (there's no native `required` attribute to lean on here). #}
+   featured services). `required=True` is accepted for symmetry, but
+   HTML can't natively require "at least one of these checkboxes" —
+   server-side validation owns that (there's no native `required`
+   attribute to lean on here). #}
 {% macro multi_select_field(name, label, options, labels=None, current=None, required=False, help=None, invalid=None, error=None) -%}
   {%- set _form_errors = form_errors|default({}, true) -%}
   {%- set _form_values = form_values|default({}, true) -%}
@@ -285,7 +291,7 @@ emitted attribute string. #}
        aria-labelledby="{{ name }}-label"
        {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
        {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %}>
-    <span class="form-field-label" id="{{ name }}-label">{{ _field_label(label, required) }}</span>
+    {{ _field_prompt(name, label, help, error, label_id=name ~ "-label") }}
     <div class="checkbox-list">
       {%- for v in options %}
         <label>
@@ -297,7 +303,6 @@ emitted attribute string. #}
         </label>
       {%- endfor %}
     </div>
-    {{- _help_small(name, help, error) }}
   </div>
 {%- endmacro %}
 {# `<select>` populated from a list of entity rows — the canonical
@@ -327,7 +332,7 @@ emitted attribute string. #}
   {%- set current_s = current|string if current is not none else "" -%}
   {%- set aria_invalid = true if error else invalid -%}
   <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
+    {{ _field_prompt(name, label, help, error) }}
     <select id="{{ name }}"
             name="{{ name }}"
             {% if required %}required{% endif %}
@@ -344,7 +349,6 @@ emitted attribute string. #}
         <option value="{{ ev }}"{% if current_s == ev|string %} selected{% endif %}>{{ el }}</option>
       {%- endfor %}
     </select>
-    {{- _help_small(name, help, error) }}
   </label>
 {%- endmacro %}
 {# `<select>` populated from a pre-built list of `(value, label)` tuples.
@@ -375,7 +379,7 @@ emitted attribute string. #}
   {%- set aria_invalid = true if error else invalid -%}
   {%- set ns = namespace(matched=false) -%}
   <label class="form-field" for="{{ name }}">
-    <span class="form-field-label">{{ _field_label(label, required) }}</span>
+    {{ _field_prompt(name, label, help, error) }}
     <select id="{{ name }}"
             name="{{ name }}"
             {% if required %}required{% endif %}
@@ -391,15 +395,14 @@ emitted attribute string. #}
                   {% if is_current_match or is_default %}selected{% endif %}>{{ l }}</option>
         {%- endfor %}
       </select>
-      {{- _help_small(name, help, error) }}
     </label>
   {%- endmacro %}
   {# ---- checkbox ----------------------------------------------------- #}
   {# Single boolean checkbox as a normal form-grid row. The label sits in
    column 1 and the `<input type="checkbox">` sits in column 2 — same
-   markup shape as every other macro (`<label class="form-field">` with
-   a `<span class="form-field-label">` child), so the row aligns with
-   text/select fields without any special CSS.
+   markup shape as every other macro (`<label class="form-field">` with a
+   `.form-field-prompt` child holding the label + optional helper), so the
+   row aligns with text/select fields without any special CSS.
 
    ## The hidden-input Rails pattern
 
@@ -443,7 +446,7 @@ emitted attribute string. #}
     {%- set is_checked = current in (true, "true", "True", "on", 1, "1") -%}
     {%- set aria_invalid = true if error else invalid -%}
     <label class="form-field" for="{{ name }}">
-      <span class="form-field-label">{{ _field_label(label, required) }}</span>
+      {{ _field_prompt(name, label, help, error) }}
       <input type="hidden" name="{{ name }}" value="false" />
       <input type="checkbox"
              id="{{ name }}"
@@ -453,7 +456,6 @@ emitted attribute string. #}
              {% if required %}required{% endif %}
              {% if help or error %}aria-describedby="{{ name }}-helper"{% endif %}
              {% if aria_invalid is not none %}aria-invalid="{{ 'true' if aria_invalid else 'false' }}"{% endif %} />
-      {{- _help_small(name, help, error) }}
     </label>
   {%- endmacro %}
   {# ---- schema-driven dispatch --------------------------------------- #}
@@ -494,15 +496,29 @@ emitted attribute string. #}
    `<section>` keeps its normal box + margins and still subgrids. The
    `<h2>` reads as a plain Pico heading (no custom sizing).
 
+   An optional `description=` pairs the heading with a subheading using
+   Pico's native `<hgroup>` (the `<h2>` + a muted `<p>`), spanning both
+   columns. Use it to state the section's *perspective* — e.g. whether the
+   fields describe the client or the provider the client is seeking — not
+   to restate the heading. Without a description the section emits a bare
+   `<h2>` (no `<hgroup>`).
+
    Usage:
-     {% call form_section("Client location") %}
+     {% call form_section("Client location", description="Where the client can meet.") %}
        {{ text_field("location_city", "City") }}
        {{ select_field("location_state", "State", US_STATES) }}
      {% endcall %}
 #}
-  {% macro form_section(title) -%}
+  {% macro form_section(title, description=None) -%}
     <section class="form-section">
-      <h2>{{ title }}</h2>
+      {%- if description %}
+        <hgroup>
+          <h2>{{ title }}</h2>
+          <p>{{ description }}</p>
+        </hgroup>
+      {%- else %}
+        <h2>{{ title }}</h2>
+      {%- endif %}
       {{ caller() }}
     </section>
   {%- endmacro %}
