@@ -14,9 +14,8 @@
 {% block toolbar %}{% endblock %}
 {% block list_body %}
   {#- Poster names / contact are anonymized server-side via
-      `can_act_as_provider`. The chrome `#onboarding-banner` (base.html)
-      is the single place explaining verification unlocks the full view —
-      no per-list notice repeats it. -#}
+      `can_act_as_provider`. The verify-to-post step on the `/users/me`
+      card is where verification is explained — no per-list notice repeats it. -#}
   {%- set _empty %}{{ post_feed_empty("No posts match these filters." if active_filter_count else "No posts found.",
     link_href=entity_url("post") if active_filter_count else none
     ) }}{%- endset %}
