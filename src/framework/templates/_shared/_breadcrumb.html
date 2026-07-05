@@ -20,9 +20,10 @@ Each item is a `(label, href, lock_reason?)` tuple. Per item:
   - `href` set, no lock → a plain `<a href>` link.
   - neither → plain current-page text (`aria-current="page"`).
 
-A "Home" root (→ `/home`, the signed-in hub) is prepended to every
-chain, so callers pass only the ancestors + current segment. An empty
-`items` therefore renders just the Home crumb.
+A "Home" root (→ `/posts?kind=referral`, the referral board that "home"
+now means) is prepended to every chain, so callers pass only the
+ancestors + current segment. An empty `items` therefore renders just the
+Home crumb.
 
     {{ breadcrumb([
         ("Posts", "/posts"),
@@ -32,7 +33,7 @@ chain, so callers pass only the ancestors + current segment. An empty
     → Home › Posts › Post › Edit
 #}
 {% macro breadcrumb(items) -%}
-  {%- set _chain = [("Home", "/home", none)] + (items | list if items else []) -%}
+  {%- set _chain = [("Home", entity_url('post') ~ '?kind=referral', none)] + (items | list if items else []) -%}
   <nav aria-label="breadcrumb" class="breadcrumb-bar">
     <div class="container">
       <ul>

@@ -37,8 +37,8 @@ async def test_primary_nav_highlights_active_section(
     logged_in_user: User,
 ):
     """The avatar menu's "My posts" entry lights on the posts list page and
-    its subpaths (it is the Posts-family link; the brand `a[href="/home"]`
-    is not section-highlighted)."""
+    its subpaths (it is the Posts-family link; the brand
+    `a[href="/posts?kind=referral"]` is not section-highlighted)."""
     posts = await authenticated_client.get("/posts")
     tree = HTMLParser(posts.text)
     assert (
@@ -69,8 +69,8 @@ async def test_base_template_renders_primary_nav_for_anonymous_visitors(
     tree = HTMLParser(response.text)
     nav = tree.css_first('nav[aria-label="Primary"]')
     assert nav is not None
-    # Brand link is present and points at /home.
-    brand = nav.css_first('a[href="/home"]')
+    # Brand link is present and points at `/` (anonymous → public landing).
+    brand = nav.css_first('a[href="/"]')
     assert brand is not None
     # No profile link, no Login link, no Login indicator.
     assert tree.css_first('nav[aria-label="Primary"] a[href="/users/me"]') is None
@@ -246,12 +246,14 @@ async def test_get_users_me_renders_authenticated_self_view(
     assert (
         tree.css("nav[aria-label='Primary'] a[href='/clinicians/form']") == []
     ), "Create-clinician CTA must be removed from nav (#697)"
-    # Brand → /home (the quicklinks hub) for every viewer; anonymous
-    # /home falls through to the public landing page (test_users.py
-    # anonymous nav test).
+    # Brand → the referral board (signed-in "home"); an anonymous viewer's
+    # brand points at `/` instead (test_users.py anonymous nav test).
     assert (
-        tree.css_first('nav[aria-label="Primary"] a[href="/home"] strong') is not None
-    ), "brand link must point at /home"
+        tree.css_first(
+            'nav[aria-label="Primary"] a[href="/posts?kind=referral"] strong'
+        )
+        is not None
+    ), "brand link must point at the referral board"
     # `Post` link (a visible <li>, outside the profile dropdown) → create form.
     posts = [
         a
