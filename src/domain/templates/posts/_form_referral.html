@@ -16,9 +16,9 @@ keep preferences open text:
 
   (Referring as — affiliation picker, before any section)
   1. Logistics — state, session format, city
-  2. Service type — services multi-select + "Other" free-text
-  3. About the client — age, pronouns, languages, narrative
-  4. Coverage — payment-path booleans + carrier notes
+  2. Service type — services + languages sought (each + "Other" free-text)
+  3. About the client — age, pronouns, narrative
+  4. Payment options — payment-path booleans + carrier notes
 
 No post kind has a `subject` field: the title is always derived in the
 view layer (`post_feed_headline` in `domain/logic/posts/view.py`) — for
@@ -55,7 +55,7 @@ override it.
       {%- endfor -%}
     {%- endfor -%}
     {{ composite_select_field("clinician_affiliation_id", "Referring as", _practices.opts, current=d.clinician_affiliation_id if d else None, default_first=true) }}
-    {% call form_section("Logistics") %}
+    {% call form_section("Logistics", description="Where and how the client can meet.") %}
       {{ select_field("location_state", "State", US_STATES, current=d.location_state if d else None, placeholder=true) }}
       {# Session-format is a multi-checkbox — any subset of
          {in_person, virtual}. Empty = "unspecified". #}
@@ -64,13 +64,22 @@ override it.
         {{ text_field("location_city", "City", current=d.location_city if d else None, required=false, help="City or area for in-person sessions.") }}
       {% endcall %}
     {% endcall %}
-    {% call form_section("Service type") %}
+    {% call form_section("Service type", description="What the client needs a provider to offer.") %}
       {{ multi_select_field("services", "Services", REFERRAL_SERVICES, labels=REFERRAL_SERVICE_LABELS, current=d.services if d else None) }}
       {% call conditional_field("services:other") %}
-        {{ textarea_field("services_other_text", "Other services (describe)", current=d.services_other_text if d else None, required=false) }}
+        {{ textarea_field("services_other_text", "Other services (specify)", current=d.services_other_text if d else None, required=false) }}
+      {% endcall %}
+      {# Languages is a service-fit axis, not a client demographic: what
+         matters is the language the provider must speak, since the client
+         is looking for a provider who speaks it. The label stays terse
+         ("Languages", matching the detail page); the help carries the
+         provider-orientation. #}
+      {{ field_for(schema, "languages", "Languages", current=d.languages if d else None, help="The language(s) the provider should speak.") }}
+      {% call conditional_field("languages:other") %}
+        {{ text_field("languages_other_text", "Other language (specify)", current=d.languages_other_text if d else None, required=false) }}
       {% endcall %}
     {% endcall %}
-    {% call form_section("About the client") %}
+    {% call form_section("About the client", description="Who the client is.") %}
       {# A referral describes one client, so age is a single value — the
          options use the singular noun ("Child", not "Children"). The wire
          shape stays `age_groups: list[str]`; the form renders a single
@@ -80,22 +89,19 @@ override it.
       {% call conditional_field("pronouns:other") %}
         {{ text_field("pronouns_other_text", "Other pronouns (specify)", current=d.pronouns_other_text if d else None, required=false) }}
       {% endcall %}
-      {{ field_for(schema, "languages", "Languages the client speaks", current=d.languages if d else None) }}
-      {% call conditional_field("languages:other") %}
-        {{ text_field("languages_other_text", "Other language (specify)", current=d.languages_other_text if d else None, required=false) }}
-      {% endcall %}
-      {{ textarea_field("description", "Narrative", current=d.description if d else None, help="The client's story, what you're hoping for in treatment, and what would make a provider a good fit. Please don't include identifying details.") }}
+      {{ textarea_field("description", "Narrative", current=d.description if d else None, help="Briefly describe the patient and the services they may need. Please don't include any identifying details.") }}
     {% endcall %}
-    {# Coverage — list the carriers the client is covered by (this is the
-     in-network statement; there's no separate "has insurance" checkbox).
-     Private pay and sliding scale are independent opt-ins. #}
-    {% call form_section("Coverage") %}
-      {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="The carrier(s) to bill in-network. Leave empty if none apply.") }}
-      {% call conditional_field("insurance_carriers:other") %}
-        {{ text_field("insurance_carriers_other_text", "Other carrier (specify)", current=d.insurance_carriers_other_text if d else None, required=false, help="Name the carrier — it isn't in the list above.") }}
-      {% endcall %}
-      {{ checkbox_field("accepts_private_pay", "Private pay (out of pocket)", current=(d.accepts_private_pay if d else False) ) }}
+    {# Payment options — the payment paths open to this client. Private pay
+     and sliding scale are independent opt-ins and lead the section; the
+     carrier list is the in-network statement (a non-empty list = in-network;
+     there's no separate "has insurance" checkbox). #}
+    {% call form_section("Payment options", description="Payment paths the provider must accept.") %}
+      {{ checkbox_field("accepts_private_pay", "Private pay", current=(d.accepts_private_pay if d else False) ) }}
       {{ checkbox_field("sliding_scale", "Sliding scale", current=(d.sliding_scale if d else False) ) }}
+      {{ multi_select_field("insurance_carriers", "Insurance carriers", INSURANCE_CARRIERS, labels=INSURANCE_CARRIER_LABELS, current=d.insurance_carriers if d else None, required=false, help="The client's insurance carrier(s) — leave empty if none apply.") }}
+      {% call conditional_field("insurance_carriers:other") %}
+        {{ text_field("insurance_carriers_other_text", "Other carrier (specify)", current=d.insurance_carriers_other_text if d else None, required=false) }}
+      {% endcall %}
     {% endcall %}
     {{ actions(submit_label, cancel_url=cancel_url) }}
   {%- endcall -%}

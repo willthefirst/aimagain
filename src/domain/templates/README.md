@@ -55,25 +55,25 @@ Every label, legend, help string, button, and intro paragraph in `src/domain/tem
 
 - **Full sentence, period at the end.** `Adding your NPI lets us cross-check your identity against NPPES.` not `Adding your NPI lets us cross-check your identity against NPPES`.
 - **Specific.** Explain *what the value is for*, not that the field exists. `For example: DBT, EMDR, IFS.` beats `Free text.`.
-- **Never write `help="Optional."`.** Optionality is signaled by the *absence* of the required `*` marker — never by prose. See below.
+- **Never write `help="Optional."`.** Forms carry no visual required/optional indicator, so don't restate optionality in prose either — leave optional fields' help to describe the value, nothing more. See below.
 - If the same help string appears in two or more forms, move it to [`../../framework/templates/_shared/form_copy.html`](../../framework/templates/_shared/form_copy.html) and import it.
 
 ### Required vs. optional fields
 
-Requiredness is owned entirely by the `required=` argument to any form-field macro — never markup it yourself. `_field_label` (in [`../../framework/templates/_shared/form_fields.html`](../../framework/templates/_shared/form_fields.html)) renders an accent-colored `*` after the label of required fields and **nothing** for optional ones. The `*` is `aria-hidden` decoration; the control's own `required` attribute conveys the semantics to assistive tech.
+Requiredness is owned entirely by the `required=` argument to any form-field macro — never markup it yourself. It emits the control's own HTML `required` attribute (which enforces the field client-side and conveys the semantics to assistive tech). There is **no visual label decoration** — required and optional fields' labels look identical; the browser surfaces the requirement on submit.
 
 ```jinja
-{# Required (the default for most macros) — `*` is rendered automatically #}
+{# Required (the default for most macros) — emits the `required` attribute #}
 {{ text_field("last_name", "Last name", help="As it appears on your license.") }}
 
-{# Optional — pass required=False; no marker, no "Optional." prose #}
+{# Optional — pass required=False; no "Optional." prose #}
 {{ text_field("npi", "NPI", required=False, help="Adding your NPI lets us cross-check your identity against NPPES.") }}
 
-{# Bad — restates optionality the missing `*` already conveys #}
+{# Bad — don't announce optionality in prose #}
 {{ text_field("npi", "NPI", required=False, help="Optional. Adding your NPI lets us cross-check your identity against NPPES.") }}
 ```
 
-Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — required fields are marked and optional ones are bare.
+Fieldset-level "everything below is optional" lines (the previous `<small>Both lists optional.</small>` pattern) are gone — labels are bare and requiredness lives on the control.
 
 ### Buttons
 
