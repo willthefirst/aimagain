@@ -146,20 +146,32 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.get("/")
-async def read_root() -> RedirectResponse:
-    # `/home` is the canonical home URL; `/` just redirects there so the
-    # brand link, bookmarks, and the bare-domain entry all resolve to one
-    # place. The auth-aware split (signed-in hub vs public landing) lives
-    # in `read_home`.
-    return RedirectResponse(url="/home", status_code=302)
+async def read_root(request: Request, user=Depends(current_optional_user)):
+    # `/` is the one bare-domain entry, split by auth state. "Home" now
+    # means the referral board (`/posts?kind=referral`): a signed-in
+    # viewer is redirected straight there. An anonymous visitor gets the
+    # public landing page rendered in place (not the login wall, and not
+    # `/posts`, which is auth-gated). `/home` is retired from the live
+    # flow — nothing links to it — but kept defined below for possible
+    # later use.
+    if user is not None:
+        return RedirectResponse(url="/posts?kind=referral", status_code=302)
+    return APIResponse.html_response(
+        template_name="landing.html",
+        context={},
+        request=request,
+    )
 
 
 @app.get("/home")
 async def read_home(request: Request, user=Depends(current_optional_user)):
     # `/home` is the signed-in launchpad — a goal-oriented hub linking to
     # the app's main surfaces, rendered from `home.html`. Anonymous
-    # visitors get the public landing page instead (not the login wall);
-    # the anonymous brand link (`_page_header.html`) points here too.
+    # visitors get the public landing page instead (not the login wall).
+    #
+    # Retired from the live flow: nothing in the app links here anymore
+    # ("home" now means the referral board — see `read_root`). Kept
+    # defined so the hub can be re-promoted later without rebuilding it.
     if user is not None:
         # `readiness` drives the dynamic "finish setting up" task at the
         # top of the hub: when the account can't post yet, the next

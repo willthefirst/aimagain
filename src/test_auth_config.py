@@ -62,22 +62,23 @@ def _login_manager() -> auth_config.UserManager:
 
 
 @pytest.mark.asyncio
-async def test_on_after_login_defaults_to_home():
-    """No `?next=` → post-login lands on `/home`, the signed-in hub, in
-    lockstep with `src/main.py:read_root`'s `/` → `/home` redirect."""
+async def test_on_after_login_defaults_to_referral_board():
+    """No `?next=` → post-login lands on the referral board
+    (`/posts?kind=referral`), the signed-in "home", in lockstep with
+    `src/main.py:read_root`'s authed `/` redirect target."""
     request = SimpleNamespace(query_params={})
     response = SimpleNamespace(status_code=None, headers={})
     await _login_manager().on_after_login(
         user=SimpleNamespace(id="uid"), request=request, response=response
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "/home"
+    assert response.headers["Location"] == "/posts?kind=referral"
 
 
 @pytest.mark.asyncio
 async def test_on_after_login_honors_safe_next_param():
-    """A relative `?next=` overrides the `/home` default so an auth wall
-    can bounce the user back to where they were headed."""
+    """A relative `?next=` overrides the referral-board default so an auth
+    wall can bounce the user back to where they were headed."""
     request = SimpleNamespace(query_params={"next": "/users/me"})
     response = SimpleNamespace(status_code=None, headers={})
     await _login_manager().on_after_login(
@@ -92,10 +93,11 @@ async def test_on_after_login_honors_safe_next_param():
 )
 async def test_on_after_login_rejects_offsite_next(evil_next: str):
     """Protocol-relative / absolute `next` values are ignored — they
-    could redirect to an attacker site — falling back to `/home`."""
+    could redirect to an attacker site — falling back to the referral
+    board."""
     request = SimpleNamespace(query_params={"next": evil_next})
     response = SimpleNamespace(status_code=None, headers={})
     await _login_manager().on_after_login(
         user=SimpleNamespace(id="uid"), request=request, response=response
     )
-    assert response.headers["Location"] == "/home"
+    assert response.headers["Location"] == "/posts?kind=referral"

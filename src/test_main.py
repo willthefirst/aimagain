@@ -21,27 +21,35 @@ from tests.helpers import make_clinician_with_org
 pytestmark = pytest.mark.asyncio
 
 
-# --- Landing: `/` redirects to `/home`, the auth-aware hub --------------
+# --- Landing: `/` is the bare-domain entry, split by auth state --------
 #
-# `/home` is the canonical home URL. `/` is a bare redirect to it for both
-# auth states, so the brand link, bookmarks, and the bare domain all land
-# in one place. `/home` then splits: a signed-in viewer gets the
-# goal-oriented hub (`home.html`); an anonymous one gets the public
-# landing page (`landing.html`), never the login wall.
+# "Home" now means the referral board (`/posts?kind=referral`). A signed-in
+# viewer hitting `/` is redirected there. An anonymous visitor gets the
+# public landing page (`landing.html`) rendered in place — never the login
+# wall, and never `/posts` (which is auth-gated). `/home` is retired from
+# the live flow but kept defined (see `read_home`).
 
 
-@pytest.mark.parametrize("authed", [True, False])
-async def test_root_redirects_to_home(
-    authed: bool,
+async def test_root_redirects_authed_to_referral_board(
     authenticated_client: AsyncClient,
-    test_client: AsyncClient,
 ):
-    """`/` redirects to `/home` for both signed-in and anonymous visitors
-    — `/home` is the single canonical home URL."""
-    client = authenticated_client if authed else test_client
-    response = await client.get("/", follow_redirects=False)
+    """A signed-in viewer hitting `/` is redirected to the referral board
+    (`/posts?kind=referral`) — the signed-in "home"."""
+    response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/home"
+    assert response.headers["location"] == "/posts?kind=referral"
+
+
+async def test_root_anonymous_renders_public_landing(test_client: AsyncClient):
+    """An anonymous visitor hitting `/` gets the public landing page in
+    place (200 HTML) — not a redirect to the login wall, and not the
+    auth-gated `/posts`."""
+    response = await test_client.get(
+        "/", headers={"Accept": "text/html"}, follow_redirects=False
+    )
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Welcome to Bedlam Connect" in response.text
 
 
 async def test_authenticated_home_renders_quicklinks(

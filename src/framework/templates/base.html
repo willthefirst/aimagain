@@ -165,10 +165,10 @@
 {# Primary nav renders on every screen so the chrome stays
        consistent between authenticated app pages and the public auth
        flow. Authed users get the redesigned nav (brand → posts, + Post,
-       avatar menu); anonymous visitors get only the brand. The anonymous
-       brand link goes to `/home`, an alias of `/` that renders the public
-       landing page for an unauthed visitor (and redirects an authed one to
-       the `/posts` browse feed) — see `src/main.py:read_root`. #}
+       avatar menu); anonymous visitors get only the brand. The brand link
+       is the "home" affordance: authed viewers go to the referral board
+       (`/posts?kind=referral`), anonymous ones to `/`, which renders the
+       public landing page for them — see `src/main.py:read_root`. #}
 {# Self-profile page. The nav lights up for any path under
        the self-alias URL. #}
 {%- set _users_me_path = entity_url('user', id='me') -%}
@@ -182,7 +182,6 @@
        by typing the URL. Active-state rule is the same path-prefix
        shape used everywhere else: the tab lights on the family's list
        page and any subpath (`/posts/42`, `/posts/42/form`). #}
-{%- set _on_home = is_authenticated and request.url.path == '/home' -%}
 {%- set _posts_path = entity_url('post') -%}
 {%- set _on_posts = is_authenticated and (request.url.path == _posts_path or request.url.path.startswith(_posts_path + '/')) -%}
 {# Unified page-header band. `{% include %}` can't see this template's

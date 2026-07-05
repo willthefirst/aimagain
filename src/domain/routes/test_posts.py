@@ -159,9 +159,12 @@ async def test_form_new_picker_responds_200(
     for heading in ("Referral", "Opening", "Program intake"):
         assert heading in body
     # All three tiles are locked for the default test user, so none of
-    # them carry a navigable `?kind=` link.
+    # them carry a navigable create-form link. Scoped to the picker's
+    # `/posts/form?kind=` targets — the global chrome now carries a
+    # `/posts?kind=referral` brand/breadcrumb link (the referral board),
+    # which is a different URL family and must not trip this check.
     for kind in ("referral", "clinician_opening", "program_intake"):
-        assert f"?kind={kind}" not in body
+        assert f"/posts/form?kind={kind}" not in body
     assert 'data-locked-cta="program_intake_locked"' in body
     assert 'data-locked-cta="network_unverified"' in body
     # The picker no longer wraps its heading in a `<header>` band
