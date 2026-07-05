@@ -238,25 +238,6 @@
 <small class="meta">{{ _subtitle_html | trim | safe }}</small>
 </p>
 {%- endif %}
-{# Global onboarding nudge. A derived gate (RESOURCE_GRAMMAR.md
-         §"Derived gates") — not a resource, just a chrome signal that
-         dispatches into the existing minimal create forms. Shown when
-         `needs_provider_entity` (from `base_context`): an authenticated
-         account holding neither a clinician profile nor an org rep, so a
-         post can't yet be authored. It links straight to the two minimal
-         create forms (`entity_form_url('clinician')` / `('organization')`)
-         rather than any wizard. Goes silent the moment one entity exists;
-         the residual "verify to post" step lives on `/users/me` (I4), so
-         the surfaces don't double-nag. #}
-{% if needs_provider_entity %}
-<aside role="status" id="onboarding-banner">
-<strong>Add a clinician or organization to start posting.</strong>
-You can browse freely, but authoring a post needs a provider profile.
-<a href="{{ entity_form_url('clinician') }}">Add a clinician</a>
-or
-<a href="{{ entity_form_url('organization') }}">Add an organization</a>.
-</aside>
-{% endif %}
 {% block content %}{% endblock %}
 {# Post-content slot. `views/list.html` populates this with the
          pagination footer; non-list views leave it empty. Reserved

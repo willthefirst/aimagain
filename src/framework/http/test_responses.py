@@ -31,8 +31,6 @@ def test_base_context_anonymous():
         "can_act_as_provider": False,
         # No org-rep affiliations.
         "viewer_rep_org_ids": frozenset(),
-        # Anonymous visitors never see the onboarding banner.
-        "needs_provider_entity": False,
     }
 
 
@@ -50,36 +48,7 @@ def test_base_context_regular_user():
         "current_user_is_verified": True,
         "can_act_as_provider": False,
         "viewer_rep_org_ids": frozenset(),
-        # Authenticated account with neither clinician nor org rep — the
-        # onboarding banner fires.
-        "needs_provider_entity": True,
     }
-
-
-def test_base_context_needs_provider_entity_false_with_clinician():
-    """Holding a clinician profile (even unverified) clears the banner gate —
-    the account has a provider entity to author posts against."""
-    user = SimpleNamespace(
-        id=uuid.uuid4(),
-        username="alice",
-        is_superuser=False,
-        clinicians=[SimpleNamespace(id=uuid.uuid4())],
-        org_representations=[],
-    )
-    assert base_context(user)["needs_provider_entity"] is False
-
-
-def test_base_context_needs_provider_entity_false_with_org_rep():
-    """Holding an org representation (no clinician) also clears the banner gate
-    — "clinician OR org" satisfies the derived gate."""
-    user = SimpleNamespace(
-        id=uuid.uuid4(),
-        username="dana",
-        is_superuser=False,
-        clinicians=[],
-        org_representations=[SimpleNamespace(org_id=uuid.uuid4())],
-    )
-    assert base_context(user)["needs_provider_entity"] is False
 
 
 def test_base_context_can_act_as_provider_true_for_verified_clinician():
