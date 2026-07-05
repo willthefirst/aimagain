@@ -34,13 +34,18 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import JSON as SAJSON
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from scripts.dev.seed import seed_all
 from scripts.dev.seed.check_registry import CHECK_VALUES
+from src.domain.logic.capabilities import can_post_opening, can_post_referral
 from src.domain.models import (
     ClinicianAffiliation,
+    Post,
+    User,
     metadata,
 )
+from src.domain.routes.dev_personas import PERSONAS
 from tests.fixtures import async_test_sessionmaker, test_engine
 
 
@@ -184,6 +189,109 @@ async def test_nullable_columns_have_both_null_and_populated(seeded_db):
             elif populated == 0:
                 misses.append(f"  {table.name}.{column.name}: every row is NULL")
     assert not misses, "Nullable-coverage gaps:\n" + "\n".join(misses)
+
+
+async def test_persona_post_ownership_reflects_capabilities(seeded_db):
+    """Every post a dev persona owns must be one that persona could
+    actually have authored under the capability gates in
+    `domain/logic/capabilities.py`:
+
+      - `unverified@` (email unverified) and `clinician-pending@`
+        (clinician not verified) hold no publishing capability, so they
+        own zero posts.
+      - `clinician-verified@` holds Claim A → may own referral / opening
+        posts (and, per the seed, does — so the "my posts" flows have
+        content), but never a program_intake (that needs Claim B, which
+        no persona holds).
+
+    Regression guard for the old bug where the round-robin owner pool
+    included personas, handing an unverified user authored posts."""
+    async with async_test_sessionmaker() as session:
+        for persona in PERSONAS:
+            user = (
+                await session.execute(
+                    select(User)
+                    .where(User.email == persona.email)
+                    .options(selectinload(User.clinicians))
+                )
+            ).scalar_one()
+            posts = (
+                (await session.execute(select(Post).where(Post.owner_id == user.id)))
+                .scalars()
+                .all()
+            )
+            kinds = sorted({p.kind for p in posts})
+
+            # No persona is a verified org rep → none may own an intake.
+            assert (
+                "program_intake" not in kinds
+            ), f"{persona.email} owns a program_intake but holds no Claim B"
+            for post in posts:
+                if post.kind == "referral":
+                    assert can_post_referral(
+                        user
+                    ), f"{persona.email} owns a referral it couldn't author"
+                elif post.kind == "clinician_opening":
+                    assert can_post_opening(
+                        user
+                    ), f"{persona.email} owns an opening it couldn't author"
+
+            if persona.clinician_verified is True:
+                assert posts, f"{persona.email} (verified) should own sample posts"
+            else:
+                assert not posts, (
+                    f"{persona.email} holds no publishing capability but "
+                    f"owns {kinds}"
+                )
+
+
+async def test_referral_and_opening_owners_hold_claim_a(seeded_db):
+    """Every seeded referral / clinician_opening post is owned by a user
+    who passes the matching self-path capability gate (`can_post_referral`
+    / `can_post_opening`, i.e. holds Claim A). These are self-path posts,
+    so an owner who couldn't have authored one is seed data that
+    contradicts the domain — the exact bug this guards against.
+
+    Program-intake is intentionally excluded: its Claim-B ownership chain
+    isn't coherent in the seed yet (see `overrides/posts.py`)."""
+    async with async_test_sessionmaker() as session:
+        posts = (
+            (
+                await session.execute(
+                    select(Post).where(Post.kind.in_(["referral", "clinician_opening"]))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert posts, "expected referral/opening posts in the seed"
+        owner_ids = {p.owner_id for p in posts}
+        owners = (
+            (
+                await session.execute(
+                    select(User)
+                    .where(User.id.in_(owner_ids))
+                    .options(selectinload(User.clinicians))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        owner_by_id = {u.id: u for u in owners}
+
+        violations: list[str] = []
+        for post in posts:
+            owner = owner_by_id[post.owner_id]
+            ok = (
+                can_post_referral(owner)
+                if post.kind == "referral"
+                else can_post_opening(owner)
+            )
+            if not ok:
+                violations.append(f"  {post.kind} {post.id} owned by {owner.email}")
+        assert not violations, "Posts owned by users lacking Claim A:\n" + "\n".join(
+            violations
+        )
 
 
 async def test_multi_affiliation_clinician_present(seeded_db):
