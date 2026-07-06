@@ -16,6 +16,8 @@ from src.framework.access.capabilities.capabilities import (
     Gate,
     Leaf,
     LeafRegistry,
+    WizardStep,
+    wizard_step,
 )
 
 
@@ -344,3 +346,131 @@ def test_registry_all_snapshot_unaffected_by_later_register():
     reg.register(_leaf(name="b"))
     assert len(early) == 1
     assert len(reg.all()) == 2
+
+
+# ---------- wizard_step traversal ------------------------------------------
+
+
+def _cond(label: str, *, met: bool, fix_url: str = "/fix") -> Condition:
+    return Condition(label_active=label, label_done=label, met=met, fix_url=fix_url)
+
+
+def _check(tree) -> CapabilityCheck:
+    return CapabilityCheck(name="cap", tree=tree)
+
+
+def test_wizard_step_granted_is_done():
+    tree = Bundle(label_active="b", label_done="b", children=(_met(), _met()))
+    step = wizard_step(_check(tree))
+    assert step.kind == "done"
+    assert step.done is True
+    assert step.primary is None
+    assert step.options == ()
+
+
+def test_wizard_step_first_unmet_condition_is_the_step():
+    """A `Bundle` reports its first unmet child as the next action, and
+    positions it in the rail."""
+    email = _cond("email", met=False, fix_url="/email")
+    identity = _cond("identity", met=False, fix_url="/identity")
+    step = wizard_step(
+        _check(Bundle(label_active="b", label_done="b", children=(email, identity)))
+    )
+    assert step.kind == "condition"
+    assert step.primary is email
+    assert step.alternatives == ()
+    assert (step.index, step.total) == (1, 2)
+
+
+def test_wizard_step_advances_past_met_children():
+    """Once the first requirement is met, the walker moves to the next
+    unmet one and the rail index advances."""
+    email = _cond("email", met=True, fix_url="/email")
+    identity = _cond("identity", met=False, fix_url="/identity")
+    step = wizard_step(
+        _check(Bundle(label_active="b", label_done="b", children=(email, identity)))
+    )
+    assert step.kind == "condition"
+    assert step.primary is identity
+    assert (step.index, step.total) == (2, 2)
+
+
+def test_wizard_step_unmet_gate_is_a_choice():
+    """An unmet `Gate` with more than one open branch is a choice: the
+    first branch is the default, the rest are switchable alternatives."""
+    clinician = _cond("clinician", met=False, fix_url="/clinicians/form")
+    org = _cond("org", met=False, fix_url="/organizations/form")
+    gate = Gate(label_active="g", label_done="g", children=(clinician, org))
+    step = wizard_step(_check(gate))
+    assert step.kind == "choice"
+    assert step.is_choice is True
+    assert step.primary is clinician
+    assert step.alternatives == (org,)
+    assert step.options == (clinician, org)
+
+
+def test_wizard_step_provider_network_shape_offers_the_identity_choice():
+    """The real provider-network shape: email AND (clinician OR org).
+    With email met, the next step is the clinician/org choice at rail
+    position 2 of 2."""
+    email = _cond("email", met=True, fix_url="/email")
+    clinician = _cond("clinician", met=False, fix_url="/clinicians/form")
+    org = _cond("org", met=False, fix_url="/organizations/form")
+    gate = Gate(label_active="g", label_done="g", children=(clinician, org))
+    tree = Bundle(label_active="b", label_done="b", children=(email, gate))
+    step = wizard_step(_check(tree))
+    assert step.kind == "choice"
+    assert step.options == (clinician, org)
+    assert (step.index, step.total) == (2, 2)
+
+
+def test_wizard_step_choice_skips_non_actionable_branch():
+    """A branch whose only unmet leaf has no `fix_url` isn't offered — so
+    a two-branch gate with one dead branch collapses to a single
+    actionable condition, not a choice."""
+    dead = _cond("superuser", met=False, fix_url="")
+    org = _cond("org", met=False, fix_url="/organizations/form")
+    gate = Gate(label_active="g", label_done="g", children=(dead, org))
+    step = wizard_step(_check(gate))
+    assert step.kind == "condition"
+    assert step.options == (org,)
+
+
+def test_wizard_step_choice_descends_nested_branch_to_representative():
+    """A gate branch that is itself a `Bundle` surfaces its first unmet,
+    actionable leaf as that branch's representative option."""
+    inner = Bundle(
+        label_active="inner",
+        label_done="inner",
+        children=(_cond("a", met=True), _cond("b", met=False, fix_url="/b")),
+    )
+    org = _cond("org", met=False, fix_url="/organizations/form")
+    gate = Gate(label_active="g", label_done="g", children=(inner, org))
+    step = wizard_step(_check(gate))
+    assert step.kind == "choice"
+    assert [c.fix_url for c in step.options] == ["/b", "/organizations/form"]
+
+
+def test_wizard_step_blocked_when_nothing_is_self_serviceable():
+    """Ungranted but every open leaf lacks a fix URL — reported as
+    ``blocked``, never a lying ``done``."""
+    tree = Bundle(
+        label_active="b",
+        label_done="b",
+        children=(_cond("superuser", met=False, fix_url=""),),
+    )
+    step = wizard_step(_check(tree))
+    assert step.kind == "blocked"
+    assert step.options == ()
+    assert step.done is False
+
+
+def test_wizard_step_single_condition_tree_is_one_of_one():
+    step = wizard_step(_check(_cond("solo", met=False, fix_url="/solo")))
+    assert step.kind == "condition"
+    assert (step.index, step.total) == (1, 1)
+
+
+def test_wizard_step_returns_wizard_step_type():
+    step = wizard_step(_check(_cond("solo", met=True)))
+    assert isinstance(step, WizardStep)

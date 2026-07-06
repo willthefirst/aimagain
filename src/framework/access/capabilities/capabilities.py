@@ -15,6 +15,14 @@ Two layers, in order:
    makes "which capabilities depend on leaf X" a one-liner instead of a
    grep.
 
+3. **Traversal** — `WizardStep` + `wizard_step(check)`. A pure projection
+   of an evaluated tree into "what should the user do next": the first
+   unmet requirement, or the open branches of an unmet `Gate` (a choice),
+   or done. This is what lets a capability page *guide* (one next action)
+   as well as *explain* (the whole requirement tree). It reads the same
+   `met`/`fix_url` the renderer uses, so guidance can't disagree with the
+   tree.
+
 Domain code:
 - Registers each `Leaf` once with its labels, fix URL, and a predicate.
 - Builds capability `check_*` functions whose trees compose registered
@@ -100,6 +108,123 @@ class CapabilityCheck:
     @property
     def granted(self) -> bool:
         return self.tree.met
+
+
+@dataclass(frozen=True)
+class WizardStep:
+    """The user's current position walking a capability tree toward granted.
+
+    Produced by `wizard_step(check)` — a pure projection of an evaluated
+    `CapabilityCheck` into "what to do next", rendered as a single
+    call-to-action above the full requirement tree.
+
+    `kind`:
+      - ``"done"`` — the capability is granted; `options` is empty.
+      - ``"condition"`` — one actionable requirement is next; `options`
+        holds exactly that `Condition` (its `fix_url` is the CTA).
+      - ``"choice"`` — the next unmet requirement is an OR (`Gate`) with
+        more than one open branch; `options` holds one representative
+        `Condition` per open branch, `options[0]` being the default and
+        the rest offered as "or do this instead" switches.
+      - ``"blocked"`` — ungranted but nothing open is self-serviceable
+        (every unmet leaf lacks a `fix_url`); `options` is empty. Not
+        reachable for user-facing capabilities today (the only
+        fix-URL-less leaf is `superuser`, whose gate is always met when
+        present), but the walker reports it honestly rather than "done".
+
+    `index`/`total` place the step among the root's direct requirements
+    ("step 2 of 2") for a progress rail; both are 1 for a single-node or
+    root-`Gate` tree.
+    """
+
+    kind: str
+    options: tuple[Condition, ...]
+    index: int
+    total: int
+
+    @property
+    def primary(self) -> Condition | None:
+        """The default action — `options[0]`, or `None` when done/blocked."""
+        return self.options[0] if self.options else None
+
+    @property
+    def alternatives(self) -> tuple[Condition, ...]:
+        """Non-default choice branches (empty unless `kind == "choice"`)."""
+        return self.options[1:]
+
+    @property
+    def is_choice(self) -> bool:
+        return self.kind == "choice"
+
+    @property
+    def done(self) -> bool:
+        return self.kind == "done"
+
+
+def _unmet_children(node: Any) -> tuple:
+    return tuple(c for c in node.children if not c.met)
+
+
+def _representative(node: Any) -> Condition | None:
+    """The first self-serviceable `Condition` in `node`'s unmet subtree,
+    following the default (first-unmet) branch at each level, or `None`
+    if the subtree is met or has no leaf carrying a `fix_url`."""
+    if node.met:
+        return None
+    if isinstance(node, Condition):
+        return node if node.fix_url else None
+    for child in _unmet_children(node):
+        rep = _representative(child)
+        if rep is not None:
+            return rep
+    return None
+
+
+def _actionable(node: Any) -> tuple[Condition, ...]:
+    """The actionable option(s) at `node`'s current step: one `Condition`
+    for a `Bundle`/`Condition` (its first unmet, self-serviceable
+    requirement), or one representative per open branch of an unmet
+    `Gate` (the choice). Empty when met or wholly non-actionable."""
+    if node.met:
+        return ()
+    if isinstance(node, Condition):
+        return (node,) if node.fix_url else ()
+    if isinstance(node, Gate):
+        return tuple(rep for c in _unmet_children(node) if (rep := _representative(c)))
+    # Bundle (AND): advance into the first unmet child.
+    return _actionable(_unmet_children(node)[0])
+
+
+def _progress(tree: Any) -> tuple[int, int]:
+    """Position among the root's direct requirements as `(index, total)`,
+    1-based. `total` is the count of top-level requirements (root
+    `Bundle` children, else 1); `index` is the first unmet one, clamped
+    to `total` once all are met."""
+    children = getattr(tree, "children", None)
+    if not children or isinstance(tree, Gate):
+        return (1, 1)
+    total = len(children)
+    met = sum(1 for c in children if c.met)
+    return (min(met + 1, total), total)
+
+
+def wizard_step(check: CapabilityCheck) -> WizardStep:
+    """Walk an evaluated capability tree to the user's next action.
+
+    Pure projection over `check.tree` — see `WizardStep` for the return
+    shape. Superuser overrides need no special-casing: the override is
+    modeled in-tree as a met `Gate` branch, so a granted superuser
+    reports ``"done"`` like anyone else.
+    """
+    tree = check.tree
+    index, total = _progress(tree)
+    if check.granted:
+        return WizardStep(kind="done", options=(), index=total, total=total)
+    options = _actionable(tree)
+    if not options:
+        return WizardStep(kind="blocked", options=(), index=index, total=total)
+    kind = "choice" if len(options) > 1 else "condition"
+    return WizardStep(kind=kind, options=options, index=index, total=total)
 
 
 @dataclass(frozen=True)
@@ -243,7 +368,8 @@ def mount_capability_routes(
     Template context keys:
       - index: ``capabilities_url``
       - list: ``checks`` (dict[str, CapabilityCheck]), ``capability_base_url``, ``access_index_url``
-      - detail: ``check`` (CapabilityCheck), ``access_index_url``, ``capabilities_url``
+      - detail: ``check`` (CapabilityCheck), ``step`` (WizardStep — the
+        guided next action for `check`), ``access_index_url``, ``capabilities_url``
     """
     _access_index_url = str(router.prefix)
     _capability_base_url = f"{router.prefix}/capabilities"
@@ -301,6 +427,7 @@ def mount_capability_routes(
             template_name=detail_template,
             context={
                 "check": check,
+                "step": wizard_step(check),
                 "access_index_url": _access_index_url,
                 "capabilities_url": _capability_base_url,
             },
