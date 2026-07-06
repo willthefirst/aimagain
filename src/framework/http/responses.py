@@ -49,23 +49,10 @@ def base_context(user: Actor | None) -> dict:
     own — "own" for an Organization includes verified-rep affiliation,
     matching message-1 "owns/is affiliated to". Empty set for anonymous
     or anyone without rep status.
-
-    `needs_provider_entity` drives the global `#onboarding-banner` in
-    `base.html`. It is the derived-gate signal (`RESOURCE_GRAMMAR.md`
-    §"Derived gates"): True only for an authenticated account that holds
-    **neither** a clinician profile **nor** any org representation — i.e.
-    has no provider entity to author a post against, so the create flow
-    is dead-ended until one exists. It keys on entity *existence*, not
-    verification: once the account adds a clinician or org the banner
-    goes silent and the remaining "verify to post" step lives on the
-    `/users/me` card (coordinated with I4), so the two surfaces don't
-    double-nag. Anonymous visitors and stubs without the relationships
-    read as not-needing (the banner is for signed-in, empty accounts).
     """
     from src.domain.logic.capabilities import can_act_as_provider, claim_state
 
     has_clinician = bool(getattr(user, "clinicians", None))
-    has_org_rep = bool(getattr(user, "org_representations", None))
     return {
         "is_authenticated": user is not None,
         "is_admin": is_admin(user),
@@ -77,9 +64,6 @@ def base_context(user: Actor | None) -> dict:
         ),
         "can_act_as_provider": can_act_as_provider(user),
         "viewer_rep_org_ids": claim_state(user).b,
-        "needs_provider_entity": (
-            user is not None and not has_clinician and not has_org_rep
-        ),
     }
 
 

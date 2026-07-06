@@ -2,10 +2,9 @@
    and no org), blocking post creation. Include this partial inside the
    "no provider entity" branch of any create-form template that requires a
    clinician or org to proceed. Frames the gate as "clinician OR org" to
-   match the global #onboarding-banner (base.html) and the derived-gate
-   model (RESOURCE_GRAMMAR.md §"Derived gates"): it only dispatches into
-   the existing minimal create forms. Relies on `entity_form_url` from the
-   calling template's context. #}
+   match the derived-gate model (RESOURCE_GRAMMAR.md §"Derived gates"): it
+   only dispatches into the existing minimal create forms. Relies on
+   `entity_form_url` from the calling template's context. #}
 <p>
   Add a clinician or organization first.
   <a href="{{ entity_form_url('clinician') }}">Add a clinician</a>
