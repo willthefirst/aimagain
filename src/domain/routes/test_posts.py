@@ -905,7 +905,7 @@ async def test_create_form_gate_shown_when_no_clinician_profile(
     """GET /posts/form?kind=<kind> shows the provider-entity gate when the
     requesting user has no clinician profiles, not the create form. The gate
     copy (`posts/_shared/_require_clinician_profile.html`) nudges toward a
-    clinician *or* org, matching the global #onboarding-banner."""
+    clinician *or* org."""
     response = await authenticated_client.get(f"/posts/form?kind={kind}")
     assert response.status_code == 200
     assert "Add a clinician or organization first." in response.text
@@ -1394,9 +1394,8 @@ async def test_list_has_no_inline_verify_notice_for_unverified(
 ):
     """The /posts list carries no inline verify notice, even for an
     unverified viewer. Poster names / contact are anonymized server-side;
-    the single chrome `#onboarding-banner` is the only place that explains
-    verification unlocks the full view — the old `posts-verify-notice` is
-    gone."""
+    the verify-to-post step on the `/users/me` card is where verification
+    is explained — the old `posts-verify-notice` is gone."""
     response = await authenticated_client.get("/posts")
     assert response.status_code == 200
     assert "posts-verify-notice" not in response.text

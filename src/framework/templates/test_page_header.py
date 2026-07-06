@@ -164,8 +164,8 @@ def test_every_toolbar_reserves_the_action_row_height() -> None:
         assert reserve.attributes.get("tabindex") == "-1"
 
 
-# Context for the authenticated-chrome tests. The onboarding banner has been
-# removed; this only sets `is_authenticated=True` to exercise the authed path.
+# Context for the authenticated-chrome tests: only sets `is_authenticated=True`
+# to exercise the authed path.
 _AUTHED_CTX: dict[str, object] = dict(is_authenticated=True)
 
 
@@ -173,14 +173,12 @@ def test_body_layout_rows_are_header_breadcrumb_main_footer() -> None:
     """`base.html` emits the four full-width layout rows of the body flex
     column — `<header>`, the breadcrumb `<nav>`, `<main>`, `<footer>` — in
     order, followed only by locked-CTA `<div popover>` elements and an init
-    `<script>`. The banner (when shown) is a child of `<main>`, never a
-    top-level band."""
+    `<script>`."""
     env = _make_env()
     _add_child(env, "liststub.html", _LIST_STUB)
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     for name in ("liststub.html", "detailstub.html"):
         tree = HTMLParser(_render(env, name, **_AUTHED_CTX))
-        assert tree.css_first("#onboarding-banner") is None, name
         top_level = [n.tag for n in tree.css("body > *")]
         assert top_level[:4] == [
             "header",

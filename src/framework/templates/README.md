@@ -93,7 +93,6 @@ The top chrome is a stack of **full-width bands**, each a body-level layout row.
 │ <main>                              .container            │
 │   <h1> title                              [actions ▶]     │  ← captured `{% block toolbar %}`
 │   subtitle (optional)  NPI · Verified                     │  ← `{% block subtitle %}`
-│   onboarding banner    "Add a clinician or organization…" │  ← `#onboarding-banner` (gated on `needs_provider_entity`)
 │   page content                                            │  ← `{% block content %}`
 ├───────────────────────────────────────────────────────────┤
 │ <footer>                            .container            │  ← `{% block footer %}` (default body in `base.html`)
@@ -101,8 +100,6 @@ The top chrome is a stack of **full-width bands**, each a body-level layout row.
 ```
 
 **Toolbar action-row reserve.** A button is taller than the bare `<h1>`, so the toolbar (`_shared/_toolbar.html`) renders a hidden non-interactive `<button class="toolbar-reserve">` sharing the H1's grid cell — the H1 row is one real-button tall whether or not the page has actions, so the heading row height is consistent across pages. The actions cell still auto-flows (col 2 on desktop, row 2 in the ≤640px stack, where actions-below-heading is intended).
-
-**Onboarding banner.** `#onboarding-banner` is a global derived gate ([`../../domain/routes/RESOURCE_GRAMMAR.md`](../../domain/routes/RESOURCE_GRAMMAR.md) §"Derived gates") — not a resource or wizard, just a chrome nudge that dispatches into the two minimal create forms (`entity_form_url('clinician')` / `('organization')`). It renders inside `<main>` only when `needs_provider_entity` is set in `base_context` (an authenticated account holding **neither** a clinician profile **nor** an org rep, so no post can be authored yet). It keys on entity *existence*, not verification: adding a clinician or org silences it, and the residual "verify to post" step lives on the `/users/me` card. The matching create-time copy is `posts/_shared/_require_clinician_profile.html`. Contract pinned in [`../../domain/routes/test_chrome_banner.py`](../../domain/routes/test_chrome_banner.py).
 
 `{% include %}` can't see the including template's blocks, so `base.html` captures the `breadcrumb` / `toolbar` / `subtitle` block output into context vars: the header partial gets none of them (it's nav-only), the breadcrumb band renders the captured `breadcrumb` HTML (or the Home fallback), and the toolbar + subtitle render at the top of `<main>`. Children still just override the blocks — the capture indirection is transparent. The header band renders on every page; the breadcrumb band renders only when there's a crumb to show (a page-supplied breadcrumb, or — for an authenticated viewer — the Home fallback), so anonymous public pages (landing, the `/auth/*` flow) keep their bare brand nav with no breadcrumb band.
 
