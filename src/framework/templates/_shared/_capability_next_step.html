@@ -1,0 +1,51 @@
+{# Capability next-step guidance banner.
+
+   Renders the `WizardStep` produced by `wizard_step(check)` as a single
+   call-to-action above the requirement tree, so a capability page
+   *guides* (one next action) as well as *explains* (the whole tree).
+
+   Usage: {{ capability_next_step(step) }}
+     step — a `WizardStep` (see
+            `framework/access/capabilities/capabilities.py`):
+            `.kind`, `.primary`, `.alternatives`, `.index`, `.total`.
+
+   By `kind`:
+     - done      — a positive confirmation; the tree below shows the met
+                   requirements.
+     - condition — the one next action as a primary link (its `fix_url`).
+     - choice    — the default branch as the primary link, plus each
+                   alternative as an "or" switch to its own `fix_url`.
+     - blocked   — an honest "nothing to do here yourself" note (not
+                   reachable for user-facing capabilities today). #}
+{% from "_shared/icon_label.html" import icon_label %}
+{% macro capability_next_step(step) %}
+  {% if step.done %}
+    <article data-state="unlocked">
+      <p>{{ icon_label('check', 'You have this capability — nothing left to do.') }}</p>
+    </article>
+  {% elif step.kind == "blocked" %}
+    <article data-state="locked">
+      <p>{{ icon_label('lock', 'This capability is granted by an administrator; there are no self-serve steps.') }}</p>
+    </article>
+  {% else %}
+    <article data-state="locked">
+      <header>
+        <hgroup>
+          <h3>Your next step</h3>
+          <p>Step {{ step.index }} of {{ step.total }}</p>
+        </hgroup>
+      </header>
+      <p>
+        <a href="{{ step.primary.fix_url }}" role="button">{{ step.primary.label_active }}</a>
+      </p>
+      {% if step.is_choice %}
+        <p>
+          <small>or</small>
+          {% for alt in step.alternatives %}
+            <a href="{{ alt.fix_url }}" role="button" class="secondary outline">{{ alt.label_active }}</a>
+          {% endfor %}
+        </p>
+      {% endif %}
+    </article>
+  {% endif %}
+{% endmacro %}

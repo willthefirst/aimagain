@@ -2,6 +2,7 @@
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_capability_requirements.html" import capability_requirements_panel -%}
+{%- from "_shared/_capability_next_step.html" import capability_next_step -%}
 {% block title %}{{ check.tree.label_active }}{% endblock %}
 {% block breadcrumb %}
   {{ breadcrumb([
@@ -16,8 +17,12 @@
   {% endcall %}
 {% endblock %}
 {% block content %}
-  {# The superuser override renders as an explicit "any one of these"
-     branch inside the tree (see `_superuser_gate`) — no out-of-band
-     bypass note needed. #}
+  {# The next-step banner *guides* (one action); the requirements panel
+     *explains* (the whole tree). Both read the same evaluated `check`,
+     so they can't disagree — the banner's CTA is always the tree's first
+     unmet, actionable leaf. The superuser override renders as an explicit
+     "any one of these" branch inside the tree (see `_superuser_gate`), and
+     surfaces as a granted "done" step — no out-of-band bypass note needed. #}
+  {{ capability_next_step(step) }}
   {{ capability_requirements_panel(check.tree, check.granted, check.description) }}
 {% endblock %}
