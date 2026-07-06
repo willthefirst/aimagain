@@ -102,6 +102,37 @@ async def test_capability_detail_shows_status(
     assert "Available" in response.text or "Not available yet" in response.text
 
 
+async def test_capability_detail_shows_next_step_banner(
+    authenticated_client: AsyncClient,
+):
+    """The detail page guides, not just explains: an email-verified
+    non-provider is at the identity step (2 of 2), offered as a choice
+    between verifying a clinician (default) or an organization — each a
+    link to its own fix route."""
+    response = await authenticated_client.get(
+        "/users/me/access/capabilities/provider-network"
+    )
+    assert response.status_code == 200
+    assert "Your next step" in response.text
+    assert "Step 2 of 2" in response.text
+    # Default branch + switchable alternative, each deep-linking its form.
+    assert "/clinicians/form" in response.text
+    assert "/organizations/form" in response.text
+
+
+async def test_capability_detail_granted_shows_done_banner(
+    superuser_client: AsyncClient,
+):
+    """When the capability is already granted, the banner confirms there's
+    nothing left to do rather than pointing at a next step."""
+    response = await superuser_client.get(
+        "/users/me/access/capabilities/provider-network"
+    )
+    assert response.status_code == 200
+    assert "Your next step" not in response.text
+    assert "nothing left to do" in response.text
+
+
 async def test_capability_detail_nonexistent_returns_404(
     authenticated_client: AsyncClient,
 ):
