@@ -15,6 +15,7 @@ in one place per email type.
 
 from __future__ import annotations
 
+from src.domain.logic.posts.view import post_feed_headline
 from src.domain.models import Post, User
 from src.framework.config import settings
 from src.framework.email import send_email
@@ -46,14 +47,15 @@ async def send_post_message_email(*, post: Post, sender: User, body: str) -> Non
     no-reply mailbox.
 
     Sender identity in the body is `sender.username` (display name —
-    the email address is in the headers, not duplicated in the body
-    prose). The link back to the post lets the poster re-anchor on
-    what was being asked about.
+    the reply address lives on the `Reply-To:` header, not in the body
+    prose). The post's derived headline (`post_feed_headline`) is the
+    hyperlinked subject line so the poster can re-anchor on what's being
+    asked about in one click.
     """
     post_url = _absolute_url(f"/posts/{post.id}")
     context = {
         "sender_username": sender.username,
-        "sender_email": sender.email,
+        "post_headline": post_feed_headline(post),
         "body": body,
         "post_url": post_url,
     }
