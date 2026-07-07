@@ -153,10 +153,10 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   color: var(--pico-secondary);
   background: color-mix(in srgb, var(--pico-secondary) 10%, transparent);
 }
-/* Post detail identity line — pill + date + author/modality, the detail-page
-   counterpart to the feed row's header. Muted via Pico's `--pico-muted-color`
-   (no <small> tag); the inner `.meta` span draws the middots between the date
-   and the author/modality. Spacing comes from Pico's `--pico-spacing`. */
+/* Post detail identity line — pill + date, the detail-page counterpart to
+   the feed row's header. Muted via Pico's `--pico-muted-color`; the inline
+   `<p class="meta">` sits beside the type pill (its own `margin` is zeroed by
+   the `.meta` rule). Spacing comes from Pico's `--pico-spacing`. */
 .post-meta {
   display: flex;
   flex-wrap: wrap;

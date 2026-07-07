@@ -57,7 +57,9 @@ CSS lives in the "Feed rows" section of `src/domain/static/css/domain.css`. #}
            class="post-feed-headline-text">{{ headline }}</a>
       </h2>
       {%- if show_poster and post.owner and view.provider_ref and (view.provider_ref.name or view.provider_ref.id) -%}
-        <p>{{ provider_ref(view.provider_ref, redacted=not can_act_as_provider, linked=False) }}</p>
+        {# `provider_ref` emits its own `<p class="meta">` via `meta_list` —
+           no outer `<p>` (nested `<p>` is invalid). #}
+        {{ provider_ref(view.provider_ref, redacted=not can_act_as_provider, linked=False) }}
       {%- endif -%}
     </hgroup>
     {# ── Facts: services sought + location, via the shared card macros ── #}

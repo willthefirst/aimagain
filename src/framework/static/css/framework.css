@@ -466,20 +466,37 @@ dd { margin: 0; }
     grid-template-columns: 1fr;
   }
 }
-/* Inline meta list — the small print under a card heading or
-   page H1 that joins several short facts with " · ". Templates
-   wrap each fact in its own element (`<span>{{ date }}</span>
-   <span>Virtual</span>...`); this rule puts the middot between
-   every pair of adjacent siblings. The advantage over a
-   hardcoded `{{ items | join(' · ') }}` is locality: drop or
-   hide a single child and the surrounding separators redo
-   themselves; render zero or one child and nothing extra
-   appears. Works on any tag (`<span>`, `<a>`, etc.) — the
-   selector is purely structural. */
-.meta > * + *::before { content: " · "; }
+/* Meta list — the small print under a card heading or page H1 that
+   joins several short facts with " · ". Always a `<p class="meta">`
+   (see the card / subtitle / `meta_list` macros); each fact is its
+   own child element (`<span>{{ date }}</span><span>Virtual</span>…`)
+   and the middot between two facts is a REAL element — the shared
+   `meta_sep()` macro's `<span class="meta-sep" aria-hidden>·</span>`,
+   not a CSS `::before`. A pseudo-element lives *inside* its element's
+   box, so on an inline-block child (a locked `<button>`) it joins the
+   button's hit area, inherits its style, and loses its leading space
+   at the box edge. A real separator is a sibling — detached from the
+   buttons, symmetric spacing from the flex `gap`.
+
+   Flex (not inline flow) so the `gap` — not collapsible whitespace —
+   owns the spacing: identical on both sides of every middot regardless
+   of template newlines. `align-items: baseline` keeps inline-block
+   locked buttons on the same line as plain-text siblings.
+
+   `font-size`/`margin` live here (not on a `<small>` tag) so every
+   `.meta` renders identically regardless of where it's mounted. */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.4em;
+  font-size: 0.875em;
+  margin: 0;
+}
+.meta-sep { color: var(--pico-muted-color); user-select: none; }
 @media (max-width: 576px) {
-  .meta { display: flex; flex-direction: column; gap: 0.15em; }
-  .meta > * + *::before { display: none; }
+  .meta { flex-direction: column; gap: 0.15em; }
+  .meta-sep { display: none; }
 }
 /* Page-scoped zone bar. Every page renders one
    `<div class="toolbar">` carrying:
@@ -688,8 +705,11 @@ td > menu > li > [role="button"] {
    `<main>`, content wrapped in an inner `.container`). Centered chrome
    line, present on every page via the default `{% block footer %}` body.
    `text-align` is set on `<footer>` itself (full width) so it cascades to
-   the inner container's text. */
+   the inner container's text. The default body is a `.meta` list
+   (copyright · contact); `.meta` is a flex row, so center it here rather
+   than lean on the inherited `text-align`. */
 footer { text-align: center; }
+footer .meta { justify-content: center; }
 fieldset { border: none; padding: 0; margin: 0 0 1.25rem; }
 legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); font-weight: 500; padding: 0; }
 /* Primary nav — the canonical Pico shape: `<nav>` with a brand `<ul>`
@@ -769,11 +789,16 @@ a.locked-link[aria-disabled="true"] {
   cursor: not-allowed;
 }
 
-/* Ghost button for inline locked names and fields */
+/* Ghost button for inline locked names and fields. `inline-block` (not
+   `inline-flex`) so the button's baseline is its text baseline — it then
+   sits on the same line as the plain `<span>`/`<a>` meta siblings around
+   it, instead of the synthesized baseline an inline-flex box would impose.
+   The lock → text gap comes from the global `[class^="icon-"]
+   margin-inline-end` rule (same as every other icon+label), so no flex
+   `gap` is needed — and the old flex `gap` + icon-margin double-space is
+   gone. */
 .locked-ghost-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25em;
+  display: inline-block;
   background: none;
   border: none;
   padding: 0;

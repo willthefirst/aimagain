@@ -11,10 +11,9 @@
   {{ view.headline or 'Post'|truncate(40) }}
   {% if view.header_state %}, {{ view.header_state }}{% endif %}
 {% endblock %}
-{# The post identity line (type pill · date · author/modality) is NOT the
-   framework `subtitle` block — that wraps its output in `<small class="meta">`
-   and we want the same un-`<small>` treatment as the feed row. It's rendered
-   as a `.post-meta` block at the top of `content` instead (see below). #}
+{# The post identity line (type pill · date) is NOT the framework `subtitle`
+   block — it's rendered as a `.post-meta` block at the top of `content`
+   instead (see below), so the type pill can sit inline beside the date. #}
 {% block actions %}
   {% include "posts/_shared/_owner_actions.html" %}
 {% endblock %}
@@ -28,13 +27,11 @@
     {# Identity line — just the type pill + date on every kind. Location +
        modality now live in the body's Logistics section (both sides), and
        the provider identity lives in the Connect panel, so the meta line
-       stays minimal. No `<small>` — `.post-meta` owns the muted treatment
-       via Pico's `--pico-muted-color`. #}
+       stays minimal — a single date needs no child `<span>`. `.post-meta`
+       owns the muted treatment via Pico's `--pico-muted-color`. #}
     <section class="post-meta">
       {{ post_type_tag(view.kind) }}
-      <span class="meta">
-        <span>{{ post.created_at | format_post_date }}</span>
-      </span>
+      <p class="meta">{{ post.created_at | format_post_date }}</p>
     </section>
     <div class="post-detail-grid">
       <div class="post-detail-main">

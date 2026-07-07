@@ -1,7 +1,7 @@
 {# Modality posture as `<span>` chips for the post card's meta line.
 
 Emits zero, one, or two `<span>`s — the parent `.meta` rule in
-`base.html` adds the " · " separators between siblings via CSS
+`framework.css` adds the " · " separators between siblings via CSS
 `::before` content, so this macro doesn't carry a join string.
 
 `in_person` and `virtual` are `LOCATION_AVAILABILITY_OPTIONS` values
@@ -9,13 +9,14 @@ Emits zero, one, or two `<span>`s — the parent `.meta` rule in
 nothing; the parent `.meta` rule then has nothing to separate, so no
 spurious middot leaks out.
 
-Used by `posts/_item.html` (the list card) and `posts/detail.html`
-(the detail page) so modality reads the same wherever it appears.
-Both callers wrap the macro's output inside `<small class="meta">…
-<span>{{ date }}</span> {{ modality_chips(...) }}</small>`. #}
+Used by `posts/_item.html` (the list card), which places the chips inside
+the card's `<p class="meta">` after `<span>{{ date }}</span>`. Each chip is
+prefixed with `meta_sep()` — the date always precedes it, so the leading
+separator is always correct and yields `date · Virtual · In-person`. #}
+{%- from "_shared/sections.html" import meta_sep -%}
 {% macro modality_chips(in_person, virtual) -%}
-  {%- if virtual == "yes" %}<span>Virtual</span>
+  {%- if virtual == "yes" %}{{ meta_sep() }}<span>Virtual</span>
 {% endif -%}
-{%- if in_person == "yes" %}<span>In-person</span>
+{%- if in_person == "yes" %}{{ meta_sep() }}<span>In-person</span>
 {% endif -%}
 {%- endmacro %}
