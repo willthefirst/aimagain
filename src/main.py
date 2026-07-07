@@ -147,15 +147,21 @@ async def unauthorized_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 async def read_root(request: Request, user=Depends(current_optional_user)):
-    # `/` is the one bare-domain entry, split by auth state. "Home" now
-    # means the referral board (`/posts?kind=referral`): a signed-in
-    # viewer is redirected straight there. An anonymous visitor gets the
-    # public landing page rendered in place (not the login wall, and not
-    # `/posts`, which is auth-gated). `/home` is retired from the live
-    # flow — nothing links to it — but kept defined below for possible
-    # later use.
+    # `/` is the one bare-domain entry AND the single source of truth for
+    # "home". Every home affordance — the nav brand, the breadcrumb "Home"
+    # root, the post-login / post-register redirects — points at `/`; this
+    # handler is the only place that decides where home actually goes. So
+    # changing the signed-in landing (destination or default filter) is a
+    # one-line edit here, not a hunt across redirects and templates.
+    #
+    # Signed in → the referral board, defaulting to California
+    # (`state=CA` is a starting filter the viewer can clear/change).
+    # Anonymous → the public landing page rendered in place (not the login
+    # wall, and not `/posts`, which is auth-gated). `/home` is retired from
+    # the live flow — nothing links to it — but kept defined below for
+    # possible later use.
     if user is not None:
-        return RedirectResponse(url="/posts?kind=referral", status_code=302)
+        return RedirectResponse(url="/posts?kind=referral&state=CA", status_code=302)
     return APIResponse.html_response(
         template_name="landing.html",
         context={},

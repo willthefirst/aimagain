@@ -53,8 +53,9 @@ ALLOWLIST: frozenset[str] = frozenset(
         # panel without a `card`-macro shape.
         "users/detail.html",
         # The unverified-email inbox CTA is a bespoke onboarding
-        # surface: provider deep-link + Resend in a load-bearing alert
-        # panel. Single instance, no second consumer.
+        # surface: provider deep-link + a raw `hx-post` Resend button
+        # (no `actions`-macro shape fits a plain HTMX button). Single
+        # instance, no second consumer.
         "users/email_form.html",
         # Message-the-poster micro-form swaps itself in place on send;
         # the swap-self contract doesn't match `inline_add_form`.

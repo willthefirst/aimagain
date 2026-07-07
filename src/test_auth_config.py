@@ -62,17 +62,16 @@ def _login_manager() -> auth_config.UserManager:
 
 
 @pytest.mark.asyncio
-async def test_on_after_login_defaults_to_referral_board():
-    """No `?next=` → post-login lands on the referral board
-    (`/posts?kind=referral`), the signed-in "home", in lockstep with
-    `src/main.py:read_root`'s authed `/` redirect target."""
+async def test_on_after_login_defaults_to_home():
+    """No `?next=` → post-login goes "home" (`/`), the single home entry
+    point that `src/main.py:read_root` forwards to the referral board."""
     request = SimpleNamespace(query_params={})
     response = SimpleNamespace(status_code=None, headers={})
     await _login_manager().on_after_login(
         user=SimpleNamespace(id="uid"), request=request, response=response
     )
     assert response.status_code == 302
-    assert response.headers["Location"] == "/posts?kind=referral"
+    assert response.headers["Location"] == "/"
 
 
 @pytest.mark.asyncio
@@ -93,11 +92,10 @@ async def test_on_after_login_honors_safe_next_param():
 )
 async def test_on_after_login_rejects_offsite_next(evil_next: str):
     """Protocol-relative / absolute `next` values are ignored — they
-    could redirect to an attacker site — falling back to the referral
-    board."""
+    could redirect to an attacker site — falling back to home (`/`)."""
     request = SimpleNamespace(query_params={"next": evil_next})
     response = SimpleNamespace(status_code=None, headers={})
     await _login_manager().on_after_login(
         user=SimpleNamespace(id="uid"), request=request, response=response
     )
-    assert response.headers["Location"] == "/posts?kind=referral"
+    assert response.headers["Location"] == "/"

@@ -33,7 +33,7 @@ Home crumb.
     → Home › Posts › Post › Edit
 #}
 {% macro breadcrumb(items) -%}
-  {%- set _chain = [("Home", entity_url('post') ~ '?kind=referral', none)] + (items | list if items else []) -%}
+  {%- set _chain = [("Home", "/", none)] + (items | list if items else []) -%}
   <nav aria-label="breadcrumb" class="breadcrumb-bar">
     <div class="container">
       <ul>

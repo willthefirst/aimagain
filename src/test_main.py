@@ -23,9 +23,10 @@ pytestmark = pytest.mark.asyncio
 
 # --- Landing: `/` is the bare-domain entry, split by auth state --------
 #
-# "Home" now means the referral board (`/posts?kind=referral`). A signed-in
-# viewer hitting `/` is redirected there. An anonymous visitor gets the
-# public landing page (`landing.html`) rendered in place — never the login
+# "Home" now means the referral board, California-defaulted
+# (`/posts?kind=referral&state=CA`). `/` is the single home entry point: a
+# signed-in viewer hitting `/` is redirected there. An anonymous visitor gets
+# the public landing page (`landing.html`) rendered in place — never the login
 # wall, and never `/posts` (which is auth-gated). `/home` is retired from
 # the live flow but kept defined (see `read_home`).
 
@@ -33,11 +34,12 @@ pytestmark = pytest.mark.asyncio
 async def test_root_redirects_authed_to_referral_board(
     authenticated_client: AsyncClient,
 ):
-    """A signed-in viewer hitting `/` is redirected to the referral board
-    (`/posts?kind=referral`) — the signed-in "home"."""
+    """A signed-in viewer hitting `/` is redirected to the referral board,
+    defaulting to California (`/posts?kind=referral&state=CA`) — the
+    signed-in "home"."""
     response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/posts?kind=referral"
+    assert response.headers["location"] == "/posts?kind=referral&state=CA"
 
 
 async def test_root_anonymous_renders_public_landing(test_client: AsyncClient):

@@ -1,7 +1,7 @@
 """Tests for the ``_shared/_breadcrumb.html`` macro.
 
-The breadcrumb renders a full Pico chain: a "Home" root (→
-`/posts?kind=referral`, the referral board) prepended to each passed
+The breadcrumb renders a full Pico chain: a "Home" root (→ `/`, the
+single home entry point) prepended to each passed
 ``(label, href, lock_reason?)`` segment, with Pico drawing the ``>``
 dividers. Per segment:
 
@@ -41,13 +41,13 @@ def _crumbs(html: str) -> list[Node]:
 
 
 def test_home_root_is_always_prepended() -> None:
-    """Every chain starts with a Home link to `/posts?kind=referral` — an
-    empty `items` renders just that crumb."""
+    """Every chain starts with a Home link to `/` — an empty `items`
+    renders just that crumb."""
     lis = _crumbs(_render("[]"))
     assert len(lis) == 1
     home = lis[0].css_first("a")
     assert home.text(strip=True) == "Home"
-    assert home.attributes.get("href") == "/posts?kind=referral"
+    assert home.attributes.get("href") == "/"
 
 
 def test_two_tuple_segment_renders_link_after_home() -> None:

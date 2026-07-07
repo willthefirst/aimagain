@@ -66,6 +66,31 @@ async def test_email_form_omits_resend_when_verified(
     assert resend is None, "verified user should not see Resend button"
 
 
+async def test_email_form_unverified_body_is_decluttered(
+    authenticated_client: AsyncClient,
+    logged_in_user: User,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """The unverified CTA body is flat: the page `<h1>` is the only
+    heading (no redundant alert-panel `<h2>`), and there's no
+    `role="alert"` wrapper — just the lede, the primary inbox action, and
+    Resend. The page chrome (breadcrumb / heading) is untouched; only the
+    body decluttered."""
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            user = await session.get(User, logged_in_user.id)
+            user.is_verified = False
+
+    response = await authenticated_client.get("/users/me/email/form")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    # No alert panel and no second heading competing with the page H1.
+    assert tree.css_first('[role="alert"]') is None
+    assert tree.css_first("h2") is None
+    # The essentials remain: resend control is still present.
+    assert tree.css_first("button[hx-post='/auth/resend-verify']") is not None
+
+
 async def test_email_form_breadcrumb_points_to_profile(
     authenticated_client: AsyncClient,
     logged_in_user: User,
@@ -142,8 +167,8 @@ async def test_email_form_shows_just_sent_banner_with_query_flag(
     db_test_session_manager: async_sessionmaker[AsyncSession],
     logged_in_user: User,
 ):
-    """`?sent=1` (set by the resend redirect) renders the "just sent"
-    status line."""
+    """`?sent=1` (set by the resend redirect) swaps the lede to the
+    "sent again" confirmation."""
     async with db_test_session_manager() as session:
         async with session.begin():
             user = await session.get(User, logged_in_user.id)
@@ -151,7 +176,7 @@ async def test_email_form_shows_just_sent_banner_with_query_flag(
 
     response = await authenticated_client.get("/users/me/email/form?sent=1")
     assert response.status_code == 200
-    assert "Verification email sent" in response.text
+    assert "sent another link" in response.text
 
 
 async def test_email_form_omits_just_sent_banner_without_query_flag(
@@ -160,7 +185,7 @@ async def test_email_form_omits_just_sent_banner_without_query_flag(
     logged_in_user: User,
 ):
     """The "just sent" status is opt-in via `?sent=1`; first-visit
-    (post-registration redirect) doesn't show it."""
+    (post-registration redirect) shows the default lede instead."""
     async with db_test_session_manager() as session:
         async with session.begin():
             user = await session.get(User, logged_in_user.id)
@@ -168,7 +193,8 @@ async def test_email_form_omits_just_sent_banner_without_query_flag(
 
     response = await authenticated_client.get("/users/me/email/form")
     assert response.status_code == 200
-    assert "Verification email sent" not in response.text
+    assert "sent another link" not in response.text
+    assert "sent a verification link" in response.text
 
 
 async def test_email_form_omits_inbox_cta_when_verified(
@@ -187,4 +213,4 @@ async def test_email_form_omits_inbox_cta_when_verified(
     response = await authenticated_client.get("/users/me/email/form?sent=1")
     assert response.status_code == 200
     assert "Open Gmail" not in response.text
-    assert "Verification email sent" not in response.text
+    assert "sent another link" not in response.text

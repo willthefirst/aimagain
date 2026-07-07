@@ -112,12 +112,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         response: Optional[Response] = None,
     ):
         print(f"User {user.id} has logged in.")
-        # Post-login lands on the referral board (`/posts?kind=referral`),
-        # the signed-in "home" — kept in lockstep with
-        # `src/main.py:read_root`'s redirect target for authed viewers. A
-        # `?next=` param (set when an auth wall bounced the user)
+        # Post-login goes "home" — `/`, the single home entry point, which
+        # forwards a signed-in viewer to the referral board (see
+        # `src/main.py:read_root`). Pointing here rather than duplicating
+        # the board URL means the home destination lives in exactly one
+        # place. A `?next=` param (set when an auth wall bounced the user)
         # overrides this default below.
-        redirect_url = "/posts?kind=referral"
+        redirect_url = "/"
         next_url = request.query_params.get("next")
         if next_url:
             # Security check: only allow relative URLs that start with "/"

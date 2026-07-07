@@ -58,7 +58,11 @@ and the constant-boundary rationale (one source of truth).
     <nav aria-label="Primary">
       <ul>
         <li>
-          <a href="{% if is_authenticated %}{{ entity_url("post") }}?kind=referral{% else %}/{% endif %}"><strong>Bedlam Connect</strong></a>
+          {# Brand is the "home" affordance → `/`, the single home entry
+             point. `read_root` splits it by auth state (signed-in → the
+             referral board, anonymous → the public landing), so the brand
+             href stays the same for everyone. #}
+          <a href="/"><strong>Bedlam Connect</strong></a>
         </li>
       </ul>
       {% if is_authenticated %}
