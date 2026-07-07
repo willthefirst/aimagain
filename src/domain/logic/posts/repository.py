@@ -11,7 +11,6 @@ from src.domain.models import (
     Post,
     Program,
     ReferralDetail,
-    User,
 )
 from src.framework.persistence.base_repository import BaseRepository
 from src.framework.persistence.dependencies import register_repository
@@ -37,8 +36,6 @@ class PostRepository(BaseRepository):
       stamps on the repo. Powers the "My posts" view.
     * ``q`` (Text) — ILIKE substring over both detail tables'
       ``description``.
-    * ``posted_by`` (Text) — ILIKE substring over the owner's
-      ``username``.
     * ``state`` (Choice, multi) — ``location_state`` ``IN`` across
       ``ReferralDetail`` (seeking) and the offering side's linked
       ``ClinicianAffiliation``.
@@ -78,7 +75,6 @@ class PostRepository(BaseRepository):
         kind: str | list[str] | None = None,
         q: str | None = None,
         owner: str | None = None,
-        posted_by: str | None = None,
         state: list[str] | None = None,
         city: str | None = None,
         age_group: list[str] | None = None,
@@ -116,15 +112,12 @@ class PostRepository(BaseRepository):
         # person-level ``languages``; ``IntakeDetail`` joins for the
         # intake's own ``age_groups`` (and as the ``Program`` join key).
         needs_clinician_join = bool(state or city or insurance)
-        needs_owner_join = bool(posted_by)
         # ``services`` reads ``IntakeDetail.services`` too, so it needs the
         # intake-detail join alongside the referral/opening detail join.
         needs_intake_join = bool(age_group or language or services)
         needs_program_join = bool(language)
         needs_person_join = bool(language)
 
-        if needs_owner_join:
-            stmt = stmt.outerjoin(User, User.id == Post.owner_id)
         if needs_detail_join:
             stmt = stmt.outerjoin(
                 ReferralDetail,
@@ -181,8 +174,6 @@ class PostRepository(BaseRepository):
             viewer = self._requesting_user
             viewer_id = getattr(viewer, "id", None) if viewer is not None else None
             stmt = stmt.filter(Post.owner_id == viewer_id)
-        if posted_by:
-            stmt = stmt.filter(User.username.ilike(f"%{posted_by}%"))
         if state:
             stmt = stmt.filter(
                 or_(
