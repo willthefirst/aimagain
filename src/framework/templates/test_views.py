@@ -306,9 +306,9 @@ def test_list_view_wraps_each_sidebar_filter_in_a_folded_accordion() -> None:
     assert all("open" not in a.attributes for a in accordions)
     summaries = [a.css_first("summary").text(strip=True) for a in accordions]
     assert summaries == ["License type", "Keyword"]
-    # An <hr /> divides adjacent accordions — one fewer than the filter count,
-    # so the last accordion has no trailing rule.
-    assert len(sidebar.css("hr")) == len(filters) - 1
+    # No divider rules — adjacent accordions read as discrete rows from their
+    # chevroned `<summary>` + Pico's default `<details>` spacing, not an `<hr />`.
+    assert sidebar.css("hr") == []
     # Heading suppressed inside the accordion: the multi-choice fieldset
     # renders without a `<legend>` (the summary already names the section).
     fieldset = sidebar.css_first("fieldset.search-checkbox-fieldset")

@@ -40,9 +40,15 @@ def test_clinician_with_org_links_both_parts() -> None:
     org_link = tree.css_first("a[href='/organizations/o1']")
     assert name_link is not None and name_link.text() == "Jane Smith"
     assert org_link is not None and org_link.text() == "Acme Counseling"
-    # The middot comes from the `.meta` CSS rule, never a literal char.
-    assert "·" not in (tree.body.text() or "")
-    assert tree.css_first("span.meta") is not None
+    assert tree.css_first("p.meta") is not None
+    # The middot is a real, aria-hidden separator element BETWEEN the two
+    # parts — never baked into the name/org anchor text.
+    seps = tree.css("span.meta-sep")
+    assert len(seps) == 1
+    assert seps[0].attributes.get("aria-hidden") == "true"
+    assert seps[0].text() == "·"
+    assert "·" not in name_link.text()
+    assert "·" not in org_link.text()
 
 
 def test_program_links_to_program_detail() -> None:
@@ -64,12 +70,15 @@ def test_sole_prop_clinician_renders_name_only() -> None:
     )
     assert tree.css_first("a[href='/clinicians/c1']") is not None
     assert tree.css_first("a[href^='/organizations/']") is None
+    # No org → no separator (a dangling dot would be a bug).
+    assert tree.css("span.meta-sep") == []
 
 
 def test_name_only_reference_renders_plain_text_no_anchor() -> None:
     tree = _render({"name": "Carlos Rivera", "entity": None, "id": None, "org": None})
     assert tree.css("a") == []
     assert "Carlos Rivera" in (tree.body.text() or "")
+    assert tree.css("span.meta-sep") == []
 
 
 def test_linked_false_renders_name_and_org_as_plain_text() -> None:
@@ -88,9 +97,9 @@ def test_linked_false_renders_name_and_org_as_plain_text() -> None:
     body_text = tree.body.text() or ""
     assert "Jane Smith" in body_text
     assert "Acme Counseling" in body_text
-    # Still the meta_list wrapper, so the CSS middot still joins the parts.
-    assert tree.css_first("span.meta") is not None
-    assert "·" not in body_text
+    # Still the meta_list wrapper with a single real separator between the parts.
+    assert tree.css_first("p.meta") is not None
+    assert len(tree.css("span.meta-sep")) == 1
 
 
 def test_redacted_withholds_name_and_org_behind_locks() -> None:
@@ -108,15 +117,16 @@ def test_redacted_withholds_name_and_org_behind_locks() -> None:
     assert tree.css("a[href^='/organizations/']") == []
     assert "Jane Smith" not in (tree.body.text() or "")
     assert "Acme Counseling" not in (tree.body.text() or "")
-    # Two locked placeholders (clinician + org).
+    # Two locked placeholders (clinician + org) with a real separator between
+    # them — the case that motivated the switch away from a `::before` middot
+    # (which rendered *inside* the second locked `<button>`).
     assert len(tree.css("button.locked-ghost-btn")) == 2
+    assert len(tree.css("span.meta-sep")) == 1
 
 
 def test_empty_reference_renders_nothing() -> None:
-    assert _render(None).css("span.meta") == []
+    assert _render(None).css("p.meta") == []
     assert (
-        _render({"name": None, "entity": None, "id": None, "org": None}).css(
-            "span.meta"
-        )
+        _render({"name": None, "entity": None, "id": None, "org": None}).css("p.meta")
         == []
     )

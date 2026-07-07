@@ -41,11 +41,10 @@ Child contract:
                      identity-adjacent meta that doesn't belong in the
                      H1 itself — e.g. NPI on clinicians, date +
                      modality on posts. The chrome wraps the block's
-                     output in `<p><small class="meta">...</small></p>`,
-                     so a block with multiple `<span>` (or `<a>`)
-                     children automatically gets " · " between
-                     siblings via the `.meta` CSS rule in base.html.
-                     Nothing renders when the block is empty.
+                     output in `<p class="meta">...</p>`. A block with
+                     multiple items emits `meta_sep()` between them for
+                     the " · " middot (see the `.meta` rule in
+                     framework.css). Nothing renders when the block is empty.
     actions        — toolbar right-zone content: Edit, Delete,
                      Favorite, admin actions, etc. Each action is a
                      `<li>` because the right zone is a
@@ -86,7 +85,7 @@ Child contract:
   {% endcall %}
 {% endblock %}
 {# Subtitle renders below the band's rule (top of `<main>`) — base.html
-   captures this block and wraps it in `<p><small class="meta">…`. Net
-   position is unchanged from when it lived after the toolbar call. #}
+   captures this block and wraps it in `<p class="meta">…`. Net position
+   is unchanged from when it lived after the toolbar call. #}
 {% block subtitle %}{% endblock %}
 {% block content %}{% endblock %}

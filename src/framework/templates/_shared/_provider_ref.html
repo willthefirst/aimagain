@@ -25,14 +25,14 @@
    org are withheld behind `locked_name` placeholders — the row still
    renders so the viewer knows a real value exists. Redaction is the
    caller's decision (it passes the flag); this macro only renders. #}
-{%- from "_shared/sections.html" import meta_list -%}
+{%- from "_shared/sections.html" import meta_list, meta_sep -%}
 {%- from "_shared/_locked.html" import entity_link, locked_name -%}
 {% macro provider_ref(ref, redacted=False, linked=True) -%}
   {%- if ref and (ref.name or ref.id) -%}
     {%- call meta_list() -%}
       {%- if redacted -%}
         {{ locked_name("Dr. J. Doe" if ref.entity == "clinician" else "Doe Health Group") }}{# title-case-ignore: placeholder name #}
-        {%- if ref.org %}{{ locked_name("Doe Health Group") }}{% endif %}
+        {%- if ref.org %}{{ meta_sep() }}{{ locked_name("Doe Health Group") }}{% endif %}
         {# title-case-ignore: placeholder org name #}
       {%- else -%}
         {%- if linked and ref.id and ref.entity -%}
@@ -41,6 +41,7 @@
           <span>{{ ref.name }}</span>
         {%- endif -%}
         {%- if ref.org -%}
+          {{ meta_sep() }}
           {%- if linked -%}
             {{ entity_link('organization', ref.org.name, id=ref.org.id) }}
           {%- else -%}

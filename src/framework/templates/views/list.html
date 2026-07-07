@@ -136,16 +136,16 @@ Child contract:
               opens by default when its filter is in a dirty (active) state —
               a non-empty value (a chosen radio/select/text value or any
               checked multi-choice box) — so applied filters stay visible on
-              reload instead of hiding behind a folded summary. An `<hr />`
-              divides adjacent accordions (rendered after every one but the
-              last) so the folded list reads as discrete rows. -#}
+              reload instead of hiding behind a folded summary. Each folded
+              `<summary>` is its own chevroned row with Pico's default
+              `<details>` spacing, so the list reads as discrete rows without
+              an `<hr />` divider between them. -#}
           {%- for f in filters %}
             {%- set _value = filter_values.get(f.name) %}
             <details class="filter-accordion"{% if _value %} open{% endif %}>
               <summary>{{ f.display_label }}</summary>
               {{ filter_field(f, _value, heading=false) }}
             </details>
-            {%- if not loop.last %}<hr />{% endif %}
           {%- endfor %}
           <menu>
             <li>

@@ -3,7 +3,7 @@
 {%- from "_shared/_locked.html" import locked_name, locked_action -%}
 {%- from "_shared/_picker.html" import picker -%}
 {%- from "_shared/icon_label.html" import icon_label -%}
-{%- from "_shared/sections.html" import fact, facts_block -%}
+{%- from "_shared/sections.html" import fact, facts_block, meta_sep -%}
 {%- set view = clinician_card_view(clinician) -%}
 {# When the viewer lacks provider-network access and isn't the owner,
    redact identifying fields per the `_clinician_card.html` /
@@ -30,12 +30,12 @@
 {% block subtitle %}
   {% if not _redacted %}
     {% if view.npi %}<span>NPI {{ view.npi }}</span>{% endif %}
-    {%- if verification_status == "verified" %}
-      <small>{{ icon_label('shield-check', 'Verified') }}</small>
-    {%- elif verification_status == "needs_review" %}
-      <small>{{ icon_label('shield-alert', 'Needs review') }}</small>
-    {%- elif verification_status == "failed" %}
-      <small>{{ icon_label('shield-x', 'Verification failed') }}</small>
+    {%- set _verif_label = {"verified": ("shield-check", "Verified"),
+        "needs_review": ("shield-alert", "Needs review"),
+        "failed": ("shield-x", "Verification failed")}.get(verification_status) %}
+    {%- if _verif_label %}
+      {% if view.npi %}{{ meta_sep() }}{% endif %}
+      <small>{{ icon_label(_verif_label[0], _verif_label[1]) }}</small>
     {%- endif %}
   {% endif %}
 {% endblock %}
