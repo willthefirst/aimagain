@@ -163,10 +163,10 @@ async def test_register_via_htmx_sets_cookie_and_redirects(test_client: AsyncCli
         headers={"HX-Request": "true", "Content-Type": "application/json"},
     )
     assert response.status_code == 200
-    # Post-register HTMX flow lands on the consolidated email management /
-    # CTA page so the user is nudged to open their inbox and click the
-    # verify link.
-    assert response.headers.get("HX-Redirect") == "/users/me/email/form"
+    # Post-register HTMX flow goes "home" (`/`, which forwards to the
+    # referral board), same as a normal login — no longer forced onto the
+    # email CTA.
+    assert response.headers.get("HX-Redirect") == "/"
     # A session cookie must be set so the redirect lands authenticated.
     assert (
         "fastapiusersauth" in response.cookies
@@ -365,10 +365,10 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     test_client: AsyncClient, logged_in_user: User
 ):
     """HTMX-flagged POST + valid credentials → 204 + `Set-Cookie:
-    fastapiusersauth=...` + `HX-Redirect` (default `/posts?kind=referral`
-    per `UserManager.on_after_login`). The wrapper converts the
-    underlying 302+Location into 204+HX-Redirect for HTMX so the
-    browser doesn't auto-follow before HTMX honors the navigation."""
+    fastapiusersauth=...` + `HX-Redirect` (default `/` — home — per
+    `UserManager.on_after_login`). The wrapper converts the underlying
+    302+Location into 204+HX-Redirect for HTMX so the browser doesn't
+    auto-follow before HTMX honors the navigation."""
     response = await test_client.post(
         "/auth/login",
         data={"username": logged_in_user.email, "password": "password123"},
@@ -377,10 +377,10 @@ async def test_post_login_wrapper_htmx_success_sets_cookie_and_hx_redirect(
     assert response.status_code == 204
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
     # `Location` is popped (auto-follow guard for HTMX); HX-Redirect
-    # takes over. `on_after_login` defaults to `/posts?kind=referral` when
-    # no `?next=` is set.
+    # takes over. `on_after_login` defaults to `/` (home) when no `?next=`
+    # is set.
     assert "Location" not in response.headers
-    assert response.headers.get("HX-Redirect") == "/posts?kind=referral"
+    assert response.headers.get("HX-Redirect") == "/"
 
 
 async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
@@ -395,7 +395,7 @@ async def test_post_login_wrapper_non_htmx_success_returns_302_redirect(
         data={"username": logged_in_user.email, "password": "password123"},
     )
     assert response.status_code == 302
-    assert response.headers.get("Location") == "/posts?kind=referral"
+    assert response.headers.get("Location") == "/"
     assert "fastapiusersauth=" in response.headers.get("Set-Cookie", "")
 
 
@@ -888,7 +888,7 @@ async def test_post_verify_with_valid_token_verifies_and_auto_logs_in(
         follow_redirects=False,
     )
     # Non-HTMX POST → 302 + Location to the clinician-create form
-    # (NOT `on_after_login`'s default `/posts?kind=referral`).
+    # (NOT `on_after_login`'s default `/`).
     assert response.status_code == 302
     assert response.headers["location"] == "/clinicians/form"
     # Session cookie was minted.
@@ -1144,8 +1144,8 @@ async def test_home_anonymous_returns_landing_page(test_client: AsyncClient):
 async def test_root_authenticated_redirects_to_referral_board(
     authenticated_client: AsyncClient,
 ):
-    """Authenticated GET / redirects to the referral board
-    (`/posts?kind=referral`) — the signed-in "home"."""
+    """Authenticated GET / redirects to the referral board, defaulting to
+    California (`/posts?kind=referral&state=CA`) — the signed-in "home"."""
     response = await authenticated_client.get("/", follow_redirects=False)
     assert response.status_code == 302
-    assert response.headers["location"] == "/posts?kind=referral"
+    assert response.headers["location"] == "/posts?kind=referral&state=CA"

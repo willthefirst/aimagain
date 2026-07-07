@@ -101,21 +101,6 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
     # filters; ``level_of_care`` / ``modality`` were dropped when settings /
     # modalities collapsed onto the single ``services`` axis.
     filters=(
-        # `?owner=me` scopes the list to posts the viewer owns
-        # (``Post.owner_id == self._requesting_user.id``) — the same
-        # single-toggle radio clinicians/orgs expose. Rendered first so
-        # the viewer-relative scope sits above the structured facets;
-        # the viewer-id resolution happens in
-        # ``PostRepository.list_posts`` via the ``_requesting_user``
-        # field ``handle_list`` stamps on the repo. Powers the "My
-        # posts" view (`/posts?owner=me`, each row → Edit).
-        ChoiceFilter(
-            name="owner",
-            label="Owner",
-            choices=(("me", "Owned by me"),),
-            multi=False,
-            radio=True,
-        ),
         ChoiceFilter(
             name="kind",
             label="Type",
@@ -161,11 +146,22 @@ POST_ENTITY: Final[EntitySpec] = EntitySpec(
             choices=tuple((v, INSURANCE_CARRIER_LABELS[v]) for v in INSURANCE_CARRIERS),
             multi=True,
         ),
-        # Broad free-text filters trail at the bottom — reached for less
-        # often than the structured facets above.
+        # Broad free-text filter trails the structured facets — reached
+        # for less often.
         TextFilter(name="q", label="Keyword", placeholder="Search descriptions…"),
-        TextFilter(
-            name="posted_by", label="Posted by", placeholder="Username contains…"
+        # `?owner=me` scopes the list to posts the viewer owns
+        # (``Post.owner_id == self._requesting_user.id``) — the same
+        # single-toggle radio clinicians/orgs expose. Rendered last, as a
+        # viewer-relative scope below the content facets; the viewer-id
+        # resolution happens in ``PostRepository.list_posts`` via the
+        # ``_requesting_user`` field ``handle_list`` stamps on the repo.
+        # Powers the "My posts" view (`/posts?owner=me`, each row → Edit).
+        ChoiceFilter(
+            name="owner",
+            label="Owner",
+            choices=(("me", "Owned by me"),),
+            multi=False,
+            radio=True,
         ),
     ),
     templates=Templates(

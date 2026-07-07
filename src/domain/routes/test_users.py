@@ -37,8 +37,8 @@ async def test_primary_nav_highlights_active_section(
     logged_in_user: User,
 ):
     """The avatar menu's "My posts" entry lights on the posts list page and
-    its subpaths (it is the Posts-family link; the brand
-    `a[href="/posts?kind=referral"]` is not section-highlighted)."""
+    its subpaths (it is the Posts-family link; the brand `a[href="/"]` is
+    not section-highlighted)."""
     posts = await authenticated_client.get("/posts")
     tree = HTMLParser(posts.text)
     assert (
@@ -246,14 +246,11 @@ async def test_get_users_me_renders_authenticated_self_view(
     assert (
         tree.css("nav[aria-label='Primary'] a[href='/clinicians/form']") == []
     ), "Create-clinician CTA must be removed from nav (#697)"
-    # Brand → the referral board (signed-in "home"); an anonymous viewer's
-    # brand points at `/` instead (test_users.py anonymous nav test).
+    # Brand → `/`, the single home entry point (same for authed and
+    # anonymous; `read_root` splits the destination server-side).
     assert (
-        tree.css_first(
-            'nav[aria-label="Primary"] a[href="/posts?kind=referral"] strong'
-        )
-        is not None
-    ), "brand link must point at the referral board"
+        tree.css_first('nav[aria-label="Primary"] a[href="/"] strong') is not None
+    ), "brand link must point at home (`/`)"
     # `Post` link (a visible <li>, outside the profile dropdown) → create form.
     posts = [
         a

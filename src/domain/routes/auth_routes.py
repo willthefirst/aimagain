@@ -114,13 +114,14 @@ async def register_request_handler(
     )
 
     if request.headers.get("HX-Request") == "true":
-        # HTMX submit: auto-login and redirect to the consolidated email
-        # management / CTA page so the user is nudged to open their inbox
-        # and click the verify link. Mirrors the pattern in
-        # src/domain/routes/dev_auth.py.
+        # HTMX submit: auto-login and go "home" — `/`, the single home
+        # entry point, which forwards to the referral board (same as a
+        # normal login; see `main.py:read_root`). The verify email still
+        # goes out via `on_after_register`; we no longer force the new user
+        # onto the email CTA page.
         login_response = await auth_backend.login(get_strategy(), created_user)
         login_response.status_code = 200
-        login_response.headers["HX-Redirect"] = "/users/me/email/form"
+        login_response.headers["HX-Redirect"] = "/"
         return login_response
 
     return created_user

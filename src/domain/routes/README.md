@@ -36,7 +36,7 @@ The grammar fits resource-shaped CRUD. These stay hand-written:
 | `GET /users/me`, `GET /users/me/clinicians` | `users.py` | Singleton aliases — mounted via `singleton_alias=` on the existing `mount_detail` / `mount_related_list`. |
 | `POST/DELETE /users/me/favorites/{clinician_id}` | `favorites.py` | M:N edge add/remove toggle via `mount_edge_routes` (no `list_handler` → no list page; favorited clinicians are browsed via `/clinicians?favorited=me`). |
 | `GET /users/me/access`, `GET /users/me/access/capabilities/{name}` | `access.py` | Derived read view — capability posture, no stored row. |
-| `GET /users/me/email/form` | `user_email.py` | Email field-cluster subresource form — self-only; surfaces verification status, hosts the post-register / post-resend inbox CTA, and the resend-verification action. |
+| `GET /users/me/email/form` | `user_email.py` | Email field-cluster subresource form — self-only; surfaces verification status, hosts the unverified-viewer / post-resend inbox CTA, and the resend-verification action. |
 | `GET /`, `GET /health` | `../../main.py` | Utility endpoints. |
 
 ## Tests
