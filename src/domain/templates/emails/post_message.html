@@ -5,7 +5,10 @@
                max-width: 560px;
                margin: 2rem auto;
                line-height: 1.5">
-    <p>{{ sender_username }} sent you a message about your post on Bedlam Connect.</p>
+    <p>
+      {{ sender_username }} is reaching out regarding your post about
+      <a href="{{ post_url }}">{{ post_headline }}</a>.
+    </p>
     <blockquote style="border-left: 3px solid #ccc;
                        margin: 1rem 0;
                        padding: 0.25rem 0 0.25rem 1rem;
@@ -13,13 +16,6 @@
                        white-space: pre-wrap">
       {{ body }}
     </blockquote>
-    <p>
-      Reply directly to this email to respond to {{ sender_username }} at
-      <a href="mailto:{{ sender_email }}">{{ sender_email }}</a>.
-    </p>
-    <p>
-      <a href="{{ post_url }}">View the post</a>
-    </p>
-    <p>— Bedlam Connect</p>
+    <p>Reply directly to this email to respond to {{ sender_username }}.</p>
   </body>
 </html>

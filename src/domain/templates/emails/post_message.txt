@@ -1,11 +1,7 @@
-{{ sender_username }} sent you a message about your post on Bedlam Connect.
+{{ sender_username }} is reaching out regarding your post about {{ post_headline }} ({{ post_url }}).
 
 ---
 {{ body }}
 ---
 
-Reply directly to this email to respond to {{ sender_username }} at {{ sender_email }}.
-
-View the post: {{ post_url }}
-
-— Bedlam Connect
+Reply directly to this email to respond to {{ sender_username }}.
