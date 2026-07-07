@@ -546,7 +546,7 @@ async def post_verify(
     # in place rather than replace.
     #
     # Destination is the clinician-create form, NOT `on_after_login`'s
-    # default (/posts?kind=referral). #1302 routes verify-success into
+    # default (`/`, home). #1302 routes verify-success into
     # the create-clinician funnel — the intended next step for a
     # freshly-verified new user — and that intent persists across the
     # GET-render / POST-confirm split.

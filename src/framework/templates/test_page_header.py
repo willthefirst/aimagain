@@ -113,9 +113,10 @@ def test_list_page_shows_visible_home_breadcrumb_no_placeholder() -> None:
     bar = tree.css_first("body > nav.breadcrumb-bar")
     assert bar is not None
     crumbs = bar.css("div.container ul li")
-    # Home links to the referral board; the collection itself is the current leaf.
+    # Home links to `/` (the single home entry point); the collection
+    # itself is the current leaf.
     assert [li.text(strip=True) for li in crumbs] == ["Home", "Clinicians"]
-    assert crumbs[0].css_first("a").attributes.get("href") == "/posts?kind=referral"
+    assert crumbs[0].css_first("a").attributes.get("href") == "/"
     assert crumbs[-1].css_first("a") is None  # current page, no link
     # The hidden-placeholder mechanism is gone entirely.
     assert tree.css_first(".page-header-crumb-placeholder") is None
@@ -211,10 +212,10 @@ def test_authenticated_nav_has_post_link_and_avatar_dropdown() -> None:
     # The id hook was removed in favor of the landmark.
     assert nav.attributes.get("id") is None
 
-    # Brand → the referral board (signed-in "home"), inside the first <ul>.
+    # Brand → `/` (the single home entry point), inside the first <ul>.
     brand = nav.css_first("ul li a strong")
     assert brand is not None and brand.text(strip=True) == "Bedlam Connect"
-    assert brand.parent.attributes.get("href") == "/posts?kind=referral"
+    assert brand.parent.attributes.get("href") == "/"
 
     # `Post` is a plain link to the create form, fronted by a `plus` glyph
     # (aria-hidden, so the label text is still just "Post").

@@ -507,9 +507,9 @@ def test_primary_nav_excludes_non_journey_links_for_all_viewers() -> None:
         nav_links = {
             a.attributes.get("href") for a in tree.css('nav[aria-label="Primary"] a')
         }
-        # Brand → the referral board (signed-in "home"); the posts feed
-        # family is promoted via the `Post` link and the avatar's "My posts".
-        assert "/posts?kind=referral" in nav_links
+        # Brand → `/` (the single home entry point); the posts feed family
+        # is promoted via the `Post` link and the avatar's "My posts".
+        assert "/" in nav_links
         assert "/posts/form" in nav_links
         assert "/posts?owner=me" in nav_links
         # Non-journey families are NOT in the primary nav (regardless of

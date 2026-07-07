@@ -5,11 +5,15 @@
 Houses verification status and the resend-verification action. Email
 change (PUT /users/me/email) belongs here when implemented.
 
-Doubles as the post-registration / post-resend CTA: when the viewer
-is unverified, the page renders an "open your inbox" affordance —
-smart link to the recognized webmail provider when we have one, plain
-fallback otherwise. `?sent=1` (set by the resend redirect) swaps the
-lede to a "just sent another email" confirmation.
+Doubles as the inbox CTA for an unverified viewer: the page's body
+swaps to a focused "open your inbox" affordance — a smart link to the
+recognized webmail provider when we have one, plain fallback otherwise
+— with Resend as the quiet secondary. The page chrome (breadcrumb →
+profile, "Email" heading) is unchanged from the verified view; only the
+body content differs. `POST /auth/resend-verify` redirects here with
+`?sent=1`, which swaps the lede to a "just sent" confirmation.
+Registration no longer force-lands here — new users go to the signed-in
+home like any login (see `auth_routes.register_request_handler`).
 
 Follows the bespoke-route pattern documented in
 `src/domain/routes/README.md § Bespoke routes`.

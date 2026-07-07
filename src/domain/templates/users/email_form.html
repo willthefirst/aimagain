@@ -3,72 +3,57 @@
 {% block resource_label %}Users{% endblock %}
 {% block current_label %}{{ target_user.username }}{% endblock %}
 {% block form_content %}
-  {# Verified users see only the email row — there is no edit affordance
-     on this page today, so this is a confirmation surface. Unverified
-     users instead get the inline check-your-inbox CTA below, which names
-     the email itself, so the standalone row would be a redundant
-     restatement of the same string. #}
   {% if target_user.is_verified %}
+    {# No edit affordance today — a plain confirmation of the address on file. #}
     {%- call facts_block() %}
       {{ fact('email', 'Email', target_user.email) }}
     {%- endcall %}
   {% else %}
-    {# Doubles as the post-registration / post-resend CTA: the inbox
-       link is the primary affordance, "Resend" is the secondary fallback.
-       Both `POST /auth/register` and `POST /auth/resend-verify` redirect
-       here (the latter with `?sent=1` so the lede swaps to a "just sent"
-       confirmation). `hx-swap="none"` on the Resend button lets HTMX
-       follow the `HX-Redirect` without trying to swap a body. #}
-    <article role="alert">
-      <header>
-        <hgroup>
-          {% if just_sent %}
-            <h2>Verification email sent</h2>
-            <p>Check your inbox — the link expires in an hour.</p>
-          {% else %}
-            <h2>Check your inbox</h2>
-            <p>
-              We sent a verification link to <strong>{{ target_user.email }}</strong>.
-            </p>
-            <p>Click it to finish setting up your account.</p>
-          {% endif %}
-        </hgroup>
-      </header>
-      {% if provider_url %}
-        <p>
-          {# `target="_blank"` opens a new tab so the user doesn't lose
-             this page (and the Resend fallback below) when they pop
-             out to their inbox. On iOS, mobile Safari won't reliably
-             hand off `https://mail.google.com/...` to the Gmail app
-             when target="_blank" triggers window.open() — so when the
-             provider publishes a native URL scheme (`provider_ios_url`,
-             set by `email_provider_search_url`), an inline `onclick`
-             swaps the href to that scheme on iPhone/iPad UAs. Loses
-             the inbox search filter, but the verification email is
-             the most recent so it sits at the top anyway. #}
-          <a href="{{ provider_url }}"
-             target="_blank"
-             rel="noopener"
-             role="button"
-             {%- if provider_ios_url %}
-             onclick="if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){this.href='{{ provider_ios_url }}';}"
-             {%- endif %}>Open {{ provider_label }}</a>
-        </p>
-        <p>
-          <small>We'll search your inbox for messages from <strong>{{ from_address }}</strong>.</small>
-        </p>
-      {% else %}
-        <p>
-          Look for a message from <strong>{{ from_address }}</strong>.
-        </p>
-      {% endif %}
-      <footer>
-        <small>Didn't get it?</small>
-        <button type="button"
-                hx-post="/auth/resend-verify"
-                hx-swap="none"
-                class="secondary">Resend verification email</button>
-      </footer>
-    </article>
+    {# Post-registration / post-resend CTA (both `POST /auth/register` and
+       `POST /auth/resend-verify` redirect here). Deliberately flat: the
+       page `<h1>` ("Email") is the only heading, so the body is one lede
+       line, one primary action (open the inbox), and a quiet Resend —
+       no alert panel, no second heading, no restating what the button
+       already says. `?sent=1` swaps the lede to a "sent again" line. #}
+    {% if just_sent %}
+      <p>
+        We sent another link to <strong>{{ target_user.email }}</strong> — it expires in an hour.
+      </p>
+    {% else %}
+      <p>
+        We sent a verification link to <strong>{{ target_user.email }}</strong> — open it to finish signing up.
+      </p>
+    {% endif %}
+    {% if provider_url %}
+      {# `target="_blank"` keeps this page (and the Resend fallback) open
+         when the user pops out to their inbox. On iOS, mobile Safari
+         won't reliably hand a `https://mail.google.com/…` URL to the
+         Gmail app, so when the provider publishes a native scheme
+         (`provider_ios_url`) an inline `onclick` swaps to it on Apple
+         UAs — losing the inbox search filter, but the verify email is
+         newest so it sits on top anyway. #}
+      <p>
+        <a href="{{ provider_url }}"
+           target="_blank"
+           rel="noopener"
+           role="button"
+           {%- if provider_ios_url %}
+           onclick="if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){this.href='{{ provider_ios_url }}';}"
+           {%- endif %}>Open {{ provider_label }}</a>
+      </p>
+    {% else %}
+      <p>
+        Look for an email from <strong>{{ from_address }}</strong>.
+      </p>
+    {% endif %}
+    <p>
+      Didn't get it?
+      {# `hx-swap="none"` lets HTMX follow the resend handler's
+         `HX-Redirect` (back here with `?sent=1`) without swapping a body. #}
+      <button type="button"
+              hx-post="/auth/resend-verify"
+              hx-swap="none"
+              class="secondary outline">Resend email</button>
+    </p>
   {% endif %}
 {% endblock %}
