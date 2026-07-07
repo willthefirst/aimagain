@@ -24,10 +24,10 @@ Layout per card:
 The card is `<article>` with `<header>`, a body block, and
 `<footer>` — Pico's automatic styling tints header and footer as the
 top/bottom bands of the card. The header band is an `<h3>` headline
-link followed by a `<small class="meta">` line of `<span>` items
-(date plus zero, one, or two modality chips). The `.meta` rule in
-`base.html` joins adjacent span siblings with " · " via CSS, so
-each item is its own element rather than a hardcoded join string.
+link followed by a `<p class="meta">` line of `<span>` items
+(date plus zero, one, or two modality chips). Items are joined by
+`meta_sep()` middots (`modality_chips` prefixes each chip with one),
+so each item is its own element rather than a hardcoded join string.
 The body is one `<dl>` from `_facts_block` whose first row carries
 the services (`Seeking` / `Providing` verb + `icon_list` of
 services); subsequent rows carry the demographic facts. The footer

@@ -140,16 +140,25 @@ Example:
       <p>{{ empty_message }}</p>
     {% endif %}
   {%- endmacro %}
-  {# Inline middot-separated list. Wraps the caller's element children in
-   `<span class="meta">` so the `.meta > * + *::before { content: " · " }`
-   rule in `framework.css` draws the separator — callers never embed a
-   literal `·`, and dropping/hiding a child re-flows the dots for free.
-   Children must be ELEMENTS (`<a>`, `<span>`, `<button>`, …); the
-   selector is structural and skips intervening whitespace text nodes.
+  {# Middot-separated meta list. Wraps the caller's element children in
+   `<p class="meta">` (the `.meta` flex rule in `framework.css` handles
+   layout + spacing). The caller emits the items AND a `meta_sep()`
+   between adjacent ones — the separator is a real `<span class="meta-sep">`
+   sibling, never a CSS `::before` (a pseudo-element inside an inline-block
+   child like a locked `<button>` joins its hit area and mis-spaces). The
+   `<p>` is block-level — call it in a block context, never inline inside a
+   `<p>` (nested `<p>` is invalid).
 
    Example:
-     {% call meta_list() %}<a href="…">Jane Smith</a><a href="…">Acme</a>{% endcall %}
+     {% call meta_list() %}<a href="…">Jane Smith</a>{{ meta_sep() }}<a href="…">Acme</a>{% endcall %}
    renders: Jane Smith · Acme #}
   {% macro meta_list() -%}
-    <span class="meta">{{ caller() }}</span>
+    <p class="meta">{{ caller() }}</p>
   {%- endmacro %}
+  {# The one middot separator between two `.meta` items. A real element
+   (not a CSS `::before`) so it sits *between* items — detached from any
+   inline-block `<button>` sibling. `aria-hidden` keeps it out of the
+   accessibility tree; it's decorative punctuation. Emit it BETWEEN items
+   only (never leading/trailing), so a dropped item leaves no stray dot. #}
+  {% macro meta_sep() -%}
+    <span class="meta-sep" aria-hidden="true">·</span>{%- endmacro %}

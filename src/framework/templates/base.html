@@ -200,6 +200,7 @@
 {% block subtitle %}{% endblock %}
 {% endset -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
+{%- from "_shared/sections.html" import meta_sep -%}
 {% include "_shared/_page_header.html" %}
 {# Breadcrumb bar — its own `<nav class="breadcrumb-bar">`, a body-level
        sibling of `<header>` / `<main>` / `<footer>` (NOT inside the
@@ -230,14 +231,10 @@
 {# Subtitle slot — a one-line muted meta string tied to the page `<h1>`
          (e.g. a clinician's "NPI · Verified", a profile-mode line). Rendered
          immediately below the toolbar `<h1>` so it reads as the heading's
-         subtitle. Wrapped in `<small class="meta">` so multiple `<span>`
-         children auto-join with " · " (see the `.meta` rule). Empty on pages
-         that don't set `{% block subtitle %}`. #}
-{%- if _subtitle_html | trim %}
-<p>
-<small class="meta">{{ _subtitle_html | trim | safe }}</small>
-</p>
-{%- endif %}
+         subtitle. Wrapped in `<p class="meta">`; a block with multiple items
+         emits `meta_sep()` between them for the middot (see the `.meta` rule).
+         Empty on pages that don't set `{% block subtitle %}`. #}
+{%- if _subtitle_html | trim %}<p class="meta">{{ _subtitle_html | trim | safe }}</p>{%- endif %}
 {% block content %}{% endblock %}
 {# Post-content slot. `views/list.html` populates this with the
          pagination footer; non-list views leave it empty. Reserved
@@ -258,7 +255,9 @@
 <footer>
 <div class="container">
 {% block footer %}
-<small>&copy; 2026 Bedlam Health &middot; <a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a></small>
+<p class="meta">
+<span>&copy; 2026 Bedlam Health</span>{{ meta_sep() }}<a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a>
+</p>
 {% endblock %}
 </div>
 </footer>

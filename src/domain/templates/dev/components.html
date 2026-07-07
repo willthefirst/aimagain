@@ -7,7 +7,7 @@
    Gallery CSS is inlined here (not in framework.css / domain.css) since
 it's dev-only chrome that should never ship to production. #}
 {%- from "_shared/_card.html" import card -%}
-{%- from "_shared/sections.html" import fact, list_or_empty -%}
+{%- from "_shared/sections.html" import fact, list_or_empty, meta_sep -%}
 {%- from "_shared/form_fields.html" import text_field, select_field, multi_select_field, checkbox_field, textarea_field, conditional_field -%}
 {%- from "_shared/actions.html" import actions -%}
 {%- from "_shared/forms.html" import filter_checkbox, icon_legend -%}
@@ -297,7 +297,9 @@ it's dev-only chrome that should never ship to production. #}
           {{ fact('location', 'Location', 'San Francisco, CA') }}
           {{ fact('license', 'Licensed in', 'CA, NY, WA') }}
           {%- call fact("insurance", "Insurance") -%}
-            <span class="meta"><span>Aetna</span><span>Blue Cross</span></span>
+            <p class="meta">
+              <span>Aetna</span>{{ meta_sep() }}<span>Blue Cross</span>
+            </p>
           {%- endcall %}
           {{ fact('empty', 'Empty field', '') }}
         </dl>
@@ -305,17 +307,13 @@ it's dev-only chrome that should never ship to production. #}
       <section class="gallery-section" id="meta">
         <h2>Meta list</h2>
         <p>
-          <small>CSS class <code>.meta</code> — children joined with " · " via <code>::before</code> pseudo-element. Stacks vertically on mobile.</small>
+          <small>CSS class <code>.meta</code> — a flex row; items joined by a real <code>meta_sep()</code> middot element (not a <code>::before</code>). Stacks vertically on mobile.</small>
         </p>
         <p class="meta">
-          <span>San Francisco, CA</span>
-          <span>In-person</span>
-          <span>Telehealth</span>
-          <span>Aetna</span>
+          <span>San Francisco, CA</span>{{ meta_sep() }}<span>In-person</span>{{ meta_sep() }}<span>Telehealth</span>{{ meta_sep() }}<span>Aetna</span>
         </p>
         <p class="meta">
-          <a href="#">Posts</a>
-          <span>2 days ago</span>
+          <a href="#">Posts</a>{{ meta_sep() }}<span>2 days ago</span>
         </p>
       </section>
       <section class="gallery-section" id="glyph-list">

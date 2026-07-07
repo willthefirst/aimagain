@@ -112,6 +112,24 @@ def test_meta_description_present_with_default_copy() -> None:
     assert len(content) > 30
 
 
+def test_default_footer_is_a_meta_list_with_real_separator() -> None:
+    """The default footer (copyright · contact) uses the shared meta
+    pattern — a `<p class="meta">` whose two items are joined by a real
+    `<span class="meta-sep">` element, not a hand-written `·` or a
+    `&middot;` entity. Pins the "one middot pattern for inline HTML
+    items" contract at the site-wide chrome level."""
+    tree = HTMLParser(_render())
+    footer = tree.css_first("footer")
+    assert footer is not None
+    meta = footer.css_first("p.meta")
+    assert meta is not None
+    seps = meta.css("span.meta-sep")
+    assert len(seps) == 1
+    assert seps[0].attributes.get("aria-hidden") == "true"
+    # The contact link is a real item in the list, after the separator.
+    assert meta.css_first("a[href^='mailto:']") is not None
+
+
 def test_preconnect_to_each_vendor_cdn() -> None:
     """Every cross-origin CDN we fetch from in `<head>` needs a
     matching `<link rel="preconnect">` so the TCP+TLS handshake fires

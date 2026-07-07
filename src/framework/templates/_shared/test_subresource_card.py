@@ -37,6 +37,30 @@ def test_subtitle_parts_wrap_each_truthy_string_in_span() -> None:
     )
     assert "<span>CA</span>" in out
     assert "<span>Active</span>" in out
+    # Two parts → exactly one real separator element between them.
+    assert out.count('class="meta-sep"') == 1
+
+
+def test_single_subtitle_part_has_no_separator() -> None:
+    """One part → no dangling separator."""
+    out = _render(
+        '{{ subresource_card(id=1, headline_url="/x", headline="H",'
+        ' subtitle_parts=["CA"]) }}'
+    )
+    assert "<span>CA</span>" in out
+    assert "meta-sep" not in out
+
+
+def test_subtitle_renders_as_p_meta_not_small() -> None:
+    """The meta line is always a `<p class="meta">` — never a `<small>` or
+    `<span>` (see `_card.html` / the `.meta` CSS rule). Pins the wrapper tag
+    so a regression can't reintroduce the old `<small class="meta">`."""
+    out = _render(
+        '{{ subresource_card(id=1, headline_url="/x", headline="H",'
+        ' subtitle_parts=["CA"]) }}'
+    )
+    assert '<p class="meta">' in out
+    assert "<small" not in out
 
 
 def test_subtitle_parts_skip_falsy_entries() -> None:
@@ -50,7 +74,7 @@ def test_subtitle_parts_skip_falsy_entries() -> None:
 
 
 def test_subtitle_omitted_when_no_parts_render() -> None:
-    """All-empty `subtitle_parts` produces no `<small class="meta">` band."""
+    """All-empty `subtitle_parts` produces no `<p class="meta">` band."""
     out = _render(
         '{{ subresource_card(id=1, headline_url="/x", headline="H",'
         ' subtitle_parts=[None, ""]) }}'
