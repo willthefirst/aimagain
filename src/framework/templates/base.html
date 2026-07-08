@@ -200,7 +200,6 @@
 {% block subtitle %}{% endblock %}
 {% endset -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
-{%- from "_shared/sections.html" import meta_sep -%}
 {% include "_shared/_page_header.html" %}
 {# Breadcrumb bar — its own `<nav class="breadcrumb-bar">`, a body-level
        sibling of `<header>` / `<main>` / `<footer>` (NOT inside the
@@ -250,14 +249,18 @@
        `.container` (not on `<footer>` itself) so the footer band can span
        the full page while its text is centered and capped at Pico's
        container max-width — same pattern as `<header>` and `<main>`. The
-       default body is a site-wide copyright / contact line shown on every
-       page; pages can override by redefining `{% raw %}{% block footer %}{% endraw %}`. #}
+       default body is a site-wide support note shown on every page: a
+       single centered paragraph (plain text + one `mailto:`), so it stays
+       centered at every width without the `.meta` flex machinery. The copy
+       and pre-filled `mailto:` come from `_shared/support.html` — the same
+       macro the transactional emails render, so the support line never
+       drifts between the site and our mail. Pages can override by redefining
+       `{% raw %}{% block footer %}{% endraw %}`. #}
 <footer>
 <div class="container">
 {% block footer %}
-<p class="meta">
-<span>&copy; 2026 Bedlam Health</span>{{ meta_sep() }}<a href="mailto:support@bedlamhealth.com">support@bedlamhealth.com</a>
-</p>
+{%- from "_shared/support.html" import support_note_html -%}
+<p class="footer-note">{{ support_note_html() }}</p>
 {% endblock %}
 </div>
 </footer>

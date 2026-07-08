@@ -189,12 +189,30 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   align-items: flex-start;
 }
 .filter-sidebar { flex: 0 0 220px; min-width: 0; }
-.browse-results { flex: 1 1 0; min-width: 0; }
+/* Flex column so the filter-summary header and the list body stack with one
+   consistent gap between them (instead of relying on each child's own
+   margins). Same gap as between the article cards in the list below. */
+.browse-results {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--pico-spacing) * 0.5);
+}
 
-/* The results-summary actions ("Edit filters" → the full-page search,
-   "Clear filters" → the bare list path) sit in a row beneath the
-   "Showing results with N filters" line. */
-.filter-summary-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+/* The results summary is a plain `<p>` count sentence with a small `.meta`
+   group of links ("Edit" / "Clear" — see `views/list.html`) inline on the same
+   row. The header is a baseline flex row so the full-weight count and the
+   smaller meta links share one line and wrap together on narrow widths; the
+   count `<p>` drops its default block margin so both children sit centered on
+   the shared baseline. `.meta` owns the links' own middot spacing. */
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+}
+.filter-summary > p { margin: 0; }
 
 /* Narrow: hide the filter sidebar entirely (filters are reached via the
    in-results "Edit filters" action), and drop the inline form. `align-items: stretch`

@@ -1,0 +1,8 @@
+{# Text part of the support-contact footer (plain-text email bodies). Lives
+   in a `.txt` so it renders WITHOUT autoescape — the HTML macro in the
+   sibling `support.html` would emit `isn&#39;t` in a text body. Imports the
+   sentence + address from `support.html` so both parts share one source. #}
+{%- import "_shared/support.html" as _support -%}
+{% macro support_note_text() -%}
+{{ _support.support_lead }} {{ _support.support_email }}.
+{%- endmacro %}

@@ -1,3 +1,4 @@
+{%- from "_shared/support.txt" import support_note_text -%}
 Verify your email
 
 Hi {{ username }},
@@ -10,3 +11,5 @@ confirm this email address:
 If you didn't create an account with us, you can ignore this email.
 
 — Bedlam Connect
+
+{{ support_note_text() }}
