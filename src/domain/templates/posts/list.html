@@ -4,6 +4,8 @@
 {%- from "_shared/forms.html" import entity_form -%}
 {%- from "_shared/form_fields.html" import text_field with context -%}
 {%- from "_shared/actions.html" import actions -%}
+{%- from "_shared/sections.html" import meta_sep -%}
+{%- from "_shared/_modal.html" import modal -%}
 {#- No page toolbar on the posts browse. The h1 + "Create post" action that
     the shared list view renders are both suppressed here: posting is offered
     by the always-present global "+ Post" nav button (see `_page_header.html`),
@@ -23,27 +25,38 @@
         empty=_empty,
         pager=pager) }}
   {% endblock %}
-  {% block after_content %}
-    {#- "Save this search" — persists the *current* filter set as a named
-      SavedSearch owned by the viewer. Only shown to a signed-in user
+  {#- "Save" sits in the results-summary meta (next to Edit · Clear), only
+      for a signed-in viewer with active filters — the summary slot only
+      renders in the filtered branch, so `active_filter_count` is already
+      guaranteed here; the `current_user` guard is the remaining condition.
+      `data-target` points the shared modal utility (base.html) at the
+      dialog below. -#}
+  {% block filter_summary_extra %}
+    {%- if current_user %}{{ meta_sep() }}<a href="#save-search" data-target="save-search">Save</a>{% endif %}
+{% endblock %}
+{% block after_content %}
+  {#- "Save this search" — persists the *current* filter set as a named
+      SavedSearch owned by the viewer, shown in a Pico modal opened from the
+      results-summary "Save" link above. Only rendered for a signed-in user
       with at least one active filter (saving the unfiltered directory is
-      pointless). The hidden `filters` field carries the live
-      `filter_values` dict as JSON; `SavedSearchCreate._coerce_filters`
-      parses the string and scopes it to declared post filters. Posts to
-      the viewer's own collection — the framework's create handler runs
-      `assert_self_or_admin` against the URL's user. -#}
-    {%- if current_user and active_filter_count %}
-      <details class="save-search">
-        <summary>Save this search</summary>
-        <section class="entity-form-page">
-          {%- call entity_form(entity_url('user', id=current_user.id) ~ "/saved_searches",
-            method="post") %}
-            <input type="hidden" name="filters" value='{{ filter_values | tojson }}'>
-            {{ text_field("name", "Name", required=true, maxlength=200,
-                        help="Give this filter set a name to find it later.") }}
-            {{ actions("Save search") }}
-          {%- endcall %}
-        </section>
-      </details>
-    {%- endif %}
-  {% endblock %}
+      pointless). The hidden `filters` field carries the live `filter_values`
+      dict as JSON; `SavedSearchCreate._coerce_filters` parses the string and
+      scopes it to declared post filters. Posts to the viewer's own
+      collection — the framework's create handler runs `assert_self_or_admin`
+      against the URL's user. The modal chrome comes from the shared
+      `modal()` macro (Pico `<dialog>`/`<article>`/close button); base.html's
+      modal utility toggles it via the `data-target` triggers. -#}
+  {%- if current_user and active_filter_count %}
+    {%- call modal("save-search", "Save this search") %}
+      <section class="entity-form-page">
+        {%- call entity_form(entity_url('user', id=current_user.id) ~ "/saved_searches",
+          method="post") %}
+          <input type="hidden" name="filters" value='{{ filter_values | tojson }}'>
+          {{ text_field("name", "Name", required=true, maxlength=200,
+                    help="Give this filter set a name to find it later.") }}
+          {{ actions("Save search") }}
+        {%- endcall %}
+      </section>
+    {%- endcall %}
+  {%- endif %}
+{% endblock %}

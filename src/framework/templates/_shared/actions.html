@@ -10,7 +10,8 @@ an Edit button regardless of where it lives.
 |-----------------|----------------------------|-----------------------------------------------------|
 | Primary CTA     | (none — Pico default)      | Create org, Save, Submit, Apply, "Add licensure"    |
 | Secondary       | `class="outline"`          | Edit, Favorite (toggle on), Favorites (nav link)    |
-| Neutral         | `class="secondary outline"`| Cancel, Clear, Email, Unfavorite, Deactivate, Delete|
+| Neutral         | `class="secondary outline"`| Email, Unfavorite, Deactivate, Delete               |
+| Link            | `<a class="secondary">`    | Cancel, Clear — escapes that just navigate          |
 
 Rules:
   - **Primary** is filled blue. One per page conceptually — Create on a
@@ -18,13 +19,17 @@ Rules:
   - **Secondary** is outlined blue. Used for follow-up actions next to
     a primary (Edit on a detail page) or for "additive" toggles
     (Favorite-add).
-  - **Neutral** is outlined muted. Used for non-destructive escapes
-    (Cancel, Clear) and contextual "do this thing" affordances that
-    aren't the page's primary (Email, Unfavorite, admin Deactivate).
-    Delete also renders as neutral while we work out a destructive
-    color treatment that survives Pico's button cascade — every
-    Delete still pairs the click with an `hx-confirm` dialog so a
+  - **Neutral** is outlined muted. Used for contextual "do this thing"
+    affordances that aren't the page's primary (Email, Unfavorite, admin
+    Deactivate). Delete also renders as neutral while we work out a
+    destructive color treatment that survives Pico's button cascade —
+    every Delete still pairs the click with an `hx-confirm` dialog so a
     misfire requires explicit confirmation.
+  - **Link** is a plain `<a class="secondary">` (Pico's native muted link
+    color — no `role="button"`, so it reads as text, not a button). Used
+    for non-destructive escapes that just navigate away (Cancel back to a
+    detail page, Clear back to an unfiltered list). Sits quietly beside
+    the primary rather than competing with it as a second button.
 
 When an action fits one of these axes, **use the matching class
 combination directly** (or the macro below for Delete) — don't
@@ -39,16 +44,18 @@ button outside any cluster.
 #}
 {# Unified action cluster. One macro covers two layouts:
 
-  - **`wrapper="form"` (default)** — wraps the buttons in
-    `<div class="form-actions">`, the flex row at the bottom of every
-    entity create/edit form. Save / Cancel grow to share the row; Delete
-    is pushed right via `.form-actions-destructive` (see `base.html`).
+  - **`wrapper="form"` (default)** — wraps the controls in
+    `<div class="form-actions">`. Below Pico's `sm` breakpoint the
+    controls stack full-width (Pico default) with the primary on top;
+    at ≥576px they become a right-aligned natural-width row with the
+    primary on the far right and Delete isolated on the far left (see
+    `framework.css`).
   - **`wrapper="toolbar"`** — emits raw `<li>` items the calling
     `<menu class="toolbar-right">` (provided by `page_toolbar`) consumes.
     Used by every detail page's `{% block actions %}`.
 
-All buttons in both layouts share the same vocabulary (Save = primary,
-Cancel = neutral, Edit = secondary, Delete = destructive); change the
+All controls in both layouts share the same vocabulary (Save = primary,
+Cancel = link, Edit = secondary, Delete = destructive); change the
 class on one line here and every callsite updates.
 
 Slot semantics:
@@ -57,15 +64,18 @@ Slot semantics:
     templates README) when omitted; create forms pass an explicit
     `"Create <noun>"` from `entity_create_label(...)`. Toolbar layout
     suppresses the button when `submit_label` is omitted.
-  - `cancel_url` — neutral outline Cancel link. Form layout only.
+  - `cancel_url` — Cancel escape rendered as a plain `<a class="secondary">`
+    link (not a button). Carries `data-cancel-btn` for the dirty-form
+    guard script below.
   - `edit_url` + `edit_label` — secondary outline Edit link. Mainly
     toolbar, but valid in form layout too.
   - `delete_url` + `delete_confirm` + `delete_label` — Delete button
-    with an `hx-confirm` dialog. Renders as neutral outline (same
-    treatment as Cancel) for now; the destructive color treatment
-    was removed when the custom `.danger` class wasn't taking effect.
-    The `hx-confirm` requirement is what keeps misfires unlikely.
-    Form layout adds `.form-actions-destructive` for right-alignment.
+    with an `hx-confirm` dialog. Renders as neutral outline; the
+    destructive color treatment was removed when the custom `.danger`
+    class wasn't taking effect. The `hx-confirm` requirement is what
+    keeps misfires unlikely. Form layout adds `.form-actions-destructive`,
+    which isolates Delete on the far left — away from the right-aligned
+    confirm cluster — on the ≥576px row.
 
 Examples:
 
@@ -119,10 +129,7 @@ Examples:
       {%- if is_toolbar %}
         <li>
         {% endif -%}
-        <a href="{{ cancel_url }}"
-           role="button"
-           class="secondary outline"
-           data-cancel-btn>Cancel</a>
+        <a href="{{ cancel_url }}" class="secondary" data-cancel-btn>Cancel</a>
         {%- if is_toolbar %}</li>{% endif %}
     {%- endif %}
     {%- if delete_url and delete_confirm %}

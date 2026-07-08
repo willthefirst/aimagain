@@ -43,8 +43,11 @@ links inline on the same row. "Edit" opens the dedicated `/<collection>/search`
 page (mounted automatically whenever `filters` is declared) and shows in both
 states; "Clear" links back to the bare list path and shows only when filters
 are active. Only the links wear `.meta`; they're plain links, not button-styled
-affordances. Entities with no declared filters render `list_body` full-width
-without any sidebar and have no filter UI at all.
+affordances. The `{% block filter_summary_extra %}` slot lets a domain list append
+its own action after `Clear` in the filtered state (posts uses it for the "Save
+search" modal trigger); it renders only when filters are active. Entities with no
+declared filters render `list_body` full-width without any sidebar and have no
+filter UI at all.
 
 Child contract:
 
@@ -105,7 +108,7 @@ Child contract:
 {% extends "base.html" %}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
-{%- from "_shared/_filter_field.html" import filter_field -%}
+{%- from "_shared/_filter_field.html" import filter_field, filter_apply -%}
 {%- from "_shared/sections.html" import meta_sep, meta_list -%}
 {% block breadcrumb %}
   {%- if _breadcrumb_items is defined %}{{ breadcrumb(_breadcrumb_items) }}
@@ -151,14 +154,11 @@ Child contract:
               {{ filter_field(f, _value, heading=false) }}
             </details>
           {%- endfor %}
-          <menu>
-            <li>
-              <button type="submit">Apply filters</button>
-            </li>
-            <li>
-              <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear all</a>
-            </li>
-          </menu>
+          {#- Lone Apply button (shared `filter_apply` macro, same on the
+              full-page search form). No Clear here — the results header's
+              `Clear` link is the single clear affordance. Pico renders the
+              button full-width in the narrow sidebar, which is the target. -#}
+          {{ filter_apply() }}
         </form>
       </aside>
       <div class="browse-results">
@@ -184,6 +184,7 @@ Child contract:
                 {{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}.
               </p>
               {%- call meta_list() %}<a href="{{ search_url }}">Edit</a>{{ meta_sep() }}<a href="{{ request.url.path }}">Clear</a>
+              {% block filter_summary_extra %}{% endblock %}
             {% endcall %}
           {%- else %}
             <p>Showing all results.</p>

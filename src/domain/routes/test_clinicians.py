@@ -1034,8 +1034,11 @@ async def test_clinician_form_new_renders_form_actions_cluster(
     tree = HTMLParser(response.text)
     actions = tree.css_first(".form-actions")
     assert actions is not None
-    cancel = tree.css_first('.form-actions a[href="/clinicians"][role="button"]')
+    cancel = tree.css_first('.form-actions a[href="/clinicians"].secondary')
     assert cancel is not None
+    assert (
+        cancel.attributes.get("role") != "button"
+    ), "Cancel is a plain muted link (Pico `class=secondary`), not a button"
     assert cancel.text(strip=True) == "Cancel"
 
 
@@ -1055,8 +1058,11 @@ async def test_clinician_form_edit_renders_cancel(
     response = await authenticated_client.get(f"/clinicians/{clinician_id}/form")
     assert response.status_code == 200
     tree = HTMLParser(response.text)
-    cancel = tree.css_first(f'a[href="/clinicians/{clinician_id}"][role="button"]')
+    cancel = tree.css_first(f'a[href="/clinicians/{clinician_id}"].secondary')
     assert cancel is not None
+    assert (
+        cancel.attributes.get("role") != "button"
+    ), "Cancel is a plain muted link (Pico `class=secondary`), not a button"
     assert cancel.text(strip=True) == "Cancel"
 
 

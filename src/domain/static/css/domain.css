@@ -225,6 +225,11 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   .browse-layout { flex-direction: column; align-items: stretch; }
   .filter-sidebar { display: none; }
   .filter-form { display: none; }
+  /* Stack the summary: the count sentence on its own line, then the
+     Edit · Clear · Save links flowing inline on a full-width line below.
+     Without this the count and the links stay on one squeezed flex row and
+     the links wrap into a cramped vertical column on the right. */
+  .filter-summary { flex-direction: column; align-items: flex-start; }
 }
 
 /* ---- Post detail two-column layout --------------------------------------

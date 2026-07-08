@@ -1,0 +1,32 @@
+{# Pico modal chrome — a `<dialog>` with the `<article>` / `<header>` /
+   close-button structure Pico styles (https://picocss.com/docs/modal). Pico
+   ships the CSS (including the `modal-is-open` / `modal-is-opening` /
+   `modal-is-closing` animation classes) but not the JS; base.html carries the
+   canonical open/close utility, driven by `data-target`.
+
+   Usage — pair with any trigger that carries `data-target="<id>"` (a link,
+   button, or `.meta` action); the utility toggles the dialog by that id:
+
+     <a href="#save-search" data-target="save-search">Save</a>
+     {% call modal("save-search", "Save this search") %}
+       …form / body…
+     {% endcall %}
+
+   The header's close button also carries `data-target`, so the same utility
+   closes it; a backdrop click or Escape closes it too. The caller supplies the
+   body (rendered inside the `<article>`, below the header).
+
+   This macro is the reason domain templates don't hand-roll `<dialog>` /
+   `<article>` / `<button>` chrome (the raw-primitive lint would reject that) —
+   the primitives live here in the framework layer, once. #}
+{% macro modal(id, title) -%}
+  <dialog id="{{ id }}">
+    <article>
+      <header>
+        <button aria-label="Close" rel="prev" data-target="{{ id }}"></button>
+        <strong>{{ title }}</strong>
+      </header>
+      {{ caller() }}
+    </article>
+  </dialog>
+{%- endmacro %}
