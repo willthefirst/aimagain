@@ -55,6 +55,22 @@ def test_cancel_link_carries_data_cancel_btn_in_form_layout() -> None:
     assert cancel.attributes.get("href") == "/things/1"
 
 
+def test_cancel_renders_as_plain_muted_link_not_a_button() -> None:
+    """Cancel uses Pico's native muted-link treatment: ``class="secondary"``
+    with NO ``role="button"``, so it reads as a quiet text link beside the
+    primary rather than competing as a second button (see the vocabulary
+    table in ``_shared/actions.html``)."""
+    html = _render_actions(_make_env(), cancel_url="/things/1", submit_label="Save")
+    cancel = HTMLParser(html).css_first("a[data-cancel-btn]")
+    assert cancel is not None
+    classes = (cancel.attributes.get("class") or "").split()
+    assert "secondary" in classes, "Cancel must carry Pico's `secondary` link class"
+    assert (
+        cancel.attributes.get("role") != "button"
+    ), "Cancel must NOT be a `role=button` — it's a plain link, not a button"
+    assert "outline" not in classes, "Cancel is no longer an outline button"
+
+
 def test_cancel_link_carries_data_cancel_btn_in_toolbar_layout() -> None:
     """``data-cancel-btn`` is present in toolbar layout too — the attribute
     is on the element, not conditional on the wrapper."""

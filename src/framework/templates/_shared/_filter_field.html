@@ -15,6 +15,15 @@
                checkbox's inline label is the control itself (not a section
                heading) and is always rendered.
 #}
+{# filter_apply — the single submit button shared by both filter surfaces
+   (browse sidebar + full-page search). One macro so the label can't drift
+   the way "Apply" vs "Apply filters" did when each template hand-rolled its
+   own button. No Clear button here: clearing lives in the results-summary
+   header's `Clear` link (see `views/list.html`), which is the one place that
+   knows the bare (unfiltered) list URL. #}
+{% macro filter_apply() -%}
+  <button type="submit">Apply filters</button>
+{%- endmacro %}
 {% macro filter_field(f, value, heading=true) -%}
   {%- if f.kind == "flag" -%}
     <label>

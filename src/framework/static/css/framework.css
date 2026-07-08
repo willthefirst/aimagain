@@ -632,45 +632,47 @@ td > menu > li > [role="button"] {
 .entity-form-page > section > form {
   max-width: var(--form-max-width);
 }
-/* Save / Cancel / Delete cluster — pinned to the form's full
-   content width so the row aligns with the rest of the form's
-   fields instead of clustering at the left edge as content-
-   width flex items.
+/* Save / Cancel / Delete cluster. One visual grammar, mostly carried
+   by Pico's defaults:
 
-   Layout shape:
-     Save + Cancel each `flex: 1 1 0` so they grow to fill the
-     row (50/50 with no Delete; ~40/40 with Delete present, since
-     Delete is content-width). Delete (`form-actions-destructive`)
-     keeps its content width and `margin-left: auto` pushes it to
-     the far right so a stray click on the wrong target stays
-     unlikely.
+     - Narrow / mobile: NO custom layout. Pico renders `<button>` and
+       `[role="button"]` as `display: block; width: 100%`, so the
+       controls stack full-width with the primary (DOM-first) on top.
+       Cancel is a plain `<a class="cancel-link">` — an inline text
+       link, not a button (see the `actions` macro).
+     - Wide (≥576px, Pico's `sm` breakpoint): the cluster becomes a
+       right-aligned row of natural-width controls. `flex-direction:
+       row-reverse` lands the DOM-first primary on the far right and
+       the last-in-DOM Delete on the far left, packed to the right
+       edge — no `justify-content`/`order` juggling needed. Delete
+       (`.form-actions-destructive`) takes `margin-right: auto` to
+       stay isolated on the left away from the confirm cluster
+       (defense-in-depth; the real safeguard is its `hx-confirm`).
 
    The cluster is a `<div class="form-actions">` rendered by the
-   shared `actions` macro
-   (`framework/templates/_shared/actions.html`). All entity
-   create/edit forms route through that macro — no per-template
-   action markup. On mobile (≤540px) the cluster wraps to a
-   column and each control becomes full-width, with Delete reset
-   back below the others. */
+   shared `actions` macro (`framework/templates/_shared/actions.html`).
+   All entity create/edit forms route through that macro — no
+   per-template action markup. The search page reuses the same wrapper;
+   the filter sidebar deliberately does NOT (it's inherently narrow, so
+   Pico's stacked default is exactly right). */
 .form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: stretch;
   margin-block-start: var(--pico-spacing);
 }
-.form-actions > button:not(.form-actions-destructive),
-.form-actions > [role="button"]:not(.form-actions-destructive) {
-  flex: 1 1 0;
-  margin: 0;
-}
-.form-actions > .form-actions-destructive {
-  margin: 0;
-  margin-left: auto;
-}
-@media (max-width: 540px) {
-  .form-actions { flex-direction: column; align-items: stretch; }
-  .form-actions > .form-actions-destructive { margin-left: 0; }
+@media (min-width: 576px) {
+  .form-actions {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .form-actions > button,
+  .form-actions > [role="button"] {
+    width: auto;
+    margin: 0;
+  }
+  .form-actions > .form-actions-destructive {
+    margin-right: auto;
+  }
 }
 /* Search-page multi-choice filters render as a `<fieldset>` wrapping
    a `.checkbox-list` of single-click checkboxes (replacing the
