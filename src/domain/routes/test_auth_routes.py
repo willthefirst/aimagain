@@ -1136,9 +1136,9 @@ async def test_home_anonymous_returns_landing_page(test_client: AsyncClient):
     # phones where stacked tappable bars read better.
     assert "cta-cluster" in response.text
     # The footer slot is shared across every page (default block in
-    # `base.html`), so the brand/contact line is present on the
+    # `base.html`), so the support note / contact is present on the
     # landing page too.
-    assert "support@bedlamhealth.com" in response.text
+    assert "help@bedlamconnect.com" in response.text
 
 
 async def test_root_authenticated_redirects_to_referral_board(

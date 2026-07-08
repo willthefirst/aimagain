@@ -1,3 +1,4 @@
+{%- from "_shared/support.txt" import support_note_text -%}
 {{ sender_username }} is reaching out regarding your post about {{ post_headline }} ({{ post_url }}).
 
 ---
@@ -5,3 +6,5 @@
 ---
 
 Reply directly to this email to respond to {{ sender_username }}.
+
+{{ support_note_text() }}

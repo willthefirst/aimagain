@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-{# Self-contained email body — no `{% extends %}`. See README in this dir. #}
+{# Self-contained email body — no `{% extends %}`. The support footer is the
+   one shared import allowed here (see README in this dir). #}
+{%- from "_shared/support.html" import support_note_html -%}
 <html>
   <body style="font-family: -apple-system, system-ui, sans-serif;
                max-width: 560px;
@@ -24,5 +26,10 @@
     </p>
     <p>If you didn't create an account with us, you can ignore this email.</p>
     <p>— Bedlam Connect</p>
+    <p style="margin-top: 2rem;
+              padding-top: 1rem;
+              border-top: 1px solid #eee;
+              font-size: 0.8125rem;
+              color: #666">{{ support_note_html() }}</p>
   </body>
 </html>
