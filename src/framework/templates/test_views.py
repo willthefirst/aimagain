@@ -212,12 +212,17 @@ def test_list_view_never_renders_filter_link_in_toolbar() -> None:
     assert sidebar.css_first("header h2") is None
     summary = tree.css_first(".browse-results > header")
     assert summary is not None
-    # With one active filter, the count ("1 filter") is the link to search.
-    summary_link = summary.css_first("a")
-    assert summary_link is not None
-    assert summary_link.attributes.get("href") == "/clinicians/search?kind=x"
-    assert summary_link.text(strip=True) == "1 filter"
+    # The count is plain text ("1 filter"); the links live in the actions menu.
     assert "Showing results with" in summary.text()
+    assert "1 filter" in summary.text()
+    actions = summary.css_first("menu.filter-summary-actions")
+    assert actions is not None
+    hrefs = [a.attributes.get("href") for a in actions.css("a")]
+    labels = [a.text(strip=True) for a in actions.css("a")]
+    assert labels == ["Edit filters", "Clear filters"]
+    # "Edit filters" opens the full-page search carrying the live query string;
+    # "Clear filters" drops back to the bare list path.
+    assert hrefs == ["/clinicians/search?kind=x", "/"]
 
 
 def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
@@ -251,7 +256,8 @@ def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     assert summary is not None
     label = summary.css_first("p")
     assert label is not None and label.text(strip=True) == "Showing all results."
-    # No filters active → no count link to the search page.
+    # No filters active → nothing to edit or clear, so no actions menu / links.
+    assert summary.css_first("menu.filter-summary-actions") is None
     assert summary.css_first("a") is None
 
 

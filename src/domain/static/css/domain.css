@@ -191,8 +191,13 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .filter-sidebar { flex: 0 0 220px; min-width: 0; }
 .browse-results { flex: 1 1 0; min-width: 0; }
 
+/* The results-summary actions ("Edit filters" → the full-page search,
+   "Clear filters" → the bare list path) sit in a row beneath the
+   "Showing results with N filters" line. */
+.filter-summary-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
 /* Narrow: hide the filter sidebar entirely (filters are reached via the
-   in-results filter link), and drop the inline form. `align-items: stretch`
+   in-results "Edit filters" action), and drop the inline form. `align-items: stretch`
    overrides the base `flex-start`: once the layout stacks into a column,
    cross-axis alignment governs child *width*, and `flex-start` would size
    `.browse-results` to its max-content (the full untruncated feed) instead
