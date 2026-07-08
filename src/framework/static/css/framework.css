@@ -702,14 +702,14 @@ td > menu > li > [role="button"] {
   margin-inline: auto;
 }
 /* Page footer (`<footer>` in base.html — sibling of `<header>` and
-   `<main>`, content wrapped in an inner `.container`). Centered chrome
-   line, present on every page via the default `{% block footer %}` body.
-   `text-align` is set on `<footer>` itself (full width) so it cascades to
-   the inner container's text. The default body is a `.meta` list
-   (copyright · contact); `.meta` is a flex row, so center it here rather
-   than lean on the inherited `text-align`. */
+   `<main>`, content wrapped in an inner `.container`). A single centered
+   support note, present on every page via the default `{% block footer %}`
+   body. `text-align: center` on `<footer>` centers the note at every width
+   — it's plain flowing text, not a `.meta` flex row, so there's nothing to
+   re-center per breakpoint. `.footer-note` caps the measure so the sentence
+   wraps to a readable width instead of the full container. */
 footer { text-align: center; }
-footer .meta { justify-content: center; }
+footer .footer-note { max-width: 42rem; margin-inline: auto; }
 fieldset { border: none; padding: 0; margin: 0 0 1.25rem; }
 legend { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pico-muted-color); font-weight: 500; padding: 0; }
 /* Primary nav — the canonical Pico shape: `<nav>` with a brand `<ul>`

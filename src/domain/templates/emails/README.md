@@ -6,12 +6,23 @@ Templates rendered as email bodies, not HTTP responses. Each pair is
 
 ## Grammar (deviates from `src/domain/templates/`)
 
-These templates **do not extend** `base.html` and do not pull in
-shared partials. Each file is fully self-contained — inline CSS only,
-no JS, no `{% include %}`. Email clients (especially Gmail / Outlook)
-strip `<head>`-level styles and reject anything that smells like a
-web page, so the chrome-portable patterns the rest of the templates
-use don't apply here.
+These templates **do not extend** `base.html`. Each file is fully
+self-contained — inline CSS only, no JS, no `{% include %}`. Email clients
+(especially Gmail / Outlook) strip `<head>`-level styles and reject anything
+that smells like a web page, so the chrome-portable patterns the rest of the
+templates use don't apply here.
+
+**One shared import is allowed:** the support footer. Both parts of every
+pair import it — the HTML part pulls `support_note_html` from
+[`_shared/support.html`](../../../framework/templates/_shared/support.html),
+the text part pulls `support_note_text` from
+[`_shared/support.txt`](../../../framework/templates/_shared/support.txt).
+Those macros are the single home for the "reach us" line, the support
+address, and the pre-filled `mailto:`, shared with the site `<footer>` so
+the copy never drifts between the site and the mail we send. They emit only
+inline-safe content (the text macro emits no HTML at all), so the
+self-contained-output rule still holds. Any *other* shared partial stays
+out — this is the one carve-out.
 
 The Jinja env that renders these is the same one used for HTTP
 responses (`src.framework.rendering.templating.templates.env`); the

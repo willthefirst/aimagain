@@ -1,0 +1,30 @@
+{# Support-contact copy — the ONE home for the "reach us" sentence, the
+   support address, and the pre-filled `mailto:`. Consumed in two places:
+
+     - the site `<footer>` (base.html) and transactional email HTML parts,
+       via `support_note_html()`;
+     - transactional email text parts, via `support_note_text()` in the
+       sibling `support.txt` (which imports `support_lead` / `support_email`
+       from here, so the sentence and address have a single source).
+
+   Emails are otherwise self-contained (see `domain/templates/emails/README`);
+   this pair is the single documented shared import they may pull in, so the
+   support copy never drifts between the site and the mail we send.
+
+   `support_lead` / `support_email` are underscore-free so `{% import %}` in
+   `support.txt` can re-export them; `_subject` / `_body` stay private (only
+   the mailto here uses them). #}
+{%- set support_email = "help@bedlamconnect.com" -%}
+{%- set support_lead = "Bedlam Connect is brand new, so expect a few rough edges. If something isn't working, we'd love to hear from you at" -%}
+{%- set _subject = "Bedlam Connect — issue report" -%}
+{%- set _body = "What happened?\n\nWhat did you expect?\n\nWhich page or link?\n\nA screenshot or short screen recording helps us a lot — thank you!" -%}
+{# The pre-filled `mailto:` — subject + a short prompt body, URL-encoded.
+   Kept light on purpose: four blanks, no required format. #}
+{% macro support_mailto() -%}
+  mailto:{{ support_email }}?subject={{ _subject | urlencode }}&body={{ _body | urlencode }}
+{%- endmacro %}
+{# HTML part — the sentence with the address as a `mailto:` link. Emits raw
+   `<a>`, so callers drop it straight into a `<p>`. #}
+{% macro support_note_html() -%}
+  {{ support_lead }} <a href="{{ support_mailto() }}">{{ support_email }}</a>.
+{%- endmacro %}
