@@ -348,23 +348,24 @@ async def test_list_filter_summary_reads_active_filter_count(
     logged_in_user,
 ):
     """The results column opens with a summary header. Filtering by kind makes
-    it read "Showing results with 1 filter." followed by "Edit filters" (to the
-    dedicated search page carrying the live query string) and "Clear filters"
-    (back to the bare list path) actions."""
+    it read "Showing results with 1 filter." above a small `.meta` row with an
+    "Edit" link (to the dedicated search page carrying the live query string)
+    and a "Clear" link (back to the bare list path)."""
     response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
     summary = HTMLParser(response.text).css_first(".browse-results > header")
     assert summary is not None
+    # The count sentence is full-weight text; only the two action links carry
+    # `.meta` (no button-styled actions menu).
     assert "Showing results with" in summary.text()
     assert "1 filter" in summary.text()
-    actions = summary.css_first("menu.filter-summary-actions")
-    assert actions is not None
-    links = {
-        a.text(strip=True): a.attributes.get("href") or "" for a in actions.css("a")
-    }
-    assert set(links) == {"Edit filters", "Clear filters"}
-    assert links["Edit filters"].startswith("/posts/search")
-    assert links["Clear filters"] == "/posts"
+    meta = summary.css_first("p.meta")
+    assert meta is not None
+    assert summary.css_first("menu.filter-summary-actions") is None
+    links = {a.text(strip=True): a.attributes.get("href") or "" for a in meta.css("a")}
+    assert set(links) == {"Edit", "Clear"}
+    assert links["Edit"].startswith("/posts/search")
+    assert links["Clear"] == "/posts"
 
 
 # --- List filter: ?owner=me scopes to the viewer's own posts -------------

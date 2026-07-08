@@ -38,12 +38,13 @@ headings). An accordion renders `open` when its filter is in a dirty
 (active) state — i.e. `filter_values` holds a non-empty value for it — so
 applied filters stay visible on reload. The results column opens with a plain `<header>` that states
 whether the result set is filtered: "Showing all results." when nothing is
-active, else "Showing results with <N filters>." followed by an "Edit filters"
-link (to the dedicated `/<collection>/search` page, mounted automatically
-whenever `filters` is declared) and a "Clear filters" link (back to the bare
-list path). Entities with no declared filters
-render `list_body` full-width without any sidebar and have no filter UI at
-all.
+active, else "Showing results with <N filters>." — with small `.meta` action
+links inline on the same row. "Edit" opens the dedicated `/<collection>/search`
+page (mounted automatically whenever `filters` is declared) and shows in both
+states; "Clear" links back to the bare list path and shows only when filters
+are active. Only the links wear `.meta`; they're plain links, not button-styled
+affordances. Entities with no declared filters render `list_body` full-width
+without any sidebar and have no filter UI at all.
 
 Child contract:
 
@@ -88,8 +89,8 @@ Child contract:
     active_filter_count, filter_heading, search_url. The sidebar
     form consumes `filters` / `filter_values`; the results-column
     summary `<header>` consumes `active_filter_count` /
-    `search_url` (the "Edit filters" link) and `request.url.path`
-    (the "Clear filters" link); `pager` is read inside the `item_list` macro.
+    `search_url` (the "Edit" link) and `request.url.path`
+    (the "Clear" link); `pager` is read inside the `item_list` macro.
     (`active_filters` / `filter_heading` are injected for any
     template that wants them but are not used by this view.)
 
@@ -105,6 +106,7 @@ Child contract:
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_filter_field.html" import filter_field -%}
+{%- from "_shared/sections.html" import meta_sep, meta_list -%}
 {% block breadcrumb %}
   {%- if _breadcrumb_items is defined %}{{ breadcrumb(_breadcrumb_items) }}
   {%- else %}
@@ -160,41 +162,41 @@ Child contract:
         </form>
       </aside>
       <div class="browse-results">
-        {#- Filter summary — states what the results column is showing. With
-            no active filter it reads "Showing all results."; with one or more,
-            it reads "Showing results with <N filters>." followed by two action
-            links: "Edit filters" opens the dedicated `/<collection>/search` page
-            (carrying the live query string via `search_url`) to refine them, and
-            "Clear filters" links back to the bare list path to drop every active
-            filter. Both actions render only when filters are active — there is
-            nothing to edit or clear otherwise. Only `active_filter_count` is
+        {#- Filter summary — states what the results column is showing and
+            carries `.meta` action links inline on the same row (the
+            `.filter-summary` header is a baseline flex row — see `domain.css`).
+            "Edit" opens the dedicated `/<collection>/search` page to add or
+            refine filters and shows in BOTH states (carrying the live query
+            string via `search_url` when filters are active). "Clear" links back
+            to the bare list path and shows ONLY when filters are active — with
+            nothing applied there is nothing to clear. So the line reads
+            "Showing all results. · Edit" when unfiltered, and "Showing results
+            with <N filters>. · Edit · Clear" when filtered. Only the links wear
+            `.meta` (the count sentence stays full-weight); they're plain links,
+            not button-styled affordances. Only `active_filter_count` is
             rendered as text (the per-value descriptor pills were dropped);
             `search_url` is set whenever filters exist. -#}
         {%- if search_url is defined and search_url %}
-          <header>
+          <header class="filter-summary">
             {%- if active_filter_count is defined and active_filter_count %}
               <p>
                 Showing results with
                 {{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}.
               </p>
-              <menu class="filter-summary-actions">
-                <li>
-                  <a href="{{ search_url }}" role="button" class="secondary outline">Edit filters</a>
-                </li>
-                <li>
-                  <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear filters</a>
-                </li>
-              </menu>
-            {%- else %}
-              <p>Showing all results.</p>
-            {%- endif %}
-          </header>
+              {%- call meta_list() %}<a href="{{ search_url }}">Edit</a>{{ meta_sep() }}<a href="{{ request.url.path }}">Clear</a>
+            {% endcall %}
+          {%- else %}
+            <p>Showing all results.</p>
+            {%- call meta_list() %}<a href="{{ search_url }}">Edit</a>
+          {% endcall %}
         {%- endif %}
-      {%- endif %}
-      {% block list_body %}{% endblock %}
-      {%- if _has_filters %}
-      </div>
-    </div>
+      </header>
+    {%- endif %}
   {%- endif %}
+  {% block list_body %}{% endblock %}
+  {%- if _has_filters %}
+  </div>
+</div>
+{%- endif %}
 {% endblock %}
 {% block after_content %}{% endblock %}

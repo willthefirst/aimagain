@@ -212,22 +212,31 @@ def test_list_view_never_renders_filter_link_in_toolbar() -> None:
     assert sidebar.css_first("header h2") is None
     summary = tree.css_first(".browse-results > header")
     assert summary is not None
-    # The count is plain text ("1 filter"); the links live in the actions menu.
+    # The count sentence is a plain <p> (full-weight, NOT meta-styled).
     assert "Showing results with" in summary.text()
     assert "1 filter" in summary.text()
-    actions = summary.css_first("menu.filter-summary-actions")
-    assert actions is not None
-    hrefs = [a.attributes.get("href") for a in actions.css("a")]
-    labels = [a.text(strip=True) for a in actions.css("a")]
-    assert labels == ["Edit filters", "Clear filters"]
-    # "Edit filters" opens the full-page search carrying the live query string;
-    # "Clear filters" drops back to the bare list path.
-    assert hrefs == ["/clinicians/search?kind=x", "/"]
+    # Only the two action links carry `.meta` (middot-separated), and they're
+    # plain links — no button-styled actions menu, and the count text is not
+    # inside the meta row.
+    meta = summary.css_first("p.meta")
+    assert meta is not None
+    assert "Showing results with" not in meta.text()
+    assert summary.css_first("menu.filter-summary-actions") is None
+    links = meta.css("a")
+    assert [a.text(strip=True) for a in links] == ["Edit", "Clear"]
+    assert all(a.attributes.get("role") != "button" for a in links)
+    # "Edit" opens the full-page search carrying the live query string;
+    # "Clear" drops back to the bare list path.
+    assert [a.attributes.get("href") for a in links] == [
+        "/clinicians/search?kind=x",
+        "/",
+    ]
 
 
 def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     """With a filtered entity but no active selection, the results-column
-    summary header reads "Showing all results." with no count link."""
+    summary header reads "Showing all results." with an "Edit" link (to go add
+    filters) but no "Clear" — there is nothing to clear."""
     env = _make_env()
     _add_child(
         env,
@@ -256,9 +265,14 @@ def test_filter_summary_reads_all_results_when_no_active_filters() -> None:
     assert summary is not None
     label = summary.css_first("p")
     assert label is not None and label.text(strip=True) == "Showing all results."
-    # No filters active → nothing to edit or clear, so no actions menu / links.
     assert summary.css_first("menu.filter-summary-actions") is None
-    assert summary.css_first("a") is None
+    # Just an "Edit" link (opens the search page to add filters) — no "Clear",
+    # since nothing is applied.
+    meta = summary.css_first("p.meta")
+    assert meta is not None
+    links = meta.css("a")
+    assert [a.text(strip=True) for a in links] == ["Edit"]
+    assert links[0].attributes.get("href") == "/clinicians/search"
 
 
 def test_list_view_wraps_each_sidebar_filter_in_a_folded_accordion() -> None:

@@ -861,11 +861,13 @@ async def test_list_clinicians_renders_empty_state(
     sidebar = tree.css_first(".filter-sidebar")
     assert sidebar is not None, "Expected .filter-sidebar on /clinicians"
     # No filters active on a bare list → the results-column summary header
-    # states the unfiltered directory and shows no count link to the search page.
+    # states the unfiltered directory. It carries an "Edit" link (to the search
+    # page, to add filters) but no "Clear" — there's nothing to clear.
     summary = tree.css_first(".browse-results > header")
     assert summary is not None, "Expected a results-column summary header"
     assert "Showing all results." in summary.text()
-    assert summary.css_first("a") is None
+    summary_links = [a.text(strip=True) for a in summary.css("p.meta a")]
+    assert summary_links == ["Edit"]
     # Multi-choice ChoiceFilters render as search-checkbox-fieldset with
     # single-click checkboxes (#583). No checkbox is preselected when the
     # filter is inactive.
