@@ -40,7 +40,7 @@ Required context (also enforced at render time by
 {% extends "base.html" %}
 {%- from "_shared/_breadcrumb.html" import breadcrumb -%}
 {%- from "_shared/_toolbar.html" import page_toolbar -%}
-{%- from "_shared/_filter_field.html" import filter_field -%}
+{%- from "_shared/_filter_field.html" import filter_field, filter_apply -%}
 {% block breadcrumb %}
   {%- set _label_override %}
     {% block resource_label %}{% endblock %}
@@ -67,17 +67,9 @@ Required context (also enforced at render time by
 {% block content %}
   <form method="get" action="{{ list_action }}" class="search-form">
     {%- for f in declared_filters %}{{ filter_field(f, filter_values.get(f.name) ) }}{%- endfor %}
-      <menu>
-        <li>
-          <button type="submit">Apply</button>
-        </li>
-        {# Use the outline variant so Clear matches the rest of the
-       app's secondary-action vocabulary (Cancel, Filters, Edit,
-       Unfavorite) — Pico's filled `.secondary` was a third button
-       style with no other callers (#599). #}
-        <li>
-          <a href="{{ list_action }}" role="button" class="secondary outline">Clear</a>
-        </li>
-      </menu>
+      {# Same lone Apply button as the browse sidebar (shared `filter_apply`
+         macro) so the label stays in sync. No Clear — the list page's
+         results header owns the single Clear affordance. #}
+      {{ filter_apply() }}
     </form>
   {% endblock %}

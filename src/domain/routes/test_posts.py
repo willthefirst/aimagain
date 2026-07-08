@@ -349,13 +349,15 @@ async def test_list_filter_summary_reads_active_filter_count(
 ):
     """The results column opens with a summary header. Filtering by kind makes
     it read "Showing results with 1 filter." above a small `.meta` row with an
-    "Edit" link (to the dedicated search page carrying the live query string)
-    and a "Clear" link (back to the bare list path)."""
+    "Edit" link (to the dedicated search page carrying the live query string),
+    a "Clear" link (back to the bare list path), and — for a signed-in viewer —
+    a "Save" link that opens the save-search modal (see
+    `test_list_filter_summary_offers_save_search_modal`)."""
     response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
     summary = HTMLParser(response.text).css_first(".browse-results > header")
     assert summary is not None
-    # The count sentence is full-weight text; only the two action links carry
+    # The count sentence is full-weight text; only the action links carry
     # `.meta` (no button-styled actions menu).
     assert "Showing results with" in summary.text()
     assert "1 filter" in summary.text()
@@ -363,9 +365,48 @@ async def test_list_filter_summary_reads_active_filter_count(
     assert meta is not None
     assert summary.css_first("menu.filter-summary-actions") is None
     links = {a.text(strip=True): a.attributes.get("href") or "" for a in meta.css("a")}
-    assert set(links) == {"Edit", "Clear"}
+    assert set(links) == {"Edit", "Clear", "Save"}
     assert links["Edit"].startswith("/posts/search")
     assert links["Clear"] == "/posts"
+
+
+async def test_list_filter_summary_offers_save_search_modal(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """With active filters, a signed-in viewer gets a "Save" link in the
+    results-summary meta that targets the save-search Pico `<dialog>` (moved
+    out of the sidebar into a modal, #1591-follow-up). The dialog carries the
+    save form: a hidden `filters` field (the live query, JSON-encoded), the
+    `name` input, and the "Save search" submit."""
+    response = await authenticated_client.get("/posts?kind=referral")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    save_link = tree.css_first('.browse-results > header a[data-target="save-search"]')
+    assert save_link is not None
+    assert save_link.text(strip=True) == "Save"
+    dialog = tree.css_first("dialog#save-search")
+    assert dialog is not None, "save-search modal must be present"
+    assert dialog.css_first('input[type="hidden"][name="filters"]') is not None
+    assert dialog.css_first('input[name="name"]') is not None
+    submit = dialog.css_first('button[type="submit"]')
+    assert submit is not None and submit.text(strip=True) == "Save search"
+    # The Pico modal close button (rel=prev) also toggles via data-target.
+    assert dialog.css_first('button[rel="prev"][data-target="save-search"]') is not None
+
+
+async def test_list_filter_summary_hides_save_when_unfiltered(
+    authenticated_client: AsyncClient,
+    logged_in_user,
+):
+    """With no active filters there's nothing worth saving, so neither the
+    "Save" link nor the save-search dialog renders — the summary slot only
+    fires in the filtered branch (`active_filter_count`)."""
+    response = await authenticated_client.get("/posts")
+    assert response.status_code == 200
+    tree = HTMLParser(response.text)
+    assert tree.css_first('a[data-target="save-search"]') is None
+    assert tree.css_first("dialog#save-search") is None
 
 
 # --- List filter: ?owner=me scopes to the viewer's own posts -------------

@@ -590,16 +590,21 @@ def test_form_edit_view_renders_breadcrumb_and_edit_heading() -> None:
     assert h1.text(strip=True) == "Edit clinician"
 
 
-def test_actions_buttons_fill_row_width_on_desktop() -> None:
-    """Save / Cancel must stretch (`flex: 1 1 0`) so the cluster fills
-    the form's content width instead of clustering at the left edge as
-    content-width flex items — without the rule the row visibly fell
-    short of the form's right edge while every other element
-    (fieldsets, inputs) filled the form. The Delete button keeps its
-    content width (the `:not(.form-actions-destructive)` selector
-    excludes it) and `margin-left: auto` pushes it to the far right.
-    Pinned against `framework.css` so a future CSS edit that drops the
-    grow rule fails here loudly."""
+def test_actions_form_row_is_right_aligned_at_desktop_width() -> None:
+    """The `.form-actions` cluster leans on Pico defaults for the
+    narrow/stacked state (full-width block buttons, primary on top) and
+    only adds a right-aligned row at Pico's `sm` breakpoint (≥576px).
+
+    Pinned against `framework.css` so a future edit that drops the row
+    treatment — or reverts to the old 50/50 `flex: 1` stretch — fails
+    here loudly. Three invariants:
+      - a `@media (min-width: 576px)` block scopes the row (so it never
+        fires in the narrow sidebar / on mobile);
+      - inside it, `.form-actions` is `flex-direction: row-reverse`
+        (DOM-first primary → far right, last-in-DOM Delete → far left);
+      - `.form-actions-destructive` takes `margin-right: auto` to stay
+        isolated from the confirm cluster on that row.
+    """
     import re
     from pathlib import Path
 
@@ -610,39 +615,32 @@ def test_actions_buttons_fill_row_width_on_desktop() -> None:
         / "css"
         / "framework.css"
     ).read_text()
-    # The non-destructive Save/Cancel rule must `flex: 1` (any
-    # `1 1 0` / `1` variant) so they grow. Match the property
-    # against any value that starts with `1`.
-    grow_rule = re.search(
-        r"\.form-actions\s*>\s*button:not\(\.form-actions-destructive\)[^{]*\{[^}]*flex:\s*1",
+    # The wide-screen row must be gated behind Pico's `sm` breakpoint and
+    # use `row-reverse` — check both within one media block.
+    row_rule = re.search(
+        r"@media\s*\(min-width:\s*576px\)\s*\{"
+        r".*?\.form-actions\s*\{[^}]*flex-direction:\s*row-reverse",
         css,
         re.DOTALL,
     )
-    assert grow_rule is not None, (
-        ".form-actions > button:not(.form-actions-destructive) must declare "
-        "`flex: 1 ...` so Save/Cancel fill the row's width — without it the "
-        "cluster falls short of the form's right edge"
+    assert row_rule is not None, (
+        ".form-actions must become a `flex-direction: row-reverse` row inside "
+        "an `@media (min-width: 576px)` block — the right-aligned desktop grammar"
     )
-    role_button_rule = re.search(
-        r"\.form-actions\s*>\s*\[role=\"button\"\]:not\(\.form-actions-destructive\)[^{]*\{[^}]*flex:\s*1",
-        css,
-        re.DOTALL,
-    )
-    assert role_button_rule is not None, (
-        '`[role="button"]` (Cancel link styled as button) must follow the '
-        "same flex-grow rule as `<button>` — without it the Cancel half of "
-        "the row stays content-width"
-    )
-    # And the destructive button must NOT grow — Delete keeps its
-    # content width on the right edge.
+    # Delete stays apart from the confirm cluster on the left.
     destructive_rule = re.search(
-        r"\.form-actions\s*>\s*\.form-actions-destructive\b[^{]*\{[^}]*margin-left:\s*auto",
+        r"\.form-actions\s*>\s*\.form-actions-destructive\b[^{]*\{[^}]*margin-right:\s*auto",
         css,
         re.DOTALL,
     )
     assert destructive_rule is not None, (
-        ".form-actions-destructive must declare `margin-left: auto` so "
-        "Delete stays right-aligned and content-sized"
+        ".form-actions-destructive must declare `margin-right: auto` so Delete "
+        "stays isolated on the far left, away from the right-aligned cluster"
+    )
+    # And the old 50/50 stretch must be gone — no `flex: 1` grow rule.
+    assert "flex: 1 1 0" not in css, (
+        "the old Save/Cancel 50/50 stretch (`flex: 1 1 0`) should be removed — "
+        "the new grammar is natural-width right-aligned, not stretched"
     )
 
 
@@ -679,10 +677,12 @@ def test_actions_macro_routes_page_level_clusters_through_form_wrapper() -> None
     submit = cluster.css_first("button[type='submit']")
     assert submit is not None
     assert submit.text().strip() == "Save changes"
-    # Cancel link is present and points at the supplied URL.
-    cancel = cluster.css_first("a[role='button']")
+    # Cancel is a plain muted link (Pico `class="secondary"`, no
+    # `role="button"`) pointing at the supplied URL.
+    cancel = cluster.css_first("a.secondary")
     assert cancel is not None
     assert cancel.attributes.get("href") == "/widgets/1"
+    assert cancel.attributes.get("role") != "button"
 
 
 def test_no_template_uses_danger_class() -> None:

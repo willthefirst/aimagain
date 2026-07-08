@@ -292,5 +292,60 @@
       })
     }())
 </script>
+{# Modal open/close — Pico ships the modal *CSS* (the `<dialog><article>`
+       chrome plus the `modal-is-open` / `modal-is-opening` / `modal-is-closing`
+       animation classes and `--pico-scrollbar-width` scroll-lock var) but
+       leaves the JS to us (https://picocss.com/docs/modal#utilities). This is
+       Pico's canonical utility, adapted to the same event-delegation shape as
+       the locked-cta script above so it drives *any* modal app-wide: a trigger
+       carries `data-target="<dialog id>"` to toggle it; a click on the dialog
+       backdrop (outside `<article>`) or Escape closes it. Pico shows the modal
+       via the `open` attribute (not `showModal()`) so its own overlay CSS and
+       animations apply — hence the manual scroll-lock class on `<html>`. #}
+<script>
+    ;(function () {
+      var html = document.documentElement
+      var DURATION = 400 // matches Pico's modal animation duration
+      var visible = null
+      function scrollbarWidth () {
+        return window.innerWidth - html.clientWidth
+      }
+      function open (modal) {
+        var w = scrollbarWidth()
+        if (w) html.style.setProperty('--pico-scrollbar-width', w + 'px')
+        html.classList.add('modal-is-open', 'modal-is-opening')
+        setTimeout(function () {
+          html.classList.remove('modal-is-opening')
+        }, DURATION)
+        modal.setAttribute('open', '')
+        visible = modal
+      }
+      function close (modal) {
+        visible = null
+        html.classList.add('modal-is-closing')
+        setTimeout(function () {
+          html.classList.remove('modal-is-closing', 'modal-is-open')
+          html.style.removeProperty('--pico-scrollbar-width')
+          modal.removeAttribute('open')
+        }, DURATION)
+      }
+      document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('[data-target]')
+        if (trigger) {
+          e.preventDefault()
+          var modal = document.getElementById(trigger.dataset.target)
+          if (modal) (modal.hasAttribute('open') ? close : open)(modal)
+          return
+        }
+        // Backdrop: a click inside the open dialog but outside its card.
+        if (visible && visible.contains(e.target) && !e.target.closest('article')) {
+          close(visible)
+        }
+      })
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && visible) close(visible)
+      })
+    }())
+</script>
 </body>
 </html>

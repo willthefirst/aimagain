@@ -338,9 +338,10 @@ async def test_form_edit_renders_save_cancel_delete_cluster(
     logged_in_user: User,
 ):
     """Edit pages render the standardized `form_actions` cluster with
-    Save (submit), Cancel (link to detail), and Delete (hx-delete with
-    confirm). Delete carries the `form-actions-destructive` class so the
-    CSS pushes it to the right of the cluster, separated from Save."""
+    Save (submit), Cancel (plain muted link to detail), and Delete
+    (hx-delete with confirm). Delete carries the `form-actions-destructive`
+    class so the CSS isolates it on the far left of the cluster, separated
+    from the right-aligned confirm actions."""
     org_id = await _seed_org(db_test_session_manager, owner_id=logged_in_user.id)
     program_id = await _seed_program_for(
         db_test_session_manager, owner_id=logged_in_user.id, org_id=org_id
@@ -350,8 +351,11 @@ async def test_form_edit_renders_save_cancel_delete_cluster(
     cluster = tree.css_first(".form-actions")
     assert cluster is not None
     assert cluster.css_first('button[type="submit"]') is not None
-    cancel = cluster.css_first(f'a[href="/programs/{program_id}"][role="button"]')
+    cancel = cluster.css_first(f'a[href="/programs/{program_id}"].secondary')
     assert cancel is not None
+    assert (
+        cancel.attributes.get("role") != "button"
+    ), "Cancel is a plain muted link (Pico `class=secondary`), not a button"
     assert cancel.text(strip=True) == "Cancel"
     delete = cluster.css_first(f'button[hx-delete="/programs/{program_id}"]')
     assert delete is not None
