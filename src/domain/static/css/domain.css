@@ -115,6 +115,17 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Same `min-width: 0` escape hatch, one level up, for the ≤640px mobile
+   collapse. There the framework flips `dl > div` from `display: contents`
+   to `display: block` (facts stack dt-over-dd), so the wrapper <div> — not
+   the <dd> — becomes the grid item. Its default `min-width: auto` measures
+   the nowrap <dd> inside at full length, blowing the `1fr` track (and the
+   whole feed) past the viewport. Zero it so the track collapses and the
+   <dd> above truncates instead. Harmless above 640px, where the <div> is
+   `display: contents` and has no box to size. */
+.post-feed-row .entity-facts dl > div {
+  min-width: 0;
+}
 /* Header line — pill · timestamp (pushed to opposite ends) */
 .post-feed-header {
   display: flex;
@@ -181,9 +192,14 @@ ul.post-feed-list > li { list-style: none; padding: 0; }
 .browse-results { flex: 1 1 0; min-width: 0; }
 
 /* Narrow: hide the filter sidebar entirely (filters are reached via the
-   in-results filter link), and drop the inline form. */
+   in-results filter link), and drop the inline form. `align-items: stretch`
+   overrides the base `flex-start`: once the layout stacks into a column,
+   cross-axis alignment governs child *width*, and `flex-start` would size
+   `.browse-results` to its max-content (the full untruncated feed) instead
+   of the viewport — pushing the page into a horizontal scroll. Stretching
+   pins it to the container so `min-width: 0` can do its job. */
 @media (max-width: 640px) {
-  .browse-layout { flex-direction: column; }
+  .browse-layout { flex-direction: column; align-items: stretch; }
   .filter-sidebar { display: none; }
   .filter-form { display: none; }
 }
