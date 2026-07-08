@@ -42,8 +42,12 @@
         {%- endif %}
       </div>
       {# Right rail: the "Connect with the provider" panel — the
-               provider's meta rows + the message form (or a locked CTA). #}
-      {% include "posts/_shared/_connect_panel.html" %}
+               provider's meta rows + the message form (or a locked CTA).
+               Hidden on your own post (`is_self`): connecting with the
+               provider is meaningless when you ARE the provider. #}
+      {% if not is_self %}
+        {% include "posts/_shared/_connect_panel.html" %}
+      {% endif %}
     </div>
   </section>
 {% endblock %}

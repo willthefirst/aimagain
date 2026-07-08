@@ -66,6 +66,29 @@ Shared infrastructure:
   emits the same shape via a different code path because its parent
   row is the requesting user with no PK lookup.
 
+## Detail context: viewer flags
+
+`handle_detail` (in `detail.py`) merges three viewer-derived booleans
+into every detail render's template context. They answer different
+questions — pick by intent, don't reach for the closest one:
+
+- `is_self` — the viewer **is** the subject. `target.<owner_attr> ==
+  viewer.id` (for `owner_attr=None`, the row IS the user, so
+  `target.id == viewer.id`). Use to hide/show something that only makes
+  sense toward *other* people — e.g. a post's "Connect with the
+  provider" panel is gated on `not is_self`, since connecting with
+  yourself is meaningless.
+- `can_edit` — the viewer **may write** the target, via
+  `spec.can_write` (typically `is_owner_or_admin`): owner **or** admin.
+  Gates edit/delete affordances. Broader than `is_self` — an admin
+  passes `can_edit` on someone else's row.
+- `can_admin_actions` — `is_admin(viewer) and not is_self`. Admin
+  affordances the viewer shouldn't aim at their own row.
+
+The uniform `owner_attr` rule (`spec.owner_attr or "id"`) lets every
+entity inherit these without per-entity glue; `test_detail.py` pins
+the `owner_attr`-set vs. `owner_attr=None` cases.
+
 ## Dependency direction
 
 `_spec.py` is the leaf — nothing in this package imports from a verb

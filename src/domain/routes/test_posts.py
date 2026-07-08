@@ -450,6 +450,38 @@ async def test_edit_form_route_works_for_each_kind(
     assert response.status_code == 200
 
 
+# --- Connect panel visibility: hidden on your own post -------------------
+
+
+@pytest.mark.parametrize("kind,builder", _KINDS)
+async def test_connect_panel_hidden_on_own_post(
+    kind: str,
+    builder,
+    authenticated_client: AsyncClient,
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+    logged_in_user,
+):
+    """The "Connect with the provider" panel is meaningless when the
+    viewer IS the provider — it's hidden on a post the viewer owns
+    (`is_self`) and shown on someone else's post."""
+    mine = builder(owner_id=logged_in_user.id)
+    other_owner = create_test_user(username=f"other-{uuid.uuid4()}")
+    theirs = builder(owner_id=other_owner.id)
+    async with db_test_session_manager() as session:
+        async with session.begin():
+            session.add(other_owner)
+            session.add(mine)
+            session.add(theirs)
+
+    own = await authenticated_client.get(f"/posts/{mine.id}")
+    assert own.status_code == 200
+    assert HTMLParser(own.text).css_first('[data-row-id="connect-panel"]') is None
+
+    other = await authenticated_client.get(f"/posts/{theirs.id}")
+    assert other.status_code == 200
+    assert HTMLParser(other.text).css_first('[data-row-id="connect-panel"]') is not None
+
+
 # --- Referral detail: grouped fact display (mirrors the create/edit form) -
 #
 # These pin the read-side / write-side parity introduced when the
