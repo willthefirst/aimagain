@@ -348,17 +348,23 @@ async def test_list_filter_summary_reads_active_filter_count(
     logged_in_user,
 ):
     """The results column opens with a summary header. Filtering by kind makes
-    it read "Showing results with 1 filter", where the count links to the
-    dedicated search page carrying the live query string."""
+    it read "Showing results with 1 filter." followed by "Edit filters" (to the
+    dedicated search page carrying the live query string) and "Clear filters"
+    (back to the bare list path) actions."""
     response = await authenticated_client.get("/posts?kind=referral")
     assert response.status_code == 200
     summary = HTMLParser(response.text).css_first(".browse-results > header")
     assert summary is not None
     assert "Showing results with" in summary.text()
-    link = summary.css_first("a")
-    assert link is not None
-    assert link.text(strip=True) == "1 filter"
-    assert (link.attributes.get("href") or "").startswith("/posts/search")
+    assert "1 filter" in summary.text()
+    actions = summary.css_first("menu.filter-summary-actions")
+    assert actions is not None
+    links = {
+        a.text(strip=True): a.attributes.get("href") or "" for a in actions.css("a")
+    }
+    assert set(links) == {"Edit filters", "Clear filters"}
+    assert links["Edit filters"].startswith("/posts/search")
+    assert links["Clear filters"] == "/posts"
 
 
 # --- List filter: ?owner=me scopes to the viewer's own posts -------------

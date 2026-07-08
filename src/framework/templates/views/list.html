@@ -38,9 +38,10 @@ headings). An accordion renders `open` when its filter is in a dirty
 (active) state — i.e. `filter_values` holds a non-empty value for it — so
 applied filters stay visible on reload. The results column opens with a plain `<header>` that states
 whether the result set is filtered: "Showing all results." when nothing is
-active, else "Showing results with <N filters>" where the count links to the
-dedicated `/<collection>/search` page (mounted automatically whenever
-`filters` is declared) for refining them. Entities with no declared filters
+active, else "Showing results with <N filters>." followed by an "Edit filters"
+link (to the dedicated `/<collection>/search` page, mounted automatically
+whenever `filters` is declared) and a "Clear filters" link (back to the bare
+list path). Entities with no declared filters
 render `list_body` full-width without any sidebar and have no filter UI at
 all.
 
@@ -87,7 +88,8 @@ Child contract:
     active_filter_count, filter_heading, search_url. The sidebar
     form consumes `filters` / `filter_values`; the results-column
     summary `<header>` consumes `active_filter_count` /
-    `search_url`; `pager` is read inside the `item_list` macro.
+    `search_url` (the "Edit filters" link) and `request.url.path`
+    (the "Clear filters" link); `pager` is read inside the `item_list` macro.
     (`active_filters` / `filter_heading` are injected for any
     template that wants them but are not used by this view.)
 
@@ -160,17 +162,29 @@ Child contract:
       <div class="browse-results">
         {#- Filter summary — states what the results column is showing. With
             no active filter it reads "Showing all results."; with one or more,
-            it reads "Showing results with <N filters>", where the count is the
-            link to the dedicated `/<collection>/search` page for refining them.
-            Only `active_filter_count` is rendered (the per-value descriptor
-            pills were dropped); `search_url` is set whenever filters exist. -#}
+            it reads "Showing results with <N filters>." followed by two action
+            links: "Edit filters" opens the dedicated `/<collection>/search` page
+            (carrying the live query string via `search_url`) to refine them, and
+            "Clear filters" links back to the bare list path to drop every active
+            filter. Both actions render only when filters are active — there is
+            nothing to edit or clear otherwise. Only `active_filter_count` is
+            rendered as text (the per-value descriptor pills were dropped);
+            `search_url` is set whenever filters exist. -#}
         {%- if search_url is defined and search_url %}
           <header>
             {%- if active_filter_count is defined and active_filter_count %}
               <p>
                 Showing results with
-                <a href="{{ search_url }}">{{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}</a>.
+                {{ active_filter_count }} filter{{ "" if active_filter_count == 1 else "s" }}.
               </p>
+              <menu class="filter-summary-actions">
+                <li>
+                  <a href="{{ search_url }}" role="button" class="secondary outline">Edit filters</a>
+                </li>
+                <li>
+                  <a href="{{ request.url.path }}" role="button" class="secondary outline">Clear filters</a>
+                </li>
+              </menu>
             {%- else %}
               <p>Showing all results.</p>
             {%- endif %}
