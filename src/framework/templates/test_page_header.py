@@ -234,9 +234,11 @@ def test_authenticated_nav_has_post_link_and_avatar_dropdown() -> None:
 
 
 def test_avatar_menu_items_are_my_posts_account_sign_out() -> None:
-    """The profile dropdown's items are exactly My posts (→ the viewer's own
-    posts via `?owner=me`), Account (→ the self user page), and Sign out
-    (`hx-post`). "Saved" is deferred and must not appear."""
+    """For a non-admin viewer the profile dropdown's items are exactly
+    My posts (→ the viewer's own posts via `?owner=me`), Account (→ the
+    self user page), and Sign out (`hx-post`). "Saved" is deferred and
+    must not appear. Admins get one extra item — see
+    `test_avatar_menu_shows_audit_log_for_admins_only`."""
     env = _make_env()
     _add_child(env, "detailstub.html", _DETAIL_STUB)
     tree = HTMLParser(_render(env, "detailstub.html", **_AUTHED_CTX))
@@ -254,6 +256,26 @@ def test_avatar_menu_items_are_my_posts_account_sign_out() -> None:
     assert by_label["My posts"].attributes.get("href") == "/posts?owner=me"
     assert by_label["Account"].attributes.get("href") == "/users/me"
     assert by_label["Sign out"].attributes.get("hx-post") == "/auth/sign-out"
+
+
+def test_avatar_menu_shows_audit_log_for_admins_only() -> None:
+    """Superusers get an Audit log item (→ `/admin/audit`) between
+    Account and Sign out. The gate is the `is_admin` chrome scalar from
+    `base_context`, which a handler cannot override — so the item can
+    never render for a non-admin (whose exact item set is pinned by
+    `test_avatar_menu_items_are_my_posts_account_sign_out`)."""
+    env = _make_env()
+    _add_child(env, "detailstub.html", _DETAIL_STUB)
+    tree = HTMLParser(_render(env, "detailstub.html", is_admin=True, **_AUTHED_CTX))
+
+    menu = tree.css_first("details.dropdown#nav-menu")
+    assert menu is not None
+    items = menu.css("ul li a")
+    labels = [a.text(strip=True) for a in items]
+    assert labels == ["My posts", "Account", "Audit log", "Sign out"]
+
+    by_label = {a.text(strip=True): a for a in items}
+    assert by_label["Audit log"].attributes.get("href") == "/admin/audit"
 
 
 def test_anonymous_nav_is_brand_only() -> None:

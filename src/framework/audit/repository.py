@@ -1,6 +1,6 @@
 """Append-only data access for the audit log per `RESOURCE_GRAMMAR.md:135`.
 
-Deliberately exposes only writes and read-by-id — there is no `update_*` or
+Deliberately exposes only writes and reads — there is no `update_*` or
 `delete_*`. Audit rows are immutable; the discipline relies on it.
 """
 
@@ -51,4 +51,15 @@ class AuditRepository(BaseRepository):
                 AuditLog.resource_id == resource_id,
             )
             .order_by(AuditLog.created_at.asc())
+        )
+
+    async def list_all(self, *, offset: int = 0, limit: int = 50) -> Sequence[AuditLog]:
+        """Newest-first page across all resources — the `/admin/audit`
+        read path. `created_at` has second resolution, so same-second
+        rows tie-break on `id` to keep pagination stable."""
+        return await self._list(
+            select(AuditLog)
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .offset(offset)
+            .limit(limit)
         )

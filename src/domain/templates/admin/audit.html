@@ -1,0 +1,61 @@
+{# `/admin/audit` — read-only, superuser-only audit log viewer.
+   Plain table, not cards: audit rows are one-line log entries scanned
+   in bulk. Resource cells are text, not links — `resource_type` spans
+   spec-less types (e.g. job rows), so there is no URL to resolve.
+#}
+{% extends "views/list.html" %}
+{%- from "_shared/pagination.html" import pagination -%}
+{% block resource_label %}Audit log{% endblock %}
+{% block list_body %}
+  <section id="audit-list">
+    {% if rows %}
+      <div class="overflow-auto">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Resource</th>
+              <th>Changes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  <time datetime="{{ row.created_at.isoformat() }}">
+                    {{ row.created_at.strftime("%Y-%m-%d %H:%M") }}
+                  </time>
+                </td>
+                <td>{{ row.actor_id or "system" }}</td>
+                <td>
+                  <code>{{ row.action }}</code>
+                </td>
+                <td>{{ row.resource_type }} {{ row.resource_id | string | truncate(8, True, '') }}</td>
+                <td>
+                  {% if row.before and row.after %}
+                    {% for key in row.after %}
+                      {% if row.before.get(key) != row.after[key] %}
+                        <div>
+                          <strong>{{ key }}</strong>: {{ row.before.get(key) }} → {{ row.after[key] }}
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  {% elif row.after %}
+                    <em>created</em>
+                  {% elif row.before %}
+                    <em>deleted</em>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p>No audit rows yet.</p>
+    {% endif %}
+  </section>
+  {{ pagination(page_meta) }}
+{% endblock %}
