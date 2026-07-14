@@ -68,11 +68,15 @@ def test_form_pages_point_at_subresource_view_templates(entity, _stem):
 
 
 @pytest.mark.parametrize("entity,_stem", CREDENTIALS)
-def test_form_partial_points_at_the_per_entity_partial(entity, _stem):
-    """The credential factory threads `form_partial` through into
-    `templates.form_partial` — the path that `views/subresource_form_*`
-    `{% include %}`s at render time. Pinning the value here catches a
-    regression where the factory drops it (e.g. the
-    `__post_init__` rebuild skipping the field again)."""
-    expected = f"{entity.url_collection}/_form_{_stem}.html"
-    assert entity.templates.form_partial == expected
+def test_templates_resolve_under_the_grouped_credential_home(entity, _stem):
+    """The factory derives every template path under
+    ``clinician_credentials/<url_collection>/`` — the trio's grouped
+    template home, a declared deviation from the
+    ``<url_collection>/<verb>.html`` convention default. Pinning both
+    paths catches a regression where the factory drops the explicit
+    declarations (e.g. the `__post_init__` rebuild skipping a field)
+    and the convention default silently points at directories that no
+    longer exist."""
+    base = f"clinician_credentials/{entity.url_collection}"
+    assert entity.templates.list == f"{base}/list.html"
+    assert entity.templates.form_partial == f"{base}/_form_{_stem}.html"

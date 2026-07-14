@@ -40,5 +40,4 @@ CERTIFICATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
         "CERTIFICATION_TYPES": CERTIFICATION_TYPES,
         "CERTIFICATION_TYPES_LABELS": CERTIFICATION_TYPES_LABELS,
     },
-    form_partial="certifications/_form_certification.html",
 )
