@@ -8,7 +8,9 @@ walking. The conformance suite and the audit-drift guard iterate
 Adding a new entity:
 
 1. Create ``<entity>.py`` next to the others, exporting
-   ``<ENTITY>_ENTITY: Final[EntitySpec]``.
+   ``<ENTITY>_ENTITY: Final[EntitySpec]``. A family of specs sharing
+   one factory-declared shape may live in a subpackage instead (see
+   ``credentials/``).
 2. Add the matching ``from .<entity> import <ENTITY>_ENTITY`` line
    below and the entry to ``ALL_ENTITY_SPECS``.
 
@@ -20,9 +22,7 @@ from src.framework.dispatch.entity_spec import EntitySpec
 
 from .clinician import CLINICIAN_ENTITY
 from .clinician_affiliation import CLINICIAN_AFFILIATION_ENTITY
-from .clinician_certification import CERTIFICATION_ENTITY
-from .clinician_education import EDUCATION_ENTITY
-from .clinician_licensure import LICENSURE_ENTITY
+from .credentials import CERTIFICATION_ENTITY, EDUCATION_ENTITY, LICENSURE_ENTITY
 from .org_representation import ORG_REPRESENTATION_ENTITY
 from .organization import ORGANIZATION_ENTITY
 from .posts import POST_ENTITY

@@ -8,9 +8,15 @@ from src.domain.specs.clinician import CLINICIAN_ENTITY
 from src.domain.specs.clinician_affiliation import (  # noqa: F401
     CLINICIAN_AFFILIATION_ENTITY,
 )
-from src.domain.specs.clinician_certification import CERTIFICATION_ENTITY  # noqa: F401
-from src.domain.specs.clinician_education import EDUCATION_ENTITY  # noqa: F401
-from src.domain.specs.clinician_licensure import LICENSURE_ENTITY  # noqa: F401
+from src.domain.specs.credentials.clinician_certification import (  # noqa: F401
+    CERTIFICATION_ENTITY,
+)
+from src.domain.specs.credentials.clinician_education import (  # noqa: F401
+    EDUCATION_ENTITY,
+)
+from src.domain.specs.credentials.clinician_licensure import (  # noqa: F401
+    LICENSURE_ENTITY,
+)
 from src.framework import register_entity
 from src.framework.dispatch.resource_routes import mount_entity
 

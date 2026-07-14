@@ -26,11 +26,11 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.models import ClinicianLicensure
 from src.domain.models.enums import LICENSE_TYPES, LICENSE_TYPES_LABELS, US_STATES
-from src.domain.specs._credential import (
+from src.domain.specs.clinician import _clinician_licensures_list_redirect
+from src.domain.specs.credentials._credential import (
     CANONICAL_CREDENTIAL_ROUTES,
     make_clinician_credential_entity,
 )
-from src.domain.specs.clinician import _clinician_licensures_list_redirect
 from src.framework.audit.core import AuditAction
 from src.framework.dispatch.entity_spec import EntitySpec, StateAxis
 
