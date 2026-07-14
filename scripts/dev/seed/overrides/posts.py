@@ -34,7 +34,7 @@ or clinician-pending persona could never have authored a post); the one
 persona that *can* author — the fully-verified one — gets a referral +
 opening anchored explicitly against its own clinician. Same exclusion
 pattern as `overrides/clinicians.py`; the persona registry is the single
-source of truth in `src/domain/routes/dev_personas.py`.
+source of truth in `src/domain/routes/dev/dev_personas.py`.
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ from src.domain.models import (
     User,
 )
 from src.domain.models.enums import CLIENT_AGE_GROUPS
-from src.domain.routes.dev_personas import PERSONAS
+from src.domain.routes.dev.dev_personas import PERSONAS
 
 from .. import counts
 from ..generators import SeedPool, build_row

@@ -30,7 +30,7 @@ from src.domain.models.enums import (
     NPI_MATCH_STATUSES,
     US_STATES,
 )
-from src.domain.routes.dev_personas import PERSONAS
+from src.domain.routes.dev.dev_personas import PERSONAS
 
 from .. import counts
 from ..generators import SeedPool
@@ -99,7 +99,7 @@ async def generate_clinicians(
     # declares one (`clinician_verified is not None`). Persona users
     # are excluded from the generic round-robin above, so this anchor
     # is the only Clinician they own. Persona registry lives in
-    # `src/domain/routes/dev_personas.py`.
+    # `src/domain/routes/dev/dev_personas.py`.
     persona_users_by_email = {u.email: u for u in all_users}
     for persona in PERSONAS:
         if persona.clinician_verified is None:

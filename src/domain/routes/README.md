@@ -27,12 +27,12 @@ Declare the child entity with `parent=PARENT_ENTITY` on its spec; pass it throug
 
 ## Bespoke routes
 
-The grammar fits resource-shaped CRUD. These stay hand-written:
+The grammar fits resource-shaped CRUD. These stay hand-written. A hand-written *family* (several modules serving one concern) lives in a subpackage — `auth/` (login/register/verify flow) and `dev/` (development-only routes, mounted iff `ENVIRONMENT == "development"`) — while single-file bespoke routes stay at the top level next to the entity route files:
 
 | Route(s) | File | Reason |
 |---|---|---|
-| `POST /auth/register` | `auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). |
-| `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth_pages.py` | Pure form rendering. |
+| `POST /auth/register` | `auth/auth_routes.py` | Auth-flow protocol (token issuance, fastapi-users hooks). |
+| `GET /auth/{register,login,forgot-password,reset-password/{token}}` | `auth/auth_pages.py` | Pure form rendering. |
 | `GET /users/me`, `GET /users/me/clinicians` | `users.py` | Singleton aliases — mounted via `singleton_alias=` on the existing `mount_detail` / `mount_related_list`. |
 | `POST/DELETE /users/me/favorites/{clinician_id}` | `favorites.py` | M:N edge add/remove toggle via `mount_edge_routes` (no `list_handler` → no list page; favorited clinicians are browsed via `/clinicians?favorited=me`). |
 | `GET /users/me/access`, `GET /users/me/access/capabilities/{name}` | `access.py` | Derived read view — capability posture, no stored row. |

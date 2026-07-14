@@ -21,7 +21,7 @@ After `dev seed` populates the seed admin user, bookmark:
 http://localhost:8000/dev/login-as-seed-user
 ```
 
-Hitting it issues the same session cookie a real login would (for the user named by `DEV_LOGIN_EMAIL`, defaulting to `admin@example.com`) and redirects to `/`, which forwards to the current default landing page (today: `/posts?kind=referral&state=CA` — the single whole-supertype `/posts` family narrowed via the `?kind=` query, California-defaulted). Saves a form submission every time you reopen the browser to the dev server. The route is only mounted when `ENVIRONMENT=development` — production never registers it. See [`src/domain/routes/dev_auth.py`](src/domain/routes/dev_auth.py) for the security guards.
+Hitting it issues the same session cookie a real login would (for the user named by `DEV_LOGIN_EMAIL`, defaulting to `admin@example.com`) and redirects to `/`, which forwards to the current default landing page (today: `/posts?kind=referral&state=CA` — the single whole-supertype `/posts` family narrowed via the `?kind=` query, California-defaulted). Saves a form submission every time you reopen the browser to the dev server. The route is only mounted when `ENVIRONMENT=development` — production never registers it. See [`src/domain/routes/dev/dev_auth.py`](src/domain/routes/dev/dev_auth.py) for the security guards.
 
 ### Playwright MCP for design review
 
