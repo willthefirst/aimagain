@@ -212,3 +212,47 @@ async def test_actor_set_null_when_user_deleted(
         fetched = await repo.get_by_model_id(AuditLog, written.id)
         assert fetched is not None  # row not deleted
         assert fetched.actor_id is None  # actor reference nulled
+
+
+async def test_list_all_pages_newest_first(
+    db_test_session_manager: async_sessionmaker[AsyncSession],
+):
+    """`list_all` is the `/admin/audit` read path: newest-first across
+    every resource type, offset/limit paging, same-second rows kept in
+    a stable order by the `id` tie-break."""
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+        written_ids = []
+        for i in range(5):
+            row = await repo.record(
+                actor_id=None,
+                resource_type="post" if i % 2 else "user",
+                resource_id=uuid.uuid4(),
+                action=f"action_{i}",
+            )
+            written_ids.append(row.id)
+        await session.commit()
+
+    async with db_test_session_manager() as session:
+        repo = AuditRepository(session)
+
+        rows = await repo.list_all(limit=50)
+        assert len(rows) == 5
+        # Newest first; the five writes share a created_at second, so
+        # ordering falls to the id tie-break — descending and stable.
+        assert [r.created_at for r in rows] == sorted(
+            (r.created_at for r in rows), reverse=True
+        )
+        assert {r.id for r in rows} == set(written_ids)
+        # Spans resource types — no implicit filter.
+        assert {r.resource_type for r in rows} == {"post", "user"}
+
+        # Offset/limit slice consecutive pages without overlap or gaps.
+        first_page = await repo.list_all(offset=0, limit=3)
+        second_page = await repo.list_all(offset=3, limit=3)
+        assert len(first_page) == 3
+        assert len(second_page) == 2
+        assert {r.id for r in first_page} | {r.id for r in second_page} == set(
+            written_ids
+        )
+        assert {r.id for r in first_page} & {r.id for r in second_page} == set()

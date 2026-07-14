@@ -28,7 +28,7 @@ The discipline check accepts any of the three. If a handler `commit`s without on
 
 - `core.py` — `AuditAction` enum, `AuditedResource` / `EdgeAudit` dataclasses, `record_audit`, `record_audit_for`, the `mutate(...)` context manager, `make_audited_resource(...)` factory, `make_snapshotter(...)`.
 - `log.py` — the `AuditLog` SQLAlchemy model (append-only; FK to `users.id` with `SET NULL`; `(resource_type, resource_id)` lookups).
-- `repository.py` — `AuditRepository`, deliberately exposing only writes + read-by-id. No `update_*` / `delete_*` — audit rows are immutable.
+- `repository.py` — `AuditRepository`, deliberately exposing only writes + reads (`list_for_resource`, the newest-first `list_all` behind the superuser-only `/admin/audit` viewer in `src/domain/routes/admin.py`). No `update_*` / `delete_*` — audit rows are immutable.
 
 ## System actor
 
