@@ -264,7 +264,7 @@ async def handle_set_license_attestation(
         record_verification_event,
     )
     from src.domain.models import ClinicianLicensure
-    from src.domain.specs.clinician_licensure import LICENSURE_ENTITY
+    from src.domain.specs.credentials.clinician_licensure import LICENSURE_ENTITY
     from src.framework.access.authz.authz import is_owner_or_admin
     from src.framework.audit.core import record_audit
 

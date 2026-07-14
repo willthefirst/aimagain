@@ -15,11 +15,11 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.models import ClinicianEducation
 from src.domain.models.enums import EDUCATION_TYPES, EDUCATION_TYPES_LABELS
-from src.domain.specs._credential import (
+from src.domain.specs.clinician import _clinician_educations_list_redirect
+from src.domain.specs.credentials._credential import (
     CANONICAL_CREDENTIAL_ROUTES,
     make_clinician_credential_entity,
 )
-from src.domain.specs.clinician import _clinician_educations_list_redirect
 from src.framework.dispatch.entity_spec import EntitySpec
 
 EDUCATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
