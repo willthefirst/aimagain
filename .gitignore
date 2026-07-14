@@ -102,6 +102,10 @@ dmypy.json
 bedlam-connect.db
 test_bedlam-connect.db
 
+# Runtime artifacts
+data/
+.playwright-mcp/
+
 */**/log
 */**/artifacts
 *.log
