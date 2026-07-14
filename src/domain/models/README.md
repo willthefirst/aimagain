@@ -16,6 +16,10 @@ A model in cluster A does not import from cluster B. Shared primitives hoist to 
 
 When an entity has variants whose fields differ, the parent table carries identity + a discriminator column; each variant's fields live in its own detail table keyed by `<parent>_id` (PK + FK with `ON DELETE CASCADE`). The registry of variants is a `DiscriminatorRegistry[<Spec>]` instance under the parent's cluster (see [`posts/post_kinds.py`](posts/post_kinds.py)). Routes, repositories, and logic are registry-driven — no `isinstance` ladders.
 
+## Steady-state context vs. per-announcement dimensions
+
+When a durable entity posts announcements, each column lives on exactly one side of a split: **steady-state context** — what doesn't change announcement-to-announcement — stays on the durable entity, while **per-announcement dimensions** — anything the same entity could legitimately vary between two simultaneous announcements — live on the announcement's detail row, which is self-describing. The mental model: *steady-state context goes on the durable entity; the announcement describes itself.* Each cluster README documents which of its columns fall on which side.
+
 ## Foreign-key relationship coverage
 
 Every domain-edge `ForeignKey` MUST have a covering `relationship(...)` at one end. Without it, SQLAlchemy's flush-ordering graph has no signal to flush parent before child, and SQLite with `PRAGMA foreign_keys = ON` rejects the out-of-order INSERT. Denormalized historical references (e.g. `audit_log.actor_id`) opt out via `ALLOWED_BARE_FKS` in [`test_fk_relationship_coverage.py`](test_fk_relationship_coverage.py) with a one-line justification — the justification is half the point.

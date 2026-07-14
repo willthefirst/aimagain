@@ -9,7 +9,7 @@ In-process scheduled work, driven by [APScheduler](https://apscheduler.readthedo
 A job needs:
 
 - A real DB session sharing the production engine and metadata (`async_session_maker` from [`../db.py`](../db.py)).
-- The same audit discipline mutation handlers obey: every meaningful state change writes a `record_audit(...)` row in the same transaction as the change.
+- The same audit discipline mutation handlers obey — see [`../framework/audit/README.md`](../framework/audit/README.md).
 
 That's two app-level dependencies plus a scheduler, which doesn't fit cleanly under `framework/` (which knows nothing about specs or domain data) or `domain/<entity>/` (jobs cut across entities).
 
