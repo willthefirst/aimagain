@@ -58,11 +58,11 @@ The work is concentrated. For each step, also add or extend the colocated `test_
 
 For polymorphic entities the URL layer can expose its kinds in one of three face shapes, all driven by `EntitySpec`'s `discriminator=<registry>` plus one of:
 
-- **kind-locked leaf** (`discriminator_value="<one kind>"`) — single-kind URL family; list forces `kind = <value>`; detail/update/delete/edit-form 404 on kind mismatch; form_new skips the `?kind=` picker. Not currently used in this codebase.
-- **subset-supertype** (`discriminator_values=("<a>", "<b>", ...)`) — one URL family listing a *subset* of kinds; create / edit dispatch by `?kind=X` on the URL (rejecting kinds outside the subset); detail/update/delete 404 unless the row's kind is in the subset. Not currently used in this codebase.
+- **kind-locked leaf** (`discriminator_value="<one kind>"`) — single-kind URL family; list forces `kind = <value>`; detail/update/delete/edit-form 404 on kind mismatch; form_new skips the `?kind=` picker.
+- **subset-supertype** (`discriminator_values=("<a>", "<b>", ...)`) — one URL family listing a *subset* of kinds; create / edit dispatch by `?kind=X` on the URL (rejecting kinds outside the subset); detail/update/delete 404 unless the row's kind is in the subset.
 - **whole-supertype** (neither set) — one URL family listing every kind; create / edit dispatch by `?kind=X` on the URL.
 
-Today: `Post` is exposed as `/posts` (whole-supertype) — the single URL family lists every Post kind, and create / edit pick the per-kind template via `?kind=<value>`. See [`domain/specs/posts/`](domain/specs/posts/), [`domain/models/posts/post_kinds.py`](domain/models/posts/post_kinds.py), and the `discriminator_value` docstring in [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py) for the full contract.
+The full contract is the `discriminator_value` docstring in [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py); the registry pattern lives in [`domain/models/README.md`](domain/models/README.md). A polymorphic entity's own face choice and kind set are documented in its cluster README (e.g. [`domain/models/posts/README.md`](domain/models/posts/README.md)).
 
 ### Cross-cutting registries
 
@@ -88,22 +88,3 @@ The structure encodes the dependency direction:
 - **`domain/logic/<entity>/` may import from `framework/`, `domain/specs/`, `domain/models/`, and from another `domain/logic/<other>/` cluster when it needs that entity's type** (e.g. `domain/logic/users/handlers.py` reads `domain/logic/clinicians/repository.ClinicianRepository` to fetch a user's clinicians). Cross-entity handler-to-handler imports are discouraged but not lint-enforced — the layer collapse made cross-entity type references frequent enough that an automated rule would mostly produce false positives.
 - **`domain/routes/` may import from anywhere** but is intentionally thin — one `mount_entity(...)` call per file plus the rare hand-written endpoint.
 - **`domain/models/` follows the strict cluster rule** (enforced by [`../scripts/dev/python_cluster_imports_check.py`](../scripts/dev/python_cluster_imports_check.py)): a model file in one cluster may not import from a sibling cluster. Cross-entity FKs reference each other via SQLAlchemy strings, not Python imports.
-
-## Where things are
-
-| You're looking for                                              | It's at                                                              |
-| --------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Declarations of every entity                                    | [`domain/specs/`](domain/specs/) — one file per entity               |
-| `EntitySpec` dataclass + its friends                            | [`framework/dispatch/entity_spec.py`](framework/dispatch/entity_spec.py)               |
-| Route mounting helpers (`mount_entity`, `mount_*`)              | [`framework/dispatch/resource_routes.py`](framework/dispatch/resource_routes.py)       |
-| Generic handlers (`handle_create`, `handle_list`, ...)          | [`framework/dispatch/handlers.py`](framework/dispatch/handlers.py)                     |
-| `BaseRepository` primitives                                     | [`framework/persistence/base_repository.py`](framework/persistence/base_repository.py)       |
-| Audit framework (`mutate`, `record_audit`, `AuditAction`)       | [`framework/audit/core.py`](framework/audit/core.py)                           |
-| Auth predicates (`is_owner_or_admin`, `is_admin`)               | [`framework/authz.py`](framework/authz.py)                           |
-| Per-entity handlers (the bespoke ones)                          | [`domain/logic/<entity>/handlers.py`](domain/logic/)                 |
-| Per-entity custom queries                                       | [`domain/logic/<entity>/repository.py`](domain/logic/)               |
-| Per-entity Pydantic shapes                                      | [`domain/logic/<entity>/schema.py`](domain/logic/)                   |
-| Route files (one per entity, thin)                              | [`domain/routes/<entity>.py`](domain/routes/)                        |
-| Jinja templates (per-entity pages)                              | [`domain/templates/<entity>/`](domain/templates/)                    |
-| Jinja chrome + generic view-type templates                      | [`framework/templates/`](framework/templates/)                       |
-| SQLAlchemy classes                                              | [`domain/models/<entity>/`](domain/models/)                          |
