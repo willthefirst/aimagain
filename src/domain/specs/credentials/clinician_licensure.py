@@ -98,5 +98,4 @@ LICENSURE_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
             forbid_self=False,
         ),
     ),
-    form_partial="licensures/_form_licensure.html",
 )
