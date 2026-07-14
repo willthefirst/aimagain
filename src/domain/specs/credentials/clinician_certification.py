@@ -17,11 +17,11 @@ from src.domain.logic.clinicians.schema import (
 )
 from src.domain.models import ClinicianCertification
 from src.domain.models.enums import CERTIFICATION_TYPES, CERTIFICATION_TYPES_LABELS
-from src.domain.specs._credential import (
+from src.domain.specs.clinician import _clinician_certifications_list_redirect
+from src.domain.specs.credentials._credential import (
     CANONICAL_CREDENTIAL_ROUTES,
     make_clinician_credential_entity,
 )
-from src.domain.specs.clinician import _clinician_certifications_list_redirect
 from src.framework.dispatch.entity_spec import EntitySpec
 
 CERTIFICATION_ENTITY: Final[EntitySpec] = make_clinician_credential_entity(
