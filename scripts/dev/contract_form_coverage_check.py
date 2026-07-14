@@ -66,12 +66,12 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
     ),
     "POST /auth/login": (
         "HTMX wrapper around `POST /auth/jwt/login` (see "
-        "`src/domain/routes/auth_pages.py::post_login`). Same request "
+        "`src/domain/routes/auth/auth_pages.py::post_login`). Same request "
         "body shape as the underlying fastapi-users route — no new "
         "JSON contract surface to verify. Response shape (200 + HTML "
         "fragment on failure, 204 + HX-Redirect on HTMX success, 302 "
         "on non-HTMX success) is pinned by the route tests in "
-        "`src/domain/routes/test_auth_routes.py`."
+        "`src/domain/routes/auth/test_auth_routes.py`."
     ),
     "POST /auth/sign-out": (
         "Empty-body endpoint that clears the session cookie. Nothing "
@@ -83,14 +83,14 @@ FORMS_WITHOUT_PAIRS: dict[str, str] = {
     ),
     "POST /auth/verify": (
         "Single hidden `token` field round-tripped from the email-link "
-        "GET render (see `src/domain/routes/auth_pages.py::post_verify` "
+        "GET render (see `src/domain/routes/auth/auth_pages.py::post_verify` "
         "for the GET→POST split rationale). Same wire shape as "
         "fastapi-users' built-in `POST /auth/verify` which our wrapper "
         "shadows — no new JSON contract surface. Response shape "
         "(200 + HTML on already_verified/error; 204 + HX-Redirect or "
         "302 + Location on success with the session cookie set) is "
         "pinned by route tests in "
-        "`src/domain/routes/test_auth_routes.py`."
+        "`src/domain/routes/auth/test_auth_routes.py`."
     ),
     "POST /org_representations": (
         "The Profile Hub's `_add_claim.html` submits to the bespoke "

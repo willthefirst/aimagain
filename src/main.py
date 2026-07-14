@@ -18,13 +18,11 @@ from src.domain.logic.users.schema import UserRead
 from src.domain.logic.users.view import onboarding_readiness
 from src.domain.routes import (
     access,
-    auth_pages,
-    auth_routes,
-    dev_auth,
-    dev_components,
     user_email,
     verifications,
 )
+from src.domain.routes.auth import auth_pages, auth_routes
+from src.domain.routes.dev import dev_auth, dev_components
 from src.framework.config import settings
 from src.framework.dispatch.registry import entity_registry
 from src.framework.http.middleware import (
@@ -242,7 +240,7 @@ for _, _router in entity_registry.entries():
 # `/dev/login-as-seed-user` shortcut doesn't exist in production. The
 # `mount_dev_routes` indirection makes the gating behavior testable
 # without monkeypatching the global `app` instance. See
-# `src/domain/routes/dev_auth.py` for the full security rationale.
+# `src/domain/routes/dev/dev_auth.py` for the full security rationale.
 dev_auth.mount_dev_routes(app, environment=settings.ENVIRONMENT)
 dev_components.mount_dev_components(app, environment=settings.ENVIRONMENT)
 

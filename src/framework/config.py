@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ENVIRONMENT: str = "production"
     # Seed-user email the dev-only auto-login route logs in as. Read
-    # by `src.domain.routes.dev_auth` when `ENVIRONMENT="development"`
+    # by `src.domain.routes.dev.dev_auth` when `ENVIRONMENT="development"`
     # — the route is not mounted in any other environment so this
     # value is inert in production. Defaults to the admin user
     # `seed.py` creates so a fresh `dev seed` + `dev up` lands the

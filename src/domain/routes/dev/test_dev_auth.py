@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.auth_config import get_user_manager
 from src.domain.logic.users.schema import UserCreate
-from src.domain.routes import dev_auth
+from src.domain.routes.dev import dev_auth
 from src.framework.config import settings
 from tests.fixtures import create_test_user
 

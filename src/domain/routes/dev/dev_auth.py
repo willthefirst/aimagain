@@ -35,7 +35,7 @@ from fastapi_users.manager import BaseUserManager
 
 from src.auth_config import auth_backend, get_strategy, get_user_manager
 from src.domain.models import User
-from src.domain.routes.dev_personas import PERSONAS
+from src.domain.routes.dev.dev_personas import PERSONAS
 from src.framework.config import settings
 
 router = APIRouter(tags=["dev"])
@@ -43,7 +43,7 @@ router = APIRouter(tags=["dev"])
 # Shown in the login-page quick-sign-in dropdown when ENVIRONMENT=development.
 #
 # Admin (superuser) plus one entry per auth-state persona from
-# ``src/domain/routes/dev_personas.py``:
+# ``src/domain/routes/dev/dev_personas.py``:
 #
 # - ``unverified@example.com`` — ``User.is_verified=False``. Surfaces the
 #   "verify your email" nag banner and gates email-verified flows.

@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth_config import UserManager
 from src.domain.logic.users.schema import UserCreate
 from src.domain.models import User
-from src.domain.routes.dev_personas import PERSONAS
+from src.domain.routes.dev.dev_personas import PERSONAS
 
 from .. import counts
 from ..generators import SeedPool
@@ -33,7 +33,7 @@ SHARED_PASSWORD = "password"
 #
 # Slot 0: the admin superuser. Slots 1+: persona anchors, sourced from
 # the single-source-of-truth registry in
-# `src/domain/routes/dev_personas.py` so adding or renaming a persona
+# `src/domain/routes/dev/dev_personas.py` so adding or renaming a persona
 # only touches that file.
 _ANCHOR_USERS: list[dict] = [
     {"email": "admin@example.com", "username": "admin", "is_superuser": True},

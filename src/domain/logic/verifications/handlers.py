@@ -53,7 +53,7 @@ _SKIPPED_NPPES = NppesResult(found=False, first_name=None, last_name=None, raw=N
 # flow without hitting the public NPPES API (which is rate-limit-free
 # but slow and flaky in CI). Never honored outside development — the
 # gate is the same one that mounts `/dev/login-as` (see
-# `src/domain/routes/dev_auth.py`).
+# `src/domain/routes/dev/dev_auth.py`).
 DEV_MAGIC_NPI = "0000000000"
 _DEV_MAGIC_FLAG = "dev_magic_npi"
 

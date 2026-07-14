@@ -201,7 +201,7 @@ class MockDataFactory:
             user_read = cls.create_user_read()
 
         return {
-            "src.domain.routes.auth_routes.handle_registration": {
+            "src.domain.routes.auth.auth_routes.handle_registration": {
                 "return_value_config": user_read
             }
         }

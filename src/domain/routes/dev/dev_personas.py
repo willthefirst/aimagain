@@ -13,7 +13,7 @@ consumers need:
     the generic post-owner round-robin (post ownership has to reflect
     each kind's capability gate) and to anchor authored posts for the
     persona that holds the publishing capability.
-  - ``src/domain/routes/dev_auth.py`` — to surface the persona in the
+  - ``src/domain/routes/dev/dev_auth.py`` — to surface the persona in the
     quick-sign-in dropdown with a human-readable label.
 
 If a persona is renamed or a new one is added, this is the only file

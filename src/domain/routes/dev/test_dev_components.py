@@ -16,7 +16,7 @@ import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from src.domain.routes import dev_components
+from src.domain.routes.dev import dev_components
 from src.framework.config import settings
 
 # --- mount_dev_components: env-gated router registration ------------------

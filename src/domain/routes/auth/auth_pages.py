@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr, ValidationError
 
 from src.auth_config import auth_backend, current_active_user, get_user_manager
 from src.domain.models import User
-from src.domain.routes.dev_auth import DEV_SEED_USERS
+from src.domain.routes.dev.dev_auth import DEV_SEED_USERS
 from src.framework import APIResponse, BaseRouter
 from src.framework.config import settings
 from src.framework.http.antibot import BotChallengeFailed, enforce_antibot
