@@ -84,6 +84,11 @@ and the constant-boundary rationale (one source of truth).
                   <a href="{{ entity_url('user', id='me') }}"
                      {% if _on_users_me %}aria-current="page"{% endif %}>Account</a>
                 </li>
+                {% if is_admin %}
+                  <li>
+                    <a href="/admin/audit">Audit log</a>
+                  </li>
+                {% endif %}
                 <li>
                   <a href="#" hx-post="/auth/sign-out">Sign out</a>
                 </li>
