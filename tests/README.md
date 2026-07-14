@@ -1,6 +1,6 @@
 # Tests
 
-Most tests are **colocated** next to the source they cover (`src/domain/routes/test_auth_routes.py` lives next to `auth_routes.py`). This directory holds the shared infrastructure those colocated tests depend on, plus the documented cross-layer exception (contract tests).
+Most tests are **colocated** next to the source they cover (`src/domain/routes/auth/test_auth_routes.py` lives next to `auth_routes.py`). This directory holds the shared infrastructure those colocated tests depend on, plus the documented cross-layer exception (contract tests).
 
 Colocation puts the test in front of any agent editing the code. See [`../CLAUDE.md`](../CLAUDE.md) for the definition-of-done that makes test updates part of every code change.
 
@@ -20,7 +20,7 @@ Pytest only auto-loads `conftest.py` from directories on the path between rootdi
 
 ```bash
 dev test                                              # everything (excludes contract — see below)
-dev test src/domain/routes/test_auth_routes.py        # single file
+dev test src/domain/routes/auth/test_auth_routes.py        # single file
 dev test -k login                                     # by keyword
 dev test tests/test_contract                          # explicit opt-in for contract
 ```
@@ -31,7 +31,7 @@ dev test tests/test_contract                          # explicit opt-in for cont
 
 `authenticated_client` and `superuser_client` share a session-cached Argon2 password hash and JWT cookie. Each fixture uses a fixed user UUID (`TESTUSER_ID`, `SUPERUSER_ID`) so the JWT is identical across tests — `JWTStrategy.write_token` only reads `user.id`. Per test, the fixture inserts a verified user row directly with the cached hash and attaches the cached cookie; no `/auth/jwt/login` round-trip, no per-test Argon2 hash or verify.
 
-Tests that exercise the real login endpoint (`POST /auth/jwt/login`) still do so explicitly — see `src/domain/routes/test_auth_routes.py::test_login_success`. The cached fixture keeps every *other* test from paying Argon2's cost on the way to its own assertion.
+Tests that exercise the real login endpoint (`POST /auth/jwt/login`) still do so explicitly — see `src/domain/routes/auth/test_auth_routes.py::test_login_success`. The cached fixture keeps every *other* test from paying Argon2's cost on the way to its own assertion.
 
 ## Database isolation
 

@@ -7,7 +7,7 @@
       `{% include "auth/_register_form.html" %}`. The chrome (header,
       footer link to login) wraps it.
    2. Standalone by `register_request_handler`'s error-rerender path
-      (see `src/domain/routes/auth_routes.py` → `form_rerender`) when
+      (see `src/domain/routes/auth/auth_routes.py` → `form_rerender`) when
       registration fails (duplicate email, invalid password). The
       `response-targets` htmx extension swaps the 4xx body into the
       `<form>` slot in place.

@@ -93,9 +93,9 @@ The pinned anchor accounts:
   - `admin@example.com` (`is_superuser=True`) — muscle-memory admin.
   - Three **persona** anchors — one per auth state the rest of the
     app branches on. The registry is the single source of truth at
-    [`src/domain/routes/dev_personas.py`](../../../src/domain/routes/dev_personas.py)
+    [`src/domain/routes/dev/dev_personas.py`](../../../src/domain/routes/dev/dev_personas.py)
     and the dev login dropdown
-    ([`src/domain/routes/dev_auth.py:DEV_SEED_USERS`](../../../src/domain/routes/dev_auth.py))
+    ([`src/domain/routes/dev/dev_auth.py:DEV_SEED_USERS`](../../../src/domain/routes/dev/dev_auth.py))
     reads from it:
 
       - `unverified@example.com` — `User.is_verified=False`, no anchor

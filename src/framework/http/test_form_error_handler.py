@@ -4,7 +4,7 @@ These cover the decorator's contract in isolation — exception
 matching, HX-Request gating, prefill collection, re-raise on miss.
 Wire-level behavior (the rerendered HTML body lands at the form
 template's `outerHTML` swap target) is pinned at the route layer in
-`src/domain/routes/test_auth_routes.py`.
+`src/domain/routes/auth/test_auth_routes.py`.
 """
 
 from __future__ import annotations

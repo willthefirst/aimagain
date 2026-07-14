@@ -45,7 +45,7 @@ from src.domain.models import (
     User,
     metadata,
 )
-from src.domain.routes.dev_personas import PERSONAS
+from src.domain.routes.dev.dev_personas import PERSONAS
 from tests.fixtures import async_test_sessionmaker, test_engine
 
 

@@ -7,7 +7,7 @@
       `{% include "auth/_login_form.html" %}`. The chrome (header,
       footer links) wraps it.
    2. Standalone by `post_login`'s error-rerender path (see
-      `src/domain/routes/auth_pages.py`). The `response-targets`
+      `src/domain/routes/auth/auth_pages.py`). The `response-targets`
       htmx extension swaps the 4xx body into the `<form>` slot in
       place.
 
@@ -17,7 +17,7 @@
    `form_with_errors` wrapper imports `form_banner` itself.
 
    `/auth/login` is this app's wrapper — see
-   `src/domain/routes/auth_pages.py::post_login` for why we wrap
+   `src/domain/routes/auth/auth_pages.py::post_login` for why we wrap
    `/auth/jwt/login`. The `?next=` query string passes the post-login
    redirect target through. #}
 {%- from "_shared/form_fields.html" import text_field with context -%}
